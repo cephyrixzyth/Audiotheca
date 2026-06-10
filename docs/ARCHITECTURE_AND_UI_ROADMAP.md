@@ -1,288 +1,256 @@
 # Audiotheca — Architecture & UI Roadmap
 
-This document describes how to evolve Audiotheca from a CLI script into a product with a detailed UI, optional archive extraction, and patterns borrowed from dedupe tools, file managers, and asset librarians (Soundminer, soundaudit, dedupe.io).
+How to evolve Audiotheca from a CLI script into a desktop product with a detailed UI, archive tools, and patterns from dedupe libraries, file managers, and asset librarians.
 
 ---
 
 ## Should you rewrite in another language?
 
-**Recommendation: no full rewrite yet.** Keep the Python engine as the core and add a proper boundary around it.
+**Recommendation: no full rewrite yet.** Modularize the Python engine, expose a stable API, then add a native UI shell.
 
 | Approach | Verdict |
 | --- | --- |
-| **Python core + modern UI shell** | Best starting point — reuse v9.6.0 logic, ship faster |
-| **Full Rust/Go rewrite** | Only after the API and UI workflows are proven |
-| **Electron/Tauri + Python sidecar** | Good for rich desktop UI on Windows + network paths |
+| **Python core + Tauri/React UI** | Best starting point — reuse v9.6.0, ship faster |
+| **Python FastAPI + web UI** | Good if you want browser-based or remote access to network shares |
+| **Full Rust/Go rewrite** | Only after API + UI workflows are proven |
+| **Rust/Go helper binaries** | Best performance win without throwing away matching logic |
 
 ### Why keep Python for the engine (for now)
 
-- Matching, reconciliation, and reporting logic is already battle-tested on SMB shares
-- `pefile`, `rapidfuzz`, and rapid iteration on regex/vendor rules matter more than raw scan speed
-- Network I/O dominates runtime — a Rust rewrite rarely cuts total scan time in half
-- A UI needs **stable contracts** (JSON/CSV/SQLite), not a new language
+- Vendor matching, reconciliation, and investigation buckets are already tuned for your library
+- Regex and `vendor_db.py` change frequently — Python iteration speed matters more than scan microseconds
+- On SMB shares, **network latency dominates**; rewriting walkers in Rust often saves less than 20–30%
+- A UI needs **stable JSON/SQLite contracts**, not a new language
 
-### When to extract hot paths to Rust/Go
+### When to add Rust or Go
 
-Consider a native helper later for:
+Extract **hot paths only** as CLI helpers (like `fpcalc` for Acoustid):
 
-- Full-file hashing at scale (klauspost/dedup-style rolling hash)
-- Parallel directory walking with cancel tokens
-- Archive listing/extraction (7z/rar backends)
+| Module | Reference | Purpose |
+| --- | --- | --- |
+| Rolling hash | [klauspost/dedup](https://github.com/klauspost/dedup) | Full-file dedupe at GB scale |
+| Parallel walk | [jpillora/dedup](https://github.com/jpillora/dedup) | Cancelable directory traversal |
+| Archive list/extract | 7-Zip backend | `.rar`/`.7z`/`.iso` without Python pain |
 
-Expose these as CLI binaries or DLLs called from Python — same pattern as `fpcalc` for Acoustid.
+Call from Python via subprocess; swap implementations without touching UI or planning logic.
 
 ---
 
 ## Target architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  UI Layer (Phase 2+)                                        │
-│  Tauri 2 / React OR Electron — file tree, diff, approvals │
-└───────────────────────────┬─────────────────────────────────┘
-                            │ IPC: REST / gRPC / stdin JSON
-┌───────────────────────────▼─────────────────────────────────┐
-│  Audiotheca API (Phase 1)                                   │
-│  FastAPI or CLI subcommands — jobs, progress, reports       │
-└───────────────────────────┬─────────────────────────────────┘
-                            │
-┌───────────────────────────▼─────────────────────────────────┐
-│  Engine Core (Python — extract from main.py)                  │
-│  scan · identify · dedupe · plan · execute                    │
-└───────────────────────────┬─────────────────────────────────┘
-                            │
-┌───────────────────────────▼─────────────────────────────────┐
-│  Storage: SQLite job DB + report artifacts + scan cache       │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│  UI — Tauri 2 + React + TypeScript                           │
+│  Tree · diff · duplicate cards · investigation inbox         │
+└────────────────────────────┬─────────────────────────────────┘
+                             │ HTTP + WebSocket (localhost)
+┌────────────────────────────▼─────────────────────────────────┐
+│  Audiotheca API — FastAPI (Python)                             │
+│  Jobs · progress events · approve · execute                  │
+└────────────────────────────┬─────────────────────────────────┘
+                             │
+┌────────────────────────────▼─────────────────────────────────┐
+│  Engine — audiotheca package (extracted from main.py)        │
+│  scan · identify · dedupe · plan · execute                   │
+└────────────────────────────┬─────────────────────────────────┘
+                             │
+┌────────────────────────────▼─────────────────────────────────┐
+│  SQLite (jobs/items/actions) + scan_cache.json + reports     │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Phase 0 — Repo hygiene (done)
+## Phase 0 — Package split (do this before UI)
 
-- [x] Git repo with docs
-- [ ] Split `main.py` into modules (next step before UI)
-
-Suggested package layout:
+Refactor without behavior changes:
 
 ```
 audiotheca/
 ├── audiotheca/
-│   ├── __init__.py
 │   ├── config.py
-│   ├── engine.py          # DeduplicationEngine
+│   ├── engine.py
 │   ├── scan.py
 │   ├── identify.py
 │   ├── dedupe.py
 │   ├── plan.py
 │   ├── execute.py
 │   ├── reports.py
-│   └── models.py          # dataclasses / pydantic
+│   └── models.py          # dataclasses or Pydantic
 ├── vendor_db.py
-├── cli.py                 # python -m audiotheca
-└── api/                   # Phase 1
-    └── server.py
+├── cli.py                 # audiotheca scan | report | execute
+└── api/server.py          # Phase 1
+```
+
+CLI subcommands map to today's phases:
+
+```bash
+audiotheca scan --root Z:\_software\_audio --dry-run
+audiotheca report --job latest --open investigation
+audiotheca execute --job latest --plan approved.json
 ```
 
 ---
 
-## Phase 1 — Headless API + job model (4–6 weeks)
-
-**Goal:** UI can drive the engine without rewriting business logic.
+## Phase 1 — Job model + API (4–6 weeks)
 
 ### Job lifecycle
 
 ```
-CREATED → SCANNING → RECONCILING → PLANNING → AWAITING_APPROVAL → EXECUTING → COMPLETE
-                                                      ↓
-                                                  CANCELLED / FAILED
+CREATED → SCANNING → RECONCILING → PLANNING → AWAITING_APPROVAL → EXECUTING → DONE
 ```
 
-Persist in **SQLite**:
+### SQLite tables
 
-- `jobs` — id, root_dir, dry_run, config snapshot, status, timestamps
-- `items` — path, vendor, fingerprint, size, os_status, investigation_bucket
-- `duplicate_groups` — members, confidence, content_check, user decision
-- `actions` — planned move/quarantine/stage/extract, approved, executed, error
+| Table | Contents |
+| --- | --- |
+| `jobs` | root_dir, config, status, timestamps, engine_version |
+| `items` | path, vendor, fingerprint, size, bucket, id_method |
+| `duplicate_groups` | key, confidence, group_kind, content_check |
+| `duplicate_members` | group_id, item_id, recommendation |
+| `actions` | type, src, dst, approved, executed, error |
+| `coexistence` | archive path, folder path, similarity |
 
-### API endpoints (FastAPI example)
+### API surface
 
 | Endpoint | Purpose |
 | --- | --- |
-| `POST /jobs` | Start scan (async background task) |
-| `GET /jobs/{id}` | Status + progress counters |
-| `GET /jobs/{id}/items` | Paginated inventory with filters |
-| `GET /jobs/{id}/duplicates` | Duplicate groups for review UI |
-| `GET /jobs/{id}/investigation` | Bucket breakdown |
-| `POST /jobs/{id}/approve` | Batch approve actions by section/item/id |
+| `POST /jobs` | Start async scan |
+| `GET /jobs/{id}` | Progress + stats |
+| `GET /jobs/{id}/items?section=a&bucket=_unknown_vendor` | Filtered inventory |
+| `GET /jobs/{id}/duplicates` | Groups for review UI |
+| `PATCH /jobs/{id}/duplicates/{gid}` | Set keeper, stage others |
+| `POST /jobs/{id}/approve` | Approve actions (section/item/all) |
 | `POST /jobs/{id}/execute` | Run approved actions only |
-| `WS /jobs/{id}/events` | Progress stream (replace silent CLI) |
+| `WS /jobs/{id}/events` | `{phase, current, total, path}` stream |
 
 ### Patterns to borrow
 
 | Source | Pattern |
 | --- | --- |
-| [dedupe.io](https://docs.dedupe.io/en/latest/how-it-works/Making-smart-comparisons.html) | Blocking keys before pairwise compare; active-learning labels stored per job |
-| [soundaudit](https://pypi.org/project/soundaudit/) | Incremental scan, analyze passes separate from scan, JSON/CSV/MD export |
-| [jpillora/dedup](https://github.com/jpillora/dedup) | Hash strategy tiers (head / head-tail / full) as user-selectable per job |
+| [dedupe.io blocking](https://docs.dedupe.io/en/latest/how-it-works/Making-smart-comparisons.html) | Predicate blocks before pairwise compare |
+| [dedupe.io active learning](https://docs.dedupe.io/en/latest/API-documentation.html) | Store user keep/skip labels per job for future runs |
+| [soundaudit](https://pypi.org/project/soundaudit/) | Separate **scan** from **analyze** passes; hash tiers |
+| [MusicDeduplicator](https://github.com/JameZUK/MusicDeduplicator) | Metadata block first, fingerprint confirm second |
 
 ---
 
-## Phase 2 — Desktop UI shell (8–12 weeks)
+## Phase 2 — Desktop UI (8–12 weeks)
 
-**Recommended stack:** **Tauri 2 + React + TypeScript**
+**Stack: Tauri 2 + React + TypeScript**
 
-- Smaller footprint than Electron
-- Native file dialogs and path handling on Windows
-- React ecosystem for complex tables (TanStack Table), trees (react-arborist), diff views
+Why Tauri over Electron: smaller binary, native Windows paths, Rust sidecar for future hash/extract helpers.
 
-**Alternative:** Electron if you want maximum npm library compatibility with minimal Rust.
+Why not pure web first: your library is on `Z:\` — a local desktop app avoids browser sandbox path issues.
 
-### UI modules (map to your reports)
+### Screen map (one screen per report you already have)
 
-| Screen | Data source | Reference UX |
+| Screen | Engine data | UX reference |
 | --- | --- | --- |
-| **Dashboard** | Run summary | CI dashboard — counts, cache hits, errors |
-| **Library tree** | Items + planned destinations | VS Code sidebar / Double Commander pane |
-| **Restructure preview** | Restructure plan | Git staging view — before/after path |
-| **Duplicate review** | Duplicate groups | dedupe.io pairwise review — side-by-side cards |
-| **Investigation inbox** | Investigation buckets | Email inbox — filter by bucket, bulk actions |
-| **Coexistence** | Archive pairs | Sync tool — archive vs folder comparison |
-| **Nested issues** | Nested CSV | Lint panel — fix suggestions |
-| **Approval queue** | Pending actions | PR review — approve section / item / all |
-| **Execution log** | Organization log | Build log with filter by FAILED |
+| **Dashboard** | Run summary | CI dashboard — KPI cards |
+| **Library explorer** | Items + tree | VS Code sidebar + [Double Commander](https://doublecmd.sourceforge.io/) dual pane |
+| **Restructure** | Restructure plan | Git staging — before → after |
+| **Duplicate review** | Duplicate groups | dedupe.io pairwise cards |
+| **Investigation inbox** | Investigation buckets | Email filters — triage by bucket |
+| **Coexistence** | Archive pairs | Sync conflict resolver |
+| **Nested issues** | Nested CSV | Linter panel with fix hints |
+| **Approval queue** | Pending actions | PR review — bulk + item mode |
+| **Execution log** | Organization log | Build output — filter FAILED |
+
+### MVP UI (build this first — 2–3 weeks after Phase 1)
+
+**Report Viewer + Investigation Inbox only:**
+
+1. Load job from SQLite (or import latest CSV bundle)
+2. Tabs: Investigation | Duplicates | Restructure
+3. Search/filter by section, vendor, bucket
+4. Mark decisions → export `approved.json`
+5. CLI executes: `audiotheca execute --plan approved.json`
+
+No live moves from UI until decisions feel right.
 
 ### Essential interactions
 
-1. **Dry run default** — big banner until user explicitly enables live mode
-2. **Diff preview** — show `current_path → destination` with vendor/confidence badges
-3. **Duplicate group card** — list members, sparse hash result, pick keeper, stage others
-4. **Investigation triage** — drag item to bucket or merge into suggested parent
-5. **Section bulk approve** — matches current `ACTION_MODE = section`
-6. **Item-by-item mode** — keyboard shortcuts (y/n/s) for fast review
+- **Dry-run banner** until user toggles live mode
+- **Path diff row:** `current → planned` with vendor badge + ID confidence
+- **Duplicate card:** members, size ratio, content check, pick keeper (keyboard y/n)
+- **Investigation triage:** reassign bucket, link to suggested parent product
+- **Open in Explorer** on any path
+- **Section bulk approve** + **item mode** (matches `ACTION_MODE`)
 
 ---
 
-## Phase 3 — Archive extraction & format tools
+## Phase 3 — Archive extraction & compare
 
-Many coexistence findings are **archive + extracted folder** pairs. Add optional extraction pipeline:
+Coexistence findings (`ARCHIVE_EXTRACTED_SIBLING`, cross-item pairs) need tooling, not just reports.
 
-### Extraction service
+### Extraction backends
 
 | Format | Backend |
 | --- | --- |
-| `.zip` | Python `zipfile` or native |
+| `.zip` | Python `zipfile` |
 | `.7z` | `7z` CLI or `py7zr` |
-| `.rar` | `unrar` / `7z` CLI (license-aware) |
-| `.iso` | 7z or Windows mount helper |
+| `.rar` | `7z` CLI (check UnRAR license for distribution) |
+| `.iso` | 7z or Windows mount |
 
-**UI flow:**
+### UI actions per coexistence row
 
-1. Coexistence row shows archive + extracted sibling
-2. Actions: **Keep archive only** | **Keep extracted only** | **Extract to temp & compare** | **Stage one to `_delete-canidates`**
-3. Never auto-delete both — mirror current safety model
+| Action | Behavior |
+| --- | --- |
+| Keep archive | Stage extracted folder → `_delete-canidates` |
+| Keep extracted | Stage archive → `_delete-canidates` |
+| Extract & compare | Extract to `_extract_preview/{job_id}/`, run sparse hash vs folder |
+| Open archive listing | Tree of contents without full extract (7z `l`) |
 
-### Compare-after-extract
-
-- Extract archive to `{ROOT}/_extract_preview/{job_id}/` (ignored bin)
-- Run sparse hash on largest files vs existing folder
-- Show MATCH/DIFFERS in UI before user picks keeper
+Never auto-delete both — same safety model as today.
 
 ---
 
-## Phase 4 — Advanced dedupe (optional)
+## Phase 4 — Advanced features (backlog)
 
-| Feature | Source inspiration | Effort |
+| Feature | Inspiration | Priority |
 | --- | --- | --- |
-| Size-bucket blocking | dedupe.io predicate blocks | Low |
-| Full hash for files &lt; 200 MB | klauspost/dedup, soundaudit | Medium |
-| Audio fingerprint (WAV/FLAC) | MusicDeduplicator / AcoustID | High |
-| UCS category hints | [UCS](https://universalcategorysystem.com/) | Medium |
-| Soundminer-style sidecar | Soundminer metadata fields | Medium |
-| Parent linking for `_likely_component` | Custom — merge-into suggestion | Low |
+| Size-bucket blocking | dedupe.io | High |
+| Parent link for `_likely_component` | Custom | High |
+| Full hash &lt; 200 MB | soundaudit, klauspost/dedup | Medium |
+| Audio fingerprint WAV/FLAC | MusicDeduplicator / AcoustID | Medium |
+| UCS category hints | [Universal Category System](https://universalcategorysystem.com/) | Medium |
+| Soundminer-style metadata fields | Soundminer | Low |
+| Incremental scan (skip unchanged sections) | soundaudit | Medium |
 
 ---
 
-## Language choice summary
+## Language summary
 
-| Layer | Language | Reason |
+| Layer | Choice | Why |
 | --- | --- | --- |
-| Engine | **Python 3.11+** | Existing logic, regex, pefile |
-| API | **Python (FastAPI)** | Same codebase, async jobs |
-| UI | **TypeScript (Tauri/React)** | Rich desktop, best for detailed UI |
-| Hash/extract native | **Rust or Go** (later) | Optional performance module |
+| Engine | Python 3.11+ | Current code, pefile, rapidfuzz |
+| API | Python FastAPI | Same repo, async jobs, WebSocket |
+| UI | TypeScript + Tauri 2 | Rich desktop, best for detailed UI |
+| Native helpers | Rust (optional) | Hash/extract performance later |
 
 ---
 
-## Recommended first UI milestone (MVP)
-
-**"Report Viewer + Approval" — 2–3 weeks after Phase 1 API**
-
-1. Load latest job SQLite / CSV exports
-2. Three tabs: **Restructure** | **Duplicates** | **Investigation**
-3. Filter/search by section, vendor, bucket
-4. Export approved action list JSON
-5. CLI executes approved list (`audiotheca execute --plan approved.json`)
-
-No file moves from UI yet — validates workflows before wiring execution.
-
----
-
-## Second UI milestone
-
-**"Live job runner"**
-
-1. Start scan from UI (pick `ROOT_DIR`)
-2. WebSocket progress bar (items/sec, cache hits, current path)
-3. Inline duplicate keeper selection
-4. Execute approved actions with rollback log
-
----
-
-## Third UI milestone
-
-**"Archive & explorer"**
-
-1. Tree view of one release folder (depth-limited)
-2. Extract archive preview
-3. Coexistence resolution wizard
-4. Open in Explorer / copy path
-
----
-
-## References to study
-
-| Project | URL | Takeaway |
-| --- | --- | --- |
-| dedupe.io | https://docs.dedupe.io/ | Blocking, pairwise review, training labels |
-| soundaudit | https://pypi.org/project/soundaudit/ | Scan/analyze split, hash tiers, TUI |
-| MusicDeduplicator | https://github.com/JameZUK/MusicDeduplicator | Metadata block + fingerprint confirm |
-| klauspost/dedup | https://github.com/klauspost/dedup | Fast rolling hash |
-| Double Commander | https://doublecmd.sourceforge.io/ | Dual-pane file manager UX |
-| Files (Google) | Material file browser patterns | Tree + detail panel |
-| Universal Category System | https://universalcategorysystem.com/ | Sample library taxonomy |
-| Tauri | https://v2.tauri.app/ | Desktop shell recommendation |
-
----
-
-## Decision log (suggested defaults)
+## Decision log
 
 | Decision | Choice |
 | --- | --- |
-| Rewrite engine now? | **No** — modularize Python first |
+| Full rewrite now? | **No** |
 | UI framework | **Tauri 2 + React** |
-| Job storage | **SQLite** |
-| First feature | **Report viewer + investigation inbox** |
-| Archive extraction | **Phase 3** — 7z CLI backend |
-| Network share strategy | Keep depth limits + cache; expose worker count in UI |
+| Persistence | **SQLite + existing CSV reports** |
+| First UI screen | **Investigation inbox** |
+| Archive tools | **Phase 3 — 7z CLI** |
+| SMB strategy | Keep depth limits; expose worker count in UI |
 
 ---
 
-## Next concrete steps
+## Next steps (ordered)
 
-1. `git init` + initial commit (docs + engine)
-2. Refactor `main.py` → `audiotheca/` package (no behavior change)
-3. Add `cli.py` with subcommands: `scan`, `report`, `execute`
-4. Add SQLite schema + import from CSV reports
-5. Scaffold Tauri app reading SQLite from job folder
-6. Build Investigation Inbox as first screen
+1. ~~Git init + docs~~ ✓
+2. Split `main.py` → `audiotheca/` package
+3. Add `cli.py` subcommands
+4. SQLite schema + import from scan results
+5. FastAPI skeleton with WebSocket progress
+6. Tauri app: Investigation Inbox MVP
+7. Wire duplicate review cards
+8. Archive extract + compare wizard
