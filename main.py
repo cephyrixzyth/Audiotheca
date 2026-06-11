@@ -40,7 +40,7 @@ except ImportError:
 # ==========================================
 # CONFIGURATION
 # ==========================================
-ENGINE_VERSION = "9.6.0"
+ENGINE_VERSION = "9.6.1"
 ROOT_DIR = r"Z:\_software\_audio"
 DRY_RUN = True
 GENERATE_INVENTORY_DUMP = True
@@ -205,10 +205,12 @@ class DeduplicationEngine:
         self.restructure_plan: list[dict] = []
         self.vendor_conflicts: list[dict] = []
         self.investigation_plan: list[dict] = []
+        self.scan_failures: list[dict] = []
         self.action_mode = "preview"
 
         self.stats = {
             "scanned": 0,
+            "scan_failures": 0,
             "cache_hits": 0,
             "routed": 0,
             "investigation": 0,
@@ -596,7 +598,7 @@ class DeduplicationEngine:
                 self._inc("errors")
 
         largest_heap.sort(key=lambda row: row[0], reverse=True)
-        info["largest_files"] = [(size, name) for size, name, _rel in largest_heap[:8]]
+        info["largest_files"] = [(size, rel_name) for size, _name, rel_name in largest_heap[:8]]
         return info
 
     @staticmethod
@@ -977,8 +979,8 @@ class DeduplicationEngine:
         candidates = item.get("largest_files") or item.get("top_files") or []
         if not candidates:
             return None
-        size, name = max(candidates, key=lambda f: f[0])
-        return (size, Path(item["path"]) / name)
+        size, rel_path = max(candidates, key=lambda f: f[0])
+        return (size, Path(item["path"]) / rel_path)
 
     def _content_check(self, items: list[dict]) -> str:
         """Compares the largest top-level file of each copy via sparse hash."""
@@ -1241,19 +1243,26 @@ class DeduplicationEngine:
                 shutil.move(str(src_path), str(dst_path))
                 return True
 
+            ok = True
             for item in src_path.iterdir():
                 source_item = src_path / item.name
                 target_item = dst_path / item.name
                 if source_item.is_dir():
-                    self.move_and_merge(source_item, target_item)
+                    if not self.move_and_merge(source_item, target_item):
+                        ok = False
                 elif not target_item.exists():
                     shutil.move(str(source_item), str(target_item))
                 else:
                     self.logger.warning("Merge collision: %s already exists in %s", item.name, dst_path)
+                    ok = False
 
             if src_path.exists() and not any(src_path.iterdir()):
-                src_path.rmdir()
-            return True
+                try:
+                    src_path.rmdir()
+                except OSError as exc:
+                    self.logger.warning("Could not remove empty source %s: %s", src_path, exc)
+                    ok = False
+            return ok
         except (OSError, PermissionError, shutil.Error) as exc:
             self.logger.error("move_and_merge failed %s -> %s: %s", src_path, dst_path, exc)
             self._inc("errors")
@@ -1310,6 +1319,7 @@ class DeduplicationEngine:
             "summary_txt": REPORT_DIR / f"Run_Summary_{self.run_stamp}.txt",
             "org_csv": REPORT_DIR / f"Library_Organization_Log_{self.run_stamp}.csv",
             "inventory_csv": REPORT_DIR / f"Library_Inventory_Dump_{self.run_stamp}.csv",
+            "scan_failures_csv": REPORT_DIR / f"Scan_Failures_{self.run_stamp}.csv",
         }
 
         if self.root_dir.exists():
@@ -1468,6 +1478,21 @@ class DeduplicationEngine:
             coexistence_rows,
         )
 
+        if self.scan_failures:
+            self._write_csv(
+                paths["scan_failures_csv"],
+                ["Section", "Item Name", "Full Path", "Error"],
+                [
+                    [
+                        row["source_bin"],
+                        row["original_name"],
+                        row["path"],
+                        row["error"],
+                    ]
+                    for row in self.scan_failures
+                ],
+            )
+
         investigation_rows = [
             [
                 row["source_bin"],
@@ -1509,7 +1534,8 @@ class DeduplicationEngine:
             "",
             f"- Root: `{self.root_dir}`",
             f"- DRY_RUN: `{self.dry_run}`",
-            f"- Items scanned: {self.stats['scanned']} (cache hits: {self.stats['cache_hits']})",
+            f"- Items scanned: {self.stats['scanned']} (cache hits: {self.stats['cache_hits']}, "
+            f"failures: {self.stats['scan_failures']})",
             f"- Planned routes: {len(self.restructure_plan)}",
             f"- Nested folder issues: {len(self.nested_issues)}",
             f"- Archive/installer coexistence findings: {len(self.coexistence_pairs)}",
@@ -1608,7 +1634,8 @@ class DeduplicationEngine:
             f"Engine version: {ENGINE_VERSION}",
             f"Run: {self.run_stamp}",
             f"DRY_RUN: {self.dry_run}",
-            f"Scanned: {self.stats['scanned']} (cache hits: {self.stats['cache_hits']})",
+            f"Scanned: {self.stats['scanned']} (cache hits: {self.stats['cache_hits']}, "
+            f"failures: {self.stats['scan_failures']})",
             f"Routes planned: {len(self.restructure_plan)}",
             f"Investigation: {self.stats['investigation']}",
             *[
@@ -1634,9 +1661,17 @@ class DeduplicationEngine:
             f"  Coexistence CSV:  {paths['coexistence_csv']}",
             f"  Investigation CSV:{paths['investigation_csv']}",
         ]
+        if self.scan_failures:
+            summary_lines.append(f"  Scan failures CSV: {paths['scan_failures_csv']}")
         paths["summary_txt"].write_text("\n".join(summary_lines), encoding="utf-8")
 
-        for key in ["preview_md", "preview_csv", "duplicate_csv", "nested_csv", "coexistence_csv", "investigation_csv", "summary_txt", "org_csv", "inventory_csv"]:
+        report_keys = [
+            "preview_md", "preview_csv", "duplicate_csv", "nested_csv", "coexistence_csv",
+            "investigation_csv", "summary_txt", "org_csv", "inventory_csv",
+        ]
+        if self.scan_failures:
+            report_keys.append("scan_failures_csv")
+        for key in report_keys:
             share_key = f"share_{key}"
             if share_key in paths and paths[key].exists():
                 try:
@@ -1706,6 +1741,16 @@ class DeduplicationEngine:
         except Exception as exc:
             self.logger.error("Worker failed on %s: %s", path, exc)
             self._inc("errors")
+            with self._lock:
+                self.scan_failures.append(
+                    {
+                        "path": str(path),
+                        "source_bin": source_bin,
+                        "original_name": path.name,
+                        "error": str(exc),
+                    }
+                )
+                self.stats["scan_failures"] = self.stats.get("scan_failures", 0) + 1
             return None
 
     # ------------------------------------------------------------------
@@ -2222,9 +2267,11 @@ class DeduplicationEngine:
         print(f" SCAN COMPLETE (v{ENGINE_VERSION}) ".center(60, "="))
         print("=" * 60)
         print(
-            f"  Scanned: {self.stats['scanned']} (cache hits: {self.stats['cache_hits']}) | "
-            f"Routes planned: {self.stats['routed']}"
+            f"  Scanned: {self.stats['scanned']} (cache hits: {self.stats['cache_hits']}, "
+            f"failures: {self.stats['scan_failures']}) | Routes planned: {self.stats['routed']}"
         )
+        if self.scan_failures:
+            print(f"  Scan failures: {len(self.scan_failures)} (see Scan_Failures CSV)")
         print(f"  Investigation: {self.stats['investigation']}", end="")
         if self.investigation_stats:
             top_buckets = sorted(self.investigation_stats.items(), key=lambda row: -row[1])[:4]

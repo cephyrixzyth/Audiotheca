@@ -5,3 +5,6 @@
 pefile>=2023.2.7      # PE binary CompanyName extraction (Windows plugins/installers)
 rapidfuzz>=3.0        # Fuzzy name similarity for duplicate detection
 tqdm>=4.66            # Progress bar during parallel scan
+
+# Development / tests
+pytest>=8.0
