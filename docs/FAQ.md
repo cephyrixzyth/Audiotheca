@@ -1,5 +1,7 @@
 # Audiotheca — FAQ
 
+Engine version: **9.7.0**
+
 ## General
 
 ### What is Audiotheca?
@@ -32,7 +34,11 @@ Yes — it was built for high-latency SMB/CIFS shares. Use conservative `MAX_WOR
 
 ### How long does a scan take?
 
-Rough guide for ~7,700 items on a network share: **30–90+ minutes** depending on latency, cache hits, and worker count. Second runs are faster when `scan_cache.json` is warm.
+Rough guide for ~7,200 items on a network share: **45–120+ minutes** depending on latency, cache hits, worker count, and archive peek (7-Zip listing adds time on scene-hash folders). Second runs are faster when `scan_cache.json` is warm. Phases print **ETA** in the terminal.
+
+### Do I need 7-Zip?
+
+**Yes**, for archive peek on `.rar`/`.7z`/`.iso`. Without it, scene-hash identity and sibling archive listing will show `NEEDS_7ZIP`. `.zip` peek works without 7-Zip.
 
 ### Why is there no terminal output for a long time?
 
@@ -114,7 +120,17 @@ These share a fingerprint with a confirmed product elsewhere. Usually they are D
 
 ### What about `_scene_release_id` folders?
 
-These are release-group hash folders (common in `=` bins). Open the folder, identify the actual product inside, and either rename the wrapper or add vendor keywords for the inner product name.
+Numeric/hash folders (e.g. `287901`, `7935P`) common in `=` bins. As of **9.7.0**:
+
+1. Check **`Scene_Archive_Peek_*.csv`** for `inferred_product` from archive listing.
+2. Check **`Multipart_Archive_Diagnostic_*.csv`** — `MISSING_PART01` means an incomplete download (only part110+ on disk).
+3. Enable **`SCENE_AUTO_RENAME`** for automatic rename when identity is confident (live run, ≥ `SCENE_RENAME_MIN_SIZE_MB`).
+
+Example: `7935P` peeks as *Sonus Paradisi Segovia Cathedral Hauptwerk*; `287901` often shows `MISSING_PART01` (part01 absent).
+
+### What is `Archive_Peek_*.csv`?
+
+Lists files **inside** archives next to extracted folders without extracting them. Verdict `MATCHES_EXTRACTED_FOLDER` means you can delete the archive after verifying the folder. Re-run peek alone: `python peek_archives.py`.
 
 ---
 
@@ -141,6 +157,8 @@ Audiotheca does not maintain an undo log. Restore from backup or move items back
 | `_non_pc_quarantine/` | Mac/Linux-only content |
 | `_tonex libraries/` | TONEX/AmpliTube captures |
 | `_dedupe_reports/` | Report copies (when share writable) |
+
+New in 9.7: `Archive_Peek_*.csv`, `Scene_Archive_Peek_*.csv`, `Multipart_Archive_Diagnostic_*.csv`, `Scene_Rename_Plan_*.csv` — see [Feature Guide](FEATURE_GUIDE.md).
 
 ---
 

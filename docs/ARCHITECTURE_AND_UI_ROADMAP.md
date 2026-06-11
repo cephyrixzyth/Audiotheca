@@ -1,6 +1,6 @@
 # Audiotheca — Architecture & UI Roadmap
 
-How to evolve Audiotheca from a CLI script into a desktop product with a detailed UI, archive tools, and patterns from dedupe libraries, file managers, and asset librarians.
+How to evolve Audiotheca from a CLI script into a desktop product with a detailed UI. **v9.7.0** already ships archive listing (`archive_peek.py`), scene-hash rename, multipart diagnostics, and phase ETA — the UI layer should consume those CSV/JSON contracts rather than reimplementing peek logic.
 
 ---
 
@@ -10,7 +10,7 @@ How to evolve Audiotheca from a CLI script into a desktop product with a detaile
 
 | Approach | Verdict |
 | --- | --- |
-| **Python core + Tauri/React UI** | Best starting point — reuse v9.6.0, ship faster |
+| **Python core + Tauri/React UI** | Best starting point — reuse v9.7.0 engine (incl. archive peek API), ship faster |
 | **Python FastAPI + web UI** | Good if you want browser-based or remote access to network shares |
 | **Full Rust/Go rewrite** | Only after API + UI workflows are proven |
 | **Rust/Go helper binaries** | Best performance win without throwing away matching logic |

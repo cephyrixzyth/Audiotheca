@@ -11,6 +11,16 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 
+from archive_peek import (
+    find_7z,
+    normalize_inferred_product,
+    peek_scene_folders,
+    peek_sibling_groups,
+    scene_rename_blocked,
+    sibling_groups_from_coexistence,
+    write_peek_csv,
+)
+from progress import PhaseProgress, tqdm_bar
 from vendor_db import VENDOR_DATABASE
 
 try:
@@ -40,9 +50,14 @@ except ImportError:
 # ==========================================
 # CONFIGURATION
 # ==========================================
-ENGINE_VERSION = "9.6.1"
+ENGINE_VERSION = "9.7.1"
 ROOT_DIR = r"Z:\_software\_audio"
-DRY_RUN = True
+# --- Staged live rollout (see comments at SCENE_AUTO_RENAME / ACTION_MODE) ---
+# Stage 1 (current): restructure only — section approval, no scene renames
+# Stage 2: SCENE_AUTO_RENAME = True, ACTION_MODE = "item"
+# Stage 3: python gen_archive_delete_candidates.py --execute + PS1
+# Stage 4: duplicate staging (optional; review HIGH groups in terminal)
+DRY_RUN = False
 GENERATE_INVENTORY_DUMP = True
 # Depth for sizing / OS detection / nested-issue discovery (SMB-safe cap still applies)
 MAX_WALK_DEPTH = 8
@@ -55,10 +70,17 @@ MIN_ARCHIVE_PAIR_SIM = 82
 # HIGH-confidence groups whose largest files differ by more than this ratio get downgraded
 MIN_DUPE_SIZE_RATIO = 0.3
 # Live-run approval: ask (prompt at start) | section | item | auto
-ACTION_MODE = "ask"
+ACTION_MODE = "section"
 # Route TENTATIVE vendor guesses not in VENDOR_DATABASE to investigation buckets
 ROUTE_UNKNOWN_TENTATIVE_TO_INVESTIGATION = True
 REPORT_DIR = Path(__file__).resolve().parent / "dedupe_reports"
+# List archive contents (7-Zip for .rar/.7z) — Archive_Peek_*.csv
+ENABLE_ARCHIVE_PEEK = True
+# Infer product names inside scene-hash folders and optionally rename in place
+ENABLE_SCENE_ARCHIVE_PEEK = True
+SCENE_AUTO_RENAME = False  # Stage 1: plan only; enable for Stage 2 renames
+SCENE_PEEK_MIN_SIZE_MB = 500
+SCENE_RENAME_MIN_SIZE_MB = 1000
 
 # Subfolders under _requiresinvestigation — sorted by likely fix action
 INVESTIGATION_BUCKETS: dict[str, str] = {
@@ -206,6 +228,11 @@ class DeduplicationEngine:
         self.vendor_conflicts: list[dict] = []
         self.investigation_plan: list[dict] = []
         self.scan_failures: list[dict] = []
+        self.archive_peek_rows: list[dict] = []
+        self.scene_archive_rows: list[dict] = []
+        self.multipart_diagnostics: list[dict] = []
+        self.scene_rename_plan: list[dict] = []
+        self._seven_zip = find_7z()
         self.action_mode = "preview"
 
         self.stats = {
@@ -259,6 +286,30 @@ class DeduplicationEngine:
                 return selection
             print("  " + " | ".join(f"{key} = {desc}" for key, desc in options.items()))
 
+    def _print_live_preflight(self) -> bool:
+        """Summarize planned live actions and require confirmation before Phase 3."""
+        counts: dict[str, int] = defaultdict(int)
+        for entry in self.restructure_plan:
+            counts[entry["status"]] += 1
+
+        high_dupes = sum(1 for group in self.duplicate_groups if group.get("confidence") == "HIGH")
+        print("\n" + "=" * 60)
+        print(" LIVE RUN PRE-FLIGHT ".center(60, "="))
+        print("=" * 60)
+        print(f"  Engine:             v{ENGINE_VERSION}")
+        print(f"  Action mode:        {self.action_mode}")
+        print(f"  Restructure routes: {len(self.restructure_plan)}")
+        for status in sorted(counts, key=lambda key: -counts[key]):
+            print(f"    {status}: {counts[status]}")
+        print(f"  Scene renames:      {len(self.scene_rename_plan)}", end="")
+        if SCENE_AUTO_RENAME:
+            print(" (will apply, item-by-item)")
+        else:
+            print(" (plan only — Stage 2)")
+        print(f"  Duplicate groups:   {len(self.duplicate_groups)} ({high_dupes} HIGH)")
+        print("=" * 60)
+        return self._confirm("Proceed with live filesystem changes?")
+
     def _resolve_action_mode(self) -> str:
         if self.dry_run:
             self.action_mode = "preview"
@@ -284,6 +335,8 @@ class DeduplicationEngine:
         items: list,
         execute_one,
         describe_one,
+        *,
+        force_item_mode: bool = False,
     ) -> None:
         """Run a list of filesystem actions according to action_mode."""
         if not items:
@@ -293,12 +346,12 @@ class DeduplicationEngine:
                 execute_one(item, dry_run=True)
             return
 
-        if self.action_mode == "auto":
+        if self.action_mode == "auto" and not force_item_mode:
             for item in items:
                 execute_one(item, dry_run=False)
             return
 
-        if self.action_mode == "section":
+        if self.action_mode == "section" and not force_item_mode:
             print(f"\n--- {label}: {len(items)} actions ---")
             for item in items[:12]:
                 print(f"  {describe_one(item)}")
@@ -1320,6 +1373,10 @@ class DeduplicationEngine:
             "org_csv": REPORT_DIR / f"Library_Organization_Log_{self.run_stamp}.csv",
             "inventory_csv": REPORT_DIR / f"Library_Inventory_Dump_{self.run_stamp}.csv",
             "scan_failures_csv": REPORT_DIR / f"Scan_Failures_{self.run_stamp}.csv",
+            "archive_peek_csv": REPORT_DIR / f"Archive_Peek_{self.run_stamp}.csv",
+            "scene_archive_peek_csv": REPORT_DIR / f"Scene_Archive_Peek_{self.run_stamp}.csv",
+            "multipart_diag_csv": REPORT_DIR / f"Multipart_Archive_Diagnostic_{self.run_stamp}.csv",
+            "scene_rename_csv": REPORT_DIR / f"Scene_Rename_Plan_{self.run_stamp}.csv",
         }
 
         if self.root_dir.exists():
@@ -1478,6 +1535,15 @@ class DeduplicationEngine:
             coexistence_rows,
         )
 
+        if self.archive_peek_rows:
+            write_peek_csv(paths["archive_peek_csv"], self.archive_peek_rows)
+        if self.scene_archive_rows:
+            write_peek_csv(paths["scene_archive_peek_csv"], self.scene_archive_rows)
+        if self.multipart_diagnostics:
+            write_peek_csv(paths["multipart_diag_csv"], self.multipart_diagnostics)
+        if self.scene_rename_plan:
+            write_peek_csv(paths["scene_rename_csv"], self.scene_rename_plan)
+
         if self.scan_failures:
             self._write_csv(
                 paths["scan_failures_csv"],
@@ -1539,6 +1605,9 @@ class DeduplicationEngine:
             f"- Planned routes: {len(self.restructure_plan)}",
             f"- Nested folder issues: {len(self.nested_issues)}",
             f"- Archive/installer coexistence findings: {len(self.coexistence_pairs)}",
+            f"- Archive peek listings: {len(self.archive_peek_rows)}",
+            f"- Scene archive peeks: {len(self.scene_archive_rows)}",
+            f"- Scene rename candidates: {len(self.scene_rename_plan)}",
             f"- Duplicate groups for review: {len(self.duplicate_groups)}",
             "",
         ]
@@ -1647,7 +1716,11 @@ class DeduplicationEngine:
             f"Vendor conflicts: {len(self.vendor_conflicts)}",
             f"Nested issues: {len(self.nested_issues)}",
             f"Coexistence findings: {len(self.coexistence_pairs)}",
+            f"Archive peek rows: {len(self.archive_peek_rows)}",
+            f"Scene archive peeks: {len(self.scene_archive_rows)}",
+            f"Scene renames planned: {len(self.scene_rename_plan)}",
             f"Scan depth: walk={MAX_WALK_DEPTH} probe={PROBE_DEPTH}",
+            f"7-Zip: {self._seven_zip or 'not found'}",
             f"Errors: {self.stats['errors']}",
             f"Duplicate groups (review): {len(self.duplicate_groups)}",
             f"  HIGH confidence: {sum(1 for g in self.duplicate_groups if g['confidence'] == 'HIGH')}",
@@ -1663,14 +1736,29 @@ class DeduplicationEngine:
         ]
         if self.scan_failures:
             summary_lines.append(f"  Scan failures CSV: {paths['scan_failures_csv']}")
+        if self.archive_peek_rows:
+            summary_lines.append(f"  Archive peek CSV:   {paths['archive_peek_csv']}")
+        if self.scene_archive_rows:
+            summary_lines.append(f"  Scene archive CSV:  {paths['scene_archive_peek_csv']}")
+        if self.multipart_diagnostics:
+            summary_lines.append(f"  Multipart diag CSV: {paths['multipart_diag_csv']}")
+        if self.scene_rename_plan:
+            summary_lines.append(f"  Scene rename CSV:   {paths['scene_rename_csv']}")
         paths["summary_txt"].write_text("\n".join(summary_lines), encoding="utf-8")
 
         report_keys = [
             "preview_md", "preview_csv", "duplicate_csv", "nested_csv", "coexistence_csv",
             "investigation_csv", "summary_txt", "org_csv", "inventory_csv",
         ]
-        if self.scan_failures:
-            report_keys.append("scan_failures_csv")
+        for optional in (
+            "scan_failures_csv",
+            "archive_peek_csv",
+            "scene_archive_peek_csv",
+            "multipart_diag_csv",
+            "scene_rename_csv",
+        ):
+            if paths[optional].exists():
+                report_keys.append(optional)
         for key in report_keys:
             share_key = f"share_{key}"
             if share_key in paths and paths[key].exists():
@@ -1680,6 +1768,165 @@ class DeduplicationEngine:
                     self.logger.warning("Could not copy report to share: %s", exc)
 
         return paths
+
+    # ------------------------------------------------------------------
+    # Archive peek & scene-hash rename
+    # ------------------------------------------------------------------
+
+    def _coexistence_rows_for_peek(self) -> list[dict]:
+        rows: list[dict] = []
+        for entry in self.coexistence_pairs:
+            rows.append(
+                {
+                    "source_bin": entry.get("source_bin", ""),
+                    "item_name": entry.get("item_name", ""),
+                    "item_path": entry.get("item_path", ""),
+                    "issue_type": entry.get("issue_type", ""),
+                    "parent": entry.get("parent", "."),
+                    "archive_name": entry.get("archive_name", ""),
+                    "folder_name": entry.get("folder_name", ""),
+                    "similarity": entry.get("similarity", ""),
+                }
+            )
+        return rows
+
+    def _scene_release_items(self, all_items: list[dict]) -> list[dict]:
+        scene_items: list[dict] = []
+        for item in all_items:
+            if not self._is_scene_release_code(item["original_name"]):
+                continue
+            scene_items.append(
+                {
+                    "path": item["path"],
+                    "original_name": item["original_name"],
+                    "size_mb": round(item["size"] / (1024 * 1024), 1),
+                    "source_bin": item["source_bin"],
+                }
+            )
+        return scene_items
+
+    def _run_archive_peek_phase(self) -> None:
+        groups = sibling_groups_from_coexistence(self._coexistence_rows_for_peek())
+        if not groups:
+            print("  No archive+folder sibling groups to peek.")
+            return
+
+        progress = PhaseProgress("Phase 1.8 - Archive peek (sibling pairs)", len(groups), "group")
+
+        def _tick(done: int, detail: str) -> None:
+            progress.update(1, detail=detail)
+
+        self.archive_peek_rows = peek_sibling_groups(
+            groups,
+            self._seven_zip,
+            progress_callback=_tick,
+        )
+        progress.finish(f"{len(self.archive_peek_rows)} archives listed")
+
+    def _build_scene_rename_plan(self) -> None:
+        self.scene_rename_plan = []
+        diag_by_path = {row["folder_path"]: row for row in self.multipart_diagnostics}
+        best_name: dict[str, str] = {}
+
+        for row in self.scene_archive_rows:
+            inferred = normalize_inferred_product((row.get("inferred_product") or "").strip())
+            folder_path = row.get("folder_path", "")
+            if not inferred or not folder_path:
+                continue
+            size_mb = float(row.get("size_mb") or 0)
+            if size_mb < SCENE_RENAME_MIN_SIZE_MB:
+                continue
+            diag = diag_by_path.get(folder_path, {})
+            if diag.get("diagnosis") in {"CORRUPT_OR_UNREADABLE_PART01", "MISSING_PART01"}:
+                continue
+            if folder_path not in best_name or len(inferred) > len(best_name[folder_path]):
+                best_name[folder_path] = inferred
+
+        for folder_path, inferred in best_name.items():
+            src = Path(folder_path)
+            new_name = self.clean_folder_name(inferred)
+            if not new_name or new_name == src.name:
+                continue
+            blocked = scene_rename_blocked(new_name)
+            if blocked:
+                self.logger.info("Scene rename skipped (%s): %s", blocked, src.name)
+                continue
+            dest = src.parent / new_name
+            self.scene_rename_plan.append(
+                {
+                    "scene_id": src.name,
+                    "source_path": str(src),
+                    "proposed_name": new_name,
+                    "destination_path": str(dest),
+                    "inferred_product": inferred,
+                    "multipart_diagnosis": diag_by_path.get(folder_path, {}).get("diagnosis", ""),
+                }
+            )
+
+    def _apply_scene_renames(self, all_items: list[dict], csv_writer) -> None:
+        if not self.scene_rename_plan:
+            return
+
+        def _rename_one(plan: dict, *, dry_run: bool = False) -> None:
+            src = Path(plan["source_path"])
+            dest = Path(plan["destination_path"])
+            status = "[DRY RUN] Would rename scene folder" if dry_run else "Renamed scene folder"
+            note = f"{plan['scene_id']} -> {plan['proposed_name']}"
+            csv_writer.writerow([status, plan["scene_id"], src.parent.name, str(dest.parent / plan["proposed_name"]), note, ""])
+            if dry_run:
+                return
+            if dest.exists():
+                self.logger.warning("Scene rename skipped — destination exists: %s", dest)
+                return
+            if self.safe_move(src, dest):
+                for item in all_items:
+                    if item["path"] == src:
+                        item["path"] = dest
+                        item["original_name"] = plan["proposed_name"]
+                        item["display_name"] = plan["proposed_name"]
+
+        self._execute_actions(
+            "Phase 1.6b - Scene-hash auto-rename",
+            self.scene_rename_plan,
+            lambda plan, dry_run=False: _rename_one(plan, dry_run=dry_run),
+            lambda plan: f"{plan['scene_id']} -> {plan['proposed_name']} ({plan['inferred_product'][:50]})",
+            force_item_mode=True,
+        )
+
+    def _run_scene_archive_phase(self, all_items: list[dict], csv_writer) -> None:
+        scene_items = self._scene_release_items(all_items)
+        if not scene_items:
+            print("  No scene-hash folders to peek.")
+            return
+
+        eligible = [item for item in scene_items if float(item["size_mb"]) >= SCENE_PEEK_MIN_SIZE_MB]
+        progress = PhaseProgress(
+            f"Phase 1.6 - Scene archive peek (>{SCENE_PEEK_MIN_SIZE_MB} MB)",
+            len(eligible),
+            "folder",
+        )
+
+        def _tick(done: int, detail: str) -> None:
+            progress.update(1, detail=detail)
+
+        self.scene_archive_rows, self.multipart_diagnostics = peek_scene_folders(
+            eligible,
+            self._seven_zip,
+            min_size_mb=SCENE_PEEK_MIN_SIZE_MB,
+            progress_callback=_tick,
+        )
+        progress.finish(
+            f"{len(self.scene_archive_rows)} peeks, {len(self.multipart_diagnostics)} multipart diagnostics"
+        )
+
+        self._build_scene_rename_plan()
+        if self.scene_rename_plan:
+            print(f"  Scene rename candidates: {len(self.scene_rename_plan)}", end="")
+            if SCENE_AUTO_RENAME:
+                print(" (applying)")
+                self._apply_scene_renames(all_items, csv_writer)
+            else:
+                print(" (plan only — enable SCENE_AUTO_RENAME for Stage 2)")
 
     # ------------------------------------------------------------------
     # Scan worker (runs in thread pool — never raises)
@@ -1765,6 +2012,8 @@ class DeduplicationEngine:
         print(f" ROOT: {self.root_dir}")
         print(f" DRY_RUN: {self.dry_run}")
         print(f" MAX_WALK_DEPTH: {MAX_WALK_DEPTH} | PROBE_DEPTH: {PROBE_DEPTH} | WORKERS: {self.max_workers}")
+        print(f" ARCHIVE_PEEK: {ENABLE_ARCHIVE_PEEK} | SCENE_PEEK: {ENABLE_SCENE_ARCHIVE_PEEK} | SCENE_RENAME: {SCENE_AUTO_RENAME}")
+        print(f" 7-ZIP: {self._seven_zip or 'NOT FOUND - install 7-Zip for .rar/.7z listing'}")
         print(f" REPORTS: {REPORT_DIR}")
         print("=" * 60 + "\n")
 
@@ -1813,33 +2062,38 @@ class DeduplicationEngine:
         if not self.dry_run:
             self._resolve_action_mode()
 
-        print("Phase 1: Target resolution & parallel scan...")
+        category_bins = [
+            entry
+            for entry in self.root_dir.iterdir()
+            if entry.is_dir() and entry.name not in IGNORE_BINS
+        ]
+        bin_progress = PhaseProgress("Phase 1a - Resolve targets per category", len(category_bins), "section")
         payloads: list[tuple[Path, str]] = []
-        for category_bin in self.root_dir.iterdir():
-            if not category_bin.is_dir() or category_bin.name in IGNORE_BINS:
-                continue
+        for category_bin in category_bins:
             targets = self.get_software_targets(category_bin)
             payloads.extend((target, category_bin.name) for target in targets)
-            print(f"  > {category_bin.name}: {len(targets)} targets")
+            bin_progress.update(1, detail=f"{category_bin.name}: {len(targets)} targets")
+        bin_progress.finish(f"{len(payloads):,} total targets")
 
         if not payloads:
             print("\n[!] WARNING: Found 0 targets.")
             return
 
-        print(f"\n  Scanning {len(payloads)} items with {self.max_workers} workers...")
+        scan_bar = tqdm_bar(len(payloads), "Phase 1b - Parallel scan", "item")
         results: list[dict] = []
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             futures = {
                 executor.submit(self._scan_worker, path, bin_name): path
                 for path, bin_name in payloads
             }
-            iterator = as_completed(futures)
-            if tqdm:
-                iterator = tqdm(iterator, total=len(futures), desc="  Scanning", unit="item")
-            for future in iterator:
+            for future in as_completed(futures):
                 result = future.result()
                 if result:
                     results.append(result)
+                if scan_bar is not None:
+                    scan_bar.update(1)
+        if scan_bar is not None:
+            scan_bar.close()
 
         results.sort(key=lambda r: (r["source_bin"], r["original_name"].lower()))
 
@@ -1861,12 +2115,17 @@ class DeduplicationEngine:
 
             all_items.append(item)
 
-        print("\nPhase 1.5: Reconciling vendor findings across all folders...")
+        reconcile_progress = PhaseProgress("Phase 1.5 - Vendor reconciliation", len(all_items), "item")
         reconciled = self.reconcile_vendors(all_items)
-        print(
-            f"  Reconciled {reconciled} items via shared fingerprints; "
-            f"{len(self.vendor_conflicts)} vendor conflicts flagged for review."
+        reconcile_progress.finish(
+            f"{reconciled} reconciled, {len(self.vendor_conflicts)} fingerprint conflicts"
         )
+
+        if ENABLE_SCENE_ARCHIVE_PEEK:
+            self._run_scene_archive_phase(all_items, csv_writer)
+
+        if ENABLE_ARCHIVE_PEEK:
+            self._run_archive_peek_phase()
 
         dedup_groups: dict[str, list[dict]] = defaultdict(list)
         for item in all_items:
@@ -1937,7 +2196,8 @@ class DeduplicationEngine:
                 rec = " <-- suggested keep" if item["path"] == pair["recommended_keep"]["path"] else ""
                 print(f"  [{idx}] [{kind}] {item['original_name']} ({size_mb:.1f} MB){rec}")
 
-        print("\nPhase 2: Duplicate review (strict matching + content checks)...")
+        dupe_candidates = [items for items in dedup_groups.values() if len(items) >= 2]
+        dupe_progress = PhaseProgress("Phase 2 - Duplicate review", len(dupe_candidates), "group")
         items_to_delete: list[dict] = []
 
         for dedup_key, items in dedup_groups.items():
@@ -1946,6 +2206,7 @@ class DeduplicationEngine:
             if frozenset(item["path"] for item in items) in archive_pair_path_sets:
                 continue
 
+            dupe_progress.update(1, detail=dedup_key[:40])
             assessment = self.assess_duplicate_group(items)
             if assessment["confidence"] == "LOW":
                 continue
@@ -2028,6 +2289,8 @@ class DeduplicationEngine:
                     break
                 print("Invalid index.")
 
+        dupe_progress.finish(f"{len(self.duplicate_groups)} groups flagged")
+
         if items_to_delete:
             if not self.dry_run:
                 self.delete_candidates_dir.mkdir(exist_ok=True)
@@ -2047,7 +2310,7 @@ class DeduplicationEngine:
                 if not self.dry_run:
                     self.safe_move(item["path"], self.delete_candidates_dir / item["original_name"])
 
-        print("\nPhase 3: Building restructure plan...")
+        restructure_progress = PhaseProgress("Phase 3 - Restructure plan", len(all_items), "item")
         delete_paths = {entry["path"] for entry in items_to_delete}
         conflict_bases = {c["base_name"] for c in self.vendor_conflicts}
         confirmed_bases = self._confirmed_base_vendors(all_items)
@@ -2110,6 +2373,9 @@ class DeduplicationEngine:
                     "_dest_path": dest_path,
                 }
             )
+            restructure_progress.update(1, detail=item["original_name"][:36])
+
+        restructure_progress.finish(f"{len(self.restructure_plan)} routes, {self.stats['investigation']} investigation")
 
         if self.dry_run:
             for entry in self.restructure_plan:
@@ -2124,8 +2390,11 @@ class DeduplicationEngine:
                     ]
                 )
                 self._inc("routed")
-        else:
+        elif self._print_live_preflight():
             self._execute_restructure(csv_writer)
+        else:
+            print("[!] Phase 3 restructure skipped (declined at pre-flight).")
+            self.logger.info("Phase 3 restructure skipped at pre-flight.")
 
         if not self.dry_run:
             purge_roots = [
@@ -2296,6 +2565,14 @@ class DeduplicationEngine:
         print(f"  Coexistence CSV:  {report_paths['coexistence_csv']}")
         print(f"  Investigation CSV:{report_paths['investigation_csv']}")
         print(f"  Summary:          {report_paths['summary_txt']}")
+        if report_paths.get("archive_peek_csv") and report_paths["archive_peek_csv"].exists():
+            print(f"  Archive peek CSV: {report_paths['archive_peek_csv']}")
+        if report_paths.get("scene_archive_peek_csv") and report_paths["scene_archive_peek_csv"].exists():
+            print(f"  Scene archive CSV:{report_paths['scene_archive_peek_csv']}")
+        if report_paths.get("multipart_diag_csv") and report_paths["multipart_diag_csv"].exists():
+            print(f"  Multipart diag:   {report_paths['multipart_diag_csv']}")
+        if report_paths.get("scene_rename_csv") and report_paths["scene_rename_csv"].exists():
+            print(f"  Scene rename CSV: {report_paths['scene_rename_csv']}")
         if "share_preview_md" in report_paths:
             print(f"\n  Copies also on share: {self.root_dir / '_dedupe_reports'}")
 

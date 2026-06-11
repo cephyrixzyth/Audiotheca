@@ -2,7 +2,7 @@
 
 Use this runbook when a scan fails, produces unexpected results, or appears hung.
 
-Engine version at time of writing: **9.6.0**
+Engine version at time of writing: **9.7.0**
 
 ---
 
@@ -48,6 +48,9 @@ Get-ChildItem ".\dedupe_reports\Run_Summary_*.txt" | Sort-Object LastWriteTime -
 | Crash mid-run | [Interrupted runs](#interrupted-runs) |
 | Stale / wrong results after code change | [Cache issues](#cache-issues) |
 | Wrong vendor routing | [Vendor mis-identification](#vendor-mis-identification) |
+| Scene hash unknown / huge | [Scene archive peek](#scene-archive-peek--multipart-diagnostic) |
+| Archive vs folder — which to keep? | [Archive peek verdicts](#archive-peek-verdicts) |
+| No phase ETA in terminal | [Progress / ETA](#progress--eta) |
 
 ---
 
@@ -282,6 +285,80 @@ print(e._match_vendor_detailed("Klevgrand Hillman 1.0.3"))
 
 ---
 
+## Progress / ETA
+
+9.7+ prints per-phase progress:
+
+```
+▶ Phase 1b — Parallel scan
+  1,204 / 7,204 item  (17%)  ·  elapsed 12m30s  ·  ETA 58m12s
+```
+
+If ETA is missing:
+
+1. Set `$env:PYTHONUNBUFFERED=1`
+2. Install `tqdm` for Phase 1b bar: `pip install tqdm`
+3. Watch `dedupe_engine.log` — phases log at INFO
+
+---
+
+## Scene archive peek & multipart diagnostic
+
+### Hash folder still `_scene_release_id` after scan
+
+1. Open `Scene_Archive_Peek_*.csv` — column `inferred_product`
+2. Open `Multipart_Archive_Diagnostic_*.csv` for the same `folder_path`
+
+| Diagnosis | Action |
+| --- | --- |
+| `MISSING_PART01` | Incomplete multipart download — re-fetch part01 or full set (common on `287901`) |
+| `GAP_IN_SEQUENCE` | Missing intermediate `.partN.rar` files |
+| `CORRUPT_OR_UNREADABLE_PART01` | part01 present but 7-Zip cannot open — re-download |
+| `OK` + inferred name | Enable `SCENE_AUTO_RENAME` or rename manually from CSV |
+
+### Diagnose one folder manually
+
+```powershell
+python -c "
+from pathlib import Path
+from archive_peek import diagnose_multipart_folder, find_7z, peek_archive
+folder = Path(r'Z:\_software\_audio\=\287901\287901')
+print(diagnose_multipart_folder(folder, find_7z()))
+parts = sorted(folder.glob('*.part*.rar'))
+if parts:
+    print(peek_archive(parts[0], find_7z(), limit=8))
+"
+```
+
+### 7-Zip not found
+
+Install [7-Zip](https://www.7-zip.org/) or Scoop: `scoop install 7zip`. Verify:
+
+```powershell
+python -c "from archive_peek import find_7z; print(find_7z())"
+```
+
+---
+
+## Archive peek verdicts
+
+After dry run, open `Archive_Peek_*.csv`:
+
+| Verdict | Action |
+| --- | --- |
+| `MATCHES_EXTRACTED_FOLDER` | Safe to delete archive after spot-check |
+| `LOOKS_LIKE_PRODUCT` | Archive is installer; keep extracted folder if present |
+| `MULTIPART_SECONDARY` | Informational — part1 row has the real listing |
+| `LIST_FAILED` | See multipart diagnostic; often missing part01 |
+
+Re-peek without full scan:
+
+```powershell
+python peek_archives.py
+```
+
+---
+
 ## Isolate a bad path
 
 When one folder hangs SMB:
@@ -324,6 +401,9 @@ Revert after diagnosis — DEBUG on large libraries produces huge logs on networ
 [ ] Backup or snapshot of library exists
 [ ] ACTION_MODE set (item recommended for first live)
 [ ] PYTHONUNBUFFERED=1 set
+[ ] 7-Zip available (`find_7z()` prints path at run start)
+[ ] Archive_Peek + Scene_Archive_Peek reviewed
+[ ] Multipart_Archive_Diagnostic checked for MISSING_PART01
 [ ] Share writable (live only)
 ```
 
