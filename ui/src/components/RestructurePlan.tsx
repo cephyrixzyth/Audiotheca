@@ -1,5 +1,10 @@
-import { useEffect, useState } from "react";
-import { fetchRestructure } from "../api/client";
+import { useEffect, useMemo, useState } from "react";
+import {
+  approveRestructureSection,
+  fetchRestructure,
+  fetchRestructureFeedback,
+  overrideRestructureDest,
+} from "../api/client";
 import type { RestructureItem } from "../types";
 import { PathLink } from "./PathLink";
 
@@ -13,6 +18,21 @@ export function RestructurePlan({ stamp }: Props) {
   const [status, setStatus] = useState("READY");
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [approvedSections, setApprovedSections] = useState<string[]>([]);
+  const [destOverrides, setDestOverrides] = useState<Record<string, string>>({});
+  const [msg, setMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchRestructureFeedback(stamp)
+      .then((state) => {
+        setApprovedSections(state.section_approvals ?? []);
+        setDestOverrides(state.path_dest_overrides ?? {});
+      })
+      .catch(() => {
+        setApprovedSections([]);
+        setDestOverrides({});
+      });
+  }, [stamp]);
 
   useEffect(() => {
     setLoading(true);
@@ -31,8 +51,61 @@ export function RestructurePlan({ stamp }: Props) {
     return () => clearTimeout(timer);
   }, [stamp, status, query]);
 
+  const sections = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const row of items) {
+      counts[row.section] = (counts[row.section] ?? 0) + 1;
+    }
+    return Object.entries(counts).sort(([a], [b]) => a.localeCompare(b));
+  }, [items]);
+
+  async function handleApproveSection(section: string) {
+    const res = await approveRestructureSection(stamp, section);
+    setApprovedSections(res.state.section_approvals ?? []);
+    setMsg(`Section '${section}' approved for next live run (cli.py --live)`);
+  }
+
+  async function handleOverride(row: RestructureItem) {
+    const dest = window.prompt(
+      "Relative destination (e.g. a/Vendor/Product):",
+      destOverrides[row.current_path] ?? row.planned_destination,
+    )?.trim();
+    if (!dest) return;
+    const res = await overrideRestructureDest(stamp, {
+      path: row.current_path,
+      destination: dest,
+      item_name: row.item_name,
+      old_destination: row.planned_destination,
+    });
+    setDestOverrides(res.state.path_dest_overrides ?? {});
+    setMsg(`Destination override saved for ${row.item_name}`);
+  }
+
   return (
     <div>
+      <div className="banner dry">
+        Approve sections here to skip CLI prompts on <code>python cli.py --live</code>.
+        Destination overrides apply on the next scan.
+      </div>
+
+      {sections.length > 0 && (
+        <div className="toolbar" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
+          {sections.map(([section, count]) => {
+            const approved = approvedSections.includes(section);
+            return (
+              <button
+                key={section}
+                type="button"
+                className={approved ? "primary-btn" : "keeper-btn"}
+                onClick={() => void handleApproveSection(section)}
+              >
+                {approved ? "✓ " : ""}Section {section} ({count})
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <div className="toolbar">
         <label>
           Status
@@ -54,8 +127,11 @@ export function RestructurePlan({ stamp }: Props) {
         </label>
         <span className="count-muted">
           {loading ? "Loading…" : `${total.toLocaleString()} routes`}
+          {approvedSections.length ? ` · ${approvedSections.length} sections approved` : ""}
         </span>
       </div>
+
+      {msg && <div className="banner dry">{msg}</div>}
 
       {!loading && items.length === 0 && (
         <div className="empty">No restructure routes match your filters.</div>
@@ -71,37 +147,48 @@ export function RestructurePlan({ stamp }: Props) {
               <th>ID</th>
               <th>Status</th>
               <th>Destination</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {items.map((row) => (
-              <tr key={`${row.current_path}-${row.item_name}`}>
-                <td>
-                  <code>{row.section}</code>
-                </td>
-                <td>
-                  <div>{row.item_name}</div>
-                  <PathLink path={row.current_path} />
-                </td>
-                <td>{row.vendor}</td>
-                <td>
-                  {row.id_method}
-                  <div className="path">{row.id_confidence}</div>
-                </td>
-                <td>
-                  <span
-                    className={`badge ${
-                      row.status === "READY" ? "ready" : "review"
-                    }`}
-                  >
-                    {row.status}
-                  </span>
-                </td>
-                <td>
-                  <PathLink path={row.planned_destination} />
-                </td>
-              </tr>
-            ))}
+            {items.map((row) => {
+              const override = destOverrides[row.current_path];
+              return (
+                <tr key={`${row.current_path}-${row.item_name}`}>
+                  <td>
+                    <code>{row.section}</code>
+                    {approvedSections.includes(row.section) && (
+                      <span className="badge ready">approved</span>
+                    )}
+                  </td>
+                  <td>
+                    <div>{row.item_name}</div>
+                    <PathLink path={row.current_path} />
+                  </td>
+                  <td>{row.vendor}</td>
+                  <td>
+                    {row.id_method}
+                    <div className="path">{row.id_confidence}</div>
+                  </td>
+                  <td>
+                    <span
+                      className={`badge ${row.status === "READY" ? "ready" : "review"}`}
+                    >
+                      {row.status}
+                    </span>
+                  </td>
+                  <td>
+                    <PathLink path={override ?? row.planned_destination} />
+                    {override && <div className="count-muted">override</div>}
+                  </td>
+                  <td>
+                    <button type="button" className="keeper-btn" onClick={() => void handleOverride(row)}>
+                      Edit dest
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       )}

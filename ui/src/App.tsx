@@ -8,6 +8,7 @@ import { InvestigationInbox } from "./components/InvestigationInbox";
 import { RestructurePlan } from "./components/RestructurePlan";
 import { ScanPanel } from "./components/ScanPanel";
 import { SceneRenames } from "./components/SceneRenames";
+import { VendorTools } from "./components/VendorTools";
 import type { RunListItem, RunSummary, TabId } from "./types";
 
 const TABS: { id: TabId; label: string }[] = [
@@ -18,6 +19,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "restructure", label: "Restructure" },
   { id: "archives", label: "Archives" },
   { id: "scene-renames", label: "Scene renames" },
+  { id: "vendors", label: "Vendors" },
 ];
 
 export default function App() {
@@ -116,6 +118,7 @@ export default function App() {
         {stamp && tab === "restructure" && <RestructurePlan stamp={stamp} />}
         {stamp && tab === "archives" && <ArchivePeek stamp={stamp} />}
         {stamp && tab === "scene-renames" && <SceneRenames stamp={stamp} />}
+        {tab === "vendors" && <VendorTools stamp={stamp || undefined} />}
       </main>
     </div>
   );

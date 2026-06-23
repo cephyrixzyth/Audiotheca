@@ -121,6 +121,35 @@ export function fetchRestructure(
   return getJson(`/runs/${stamp}/restructure?${qs}`);
 }
 
+export function fetchRestructureFeedback(stamp: string): Promise<{
+  stamp: string;
+  path_dest_overrides: Record<string, string>;
+  section_approvals: string[];
+  active_approval_stamp: string;
+  corrections: Array<Record<string, string>>;
+}> {
+  return getJson(`/runs/${stamp}/restructure/feedback`);
+}
+
+export function overrideRestructureDest(
+  stamp: string,
+  payload: {
+    path: string;
+    destination: string;
+    item_name?: string;
+    old_destination?: string;
+  },
+): Promise<{ ok: boolean; state: { path_dest_overrides: Record<string, string>; section_approvals: string[] } }> {
+  return postJson(`/runs/${stamp}/restructure/override`, payload);
+}
+
+export function approveRestructureSection(
+  stamp: string,
+  section: string,
+): Promise<{ ok: boolean; state: { path_dest_overrides: Record<string, string>; section_approvals: string[] } }> {
+  return postJson(`/runs/${stamp}/restructure/approve-section`, { section });
+}
+
 export function fetchSceneRenames(stamp: string): Promise<SceneRenameItem[]> {
   return getJson(`/runs/${stamp}/scene-renames`);
 }
@@ -222,11 +251,44 @@ export async function downloadDecisionsUrl(stamp: string): Promise<string> {
 export async function feedbackExportUrl(
   stamp?: string,
   format: "csv" | "json" = "csv",
+  module: "duplicates" | "investigation" | "all" = "duplicates",
 ): Promise<string> {
   const qs = new URLSearchParams();
   if (stamp) qs.set("stamp", stamp);
   qs.set("format", format);
+  qs.set("module", module);
   return `${await apiUrl(`/feedback/export?${qs}`)}`;
+}
+
+export async function unifiedFeedbackExportUrl(stamp?: string): Promise<string> {
+  return feedbackExportUrl(stamp, "csv", "all");
+}
+
+export function fetchFeedbackSummary(stamp?: string): Promise<Record<string, number>> {
+  const qs = stamp ? `?stamp=${encodeURIComponent(stamp)}` : "";
+  return getJson(`/feedback/summary${qs}`);
+}
+
+export function fetchVendors(): Promise<{
+  known: string[];
+  user_added: Array<{ company: string; keywords: string[]; category?: string }>;
+}> {
+  return getJson("/vendors");
+}
+
+export function addVendor(payload: {
+  company: string;
+  keywords: string[];
+  category?: string;
+}): Promise<{ ok: boolean; vendor: { company: string; keywords: string[] } }> {
+  return postJson("/vendors", payload);
+}
+
+export function testVendorKeyword(
+  keyword: string,
+  sample: string,
+): Promise<{ keyword: string; matches: boolean; match_span?: string; reason: string }> {
+  return postJson("/vendors/test", { keyword, sample });
 }
 
 export function startScan(params: {

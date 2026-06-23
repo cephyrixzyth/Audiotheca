@@ -28,6 +28,15 @@ from duplicate_feedback import (
 )
 import investigation_feedback as inv_feedback
 
+import feedback_export
+import restructure_feedback as rst_feedback
+from audiotheca.vendor_overrides import (
+    add_user_vendor,
+    all_known_vendors,
+    load_user_vendors,
+    match_keyword,
+)
+
 app = FastAPI(title="Audiotheca API", version="0.2.0")
 
 app.add_middleware(
@@ -168,6 +177,42 @@ def get_restructure(
     return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 
+@app.get("/api/runs/{stamp}/restructure/feedback")
+def get_restructure_feedback(stamp: str) -> dict[str, object]:
+    return rst_feedback.get_state_for_ui(stamp)
+
+
+@app.post("/api/runs/{stamp}/restructure/override")
+def restructure_override(stamp: str, body: dict = Body(...)) -> dict[str, object]:
+    path = str(body.get("path", "")).strip()
+    destination = str(body.get("destination", "")).strip()
+    if not path or not destination:
+        raise HTTPException(status_code=400, detail="path and destination are required")
+    rst_feedback.apply_dest_override(
+        path=path,
+        relative_dest=destination,
+        stamp=stamp,
+        item_name=str(body.get("item_name", "")),
+        old_destination=str(body.get("old_destination", "")),
+    )
+    return {"ok": True, "state": rst_feedback.get_state_for_ui(stamp)}
+
+
+@app.post("/api/runs/{stamp}/restructure/approve-section")
+def restructure_approve_section(stamp: str, body: dict = Body(...)) -> dict[str, object]:
+    section = str(body.get("section", "")).strip()
+    if not section:
+        raise HTTPException(status_code=400, detail="section is required")
+    rst_feedback.approve_section(stamp=stamp, section=section)
+    return {"ok": True, "state": rst_feedback.get_state_for_ui(stamp)}
+
+
+@app.delete("/api/runs/{stamp}/restructure/approve-section/{section}")
+def restructure_clear_section(stamp: str, section: str) -> dict[str, object]:
+    rst_feedback.clear_section_approval(stamp=stamp, section=section)
+    return {"ok": True, "state": rst_feedback.get_state_for_ui(stamp)}
+
+
 @app.get("/api/runs/{stamp}/scene-renames", response_model=list[SceneRenameItem])
 def get_scene_renames(stamp: str) -> list[SceneRenameItem]:
     return report_loader.load_scene_renames(stamp)
@@ -284,7 +329,14 @@ def download_feedback_export(
     module: str = Query(default="duplicates"),
     format: str = Query(default="csv"),
 ) -> FileResponse:
-    if module == "investigation":
+    if module == "all":
+        if format == "json":
+            inv_feedback.export_engine_hints()
+            export_engine_hints()
+            path = feedback_export.FEEDBACK_DIR / "investigation_hints.json"
+        else:
+            path = feedback_export.export_unified_csv(stamp)
+    elif module == "investigation":
         if format == "json":
             path = inv_feedback.export_engine_hints()
         else:
@@ -298,6 +350,40 @@ def download_feedback_export(
         raise HTTPException(status_code=404, detail="No feedback to export yet")
     media = "application/json" if format == "json" else "text/csv"
     return FileResponse(path, filename=path.name, media_type=media)
+
+
+@app.get("/api/feedback/summary")
+def feedback_summary(stamp: str | None = Query(default=None)) -> dict[str, int]:
+    return feedback_export.feedback_summary(stamp)
+
+
+@app.get("/api/vendors")
+def list_vendors() -> dict[str, object]:
+    return {
+        "known": all_known_vendors(),
+        "user_added": [row.to_dict() for row in load_user_vendors()],
+    }
+
+
+@app.post("/api/vendors")
+def create_vendor(body: dict = Body(...)) -> dict[str, object]:
+    company = str(body.get("company", "")).strip()
+    if not company:
+        raise HTTPException(status_code=400, detail="company is required")
+    keywords = body.get("keywords") or []
+    if isinstance(keywords, str):
+        keywords = [k.strip() for k in keywords.split(",") if k.strip()]
+    row = add_user_vendor(company, list(keywords), category=str(body.get("category", "User_Added")))
+    return {"ok": True, "vendor": row.to_dict()}
+
+
+@app.post("/api/vendors/test")
+def test_vendor_keyword(body: dict = Body(...)) -> dict[str, object]:
+    keyword = str(body.get("keyword", "")).strip()
+    sample = str(body.get("sample", "")).strip()
+    if not keyword or not sample:
+        raise HTTPException(status_code=400, detail="keyword and sample are required")
+    return match_keyword(keyword, sample)
 
 
 @app.get("/api/runs/{stamp}/reports/{name}")

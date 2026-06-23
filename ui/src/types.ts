@@ -142,4 +142,5 @@ export type TabId =
   | "duplicates"
   | "restructure"
   | "archives"
-  | "scene-renames";
+  | "scene-renames"
+  | "vendors";

@@ -117,7 +117,25 @@ def save_store(store: InvestigationStore) -> Path:
     store.updated = _now_iso()
     GLOBAL_PATH.write_text(json.dumps(store.to_dict(), indent=2), encoding="utf-8")
     export_engine_hints(store)
+    _sync_sidecar_files(store)
     return GLOBAL_PATH
+
+
+def _sync_sidecar_files(store: InvestigationStore) -> None:
+    from audiotheca.vendor_overrides import UserVendor, save_user_vendors, sync_bucket_overrides
+
+    vendors = [
+        UserVendor(
+            company=row.company,
+            keywords=row.keywords,
+            category=row.category,
+            created=row.created,
+        )
+        for row in store.vendor_additions
+    ]
+    save_user_vendors(vendors)
+    if store.custom_buckets:
+        sync_bucket_overrides(store.custom_buckets)
 
 
 def run_corrections_path(stamp: str) -> Path:
