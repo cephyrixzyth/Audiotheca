@@ -1,0 +1,26 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "identifier": "default",
+  "description": "Default Audiotheca desktop permissions",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "opener:default",
+    "shell:default",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "api-server",
+          "sidecar": true,
+          "args": true
+        },
+        {
+          "name": "audiotheca-engine",
+          "sidecar": true,
+          "args": true
+        }
+      ]
+    }
+  ]
+}

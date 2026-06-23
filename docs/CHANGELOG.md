@@ -1,5 +1,33 @@
 # Changelog
 
+## 9.8.0
+
+### Engine
+
+- **`space_recovery.py` hardlink dedup (new tool)** — finds byte-identical files shared between libraries (sample WAVs, manuals/PDFs), verified with **full SHA-256** before planning. Emits `Hardlink_Plan_*.csv` + `make_hardlinks_*.ps1` (preview by default; backup-rename → link → verify → restore-on-failure). Hardlinks are program-transparent — every path still opens the same bytes, so installs and runtime loading are unaffected (symlinks deliberately avoided).
+- **`space_recovery.py` bloat finder (new tool)** — flags `REDIST_INSTALLER` (DirectX/VC++/.NET/Java/QuickTime — better sourced from the vendor), `PROMO_FILE` (`.url` shortcuts, promo HTML, torrent source notes), and `OS_JUNK` (Thumbs.db, .DS_Store, AppleDouble). Redistributables embedded in installer payloads (`Installer Data/`, `Redist/`...) are flagged REVIEW and never staged — offline setup chains can invoke them. Emits `Bloat_Report_*.csv` + `move_bloat_*.ps1` staging into `_delete-canidates/_bloat/`.
+- **NAME_CONTENT identification tier** — vendor keywords matched against child file/dir names already collected by the scan (no extra I/O). Catches scene-hash folders whose children are named `Vendor.Product.vX-GROUP`; strong matches are CONFIRMED, weak matches TENTATIVE after PE/NFO.
+- **Scene vendor backfill** — after Phase 1.6 archive peek, hash folders inherit a vendor matched from their inferred product name (`ARCHIVE_PEEK` method); shrinks `_scene_release_id` and `_unknown_vendor` buckets.
+- **PE CompanyName normalization** — legal suffixes (GmbH/Inc/LLC...) stripped and re-matched against the vendor DB; prevents duplicate vendor folders like `Native Instruments` vs `Native Instruments GmbH`.
+- **NFO candidate ordering** — real `.nfo` files and shallower paths scraped before deep `readme.txt` junk.
+- **Warm-cache version decoupling** — `CACHE_SCHEMA` (bumped only on `_scan_tree` format changes) replaces `ENGINE_VERSION` in `scan_cache.json`; identification-only releases no longer force a 60–90 min rescan.
+- **CLI args** — `--dry-run`, `--live`, `--root` override `main.py` defaults without editing config.
+- **JSON progress events** — engine writes phase events to `AUDIOTHECA_PROGRESS_FILE` for UI WebSocket streaming.
+- **Staged live rollout** — documented four-stage config in `main.py` (restructure → scene renames → archive cleanup → duplicates).
+
+### Web UI & API (v0.2)
+
+- **FastAPI** (`api/server.py`) — runs, investigation, duplicates, restructure, archive-peek, scene renames, decisions, explorer, jobs + WebSocket.
+- **React/Vite UI** (`ui/`) — Dashboard, Scan, Investigation, Duplicates, Restructure, Archives, Scene renames tabs.
+- **Features** — Open in Explorer, duplicate keeper export to `approved_{stamp}.json`, scan trigger with live progress.
+- **Launchers** — `start-ui.ps1`, `start-api.ps1`, `start-tauri.ps1` (quoted paths, prerequisite checks).
+
+### Desktop packaging
+
+- **Tauri 2 shell** — spawns API on launch; kills on exit.
+- **PyInstaller sidecars** — `api-server` + `audiotheca-engine` exes in `ui/src-tauri/binaries/`; build via `scripts/build_sidecars.py`.
+- **Docs** — [Quick User Guide](USER_GUIDE.md), [Tauri Build](TAURI_BUILD.md).
+
 ## 9.7.1
 
 - Staged live pre-flight summary before Phase 3 restructure moves.

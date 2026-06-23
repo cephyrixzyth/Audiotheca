@@ -1,6 +1,6 @@
 # Audiotheca — FAQ
 
-Engine version: **9.7.0**
+Engine version: **9.8.0** · Web UI: **v0.2**
 
 ## General
 
@@ -166,7 +166,7 @@ New in 9.7: `Archive_Peek_*.csv`, `Scene_Archive_Peek_*.csv`, `Multipart_Archive
 
 ### Do I need to delete the cache after changing vendor_db.py?
 
-Not strictly — cache stores scan sizes/OS flags, not vendor routes. But after logic changes, bump `ENGINE_VERSION` which auto-invalidates cache entries from older versions.
+Not strictly — cache stores scan sizes/OS flags, not vendor routes. Bump `CACHE_SCHEMA` when scan tree format changes; identification-only `ENGINE_VERSION` bumps keep the warm cache.
 
 ### Can I scan only one section?
 
@@ -194,8 +194,34 @@ No direct integration. Sidecar JSON metadata is compatible with manual Soundmine
 
 ---
 
+## Web UI
+
+### How do I open the dashboard?
+
+```powershell
+cd "C:\path\to\audiotheca"
+.\start-ui.ps1
+```
+
+Open **http://localhost:5173**. API health: http://127.0.0.1:8787/api/health.
+
+### `npm: not recognized`
+
+Node.js is not installed or not on PATH. Install from [nodejs.org](https://nodejs.org/) or run `winget install OpenJS.NodeJS.LTS`, then **close and reopen** the terminal. Use `.\start-api.ps1` if you only need the API.
+
+### Can I use the UI without Node.js?
+
+Not for the React dev UI. Use `.\start-api.ps1` and hit JSON endpoints directly, or review CSV reports in `dedupe_reports/`. The Tauri release build bundles the UI without requiring Node for end users.
+
+### Where do duplicate keeper choices save?
+
+`dedupe_reports/decisions/approved_{stamp}.json` — export from the Duplicates tab.
+
+---
+
 ## Getting help
 
-1. Check [Debug Runbook](DEBUG_RUNBOOK.md)
-2. Review latest `Run_Summary_*.txt` and `dedupe_engine.log`
-3. Note `ENGINE_VERSION` printed at run start — include it when reporting issues
+1. [Quick User Guide](USER_GUIDE.md)
+2. [Debug Runbook](DEBUG_RUNBOOK.md)
+3. Latest `Run_Summary_*.txt` and `dedupe_engine.log`
+4. Note `ENGINE_VERSION` printed at run start when reporting issues

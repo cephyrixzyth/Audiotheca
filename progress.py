@@ -2,8 +2,24 @@
 
 from __future__ import annotations
 
+import json
+import os
 import sys
 import time
+from datetime import datetime, timezone
+
+
+def _emit_progress_event(event: dict) -> None:
+    """Append JSONL event when AUDIOTHECA_PROGRESS_FILE is set (UI job runner)."""
+    path = os.environ.get("AUDIOTHECA_PROGRESS_FILE")
+    if not path:
+        return
+    payload = {"ts": datetime.now(timezone.utc).isoformat(), **event}
+    try:
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
 
 
 def format_duration(seconds: float) -> str:
@@ -34,6 +50,15 @@ class PhaseProgress:
         print(f">>> {self.phase}", flush=True)
         print(f"  0 / {self.total} {self.unit}  |  ETA --:--", flush=True)
         print(f"{'-' * 62}", flush=True)
+        _emit_progress_event(
+            {
+                "type": "phase_start",
+                "phase": self.phase,
+                "total": self.total,
+                "unit": self.unit,
+                "done": 0,
+            }
+        )
 
     def update(self, amount: int = 1, detail: str = "") -> None:
         self.done = min(self.done + amount, self.total)
@@ -54,6 +79,19 @@ class PhaseProgress:
         if detail:
             msg += f"  |  {detail[:48]}"
         print(msg, flush=True)
+        _emit_progress_event(
+            {
+                "type": "phase_progress",
+                "phase": self.phase,
+                "done": self.done,
+                "total": self.total,
+                "unit": self.unit,
+                "pct": round(pct, 1),
+                "elapsed_s": round(elapsed, 1),
+                "eta_s": None if remaining == float("inf") else round(remaining, 1),
+                "detail": detail[:120] if detail else "",
+            }
+        )
 
     def finish(self, note: str = "") -> None:
         elapsed = time.monotonic() - self.started
@@ -62,6 +100,14 @@ class PhaseProgress:
             line += f" - {note}"
         print(line, flush=True)
         print(f"{'-' * 62}\n", flush=True)
+        _emit_progress_event(
+            {
+                "type": "phase_finish",
+                "phase": self.phase,
+                "elapsed_s": round(elapsed, 1),
+                "note": note,
+            }
+        )
 
 
 def tqdm_bar(total: int, desc: str, unit: str = "item"):

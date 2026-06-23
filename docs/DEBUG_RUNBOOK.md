@@ -2,7 +2,7 @@
 
 Use this runbook when a scan fails, produces unexpected results, or appears hung.
 
-Engine version at time of writing: **9.7.0**
+Engine version at time of writing: **9.8.0**
 
 ---
 
@@ -51,6 +51,98 @@ Get-ChildItem ".\dedupe_reports\Run_Summary_*.txt" | Sort-Object LastWriteTime -
 | Scene hash unknown / huge | [Scene archive peek](#scene-archive-peek--multipart-diagnostic) |
 | Archive vs folder — which to keep? | [Archive peek verdicts](#archive-peek-verdicts) |
 | No phase ETA in terminal | [Progress / ETA](#progress--eta) |
+| `npm` not recognized | [Web UI / API](#web-ui--api) |
+| UI blank or cannot connect | [Web UI / API](#web-ui--api) |
+| Scan from UI never starts | [Web UI / API](#web-ui--api) |
+
+---
+
+## Web UI / API
+
+### `Rust/Cargo not found` (but Rust is "installed")
+
+Usually one of these:
+
+1. **Terminal opened before Rust install** — close and reopen PowerShell/Cursor terminal.
+2. **PATH not refreshed** — `start-tauri.ps1` now reloads PATH from the registry and checks `%USERPROFILE%\.cargo\bin`.
+3. **rustup started but toolchain never downloaded** — you may have only `~\.rustup\settings.toml` and **no** `~\.cargo\bin\cargo.exe`.
+
+Verify:
+
+```powershell
+Test-Path "$env:USERPROFILE\.cargo\bin\cargo.exe"
+cargo --version
+```
+
+If `False`, finish install (run in a **new** terminal as your user):
+
+```powershell
+# If you downloaded rustup-init.exe:
+& "$env:USERPROFILE\Downloads\rustup-init.exe" -y
+
+# Or via winget:
+winget install Rustlang.Rustup
+```
+
+If download fails with `tcp connect error` / `os error 10013`, check firewall/VPN/antivirus blocking `static.rust-lang.org`, or install **Rust (MSVC)** from [rustup.rs](https://rustup.rs/) with admin rights.
+
+**Workaround:** use browser UI — `.\start-ui.ps1` — no Rust required.
+
+### `link.exe` not found / could not compile (MSVC)
+
+Rust is installed but **Visual C++ Build Tools** are missing. Tauri cannot compile without `link.exe`.
+
+```powershell
+.\scripts\install_msvc_prereqs.ps1
+# or: winget install Microsoft.VisualStudio.2022.BuildTools
+```
+
+In the installer, enable **Desktop development with C++** (MSVC v143). Restart terminal after install.
+
+Verify: `where.exe link`
+
+**Workaround:** `.\start-ui.ps1` — same UI in the browser, no MSVC needed.
+
+### `Could not connect to index.crates.io`
+
+Firewall/VPN/antivirus blocking Cargo downloads. Retry on a stable network, or temporarily disable VPN. First successful build caches crates locally.
+
+### `npm: not recognized`
+
+Node.js is missing. Install via [nodejs.org](https://nodejs.org/) or `winget install OpenJS.NodeJS.LTS`, then restart the terminal. Use `.\start-api.ps1` for API-only mode.
+
+### `Set-Location: positional parameter...`
+
+Path contains spaces without quotes:
+
+```powershell
+cd "C:\Users\Cephyrix Zyth\Desktop\audiotheca"
+```
+
+### `No module named api.servercd` or `api.servernpm`
+
+Commands were pasted on one line. Run **one command per line**:
+
+```powershell
+python -m api.server
+```
+
+### UI loads but shows no runs
+
+1. Confirm reports exist: `Get-ChildItem dedupe_reports\Run_Summary_*.txt`
+2. API health: `Invoke-RestMethod http://127.0.0.1:8787/api/health`
+3. Run a dry scan if folder is empty: `python main.py --dry-run`
+
+### Scan from UI hangs or fails
+
+- Map network drive (`Z:`) before starting API
+- Check job status: `GET http://127.0.0.1:8787/api/jobs`
+- Engine log: `dedupe_engine.log`
+- WebSocket events: `ws://127.0.0.1:8787/api/jobs/{id}/events`
+
+### Open in Explorer does nothing
+
+Requires Windows and a valid local/mapped path. Network UNC paths may need to be mapped to a drive letter first.
 
 ---
 

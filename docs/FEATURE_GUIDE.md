@@ -1,6 +1,6 @@
 # Audiotheca — Feature Guide
 
-Engine version: **9.7.0**
+Engine version: **9.8.0** · Web UI: **v0.2**
 
 ## Overview
 
@@ -57,7 +57,11 @@ Single-pass `os.scandir` walk per target:
 
 ### 3. Vendor identification
 
-Tiered ID: `NAME_STRONG` → `NAME_PRODUCT` → `PE_HEADER` → `NFO` → `NAME_SPLIT` → `RECONCILED`.
+Tiered ID: `NAME_STRONG` → `NAME_PRODUCT` → `NAME_CONTENT` (9.8+) → `PE_HEADER` → `NFO` → `NAME_SPLIT` → `RECONCILED` → `ARCHIVE_PEEK` (scene backfill).
+
+- **NAME_CONTENT** — matches vendor keywords against child file/dir names already collected by the scan (no extra I/O).
+- **Scene vendor backfill** — after Phase 1.6 peek, hash folders inherit vendor from inferred product name.
+- **PE normalization** — legal suffixes (GmbH, Inc, LLC…) stripped before vendor DB lookup.
 
 Vendor-stripped fingerprints and cross-folder reconciliation after scan.
 
@@ -114,7 +118,36 @@ Scene-hash folders (`_scene_release_id`) are prime candidates for **Phase 1.6 pe
 
 ### 9. Scan cache
 
-`scan_cache.json` keyed by directory mtime. Busts on `ENGINE_VERSION` change.
+`scan_cache.json` keyed by directory mtime + `CACHE_SCHEMA`. Identification-only engine bumps no longer force a full rescan.
+
+### 10. Space recovery tools (9.8+)
+
+**`space_recovery.py`** — optional post-dry-run cleanup:
+
+| Mode | Output | Purpose |
+| --- | --- | --- |
+| Hardlink dedup | `Hardlink_Plan_*.csv`, `make_hardlinks_*.ps1` | Byte-identical files across libraries (SHA-256 verified) |
+| Bloat finder | `Bloat_Report_*.csv`, `move_bloat_*.ps1` | Redistributables, promo junk, OS metadata files |
+
+### 11. Archive delete candidates (9.7.1+)
+
+**`gen_archive_delete_candidates.py`** reads `Archive_Peek_*.csv` and emits:
+
+- `Archive_Delete_Candidates_{stamp}.csv`
+- `move_redundant_archives_{stamp}.ps1` — preview by default; set `$Execute = $true` for Stage 3
+
+### 12. Web UI & API (v0.2)
+
+FastAPI on `http://127.0.0.1:8787` serves dry-run reports and runs scan jobs.
+
+| Endpoint area | Purpose |
+| --- | --- |
+| `/api/runs/{stamp}/*` | Investigation, duplicates, restructure, archives, scene renames |
+| `/api/jobs` + WebSocket | Trigger scan; stream phase progress |
+| `/api/decisions` | Save duplicate keeper choices → `approved_{stamp}.json` |
+| `/api/explorer` | Open path in Windows Explorer |
+
+Launch: `.\start-ui.ps1` or `python -m api.server` + `cd ui && npm run dev`.
 
 ---
 
@@ -138,37 +171,48 @@ All in `dedupe_reports/` with timestamp `YYYYMMDD_HHMM`. Copied to `{ROOT}/_dedu
 | `Scan_Failures_*.csv` | Worker exceptions |
 | `Library_Organization_Log_*.csv` | Live action log |
 | `Library_Inventory_Dump_*.csv` | Full inventory (optional) |
+| `Archive_Delete_Candidates_*.csv` | Redundant archives flagged for removal |
+| `Hardlink_Plan_*.csv` | Identical-file hardlink candidates (`space_recovery.py`) |
+| `Bloat_Report_*.csv` | Promo/redist/OS junk (`space_recovery.py`) |
+| `decisions/approved_{stamp}.json` | UI duplicate keeper export |
 
 ---
 
-## Configuration (9.7)
+## Configuration (9.8)
 
 ```python
-ENGINE_VERSION = "9.7.0"
+ENGINE_VERSION = "9.8.0"
+CACHE_SCHEMA = "9.7.1"
 ROOT_DIR = r"Z:\_software\_audio"
-DRY_RUN = True
+DRY_RUN = False                    # Stage 1 live; use --dry-run to override
 MAX_WALK_DEPTH = 8
 PROBE_DEPTH = 8
 MAX_WORKERS = 8
 ENABLE_ARCHIVE_PEEK = True
 ENABLE_SCENE_ARCHIVE_PEEK = True
-SCENE_AUTO_RENAME = True
+SCENE_AUTO_RENAME = False          # Stage 2
 SCENE_PEEK_MIN_SIZE_MB = 500
 SCENE_RENAME_MIN_SIZE_MB = 1000
-ACTION_MODE = "ask"  # ask | section | item | auto
+ACTION_MODE = "section"            # Stage 1
 ```
+
+CLI: `python main.py --dry-run`, `--live`, `--root PATH`.
 
 ---
 
 ## Typical workflow
 
 ```
-Dry run → Review Run_Summary + Archive_Peek + Scene_Archive_Peek
-       → Fix vendor_db.py / approve scene renames on next live run
-       → Delete redundant archives (MATCHES_EXTRACTED_FOLDER) manually
-       → Live run (item mode) section by section
+Dry run → Review in UI or Run_Summary + Archive_Peek + Scene_Archive_Peek
+       → Fix vendor_db.py; re-dry-run if needed
+       → Stage 1 live: restructure (section approval)
+       → Stage 2: scene renames (item approval)
+       → Stage 3: move_redundant_archives_*.ps1
+       → Stage 4: duplicate keepers via UI → approved.json
        → Review _delete-canidates
 ```
+
+See [Quick User Guide](USER_GUIDE.md) for launch commands and troubleshooting.
 
 ---
 

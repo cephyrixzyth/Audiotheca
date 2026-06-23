@@ -156,6 +156,106 @@ class TestClassifyInvestigation:
         assert "Spectrasonics" in reason
 
 
+def _scan_info(**overrides) -> dict:
+    info = {
+        "size": 0,
+        "has_windows": False,
+        "has_mac": False,
+        "has_linux": False,
+        "has_assets": False,
+        "is_tonex": False,
+        "nested": [],
+        "coexistence": [],
+        "archive_files": [],
+        "installer_files": [],
+        "pe_candidates": [],
+        "nfo_candidates": [],
+        "top_files": [],
+        "largest_files": [],
+    }
+    info.update(overrides)
+    return info
+
+
+class TestNormalizePeCompany:
+    def test_matches_db_vendor_with_legal_suffix(self, engine):
+        assert engine._normalize_pe_company("Voxengo GmbH") == "Voxengo"
+
+    def test_strips_suffix_when_not_in_db(self, engine):
+        assert engine._normalize_pe_company("Acme Audioworks LLC") == "Acme Audioworks"
+
+    def test_db_match_passthrough(self, engine):
+        assert engine._normalize_pe_company("Celemony") == "Celemony"
+
+
+class TestContentVendorTier:
+    def test_scene_hash_folder_identified_from_child_names(self, engine):
+        info = _scan_info(
+            largest_files=[(500, "Voxengo.SPAN.Plus.v2.0-R2R/Setup SPAN Plus.exe")],
+        )
+        company, method, confidence = engine.identify_vendor(Path("294999"), info)
+        assert company == "Voxengo"
+        assert method == "NAME_CONTENT"
+        assert confidence == "CONFIRMED"
+
+    def test_installer_rel_path_matches(self, engine):
+        info = _scan_info(
+            installer_files=[
+                {"size": 10, "name": "setup.exe", "depth": 2, "rel_path": "Celemony Melodyne 5/setup.exe"}
+            ],
+        )
+        company, method, _confidence = engine.identify_vendor(Path("7935X"), info)
+        assert company == "Celemony"
+        assert method == "NAME_CONTENT"
+
+    def test_no_content_match_falls_through(self, engine):
+        info = _scan_info(largest_files=[(100, "data/blob.bin")])
+        company, method, confidence = engine.identify_vendor(Path("287901"), info)
+        assert company is None
+        assert method == "NONE"
+        assert confidence == "UNKNOWN"
+
+
+class TestOrderedNfoCandidates:
+    def test_nfo_beats_txt_and_shallow_beats_deep(self, engine):
+        ordered = engine._ordered_nfo_candidates(
+            [
+                r"x\a\b\c\readme.txt",
+                r"x\deep\nested\release.nfo",
+                r"x\release.nfo",
+            ]
+        )
+        assert ordered[0] == r"x\release.nfo"
+        assert ordered[1] == r"x\deep\nested\release.nfo"
+        assert ordered[2] == r"x\a\b\c\readme.txt"
+
+
+class TestSceneVendorBackfill:
+    def test_backfills_unknown_scene_folder(self, engine, tmp_path):
+        folder = tmp_path / "295000"
+        item = {
+            "path": folder,
+            "company": None,
+            "id_method": "NONE",
+            "id_confidence": "UNKNOWN",
+        }
+        engine.scene_archive_rows = [
+            {"inferred_product": "Voxengo SPAN Plus", "folder_path": str(folder)}
+        ]
+        assert engine._backfill_scene_vendors([item]) == 1
+        assert item["company"] == "Voxengo"
+        assert item["id_method"] == "ARCHIVE_PEEK"
+
+    def test_does_not_override_existing_vendor(self, engine, tmp_path):
+        folder = tmp_path / "295001"
+        item = {"path": folder, "company": "Xfer", "id_method": "NAME_STRONG", "id_confidence": "CONFIRMED"}
+        engine.scene_archive_rows = [
+            {"inferred_product": "Voxengo SPAN Plus", "folder_path": str(folder)}
+        ]
+        assert engine._backfill_scene_vendors([item]) == 0
+        assert item["company"] == "Xfer"
+
+
 class TestMoveAndMerge:
     def test_merge_collision_returns_false(self, tmp_path):
         engine = DeduplicationEngine(tmp_path, dry_run=False, max_workers=1)

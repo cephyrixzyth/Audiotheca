@@ -1,6 +1,10 @@
 # Audiotheca — Architecture & UI Roadmap
 
-How to evolve Audiotheca from a CLI script into a desktop product with a detailed UI. **v9.7.0** already ships archive listing (`archive_peek.py`), scene-hash rename, multipart diagnostics, and phase ETA — the UI layer should consume those CSV/JSON contracts rather than reimplementing peek logic.
+How Audiotheca evolved from a CLI script into a desktop product. **v9.8.0** ships the scan engine plus a **Web UI v0.2** (FastAPI + React) and **Tauri 2** desktop shell with PyInstaller sidecars. The UI consumes existing CSV/JSON report contracts — it does not reimplement peek or matching logic.
+
+**Shipped (v0.2):** Report viewer, investigation inbox, duplicate keeper export, restructure preview, archive tab, scan jobs with WebSocket progress, Open in Explorer, launcher scripts.
+
+**Still roadmap:** SQLite job store, live execute from UI, archive extract/compare wizard, package split (`audiotheca/` module).
 
 ---
 
@@ -247,10 +251,12 @@ Never auto-delete both — same safety model as today.
 ## Next steps (ordered)
 
 1. ~~Git init + docs~~ ✓
-2. Split `main.py` → `audiotheca/` package
-3. Add `cli.py` subcommands
-4. SQLite schema + import from scan results
-5. FastAPI skeleton with WebSocket progress
-6. Tauri app: Investigation Inbox MVP
-7. Wire duplicate review cards
-8. Archive extract + compare wizard
+2. ~~FastAPI + WebSocket progress~~ ✓ (v0.2)
+3. ~~React report viewer + investigation inbox~~ ✓
+4. ~~Duplicate review + keeper export~~ ✓
+5. ~~Tauri shell + PyInstaller sidecars~~ ✓
+6. Wire `approved.json` into engine execute step
+7. Split `main.py` → `audiotheca/` package + `cli.py`
+8. SQLite schema + import from scan results
+9. Live execute from UI (section/item approval)
+10. Archive extract + compare wizard
