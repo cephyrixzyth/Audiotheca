@@ -1098,11 +1098,32 @@ def download_report(stamp: str, name: str) -> FileResponse:
     return FileResponse(path, filename=path.name)
 
 
-# --- Explorer ---
+# --- Explorer / browse (in-app; no external file manager) ---
+
+
+@app.get("/api/browse")
+def browse_directory(
+    path: str = Query(default=""),
+    limit: int = Query(default=500, le=2000),
+) -> dict[str, object]:
+    from api.browse_api import list_directory
+
+    return list_directory(path, limit=limit)
+
+
+@app.get("/api/archive/list")
+def archive_list_contents(
+    path: str = Query(...),
+    limit: int = Query(default=200, le=1000),
+) -> dict[str, object]:
+    from api.browse_api import list_archive_contents
+
+    return list_archive_contents(path, limit=limit)
 
 
 @app.post("/api/explorer")
 def open_in_explorer(body: dict = Body(...)) -> dict[str, bool]:
+    """Legacy: opens OS file manager. Prefer GET /api/browse in the web UI."""
     path_str = body.get("path", "")
     target = security.assert_library_path(str(path_str), must_exist=True, label="path")
     resolved = str(target.resolve())

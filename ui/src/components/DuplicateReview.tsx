@@ -181,7 +181,7 @@ export function DuplicateReview({ stamp }: Props) {
   return (
     <div>
       <div className="toolbar">
-        <label>
+        <label title="Filter duplicate groups by engine confidence score">
           Confidence
           <select value={confidence} onChange={(e) => setConfidence(e.target.value)}>
             <option value="">All</option>
@@ -189,16 +189,17 @@ export function DuplicateReview({ stamp }: Props) {
             <option value="MEDIUM">MEDIUM</option>
           </select>
         </label>
-        <label>
+        <label title="Search product name or full path">
           Search
           <input
             type="search"
             placeholder="Product name or path…"
+            title="Search product name or full path"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
         </label>
-        <label className="checkbox-label">
+        <label className="checkbox-label" title="Hide groups you marked as bad matches">
           <input
             type="checkbox"
             checked={hideRejected}
@@ -215,6 +216,7 @@ export function DuplicateReview({ stamp }: Props) {
           type="button"
           className="primary-btn"
           disabled={decidedCount === 0}
+          title="Persist keeper choices to approved.json for staging"
           onClick={() => void handleSave()}
         >
           Save decisions
@@ -223,6 +225,7 @@ export function DuplicateReview({ stamp }: Props) {
           type="button"
           className="keeper-btn"
           disabled={decidedCount === 0}
+          title="Simulate moving non-keeper copies to _delete-canidates"
           onClick={() => void handlePreviewDeletes()}
         >
           Preview deletes
@@ -231,11 +234,17 @@ export function DuplicateReview({ stamp }: Props) {
           type="button"
           className="danger-btn"
           disabled={decidedCount === 0}
+          title="Move non-keeper duplicates to _delete-canidates on disk"
           onClick={() => void handleStageDeletes()}
         >
           Stage deletes
         </button>
-        <button type="button" className="text-btn" onClick={() => setShowManual((v) => !v)}>
+        <button
+          type="button"
+          className="text-btn"
+          title="Report a duplicate pair the engine missed — feeds next-scan tuning"
+          onClick={() => setShowManual((v) => !v)}
+        >
           Report manual dupe
         </button>
         {feedbackUrl && (

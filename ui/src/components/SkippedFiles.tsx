@@ -184,16 +184,16 @@ export function SkippedFiles({ stamp, runs }: Props) {
     }
   }
 
-  const subTabs: { id: SubView; label: string }[] = [
-    { id: "hub", label: "All skipped" },
-    { id: "failures", label: "Scan failures" },
-    { id: "coverage", label: "Coverage gaps" },
-    { id: "cache", label: "Cache hits" },
-    { id: "nested", label: "Nested issues" },
-    { id: "coexistence", label: "Coexistence" },
-    { id: "inventory", label: "Inventory" },
-    { id: "truncations", label: "Probe limits" },
-    { id: "compare", label: "Compare runs" },
+  const subTabs: { id: SubView; label: string; title?: string }[] = [
+    { id: "hub", label: "All skipped", title: "Every skipped or deferred path with reason codes" },
+    { id: "failures", label: "Scan failures", title: "Paths where the scan phase threw or timed out" },
+    { id: "coverage", label: "Coverage gaps", title: "Library areas not reached by the last scan pass" },
+    { id: "cache", label: "Cache hits", title: "Items skipped because fingerprint cache said unchanged" },
+    { id: "nested", label: "Nested issues", title: "Archives or folders nested inside other products" },
+    { id: "coexistence", label: "Coexistence", title: "Archive and extracted folder both present — needs archive peek" },
+    { id: "inventory", label: "Inventory", title: "Loose files and unpackaged items outside normal routes" },
+    { id: "truncations", label: "Probe limits", title: "Paths cut off by max depth or size probe limits" },
+    { id: "compare", label: "Compare runs", title: "Diff skipped sets between two scan stamps" },
   ];
 
   return (
@@ -209,6 +209,7 @@ export function SkippedFiles({ stamp, runs }: Props) {
             key={t.id}
             type="button"
             className={view === t.id ? "primary-btn" : "keeper-btn"}
+            title={t.title ?? t.label}
             onClick={() => setView(t.id)}
           >
             {t.label}
@@ -221,12 +222,17 @@ export function SkippedFiles({ stamp, runs }: Props) {
           <input
             type="search"
             placeholder="Search paths…"
+            title="Search skipped file paths"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             style={{ minWidth: "16rem" }}
           />
           {view === "hub" && (
-            <select value={reason} onChange={(e) => setReason(e.target.value)}>
+            <select
+              value={reason}
+              title="Filter by why the engine skipped or deferred this path"
+              onChange={(e) => setReason(e.target.value)}
+            >
               <option value="">All reasons</option>
               {Object.entries(counts).map(([key, n]) => (
                 <option key={key} value={key}>
@@ -237,10 +243,20 @@ export function SkippedFiles({ stamp, runs }: Props) {
           )}
           {selected.size > 0 && (
             <>
-              <button type="button" className="primary-btn" onClick={handleRescanSelected}>
+              <button
+                type="button"
+                className="primary-btn"
+                title="Force a targeted rescan of selected paths on the next run"
+                onClick={handleRescanSelected}
+              >
                 Rescan selected ({selected.size})
               </button>
-              <button type="button" className="keeper-btn" onClick={handleQueueInvestigation}>
+              <button
+                type="button"
+                className="keeper-btn"
+                title="Send selected paths to the investigation inbox"
+                onClick={handleQueueInvestigation}
+              >
                 Queue investigation
               </button>
             </>

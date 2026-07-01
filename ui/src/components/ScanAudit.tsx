@@ -8,10 +8,10 @@ interface Props {
 }
 
 const QUICK_FILTERS = [
-  { id: "unknown", label: "UNKNOWN vendor", flags: "unknown_vendor" },
-  { id: "tentative", label: "Tentative ID", flags: "tentative_id" },
-  { id: "not_ready", label: "Not READY", status: "NEEDS REVIEW" },
-  { id: "failed", label: "Scan failed", status: "SCAN_FAILED" },
+  { id: "unknown", label: "UNKNOWN vendor", flags: "unknown_vendor", title: "Rows flagged unknown_vendor — need vendor ID or feedback" },
+  { id: "tentative", label: "Tentative ID", flags: "tentative_id", title: "Identification confidence is tentative — review before live run" },
+  { id: "not_ready", label: "Not READY", status: "NEEDS REVIEW", title: "Routes blocked until investigation or override" },
+  { id: "failed", label: "Scan failed", status: "SCAN_FAILED", title: "Engine could not complete scan for this path" },
 ];
 
 export function ScanAudit({ stamp }: Props) {
@@ -78,6 +78,7 @@ export function ScanAudit({ stamp }: Props) {
                 ? "primary-btn"
                 : "keeper-btn"
             }
+            title={filter.title ?? filter.label}
             onClick={() => {
               setStatus(filter.status ?? "");
               setFlags(filter.flags ?? "");
@@ -86,10 +87,20 @@ export function ScanAudit({ stamp }: Props) {
             {filter.label}
           </button>
         ))}
-        <button type="button" className="keeper-btn" onClick={() => { setStatus(""); setFlags(""); }}>
+        <button
+          type="button"
+          className="keeper-btn"
+          title="Clear status and flag filters"
+          onClick={() => { setStatus(""); setFlags(""); }}
+        >
           All rows
         </button>
-        <button type="button" className="keeper-btn" onClick={() => { setStatus("READY"); setFlags(""); }}>
+        <button
+          type="button"
+          className="keeper-btn"
+          title="Show only routes ready to move on next live run"
+          onClick={() => { setStatus("READY"); setFlags(""); }}
+        >
           READY only
         </button>
       </div>
@@ -166,7 +177,12 @@ export function ScanAudit({ stamp }: Props) {
                 <td><code style={{ fontSize: "0.75rem" }}>{row.flags || "—"}</code></td>
                 <td><PathLink path={row.planned_destination} /></td>
                 <td>
-                  <button type="button" className="keeper-btn" onClick={() => void handleSetVendor(row)}>
+                  <button
+                    type="button"
+                    className="keeper-btn"
+                    title="Override vendor for this path on the next scan"
+                    onClick={() => void handleSetVendor(row)}
+                  >
                     Set vendor
                   </button>
                 </td>

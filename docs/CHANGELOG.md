@@ -1,5 +1,22 @@
 # Changelog
 
+## 10.0.0
+
+### Engine
+
+- **Built-in library browser API** — `GET /api/browse` lists folders under configured library roots without opening an external file manager
+- **Bundled archive listing** — `GET /api/archive/list` lists `.zip`/`.rar`/`.7z` contents via bundled or system 7-Zip (`tools/7zip/` + `scripts/setup_7zip.ps1`)
+- **OS lane routing** — Mac/Linux/Windows-only items route under `_mac` / `_linux` / `_windows` instead of flat quarantine
+- **Cross-platform path logic** — Windows library paths resolve correctly on Linux CI and NAS hosts
+- Health payload includes `archive_tool` path when 7-Zip is available
+
+### Web UI
+
+- **In-app file explorer** — PathLink **Browse** opens a side panel; archive files show contents without extracting
+- **Reorderable layout** — compact inline ⠿↑↓ controls, optional empty gaps, drop slots between sections
+- **Tooltips** — navigation tabs, flow editor, and scan controls describe each facet
+- Removed third-party workflow product references from UI copy
+
 ## Unreleased / UI 0.2.x (documentation & ops)
 
 ### Documentation
@@ -16,7 +33,7 @@
 - **Skipped files** hub — coverage gaps, cache hits, coexistence, run compare, targeted rescan
 - **Scan audit** tab — full identification audit table
 - **Dashboard** — route-ready gauges, run compare, reorderable sections
-- **Scan** — processing flow editor (FileFlows-style presets), skippable phases
+- **Scan** — processing flow editor with presets, skippable phases
 - **Investigation** — group-by-prefix, bulk correct
 - Underscore whitelist engine integration (`dedupe_reports/feedback/underscore_whitelist.json`)
 - API service safeguards — health checks, job cap, orphan detection, rate limits

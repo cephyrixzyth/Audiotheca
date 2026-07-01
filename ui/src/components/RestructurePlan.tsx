@@ -108,12 +108,18 @@ export function RestructurePlan({ stamp }: Props) {
       </div>
 
       <div className="toolbar" style={{ marginBottom: "0.5rem" }}>
-        <button type="button" className="keeper-btn" onClick={() => void handleExecute(true)}>
+        <button
+          type="button"
+          className="keeper-btn"
+          title="Simulate moves for approved sections without changing disk"
+          onClick={() => void handleExecute(true)}
+        >
           Dry-run approved sections
         </button>
         <button
           type="button"
           className="primary-btn"
+          title="Apply READY moves in approved sections on the library share"
           onClick={() => {
             if (window.confirm("Move READY items in approved sections on disk?")) {
               void handleExecute(false, true);
@@ -134,6 +140,11 @@ export function RestructurePlan({ stamp }: Props) {
                 key={section}
                 type="button"
                 className={approved ? "primary-btn" : "keeper-btn"}
+                title={
+                  approved
+                    ? `Section ${section} is approved for live execute`
+                    : `Approve all READY routes in section ${section}`
+                }
                 onClick={() => void handleApproveSection(section)}
               >
                 {approved ? "✓ " : ""}Section {section} ({count})
@@ -144,7 +155,7 @@ export function RestructurePlan({ stamp }: Props) {
       )}
 
       <div className="toolbar">
-        <label>
+        <label title="Filter by route readiness — READY items can move when section is approved">
           Status
           <select value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="">All</option>
@@ -219,7 +230,12 @@ export function RestructurePlan({ stamp }: Props) {
                     {override && <div className="count-muted">override</div>}
                   </td>
                   <td>
-                    <button type="button" className="keeper-btn" onClick={() => void handleOverride(row)}>
+                    <button
+                      type="button"
+                      className="keeper-btn"
+                      title="Override planned destination relative to library root (e.g. a/Vendor/Product)"
+                      onClick={() => void handleOverride(row)}
+                    >
                       Edit dest
                     </button>
                   </td>

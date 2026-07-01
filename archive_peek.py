@@ -37,6 +37,12 @@ def find_7z() -> Path | None:
     import shutil
     import sys
 
+    from audiotheca.tools_paths import bundled_7z_candidates
+
+    for candidate in bundled_7z_candidates():
+        if candidate.is_file():
+            return candidate
+
     candidates: list[Path] = []
     if sys.platform == "win32":
         candidates.extend([

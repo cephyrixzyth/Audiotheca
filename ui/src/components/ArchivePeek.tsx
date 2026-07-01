@@ -138,12 +138,18 @@ export function ArchivePeek({ stamp }: Props) {
       </div>
 
       <div className="toolbar" style={{ marginBottom: "1rem" }}>
-        <button type="button" className="keeper-btn" onClick={() => void handleExecute(true)}>
+        <button
+          type="button"
+          className="keeper-btn"
+          title="Simulate staging confirmed archives to _delete-canidates without moving files"
+          onClick={() => void handleExecute(true)}
+        >
           Dry-run confirmed
         </button>
         <button
           type="button"
           className="primary-btn"
+          title="Move confirmed redundant archives to _delete-canidates on the library share"
           onClick={() => {
             if (
               window.confirm(
@@ -166,6 +172,7 @@ export function ArchivePeek({ stamp }: Props) {
             key={name}
             type="button"
             className={`bucket-chip ${verdict === name ? "active-chip" : ""}`}
+            title={`Filter rows with verdict ${name}`}
             onClick={() => setVerdict(name)}
           >
             {name}
@@ -175,6 +182,7 @@ export function ArchivePeek({ stamp }: Props) {
         <button
           type="button"
           className={`bucket-chip ${verdict === "" ? "active-chip" : ""}`}
+          title="Show all archive verdicts"
           onClick={() => setVerdict("")}
         >
           All
@@ -182,11 +190,12 @@ export function ArchivePeek({ stamp }: Props) {
       </div>
 
       <div className="toolbar">
-        <label>
+        <label title="Filter by archive path or product name">
           Search
           <input
             type="search"
             placeholder="Archive path, product…"
+            title="Search archive path or product name"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -247,6 +256,7 @@ export function ArchivePeek({ stamp }: Props) {
                         <button
                           type="button"
                           className="keeper-btn"
+                          title="Mark this archive safe to delete — extracted folder is a match"
                           onClick={() => void handleConfirm(row)}
                         >
                           Confirm delete
@@ -254,6 +264,7 @@ export function ArchivePeek({ stamp }: Props) {
                         <button
                           type="button"
                           className="keeper-btn"
+                          title="Archive is not redundant — engine will skip it on future scans"
                           onClick={() => void handleReject(row)}
                         >
                           Not redundant
@@ -261,6 +272,7 @@ export function ArchivePeek({ stamp }: Props) {
                         <button
                           type="button"
                           className="keeper-btn"
+                          title="Keep the extracted folder and prefer deleting the archive later"
                           onClick={() => void handleKeeper(row, "folder")}
                         >
                           Keep folder
@@ -268,6 +280,7 @@ export function ArchivePeek({ stamp }: Props) {
                         <button
                           type="button"
                           className="keeper-btn"
+                          title="Keep the archive file and treat the extracted folder as disposable"
                           onClick={() => void handleKeeper(row, "archive")}
                         >
                           Keep archive

@@ -80,7 +80,7 @@ export function FlowEditor({
   return (
     <div className="flow-editor">
       <div className="flow-editor-toolbar">
-        <label>
+        <label title="Pick a scan preset — each enables or skips engine phases">
           Preset
           <select
             value={presetId}
@@ -97,7 +97,7 @@ export function FlowEditor({
             <option value="custom">Custom</option>
           </select>
         </label>
-        <label className="checkbox-label">
+        <label className="checkbox-label" title="Pause after each major phase so you can review logs before continuing">
           <input
             type="checkbox"
             checked={pauseBetweenPhases}
@@ -184,6 +184,7 @@ export function FlowEditor({
             <button
               type="button"
               className="keeper-btn"
+              title={skipSet.has(selected.skipKey!) ? "Include this phase in the next scan" : "Skip this phase in the next scan"}
               onClick={() => togglePhase(selected.id, selected.skipKey)}
             >
               {skipSet.has(selected.skipKey) ? "Enable phase" : "Skip phase"}
@@ -193,8 +194,8 @@ export function FlowEditor({
       )}
 
       <p className="count-muted flow-hint">
-        Inspired by FileFlows — linear pipeline with skippable nodes. Required phases always run.
-        Toggle OFF on peek/dupe/quarantine nodes for faster identify-only passes.
+        Linear scan pipeline with skippable phases. Required steps always run.
+        Turn OFF peek, duplicate, or OS-lane nodes for faster identify-only passes.
       </p>
     </div>
   );

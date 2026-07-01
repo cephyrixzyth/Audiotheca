@@ -857,8 +857,9 @@ tr.inv-vendor-set {
 
 .section-drag-controls {
   display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.2rem;
   flex-shrink: 0;
 }
 
@@ -884,10 +885,127 @@ tr.inv-vendor-set {
   color: var(--text-dim);
   border-radius: 4px;
   padding: 0;
-  width: 1.4rem;
-  height: 1.1rem;
-  font-size: 0.65rem;
+  width: 1.35rem;
+  height: 1.35rem;
+  font-size: 0.7rem;
   line-height: 1;
+}
+
+.section-remove-btn {
+  color: var(--danger);
+}
+
+.reorderable-hint-actions {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.reorder-item-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.reorder-drop-slot {
+  min-height: 4px;
+  border-radius: 4px;
+  transition: min-height 0.15s ease, background 0.15s ease;
+}
+
+.reorder-drop-slot.active {
+  min-height: 1.25rem;
+  background: rgba(61, 214, 140, 0.12);
+  border: 1px dashed var(--accent-dim);
+}
+
+.reorder-spacer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.25rem;
+  padding: 0.35rem 0.75rem;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.reorder-spacer.is-drag-over {
+  border-color: var(--accent);
+}
+
+/* --- In-app file explorer --- */
+.file-explorer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.file-explorer-panel {
+  width: min(520px, 92vw);
+  height: 100%;
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem 1rem;
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.35);
+}
+
+.file-explorer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.file-explorer-header h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.file-explorer-toolbar {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.file-explorer-table {
+  font-size: 0.82rem;
+}
+
+.file-explorer-list {
+  overflow: auto;
+  flex: 1;
+}
+
+.archive-entry-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  font-size: 0.8rem;
+  max-height: 60vh;
+  overflow: auto;
+}
+
+.linkish-btn {
+  border: none;
+  background: none;
+  color: var(--accent);
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.linkish-btn:hover {
+  text-decoration: underline;
+}
+
+.dir-row {
+  background: rgba(61, 214, 140, 0.04);
 }
 
 .section-move-btn:disabled {
@@ -931,7 +1049,7 @@ tr.inv-vendor-set {
   padding: 1rem;
 }
 
-/* --- Flow editor (FileFlows-inspired) --- */
+/* --- Flow editor (scan pipeline) --- */
 .flow-editor {
   display: flex;
   flex-direction: column;

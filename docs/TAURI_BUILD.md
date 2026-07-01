@@ -14,8 +14,8 @@ For day-to-day use without building an installer, prefer the **browser UI**: `.\
 | Tool | Install |
 | --- | --- |
 | **Rust** | [rustup.rs](https://rustup.rs/) |
-| **Node.js 20+** | [nodejs.org](https://nodejs.org/) |
-| **Python 3.11+** | For building sidecars + engine development |
+| **Node.js 24+** | [nodejs.org](https://nodejs.org/) (Active LTS) |
+| **Python 3.13+** | For building sidecars + engine development |
 
 ```powershell
 pip install fastapi uvicorn pyinstaller

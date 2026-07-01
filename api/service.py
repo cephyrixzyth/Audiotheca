@@ -107,7 +107,10 @@ def startup_checks() -> dict[str, object]:
 
 
 def health_payload(*, running_job: dict | None = None) -> dict[str, object]:
+    from archive_peek import find_7z
+
     uptime_s = round(time.time() - service_state.started_at, 1) if service_state.started_at else 0.0
+    seven_zip = find_7z()
     return {
         "status": "ok" if not service_state.startup_warnings else "degraded",
         "scan_running": running_job is not None,
@@ -115,4 +118,5 @@ def health_payload(*, running_job: dict | None = None) -> dict[str, object]:
         "uptime_s": uptime_s,
         "warnings": service_state.startup_warnings,
         "job": running_job,
+        "archive_tool": str(seven_zip) if seven_zip else None,
     }

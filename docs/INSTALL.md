@@ -10,11 +10,11 @@ For a step-by-step **first run on another machine**, see **[Testing Guide](TESTI
 
 | Requirement | Notes |
 | --- | --- |
-| **Python** | 3.10+ (3.11+ recommended) |
+| **Python** | 3.11+ (3.13 recommended) |
 | **OS** | Windows (primary); Linux possible for engine/API with path adjustments |
 | **Storage** | Local disk or SMB/CIFS mapped drive |
 | **7-Zip** | **Required for archive peek** (`.rar`, `.7z`, `.iso`) — [7-zip.org](https://www.7-zip.org/) |
-| **Node.js 20+** | Browser UI only — [nodejs.org](https://nodejs.org/) |
+| **Node.js 24+** | Browser UI only — [nodejs.org](https://nodejs.org/) (Active LTS) |
 | **Rust** | Tauri desktop builds only — [rustup.rs](https://rustup.rs/) |
 | **Write access** | Live runs only (`DRY_RUN = False` or `--live`) |
 

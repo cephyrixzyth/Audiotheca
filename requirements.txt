@@ -2,18 +2,18 @@
 # (stdlib only — csv, json, logging, pathlib, re, shutil, threading, concurrent.futures)
 
 # Recommended
-pefile>=2023.2.7      # PE binary CompanyName extraction (Windows plugins/installers)
-rapidfuzz>=3.0        # Fuzzy name similarity for duplicate detection
-tqdm>=4.66            # Progress bar during parallel scan
-psutil>=5.9           # CPU/RAM metrics in scan UI (optional but recommended)
+pefile>=2024.8.26     # PE binary CompanyName extraction (Windows plugins/installers)
+rapidfuzz>=3.14.0     # Fuzzy name similarity for duplicate detection
+tqdm>=4.68.0          # Progress bar during parallel scan
+psutil>=7.0.0         # CPU/RAM metrics in scan UI (optional but recommended)
 
 # UI API (local report viewer) — optional until you run the web UI
-fastapi>=0.115.0
-uvicorn[standard]>=0.32.0
+fastapi>=0.138.0
+uvicorn[standard]>=0.49.0
 
 # Desktop sidecar build (maintainers only)
-pyinstaller>=6.0
+pyinstaller>=6.21.0
 
 # Development / tests
-pytest>=8.0
+pytest>=9.0.0
 httpx>=0.28.0

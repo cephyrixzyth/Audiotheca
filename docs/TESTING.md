@@ -2,7 +2,7 @@
 
 This guide is for **another machine or another user** validating Audiotheca without the original author's library paths or network share.
 
-Engine **9.8.0** · Web UI **0.2.0**
+Engine **10.0.0** · Web UI **0.2.0**
 
 ---
 
@@ -10,9 +10,9 @@ Engine **9.8.0** · Web UI **0.2.0**
 
 | Tool | Version | Required for |
 |------|---------|--------------|
-| Python | 3.10+ (3.11+ recommended) | Engine, API, tests |
+| Python | 3.11+ (3.13 recommended) | Engine, API, tests |
 | 7-Zip | Latest | Archive peek (`.rar`, `.7z`, `.iso`) |
-| Node.js | 20+ LTS | Browser UI only |
+| Node.js | 24+ LTS | Browser UI only |
 | Git | Any | Clone the repo |
 
 **Optional:** Rust (Tauri desktop only), Docker (SearXNG / future Unraid stack).

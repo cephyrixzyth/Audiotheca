@@ -10,9 +10,9 @@ Engine **9.8.0** · Web UI **0.2.0**
 
 | Tool | Required for | Install |
 | --- | --- | --- |
-| **Python 3.10+** | Engine + API | [python.org](https://www.python.org/downloads/) |
+| **Python 3.11+** | Engine + API (3.13 recommended) | [python.org](https://www.python.org/downloads/) |
 | **7-Zip** | Archive peek | [7-zip.org](https://www.7-zip.org/) |
-| **Node.js 20+** | Browser UI | [nodejs.org](https://nodejs.org/) |
+| **Node.js 24+** | Browser UI | [nodejs.org](https://nodejs.org/) (Active LTS) |
 
 ```powershell
 cd "C:\path\to\audiotheca"

@@ -2,7 +2,7 @@
 # syntax=docker/dockerfile:1
 
 ARG PYTHON_VERSION=3.13
-FROM node:20-alpine AS ui-build
+FROM node:24-alpine AS ui-build
 
 WORKDIR /app/ui
 COPY ui/package.json ui/package-lock.json* ./

@@ -2,7 +2,7 @@
 
 **Audio Library Dedupe & Routing Engine** — scan, classify, peek inside archives, deduplicate, and reorganize large VST/sample/installer libraries on local or network shares.
 
-Current engine version: **9.8.0** · Web UI: **0.2.0**
+Current engine version: **10.0.0** · Web UI: **0.2.0**
 
 ## What it does
 
@@ -42,7 +42,7 @@ Reports appear in `dedupe_reports/`. Always dry-run first.
 
 ### Browser UI
 
-Requires [Node.js 20+](https://nodejs.org/).
+Requires [Node.js 24+ (Active LTS)](https://nodejs.org/).
 
 ```powershell
 $env:AUDIOTHECA_LIBRARY_ROOT = "D:\YourLibrary\_software\_audio"

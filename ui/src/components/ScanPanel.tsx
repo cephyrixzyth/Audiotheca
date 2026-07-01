@@ -294,7 +294,7 @@ export function ScanPanel({ onRunComplete }: Props) {
       {
         id: "flow",
         title: "Processing flow",
-        subtitle: "FileFlows-style pipeline — toggle phases and pick presets",
+        subtitle: "Scan pipeline — toggle phases and pick presets",
         content: (
           <FlowEditor
             skipPhases={skipPhases}
@@ -349,6 +349,7 @@ export function ScanPanel({ onRunComplete }: Props) {
                 type="button"
                 className="primary-btn"
                 disabled={starting || isActive}
+                title="Queue a dry-run scan — no files moved; reports written to dedupe_reports"
                 onClick={() => void handleStart()}
               >
                 {starting ? "Starting…" : "Start dry-run scan"}
@@ -359,6 +360,7 @@ export function ScanPanel({ onRunComplete }: Props) {
                     type="button"
                     className="keeper-btn"
                     disabled={pausePending || paused}
+                    title="Finish the current phase, then wait for you to continue"
                     onClick={() => void handleControl("pause")}
                   >
                     {pausePending ? "Pause pending…" : "Pause at next checkpoint"}
@@ -367,6 +369,7 @@ export function ScanPanel({ onRunComplete }: Props) {
                     type="button"
                     className="danger-btn"
                     disabled={stopPending}
+                    title="Finish the current phase, then stop the scan job"
                     onClick={() => void handleControl("stop")}
                   >
                     {stopPending ? "Stop pending…" : "Stop at next checkpoint"}

@@ -114,12 +114,18 @@ export function SceneRenames({ stamp }: Props) {
       </div>
 
       <div className="toolbar">
-        <button type="button" className="keeper-btn" onClick={() => void handleExecute(true)}>
+        <button
+          type="button"
+          className="keeper-btn"
+          title="Simulate approved scene folder renames without moving disk"
+          onClick={() => void handleExecute(true)}
+        >
           Dry-run approved
         </button>
         <button
           type="button"
           className="primary-btn"
+          title="Rename approved scene-hash folders to product names on disk"
           onClick={() => {
             if (window.confirm("Apply approved scene renames on disk? This moves folders.")) {
               void handleExecute(false);
@@ -165,16 +171,36 @@ export function SceneRenames({ stamp }: Props) {
                   <PathLink path={row.source_path} />
                 </td>
                 <td>
-                  <button type="button" className="keeper-btn" onClick={() => void handleApprove(row)}>
+                  <button
+                    type="button"
+                    className="keeper-btn"
+                    title="Include this rename in the next dry-run or live execute"
+                    onClick={() => void handleApprove(row)}
+                  >
                     Approve
                   </button>{" "}
-                  <button type="button" className="keeper-btn" onClick={() => void handleOverride(row)}>
+                  <button
+                    type="button"
+                    className="keeper-btn"
+                    title="Edit the proposed product folder name"
+                    onClick={() => void handleOverride(row)}
+                  >
                     Edit name
                   </button>{" "}
-                  <button type="button" className="keeper-btn" onClick={() => void handleReject(row)}>
+                  <button
+                    type="button"
+                    className="keeper-btn"
+                    title="Skip this rename — engine will not propose it again"
+                    onClick={() => void handleReject(row)}
+                  >
                     Reject
                   </button>{" "}
-                  <button type="button" className="keeper-btn" onClick={() => void handleMissingPart01(row)}>
+                  <button
+                    type="button"
+                    className="keeper-btn"
+                    title="Mark multipart set as missing part 01 — defers rename"
+                    onClick={() => void handleMissingPart01(row)}
+                  >
                     Missing part01
                   </button>
                 </td>

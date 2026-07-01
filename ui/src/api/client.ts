@@ -806,3 +806,30 @@ export async function openInExplorer(path: string): Promise<void> {
   }
   await postJson("/explorer", { path });
 }
+
+export interface BrowseEntry {
+  name: string;
+  path: string;
+  is_dir: boolean;
+  size: number | null;
+}
+
+export async function browseDirectory(path: string = ""): Promise<{
+  path: string;
+  parent: string | null;
+  entries: BrowseEntry[];
+}> {
+  const qs = path ? `?path=${encodeURIComponent(path)}` : "";
+  return getJson(`/browse${qs}`);
+}
+
+export async function listArchiveContents(path: string, limit = 200): Promise<{
+  path: string;
+  archive_tool_available: boolean;
+  error: string | null;
+  entries: string[];
+  count: number;
+}> {
+  const qs = new URLSearchParams({ path, limit: String(limit) });
+  return getJson(`/archive/list?${qs}`);
+}

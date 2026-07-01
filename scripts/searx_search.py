@@ -5,7 +5,7 @@ Requires JSON format enabled on the instance (see docker/searxng/core-config/set
 Usage:
   python scripts/searx_search.py "8Dio kontakt library naming"
   python scripts/searx_search.py --preset vendor --arg "Native Instruments"
-  python scripts/searx_search.py --preset fileflows
+  python scripts/searx_search.py --preset workflow --arg "Native Instruments"
   python scripts/searx_search.py -q "site:vi-control.net kontakt custom library path" --limit 5
 
 Environment:
@@ -29,7 +29,7 @@ PRESETS: dict[str, str] = {
     "vendor": "{arg} audio software sample library vendor folder organization",
     "kontakt": "Native Instruments Kontakt library install folder structure {arg}",
     "underscore": "audio library underscore prefix folder vendor naming convention {arg}",
-    "fileflows": "FileFlows workflow deduplicate organize files {arg}",
+    "workflow": "library deduplicate organize audio plugins {arg}",
     "space": "remove duplicate sample libraries reclaim disk space installers {arg}",
     "ucs": "Universal Category System UCS sound library folder naming {arg}",
 }

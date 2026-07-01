@@ -1,4 +1,4 @@
-/** Audiotheca scan pipeline — FileFlows-inspired linear flow definition. */
+/** Audiotheca scan pipeline — linear phase definition with skippable steps. */
 
 export interface FlowPhase {
   id: string;

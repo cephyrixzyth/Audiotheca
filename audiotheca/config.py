@@ -7,7 +7,7 @@ import re
 import sys
 from pathlib import Path
 
-ENGINE_VERSION = "9.9.0"
+ENGINE_VERSION = "10.0.0"
 # Bump ONLY when _scan_tree output format changes — decoupled from ENGINE_VERSION
 # so identification-only releases keep the warm scan cache (60-90 min on SMB).
 CACHE_SCHEMA = "9.7.1"

@@ -240,14 +240,14 @@ export function InvestigationInbox({ stamp }: Props) {
   return (
     <div>
       <div className="toolbar">
-        <label>
+        <label title="Grouped view for bulk vendor/parent fixes; list view for per-item work">
           View
           <select value={view} onChange={(e) => setView(e.target.value as "list" | "groups")}>
             <option value="groups">By prefix (bulk)</option>
             <option value="list">All items</option>
           </select>
         </label>
-        <label>
+        <label title="Investigation bucket assigned when the engine could not route confidently">
           Bucket
           <select value={bucket} onChange={(e) => setBucket(e.target.value)}>
             <option value="">All ({Object.values(buckets).reduce((a, b) => a + b, 0)})</option>
@@ -259,11 +259,12 @@ export function InvestigationInbox({ stamp }: Props) {
           </select>
         </label>
         {view === "list" && (
-          <label>
+          <label title="Search item name, path, or fingerprint">
             Search
             <input
               type="search"
               placeholder="Name, path, fingerprint…"
+              title="Search item name, path, or fingerprint"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -273,11 +274,16 @@ export function InvestigationInbox({ stamp }: Props) {
           {loading ? "Loading…" : `${total.toLocaleString()} ${view === "groups" ? "groups" : "items"}`}
           {feedback ? ` · ${feedback.corrections.length} corrections` : ""}
         </span>
-        <button type="button" className="keeper-btn" onClick={() => void handleAddVendor()}>
+        <button
+          type="button"
+          className="keeper-btn"
+          title="Add a vendor keyword to feedback for the next scan"
+          onClick={() => void handleAddVendor()}
+        >
           Add vendor
         </button>
         {exportUrl && (
-          <a className="text-btn" href={exportUrl} download>
+          <a className="text-btn" href={exportUrl} download title="Download corrections CSV for engine tuning">
             Export feedback CSV
           </a>
         )}
@@ -336,6 +342,7 @@ export function InvestigationInbox({ stamp }: Props) {
                       <button
                         type="button"
                         className="primary-btn"
+                        title="Add this prefix to vendor_overrides.json so future scans recognize the vendor"
                         onClick={(e) => {
                           e.stopPropagation();
                           void handleGroupAddVendorDb(group);
@@ -347,6 +354,7 @@ export function InvestigationInbox({ stamp }: Props) {
                     <button
                       type="button"
                       className="keeper-btn"
+                      title="Set vendor name for every item in this prefix group"
                       onClick={(e) => {
                         e.stopPropagation();
                         void handleGroupSetVendor(group);
@@ -358,6 +366,7 @@ export function InvestigationInbox({ stamp }: Props) {
                       <button
                         type="button"
                         className="keeper-btn"
+                        title="Link all items in this group to a parent product folder"
                         onClick={(e) => {
                           e.stopPropagation();
                           void handleGroupLinkParent(group);
@@ -418,12 +427,18 @@ export function InvestigationInbox({ stamp }: Props) {
                     <div className="count-muted">{row.size_mb != null ? `${row.size_mb} MB` : ""}</div>
                   </td>
                   <td className="inv-actions">
-                    <button type="button" className="keeper-btn" onClick={() => void handleSetVendor(row)}>
+                    <button
+                      type="button"
+                      className="keeper-btn"
+                      title="Override vendor for this item on the next scan"
+                      onClick={() => void handleSetVendor(row)}
+                    >
                       Set vendor
                     </button>
                     <select
                       className="reject-select"
                       defaultValue=""
+                      title="Move item to a different investigation bucket"
                       onChange={(e) => {
                         if (e.target.value === "__new__") {
                           void handleNewBucket(row);
@@ -441,10 +456,20 @@ export function InvestigationInbox({ stamp }: Props) {
                       ))}
                       <option value="__new__">+ New bucket…</option>
                     </select>
-                    <button type="button" className="keeper-btn" onClick={() => void handleLinkParent(row)}>
+                    <button
+                      type="button"
+                      className="keeper-btn"
+                      title="Mark as a component or sample belonging to a parent product"
+                      onClick={() => void handleLinkParent(row)}
+                    >
                       Link parent
                     </button>
-                    <button type="button" className="text-btn" onClick={() => void handleResolved(row)}>
+                    <button
+                      type="button"
+                      className="text-btn"
+                      title="False positive — remove from investigation without changing vendor"
+                      onClick={() => void handleResolved(row)}
+                    >
                       Resolved
                     </button>
                   </td>

@@ -12,20 +12,21 @@ import { SkippedFiles } from "./components/SkippedFiles";
 import { SceneRenames } from "./components/SceneRenames";
 import { SpaceRecovery } from "./components/SpaceRecovery";
 import { VendorTools } from "./components/VendorTools";
+import { FileExplorerProvider } from "./contexts/FileExplorerContext";
 import type { RunListItem, RunSummary, TabId } from "./types";
 
-const TABS: { id: TabId; label: string }[] = [
-  { id: "dashboard", label: "Dashboard" },
-  { id: "scan", label: "Scan" },
-  { id: "investigation", label: "Investigation" },
-  { id: "duplicates", label: "Duplicates" },
-  { id: "restructure", label: "Restructure" },
-  { id: "archives", label: "Archives" },
-  { id: "scene-renames", label: "Scene renames" },
-  { id: "scan-audit", label: "Scan audit" },
-  { id: "skipped", label: "Skipped files" },
-  { id: "space-recovery", label: "Space recovery" },
-  { id: "vendors", label: "Vendors" },
+const TABS: { id: TabId; label: string; title: string }[] = [
+  { id: "dashboard", label: "Dashboard", title: "Run KPIs, trends, and quick links to other tabs" },
+  { id: "scan", label: "Scan", title: "Start scans, configure pipeline phases, and watch live progress" },
+  { id: "investigation", label: "Investigation", title: "Items the engine could not confidently route — set vendor or bucket" },
+  { id: "duplicates", label: "Duplicates", title: "Review suspected duplicate products and pick keepers" },
+  { id: "restructure", label: "Restructure", title: "Planned vendor folder moves — edit destinations before live run" },
+  { id: "archives", label: "Archives", title: "Archive vs extracted-folder pairs — confirm redundant archives" },
+  { id: "scene-renames", label: "Scene renames", title: "Approve renaming scene-hash folders to product names" },
+  { id: "scan-audit", label: "Scan audit", title: "Per-item scan status, ID method, and quick corrections" },
+  { id: "skipped", label: "Skipped files", title: "Failures, loose archives, cache hits, and rescan targets" },
+  { id: "space-recovery", label: "Space recovery", title: "Hardlink dedup and bloat detection plans" },
+  { id: "vendors", label: "Vendors", title: "Add vendor keywords, harvest gaps, and export feedback" },
 ];
 
 export default function App() {
@@ -76,6 +77,7 @@ export default function App() {
   );
 
   return (
+    <FileExplorerProvider>
     <div className="app">
       <aside className="sidebar">
         <div className="brand">
@@ -87,6 +89,7 @@ export default function App() {
             key={t.id}
             type="button"
             className={`nav-btn ${tab === t.id ? "active" : ""}`}
+            title={t.title}
             onClick={() => setTab(t.id)}
           >
             {t.label}
@@ -142,5 +145,6 @@ export default function App() {
         {tab === "vendors" && <VendorTools stamp={stamp || undefined} />}
       </main>
     </div>
+    </FileExplorerProvider>
   );
 }
