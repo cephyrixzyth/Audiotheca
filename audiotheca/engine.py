@@ -28,15 +28,18 @@ from investigation_feedback import (
     load_store as load_investigation_store,
     merged_bucket_map,
 )
+from job_control import PhaseStopRequested, phase_checkpoint
 from progress import PhaseProgress, tqdm_bar
 from restructure_feedback import (
     apply_override_to_paths,
     get_section_approvals,
     load_store as load_restructure_store,
 )
+from scan_options import ScanOptions, apply_staging_paths, load_scan_options
 from vendor_db import VENDOR_DATABASE
 
 from audiotheca.config import *  # noqa: F403
+from audiotheca.coverage import discover_coverage_gaps
 from audiotheca.helpers import _archive_stem, _limit_walk, _squash, _walk_depth
 from audiotheca.archive import ArchiveMixin
 from audiotheca.dedupe import DedupeMixin
@@ -94,6 +97,14 @@ class DeduplicationEngine(
         self.scene_archive_rows: list[dict] = []
         self.multipart_diagnostics: list[dict] = []
         self.scene_rename_plan: list[dict] = []
+        self.audit_rows: list[dict] = []
+        self.audit_index_by_path: dict[str, int] = {}
+        self.coverage_gaps: list[dict] = []
+        self.cache_hit_records: list[dict] = []
+        self.probe_truncations: list[dict] = []
+        self.skip_phase_impact: dict[str, dict] = {}
+        self.feedback_skipped_records: list[dict] = []
+        self.scan_options: ScanOptions = load_scan_options()
         self._seven_zip = find_7z()
         self.action_mode = "preview"
 
@@ -114,6 +125,7 @@ class DeduplicationEngine(
         self.investigation_stats: dict[str, int] = defaultdict(int)
         self.investigation_store = load_investigation_store()
         self.restructure_store = load_restructure_store()
+        self._stopped_by_user = False
 
     # ------------------------------------------------------------------
     # Setup / infrastructure
@@ -245,11 +257,133 @@ class DeduplicationEngine(
                 skip_remaining = True
                 self.logger.info("%s: user skipped remaining items.", label)
 
+    def _checkpoint(self, phase_id: str, phase_label: str) -> None:
+        phase_checkpoint(
+            phase_id,
+            phase_label,
+            pause_between_phases=self.scan_options.pause_between_phases,
+        )
+
+    @staticmethod
+    def _audit_flags(item: dict, *, inv_bucket: str = "", status: str = "") -> str:
+        flags: list[str] = []
+        if not item.get("company"):
+            flags.append("unknown_vendor")
+        elif item.get("id_confidence") == "TENTATIVE":
+            flags.append("tentative_id")
+        method = item.get("id_method", "")
+        if method in {"NFO", "NAME_SPLIT", "RECONCILED"}:
+            flags.append(f"weak:{method.lower()}")
+        if inv_bucket:
+            flags.append(f"inv:{inv_bucket}")
+        if status and status != "READY":
+            flags.append(f"status:{status.replace(' ', '_').lower()}")
+        if item.get("is_tonex"):
+            flags.append("tonex")
+        return ";".join(flags)
+
+    def _append_audit_row(
+        self,
+        item: dict,
+        *,
+        status: str,
+        inv_bucket: str,
+        destination: str,
+        extra_flags: str = "",
+    ) -> None:
+        self._upsert_audit_row(
+            item,
+            status=status,
+            inv_bucket=inv_bucket,
+            destination=destination,
+            extra_flags=extra_flags,
+        )
+
+    def _upsert_audit_row(
+        self,
+        item: dict,
+        *,
+        status: str,
+        inv_bucket: str,
+        destination: str,
+        extra_flags: str = "",
+    ) -> None:
+        path_key = str(item["path"])
+        flags = self._audit_flags(item, inv_bucket=inv_bucket, status=status)
+        if extra_flags:
+            flags = f"{flags};{extra_flags}" if flags else extra_flags
+        row = {
+            "section": item["source_bin"],
+            "item_name": item["original_name"],
+            "current_path": path_key,
+            "vendor": item.get("company") or "UNKNOWN",
+            "id_method": item.get("id_method") or "",
+            "id_confidence": item.get("id_confidence") or "",
+            "fingerprint": item.get("base_name") or "",
+            "version_key": item.get("version_key") or "",
+            "size_mb": round(item.get("size", 0) / (1024 * 1024), 1) if item.get("size") else "",
+            "status": status,
+            "investigation_bucket": inv_bucket or "",
+            "planned_destination": destination,
+            "flags": flags,
+        }
+        with self._lock:
+            if path_key in self.audit_index_by_path:
+                self.audit_rows[self.audit_index_by_path[path_key]] = row
+            else:
+                self.audit_index_by_path[path_key] = len(self.audit_rows)
+                self.audit_rows.append(row)
+
+    def _record_cache_hit(self, path: Path, source_bin: str) -> None:
+        try:
+            mtime = path.stat().st_mtime
+        except OSError:
+            mtime = None
+        with self._lock:
+            self.cache_hit_records.append(
+                {
+                    "section": source_bin,
+                    "path": str(path),
+                    "name": path.name,
+                    "mtime": mtime,
+                }
+            )
+
+    def _record_probe_truncation(self, item_path: Path, source_bin: str, trunc: dict) -> None:
+        with self._lock:
+            self.probe_truncations.append(
+                {
+                    "section": source_bin,
+                    "item_path": str(item_path),
+                    "item_name": item_path.name,
+                    "kind": trunc.get("kind", ""),
+                    "path": trunc.get("path", ""),
+                    "relative_path": trunc.get("relative_path", ""),
+                    "depth": trunc.get("depth", ""),
+                    "limit": trunc.get("limit", ""),
+                    "detail": (
+                        f"dirs={trunc.get('child_dirs', trunc.get('folder_count', ''))} "
+                        f"files={trunc.get('child_files', trunc.get('archive_count', ''))}"
+                    ),
+                }
+            )
+
+    def _record_skip_impact(self, phase: str, count: int, detail: str = "") -> None:
+        self.skip_phase_impact[phase] = {"count": count, "detail": detail}
+
+    def _invalidate_cache_paths(self) -> None:
+        for raw in self.scan_options.invalidate_cache_paths:
+            key = str(Path(raw))
+            if key in self.scan_cache:
+                del self.scan_cache[key]
+                self.logger.info("Cache invalidated for %s", key)
+
     # ------------------------------------------------------------------
     # Main run
     # ------------------------------------------------------------------
 
-    def run(self) -> None:
+    def run(self) -> str:
+        """Run the engine. Returns 'stopped' if user stopped, else 'ok'."""
         print("\n" + "=" * 60)
         print(f" AUDIO DEDUPLICATION ENGINE v{ENGINE_VERSION} ".center(60, "="))
         print("=" * 60)
@@ -258,6 +392,12 @@ class DeduplicationEngine(
         print(f" DRY_RUN: {self.dry_run}")
         print(f" MAX_WALK_DEPTH: {MAX_WALK_DEPTH} | PROBE_DEPTH: {PROBE_DEPTH} | WORKERS: {self.max_workers}")
         print(f" ARCHIVE_PEEK: {ENABLE_ARCHIVE_PEEK} | SCENE_PEEK: {ENABLE_SCENE_ARCHIVE_PEEK} | SCENE_RENAME: {SCENE_AUTO_RENAME}")
+        if self.scan_options.skip_phases:
+            print(f" SKIP PHASES: {', '.join(sorted(self.scan_options.skip_phases))}")
+        if self.scan_options.staging_root:
+            print(f" STAGING ROOT: {self.scan_options.staging_root}")
+        if self.scan_options.pause_between_phases:
+            print(" PAUSE BETWEEN PHASES: enabled (UI can continue/stop at each step)")
         print(f" 7-ZIP: {self._seven_zip or 'NOT FOUND - install 7-Zip for .rar/.7z listing'}")
         print(f" REPORTS: {REPORT_DIR}")
         print("=" * 60 + "\n")
@@ -272,6 +412,9 @@ class DeduplicationEngine(
             return
 
         self.logger.info("Engine v%s started | DRY_RUN=%s | ROOT=%s", ENGINE_VERSION, self.dry_run, self.root_dir)
+
+        apply_staging_paths(self, self.scan_options)
+        self._invalidate_cache_paths()
 
         paths = self._report_paths()
         csv_file = open(paths["org_csv"], "w", newline="", encoding="utf-8")
@@ -289,6 +432,10 @@ class DeduplicationEngine(
 
         try:
             self._run_phases(csv_writer, inv_writer)
+        except PhaseStopRequested as exc:
+            self._stopped_by_user = True
+            print(f"\n[!] Run stopped at phase checkpoint ({exc}). Writing partial reports.")
+            self.logger.info("Run stopped by user at phase checkpoint: %s", exc)
         except KeyboardInterrupt:
             print("\n[!] Interrupted — writing partial reports.")
             self.logger.warning("Run interrupted by user.")
@@ -305,6 +452,7 @@ class DeduplicationEngine(
             inv_hints_path = export_investigation_hints()
             self.logger.info("Engine hints refreshed: %s, %s", hints_path, inv_hints_path)
             self._print_summary(report_paths)
+        return "stopped" if self._stopped_by_user else "ok"
 
     def _run_phases(self, csv_writer, inv_writer) -> None:
         if not self.dry_run:
@@ -315,19 +463,52 @@ class DeduplicationEngine(
             for entry in self.root_dir.iterdir()
             if entry.is_dir() and entry.name not in IGNORE_BINS
         ]
+        for extra_root in self.scan_options.extra_scan_roots:
+            extra_path = Path(extra_root)
+            if not extra_path.is_dir():
+                self.logger.warning("Extra scan root not found: %s", extra_path)
+                continue
+            for entry in extra_path.iterdir():
+                if entry.is_dir() and entry.name not in IGNORE_BINS:
+                    category_bins.append(entry)
+
         bin_progress = PhaseProgress("Phase 1a - Resolve targets per category", len(category_bins), "section")
         payloads: list[tuple[Path, str]] = []
-        for category_bin in category_bins:
-            targets = self.get_software_targets(category_bin)
-            payloads.extend((target, category_bin.name) for target in targets)
-            bin_progress.update(1, detail=f"{category_bin.name}: {len(targets)} targets")
-        bin_progress.finish(f"{len(payloads):,} total targets")
+        bin_targets: dict[str, list[Path]] = {}
+
+        if self.scan_options.target_paths:
+            for raw in self.scan_options.target_paths:
+                target = Path(raw)
+                if not target.exists():
+                    self.logger.warning("Target path not found: %s", target)
+                    continue
+                section = target.parent.name if target.parent else "adhoc"
+                expanded = self.expand_single_target(target, section)
+                if not expanded:
+                    expanded = [target]
+                for item in expanded:
+                    payloads.append((item, section))
+                    bin_targets.setdefault(section, []).append(item)
+            bin_progress.finish(f"{len(payloads):,} ad-hoc targets")
+        else:
+            for category_bin in category_bins:
+                targets = self.get_software_targets(category_bin)
+                bin_targets[category_bin.name] = targets
+                payloads.extend((target, category_bin.name) for target in targets)
+                bin_progress.update(1, detail=f"{category_bin.name}: {len(targets)} targets")
+            bin_progress.finish(f"{len(payloads):,} total targets")
+
+        if not self.scan_options.target_paths:
+            for category_bin in category_bins:
+                gaps = discover_coverage_gaps(category_bin, bin_targets.get(category_bin.name, []))
+                self.coverage_gaps.extend(gaps)
+        self._checkpoint("resolve_targets", "Phase 1a - Resolve targets per category")
 
         if not payloads:
             print("\n[!] WARNING: Found 0 targets.")
             return
 
-        scan_bar = tqdm_bar(len(payloads), "Phase 1b - Parallel scan", "item")
+        scan_progress = PhaseProgress("Phase 1b - Parallel scan", len(payloads), "item")
         results: list[dict] = []
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             futures = {
@@ -338,10 +519,9 @@ class DeduplicationEngine(
                 result = future.result()
                 if result:
                     results.append(result)
-                if scan_bar is not None:
-                    scan_bar.update(1)
-        if scan_bar is not None:
-            scan_bar.close()
+                scan_progress.update(1)
+        scan_progress.finish(f"{len(results):,} items scanned")
+        self._checkpoint("parallel_scan", "Phase 1b - Parallel scan")
 
         results.sort(key=lambda r: (r["source_bin"], r["original_name"].lower()))
 
@@ -368,12 +548,32 @@ class DeduplicationEngine(
         reconcile_progress.finish(
             f"{reconciled} reconciled, {len(self.vendor_conflicts)} fingerprint conflicts"
         )
+        self._checkpoint("reconciliation", "Phase 1.5 - Vendor reconciliation")
 
-        if ENABLE_SCENE_ARCHIVE_PEEK:
+        if ENABLE_SCENE_ARCHIVE_PEEK and not self.scan_options.skip("scene_peek"):
             self._run_scene_archive_phase(all_items, csv_writer)
+        elif self.scan_options.skip("scene_peek"):
+            scene_count = sum(
+                1 for item in all_items if SCENE_RELEASE_PATTERN.match(item["original_name"])
+            )
+            self._record_skip_impact(
+                "scene_peek",
+                scene_count,
+                f"{scene_count} scene-hash folders not peeked",
+            )
+            print("  [SKIP] Scene archive peek disabled by scan options.")
+        self._checkpoint("scene_peek", "Phase 1.6 - Scene archive peek")
 
-        if ENABLE_ARCHIVE_PEEK:
+        if ENABLE_ARCHIVE_PEEK and not self.scan_options.skip("archive_peek"):
             self._run_archive_peek_phase()
+        elif self.scan_options.skip("archive_peek"):
+            self._record_skip_impact(
+                "archive_peek",
+                len(self.coexistence_pairs),
+                f"{len(self.coexistence_pairs)} coexistence pairs not peeked",
+            )
+            print("  [SKIP] Archive peek disabled by scan options.")
+        self._checkpoint("archive_peek", "Phase 1.8 - Archive peek")
 
         dedup_groups: dict[str, list[dict]] = defaultdict(list)
         for item in all_items:
@@ -395,7 +595,7 @@ class DeduplicationEngine(
             if dedup_key:
                 dedup_groups[dedup_key].append(item)
 
-        if quarantine_list:
+        if quarantine_list and not self.scan_options.skip("quarantine"):
             quarantine_meta = {
                 path: next(
                     (item for item in results if item["path"] == path),
@@ -424,6 +624,14 @@ class DeduplicationEngine(
                     f"({quarantine_meta[path]['source_bin']})"
                 ),
             )
+        elif quarantine_list:
+            self._record_skip_impact(
+                "quarantine",
+                len(quarantine_list),
+                f"{len(quarantine_list)} non-PC items left in place",
+            )
+            print(f"  [SKIP] Quarantine phase disabled — {len(quarantine_list)} non-PC items left in place.")
+        self._checkpoint("quarantine", "Phase 1b - Quarantine non-PC items")
 
         feedback_store = load_feedback_store()
 
@@ -437,6 +645,14 @@ class DeduplicationEngine(
             pair_paths = [str(item["path"]) for item in pair["items"]]
             if is_group_rejected(pair["dedup_key"], pair_paths, feedback_store):
                 self._inc("feedback_skipped")
+                self.feedback_skipped_records.append(
+                    {
+                        "dedup_key": pair["dedup_key"],
+                        "kind": "archive_pair",
+                        "paths": pair_paths,
+                        "confidence": pair["confidence"],
+                    }
+                )
                 print(f"\n[SKIP FEEDBACK] {pair['dedup_key']} — user rejected this match")
                 continue
             self.duplicate_groups.append(pair)
@@ -452,104 +668,124 @@ class DeduplicationEngine(
                 print(f"  [{idx}] [{kind}] {item['original_name']} ({size_mb:.1f} MB){rec}")
 
         dupe_candidates = [items for items in dedup_groups.values() if len(items) >= 2]
-        dupe_progress = PhaseProgress("Phase 2 - Duplicate review", len(dupe_candidates), "group")
         items_to_delete: list[dict] = []
-
-        for dedup_key, items in dedup_groups.items():
-            if len(items) < 2:
-                continue
-            if frozenset(item["path"] for item in items) in archive_pair_path_sets:
-                continue
-            item_paths = [str(item["path"]) for item in items]
-            if is_group_rejected(dedup_key, item_paths, feedback_store):
-                self._inc("feedback_skipped")
-                print(f"\n[SKIP FEEDBACK] {dedup_key} — user rejected this match")
-                continue
-
-            dupe_progress.update(1, detail=dedup_key[:40])
-            assessment = self.assess_duplicate_group(items)
-            if assessment["confidence"] == "LOW":
-                continue
-
-            is_vendor_collision = any(
-                item["company"] and _squash(item["company"]) == item["base_name"] for item in items
+        if self.scan_options.skip("duplicates"):
+            skipped_groups = len(dupe_candidates)
+            self._record_skip_impact(
+                "duplicates",
+                skipped_groups,
+                f"{skipped_groups} duplicate candidate groups not reviewed",
             )
-            if is_vendor_collision:
-                continue
+            print(f"  [SKIP] Duplicate review disabled — {skipped_groups} candidate groups skipped.")
+            dupe_progress = PhaseProgress("Phase 2 - Duplicate review", 1, "group")
+            dupe_progress.finish("skipped by scan options")
+        else:
+            dupe_progress = PhaseProgress("Phase 2 - Duplicate review", len(dupe_candidates), "group")
 
-            if assessment["confidence"] == "HIGH":
-                content = self._content_check(assessment["items"])
-                assessment["content_check"] = content
-                if content == "DIFFERS":
-                    assessment["confidence"] = "MEDIUM"
-
-            if self.dry_run:
-                action = "REVIEW ONLY (no files removed in DRY_RUN)"
-            elif assessment["confidence"] == "HIGH":
-                action = "PROMPT to backup non-recommended copies"
-            else:
-                action = "REVIEW ONLY (MEDIUM confidence)"
-
-            group_record = {"dedup_key": dedup_key, **assessment, "action": action}
-            self.duplicate_groups.append(group_record)
-            self._inc("duplicates_suspected")
-
-            print(
-                f"\n[DUPLICATE {assessment['confidence']}] {dedup_key} "
-                f"({assessment['group_kind']}, similarity {assessment['name_similarity']}%, "
-                f"content {assessment.get('content_check', 'SKIPPED')})"
-            )
-            for idx, item in enumerate(assessment["items"], 1):
-                size_mb = item["size"] / (1024 * 1024)
-                rec = " <-- suggested keep" if item["path"] == assessment["recommended_keep"]["path"] else ""
-                print(f"  [{idx}] {item['original_name']} ({size_mb:.1f} MB) in {item['source_bin']}{rec}")
-
-            if self.dry_run or assessment["confidence"] != "HIGH":
-                continue
-
-            keep = assessment["recommended_keep"]
-            candidates = [item for item in assessment["items"] if item["path"] != keep["path"]]
-            if not candidates:
-                continue
-
-            if self.action_mode == "auto":
-                if assessment.get("content_check") == "MATCH":
-                    items_to_delete.extend(candidates)
-                continue
-
-            if self.action_mode == "item":
-                skip_group = False
-                for candidate in candidates:
-                    if skip_group:
-                        break
-                    size_mb = candidate["size"] / (1024 * 1024)
-                    choice = self._prompt_choice(
-                        f"Stage duplicate '{candidate['original_name']}' ({size_mb:.1f} MB) "
-                        f"to {self.delete_candidates_dir.name}?",
-                        {"y": "yes", "n": "no", "s": "skip remaining in group"},
+            for dedup_key, items in dedup_groups.items():
+                if len(items) < 2:
+                    continue
+                if frozenset(item["path"] for item in items) in archive_pair_path_sets:
+                    continue
+                item_paths = [str(item["path"]) for item in items]
+                if is_group_rejected(dedup_key, item_paths, feedback_store):
+                    self._inc("feedback_skipped")
+                    self.feedback_skipped_records.append(
+                        {
+                            "dedup_key": dedup_key,
+                            "kind": "duplicate_group",
+                            "paths": item_paths,
+                            "confidence": "",
+                        }
                     )
-                    if choice == "y":
-                        items_to_delete.append(candidate)
-                    elif choice == "s":
-                        skip_group = True
-                continue
+                    print(f"\n[SKIP FEEDBACK] {dedup_key} — user rejected this match")
+                    continue
 
-            items_sorted = assessment["items"]
-            while True:
-                choice = input(
-                    "Select index to KEEP — others move to _delete-canidates (Enter = keep all): "
-                ).strip()
-                if choice == "":
-                    break
-                if choice.isdigit() and 1 <= int(choice) <= len(items_sorted):
-                    chosen_idx = int(choice) - 1
-                    for idx, item in enumerate(items_sorted):
-                        if idx != chosen_idx:
-                            items_to_delete.append(item)
-                    break
-                print("Invalid index.")
+                dupe_progress.update(1, detail=dedup_key[:40])
+                assessment = self.assess_duplicate_group(items)
+                if assessment["confidence"] == "LOW":
+                    continue
 
-        dupe_progress.finish(f"{len(self.duplicate_groups)} groups flagged")
+                is_vendor_collision = any(
+                    item["company"] and _squash(item["company"]) == item["base_name"] for item in items
+                )
+                if is_vendor_collision:
+                    continue
+
+                if assessment["confidence"] == "HIGH":
+                    content = self._content_check(assessment["items"])
+                    assessment["content_check"] = content
+                    if content == "DIFFERS":
+                        assessment["confidence"] = "MEDIUM"
+
+                if self.dry_run:
+                    action = "REVIEW ONLY (no files removed in DRY_RUN)"
+                elif assessment["confidence"] == "HIGH":
+                    action = "PROMPT to backup non-recommended copies"
+                else:
+                    action = "REVIEW ONLY (MEDIUM confidence)"
+
+                group_record = {"dedup_key": dedup_key, **assessment, "action": action}
+                self.duplicate_groups.append(group_record)
+                self._inc("duplicates_suspected")
+
+                print(
+                    f"\n[DUPLICATE {assessment['confidence']}] {dedup_key} "
+                    f"({assessment['group_kind']}, similarity {assessment['name_similarity']}%, "
+                    f"content {assessment.get('content_check', 'SKIPPED')})"
+                )
+                for idx, item in enumerate(assessment["items"], 1):
+                    size_mb = item["size"] / (1024 * 1024)
+                    rec = " <-- suggested keep" if item["path"] == assessment["recommended_keep"]["path"] else ""
+                    print(f"  [{idx}] {item['original_name']} ({size_mb:.1f} MB) in {item['source_bin']}{rec}")
+
+                if self.dry_run or assessment["confidence"] != "HIGH":
+                    continue
+
+                keep = assessment["recommended_keep"]
+                candidates = [item for item in assessment["items"] if item["path"] != keep["path"]]
+                if not candidates:
+                    continue
+
+                if self.action_mode == "auto":
+                    if assessment.get("content_check") == "MATCH":
+                        items_to_delete.extend(candidates)
+                    continue
+
+                if self.action_mode == "item":
+                    skip_group = False
+                    for candidate in candidates:
+                        if skip_group:
+                            break
+                        size_mb = candidate["size"] / (1024 * 1024)
+                        choice = self._prompt_choice(
+                            f"Stage duplicate '{candidate['original_name']}' ({size_mb:.1f} MB) "
+                            f"to {self.delete_candidates_dir.name}?",
+                            {"y": "yes", "n": "no", "s": "skip remaining in group"},
+                        )
+                        if choice == "y":
+                            items_to_delete.append(candidate)
+                        elif choice == "s":
+                            skip_group = True
+                    continue
+
+                items_sorted = assessment["items"]
+                while True:
+                    choice = input(
+                        "Select index to KEEP — others move to _delete-canidates (Enter = keep all): "
+                    ).strip()
+                    if choice == "":
+                        break
+                    if choice.isdigit() and 1 <= int(choice) <= len(items_sorted):
+                        chosen_idx = int(choice) - 1
+                        for idx, item in enumerate(items_sorted):
+                            if idx != chosen_idx:
+                                items_to_delete.append(item)
+                        break
+                    print("Invalid index.")
+
+            dupe_progress.finish(f"{len(self.duplicate_groups)} groups flagged")
+        self._checkpoint("duplicates", "Phase 2 - Duplicate review")
 
         if items_to_delete:
             if not self.dry_run:
@@ -641,9 +877,16 @@ class DeduplicationEngine(
                     "_dest_path": dest_path,
                 }
             )
+            self._append_audit_row(
+                item,
+                status=status,
+                inv_bucket=inv_bucket or "",
+                destination=str(dest_path),
+            )
             restructure_progress.update(1, detail=item["original_name"][:36])
 
         restructure_progress.finish(f"{len(self.restructure_plan)} routes, {self.stats['investigation']} investigation")
+        self._checkpoint("restructure", "Phase 3 - Restructure plan")
 
         if self.dry_run:
             for entry in self.restructure_plan:
@@ -658,13 +901,16 @@ class DeduplicationEngine(
                     ]
                 )
                 self._inc("routed")
-        elif self._print_live_preflight():
+        elif not self.scan_options.skip("restructure_live") and self._print_live_preflight():
             self._execute_restructure(csv_writer)
+        elif self.scan_options.skip("restructure_live"):
+            print("[!] Phase 3 live restructure skipped (scan options).")
         else:
             print("[!] Phase 3 restructure skipped (declined at pre-flight).")
             self.logger.info("Phase 3 restructure skipped at pre-flight.")
+        self._checkpoint("restructure_live", "Phase 3 - Restructure moves")
 
-        if not self.dry_run:
+        if not self.dry_run and not self.scan_options.skip("purge"):
             purge_roots = [
                 category_bin for category_bin in self.root_dir.iterdir()
                 if category_bin.is_dir() and category_bin.name not in IGNORE_BINS

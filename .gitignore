@@ -1,6 +1,12 @@
 dedupe_reports/
+dedupe_reports/.api_token
+dedupe_reports/.library_roots.json
+dedupe_reports/security_audit.jsonl
 scan_cache.json
 dedupe_engine.log
+.env
+docker/searxng/.env
+deploy/unraid/.env
 .venv/
 __pycache__/
 *.pyc

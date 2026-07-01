@@ -9,6 +9,8 @@ from pathlib import Path
 import duplicate_feedback as dup_fb
 import investigation_feedback as inv_fb
 import restructure_feedback as rst_fb
+import archive_feedback as arch_fb
+import scene_feedback as scene_fb
 
 FEEDBACK_DIR = Path(__file__).resolve().parent / "dedupe_reports" / "feedback"
 
@@ -134,6 +136,48 @@ def _read_restructure_rows(stamp: str | None) -> list[list[str]]:
     return rows
 
 
+def _read_archive_rows(stamp: str | None) -> list[list[str]]:
+    store = arch_fb.load_store()
+    rows: list[list[str]] = []
+    for row in store.corrections:
+        if stamp and row.stamp != stamp:
+            continue
+        rows.append([
+            "ARCHIVE",
+            row.action.upper(),
+            row.stamp,
+            row.path,
+            row.action,
+            row.archive_name,
+            row.value,
+            row.reason,
+            row.note or row.item_name,
+            row.created,
+        ])
+    return rows
+
+
+def _read_scene_rows(stamp: str | None) -> list[list[str]]:
+    store = scene_fb.load_store()
+    rows: list[list[str]] = []
+    for row in store.corrections:
+        if stamp and row.stamp != stamp:
+            continue
+        rows.append([
+            "SCENE",
+            row.action.upper(),
+            row.stamp,
+            row.path,
+            row.action,
+            row.proposed_name or row.scene_id,
+            row.value,
+            row.reason,
+            row.note,
+            row.created,
+        ])
+    return rows
+
+
 def export_unified_csv(stamp: str | None = None) -> Path:
     FEEDBACK_DIR.mkdir(parents=True, exist_ok=True)
     suffix = stamp or datetime.now(timezone.utc).strftime("%Y%m%d_%H%M")
@@ -142,6 +186,8 @@ def export_unified_csv(stamp: str | None = None) -> Path:
         _read_investigation_rows(stamp)
         + _read_duplicate_rows(stamp)
         + _read_restructure_rows(stamp)
+        + _read_archive_rows(stamp)
+        + _read_scene_rows(stamp)
     )
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle)
@@ -160,10 +206,16 @@ def feedback_summary(stamp: str | None = None) -> dict[str, int]:
     dup_count += sum(1 for r in dup.keeper_approvals if not stamp or r.stamp == stamp)
     rst = rst_fb.load_store()
     rst_count = sum(1 for r in rst.corrections if not stamp or r.stamp == stamp)
+    arch = arch_fb.load_store()
+    arch_count = sum(1 for r in arch.corrections if not stamp or r.stamp == stamp)
+    scene = scene_fb.load_store()
+    scene_count = sum(1 for r in scene.corrections if not stamp or r.stamp == stamp)
     return {
         "investigation": inv_count,
         "duplicate": dup_count,
         "restructure": rst_count,
+        "archive": arch_count,
+        "scene": scene_count,
         "vendor": sum(1 for r in inv.vendor_additions if not stamp or r.stamp == stamp),
-        "total": inv_count + dup_count + rst_count,
+        "total": inv_count + dup_count + rst_count + arch_count + scene_count,
     }

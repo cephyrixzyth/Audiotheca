@@ -1,0 +1,201 @@
+import { useMemo, useState } from "react";
+import {
+  FLOW_PRESETS,
+  FLOW_PRESET_STORAGE,
+  SCAN_FLOW_PHASES,
+  type FlowPreset,
+} from "../flows/scanFlow";
+
+interface Props {
+  skipPhases: string[];
+  pauseBetweenPhases: boolean;
+  onSkipPhasesChange: (skip: string[]) => void;
+  onPauseChange: (pause: boolean) => void;
+  activePhase?: string | null;
+}
+
+const GROUP_LABELS: Record<string, string> = {
+  discover: "Discover",
+  analyze: "Analyze",
+  plan: "Plan",
+  act: "Act",
+};
+
+function loadPresetId(): string {
+  try {
+    return localStorage.getItem(FLOW_PRESET_STORAGE) || "fast";
+  } catch {
+    return "fast";
+  }
+}
+
+export function FlowEditor({
+  skipPhases,
+  pauseBetweenPhases,
+  onSkipPhasesChange,
+  onPauseChange,
+  activePhase,
+}: Props) {
+  const [presetId, setPresetId] = useState(loadPresetId);
+  const [selectedNode, setSelectedNode] = useState<string | null>(null);
+
+  const skipSet = useMemo(() => new Set(skipPhases), [skipPhases]);
+
+  const enabledCount = SCAN_FLOW_PHASES.filter(
+    (p) => !p.skipKey || !skipSet.has(p.skipKey),
+  ).length;
+
+  function applyPreset(preset: FlowPreset) {
+    setPresetId(preset.id);
+    onSkipPhasesChange([...preset.skipPhases]);
+    onPauseChange(preset.pauseBetweenPhases);
+    try {
+      localStorage.setItem(FLOW_PRESET_STORAGE, preset.id);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function togglePhase(_phaseId: string, skipKey?: string) {
+    if (!skipKey) return;
+    const next = new Set(skipPhases);
+    if (next.has(skipKey)) next.delete(skipKey);
+    else next.add(skipKey);
+    onSkipPhasesChange([...next]);
+    setPresetId("custom");
+  }
+
+  const selected = SCAN_FLOW_PHASES.find((p) => p.id === selectedNode);
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, typeof SCAN_FLOW_PHASES>();
+    for (const phase of SCAN_FLOW_PHASES) {
+      const list = map.get(phase.group) ?? [];
+      list.push(phase);
+      map.set(phase.group, list);
+    }
+    return map;
+  }, []);
+
+  return (
+    <div className="flow-editor">
+      <div className="flow-editor-toolbar">
+        <label>
+          Preset
+          <select
+            value={presetId}
+            onChange={(e) => {
+              const preset = FLOW_PRESETS.find((p) => p.id === e.target.value);
+              if (preset) applyPreset(preset);
+            }}
+          >
+            {FLOW_PRESETS.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}
+              </option>
+            ))}
+            <option value="custom">Custom</option>
+          </select>
+        </label>
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={pauseBetweenPhases}
+            onChange={(e) => {
+              onPauseChange(e.target.checked);
+              setPresetId("custom");
+            }}
+          />
+          Pause between phases
+        </label>
+        <span className="count-muted">
+          {enabledCount}/{SCAN_FLOW_PHASES.length} phases active
+        </span>
+      </div>
+
+      <div className="flow-canvas">
+        {[...grouped.entries()].map(([group, phases], groupIdx) => (
+          <div key={group} className="flow-group">
+            <div className="flow-group-label">{GROUP_LABELS[group] ?? group}</div>
+            <div className="flow-group-nodes">
+              {phases.map((phase, idx) => {
+                const enabled = !phase.skipKey || !skipSet.has(phase.skipKey);
+                const isRunning =
+                  activePhase != null &&
+                  activePhase.toLowerCase().includes(phase.enginePhase.toLowerCase().replace("phase ", "phase "));
+                const isActive =
+                  activePhase != null &&
+                  (activePhase.includes(phase.label) ||
+                    activePhase.toLowerCase().includes(phase.id.replace("_", " ")));
+
+                return (
+                  <div key={phase.id} className="flow-node-wrap">
+                    {idx > 0 && <div className={`flow-connector ${enabled ? "on" : "off"}`} />}
+                    <button
+                      type="button"
+                      className={`flow-node ${enabled ? "enabled" : "disabled"} ${isActive || isRunning ? "running" : ""} ${selectedNode === phase.id ? "selected" : ""}`}
+                      onClick={() => setSelectedNode(phase.id)}
+                      title={phase.description}
+                    >
+                      <span className="flow-node-engine">{phase.enginePhase}</span>
+                      <span className="flow-node-label">{phase.label}</span>
+                      {phase.skipKey && (
+                        <span
+                          className={`flow-node-toggle ${enabled ? "on" : "off"}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            togglePhase(phase.id, phase.skipKey);
+                          }}
+                          role="switch"
+                          aria-checked={enabled}
+                          title={enabled ? "Click to skip this phase" : "Click to enable"}
+                        >
+                          {enabled ? "ON" : "OFF"}
+                        </span>
+                      )}
+                      {!phase.skipKey && <span className="flow-node-required">required</span>}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            {groupIdx < grouped.size - 1 && <div className="flow-group-bridge" />}
+          </div>
+        ))}
+      </div>
+
+      {selected && (
+        <aside className="flow-node-config">
+          <h4>{selected.label}</h4>
+          <p className="count-muted">{selected.description}</p>
+          <dl className="flow-config-meta">
+            <dt>Engine</dt>
+            <dd>{selected.enginePhase}</dd>
+            <dt>Group</dt>
+            <dd>{GROUP_LABELS[selected.group]}</dd>
+            {selected.skipKey && (
+              <>
+                <dt>Status</dt>
+                <dd>{skipSet.has(selected.skipKey) ? "Skipped" : "Enabled"}</dd>
+              </>
+            )}
+          </dl>
+          {selected.skipKey && (
+            <button
+              type="button"
+              className="keeper-btn"
+              onClick={() => togglePhase(selected.id, selected.skipKey)}
+            >
+              {skipSet.has(selected.skipKey) ? "Enable phase" : "Skip phase"}
+            </button>
+          )}
+        </aside>
+      )}
+
+      <p className="count-muted flow-hint">
+        Inspired by FileFlows — linear pipeline with skippable nodes. Required phases always run.
+        Toggle OFF on peek/dupe/quarantine nodes for faster identify-only passes.
+      </p>
+    </div>
+  );
+}

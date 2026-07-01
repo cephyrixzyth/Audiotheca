@@ -6,8 +6,11 @@ import { Dashboard } from "./components/Dashboard";
 import { DuplicateReview } from "./components/DuplicateReview";
 import { InvestigationInbox } from "./components/InvestigationInbox";
 import { RestructurePlan } from "./components/RestructurePlan";
+import { ScanAudit } from "./components/ScanAudit";
 import { ScanPanel } from "./components/ScanPanel";
+import { SkippedFiles } from "./components/SkippedFiles";
 import { SceneRenames } from "./components/SceneRenames";
+import { SpaceRecovery } from "./components/SpaceRecovery";
 import { VendorTools } from "./components/VendorTools";
 import type { RunListItem, RunSummary, TabId } from "./types";
 
@@ -19,6 +22,9 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "restructure", label: "Restructure" },
   { id: "archives", label: "Archives" },
   { id: "scene-renames", label: "Scene renames" },
+  { id: "scan-audit", label: "Scan audit" },
+  { id: "skipped", label: "Skipped files" },
+  { id: "space-recovery", label: "Space recovery" },
   { id: "vendors", label: "Vendors" },
 ];
 
@@ -30,12 +36,22 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
 
   const reloadRuns = useCallback(() => {
-    fetchRuns()
-      .then((list) => {
-        setRuns(list);
-        setStamp((current) => current || list[0]?.stamp || "");
-      })
-      .catch((err: Error) => setError(err.message));
+    const attempt = (retriesLeft: number) => {
+      fetchRuns()
+        .then((list) => {
+          setRuns(list);
+          setStamp((current) => current || list[0]?.stamp || "");
+          setError(null);
+        })
+        .catch((err: Error) => {
+          if (retriesLeft > 0) {
+            window.setTimeout(() => attempt(retriesLeft - 1), 2000);
+          } else {
+            setError(err.message);
+          }
+        });
+    };
+    attempt(3);
   }, []);
 
   useEffect(() => {
@@ -54,7 +70,7 @@ export default function App() {
     (newStamp: string) => {
       reloadRuns();
       setStamp(newStamp);
-      setTab("dashboard");
+      setTab("scan-audit");
     },
     [reloadRuns],
   );
@@ -112,12 +128,17 @@ export default function App() {
           </div>
         )}
 
-        {stamp && summary && tab === "dashboard" && <Dashboard summary={summary} />}
+        {stamp && summary && tab === "dashboard" && (
+          <Dashboard summary={summary} runs={runs} onNavigate={setTab} />
+        )}
         {stamp && tab === "investigation" && <InvestigationInbox stamp={stamp} />}
         {stamp && tab === "duplicates" && <DuplicateReview stamp={stamp} />}
         {stamp && tab === "restructure" && <RestructurePlan stamp={stamp} />}
         {stamp && tab === "archives" && <ArchivePeek stamp={stamp} />}
         {stamp && tab === "scene-renames" && <SceneRenames stamp={stamp} />}
+        {stamp && tab === "scan-audit" && <ScanAudit stamp={stamp} />}
+        {stamp && tab === "skipped" && <SkippedFiles stamp={stamp} runs={runs} />}
+        {stamp && tab === "space-recovery" && <SpaceRecovery stamp={stamp} />}
         {tab === "vendors" && <VendorTools stamp={stamp || undefined} />}
       </main>
     </div>

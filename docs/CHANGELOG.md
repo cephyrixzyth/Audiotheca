@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased / UI 0.2.x (documentation & ops)
+
+### Documentation
+
+- **[Testing Guide](TESTING.md)** — external tester setup, smoke tests, checklist
+- **[Configuration](CONFIGURATION.md)** — environment variables reference
+- **[.env.example](../.env.example)** — template for library paths and API port
+- Updated README, User Guide, Install, FAQ, Feature Guide for all UI tabs and `AUDIOTHECA_LIBRARY_ROOT`
+
+### Web UI & API
+
+- **Space recovery** tab — coexistence summary, underscore vendor whitelist, bulk full dry scan
+- **Vendors** tab — vendor gaps, web harvest, bulk add keywords
+- **Skipped files** hub — coverage gaps, cache hits, coexistence, run compare, targeted rescan
+- **Scan audit** tab — full identification audit table
+- **Dashboard** — route-ready gauges, run compare, reorderable sections
+- **Scan** — processing flow editor (FileFlows-style presets), skippable phases
+- **Investigation** — group-by-prefix, bulk correct
+- Underscore whitelist engine integration (`dedupe_reports/feedback/underscore_whitelist.json`)
+- API service safeguards — health checks, job cap, orphan detection, rate limits
+- `AUDIOTHECA_LIBRARY_ROOT` env support in engine config
+
+### Optional tooling
+
+- `docker/searxng/` — private meta-search for vendor research
+- `scripts/searx_search.py` — SearXNG CLI with Audiotheca presets
+- `scripts/library_probe.py` — lightweight library stats without full engine run
+- `deploy/unraid/` — Docker compose skeleton for NAS deployment
+
 ## 9.8.0
 
 ### Engine

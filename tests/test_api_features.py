@@ -1,17 +1,10 @@
 from __future__ import annotations
 
 import pytest
-from fastapi.testclient import TestClient
 
 from api import decisions, report_loader
-from api.server import app
 
 STAMP = "20260611_0208"
-
-
-@pytest.fixture
-def client():
-    return TestClient(app)
 
 
 def test_archive_peek_loader():
@@ -73,6 +66,14 @@ def test_jobs_list(client):
 
 def test_duplicate_reject_and_manual(client, tmp_path, monkeypatch):
     import duplicate_feedback as df
+    from api import security
+
+    lib = tmp_path / "lib"
+    path_a = lib / "a" / "Missed"
+    path_b = lib / "b" / "Missed"
+    path_a.mkdir(parents=True)
+    path_b.mkdir(parents=True)
+    monkeypatch.setattr(security, "library_roots", lambda: [lib])
 
     monkeypatch.setattr(decisions, "DECISIONS_DIR", tmp_path / "decisions")
     monkeypatch.setattr(df, "FEEDBACK_DIR", tmp_path / "feedback")
@@ -82,7 +83,7 @@ def test_duplicate_reject_and_manual(client, tmp_path, monkeypatch):
         f"/api/runs/{STAMP}/duplicates/reject",
         json={
             "dedup_key": "test|product",
-            "paths": [r"Z:\a\P", r"Z:\b\P"],
+            "paths": [str(path_a.parent / "P"), str(path_b.parent / "P")],
             "reason": "bad_match",
             "note": "not dupes",
         },
@@ -92,8 +93,8 @@ def test_duplicate_reject_and_manual(client, tmp_path, monkeypatch):
     manual = client.post(
         f"/api/runs/{STAMP}/duplicates/manual",
         json={
-            "path_a": r"Z:\a\Missed",
-            "path_b": r"Z:\b\Missed",
+            "path_a": str(path_a),
+            "path_b": str(path_b),
             "note": "same files",
         },
     )

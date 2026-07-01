@@ -237,6 +237,32 @@ def apply_correction(
     return store
 
 
+def apply_bulk_correction(
+    *,
+    paths: list[str],
+    action: str,
+    value: str = "",
+    reason: str = "other",
+    note: str = "",
+    stamp: str = "",
+    keywords: list[str] | None = None,
+) -> InvestigationStore:
+    store = load_store()
+    for path in paths:
+        if not path.strip():
+            continue
+        store = apply_correction(
+            path=path,
+            action=action,
+            value=value,
+            reason=reason,
+            note=note,
+            stamp=stamp,
+            keywords=keywords,
+        )
+    return store
+
+
 def is_resolved_path(path: str, store: InvestigationStore | None = None) -> bool:
     store = store or load_store()
     return normalize_path(path) in {normalize_path(p) for p in store.resolved_paths}

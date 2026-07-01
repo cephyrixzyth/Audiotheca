@@ -170,7 +170,13 @@ Not strictly — cache stores scan sizes/OS flags, not vendor routes. Bump `CACH
 
 ### Can I scan only one section?
 
-Not built-in. Workaround: temporarily set `ROOT_DIR` to a single bin path (e.g. `Z:\_software\_audio\a`) for a focused run.
+Use **Scan tab → target paths** or API `target_paths` for focused rescans. For a full CLI run of one bin:
+
+```powershell
+python main.py --dry-run --root "D:\YourLibrary\_software\_audio\sectionA"
+```
+
+Or temporarily set `AUDIOTHECA_LIBRARY_ROOT` to that bin path.
 
 ### What if the share is read-only?
 
@@ -200,10 +206,25 @@ No direct integration. Sidecar JSON metadata is compatible with manual Soundmine
 
 ```powershell
 cd "C:\path\to\audiotheca"
+$env:AUDIOTHECA_LIBRARY_ROOT = "D:\YourLibrary\_software\_audio"
 .\start-ui.ps1
 ```
 
 Open **http://localhost:5173**. API health: http://127.0.0.1:8787/api/health.
+
+First time on a new machine: follow **[Testing Guide](TESTING.md)**.
+
+### Why does the UI scan the wrong drive?
+
+Set `AUDIOTHECA_LIBRARY_ROOT` before starting the API. The UI reads allowed roots from `/api/security/library-roots` when the API is running.
+
+### What are underscore vendor folders?
+
+Some libraries use `_8Dio`, `_Kontakt Libraries`, etc. The engine skips `_`-prefixed folders unless whitelisted. Use the **Space recovery** tab → seed/whitelist → full dry scan. Config: `dedupe_reports/feedback/underscore_whitelist.json`.
+
+### What is Space recovery?
+
+UI + `space_recovery.py` for coexistence issues (deep installers, archive+extract siblings) and optional hardlink/bloat reports. Does not delete files automatically — generates CSV + PowerShell preview scripts.
 
 ### `npm: not recognized`
 

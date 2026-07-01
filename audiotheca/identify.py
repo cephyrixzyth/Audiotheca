@@ -24,6 +24,7 @@ from archive_peek import (
     sibling_groups_from_coexistence,
     write_peek_csv,
 )
+from audiotheca.underscore_whitelist import is_underscore_scannable
 from duplicate_feedback import export_engine_hints, is_group_rejected, load_feedback_store
 from investigation_feedback import (
     apply_hints_to_item,
@@ -97,6 +98,59 @@ class IdentifyMixin:
     def _match_vendor(self, text: str) -> str | None:
         match = self._match_vendor_detailed(text)
         return match[0] if match else None
+
+    def _strip_release_group_suffix(self, name: str) -> str:
+        """Remove trailing -R2R / -ARCADiA style group tokens."""
+        if "-" not in name:
+            return name
+        left, right = name.rsplit("-", 1)
+        token = right.strip()
+        if RELEASE_GROUP_SUFFIX.match(token) and not re.search(r"(?i)\bwin\b|\bmac\b", token):
+            return left.strip()
+        return name
+
+    def _identify_from_release_filename(self, raw_name: str) -> tuple[str, str, str] | None:
+        """Parse dotted scene release names (Vendor.Product.vX-GROUP)."""
+        name = re.sub(
+            r"\.(zip|rar|7z|iso|tar|gz|001)$", "", raw_name, flags=re.IGNORECASE
+        )
+        name = self._strip_release_group_suffix(name)
+        if "." not in name:
+            return None
+
+        parts = [part for part in name.split(".") if part]
+        if len(parts) < 2:
+            return None
+
+        for count in range(min(4, len(parts)), 0, -1):
+            prefix = " ".join(parts[:count])
+            match = self._match_vendor_detailed(prefix)
+            if match:
+                vendor, strong = match
+                conf = "CONFIRMED" if strong else "TENTATIVE"
+                return vendor, "RELEASE_FILENAME", conf
+
+        spaced = METADATA_TAG_PATTERN.sub("", name.replace(".", " "))
+        spaced = " ".join(spaced.split())
+        match = self._match_vendor_detailed(spaced)
+        if match:
+            vendor, strong = match
+            conf = "CONFIRMED" if strong else "TENTATIVE"
+            return vendor, "RELEASE_FILENAME", conf
+
+        if len(parts) >= 2 and not sum(ch.isdigit() for ch in parts[0]) > len(parts[0]) // 2:
+            guess_parts = parts[:2] if not parts[0].isdigit() else parts[:3]
+            guess = " ".join(guess_parts)
+            guess = " ".join(word.capitalize() if word.islower() else word for word in guess.split())
+            guess_key = _squash(guess)
+            if guess_key in RELEASE_FILENAME_BLOCKLIST or any(
+                token in RELEASE_FILENAME_BLOCKLIST for token in guess.lower().split()
+            ):
+                return None
+            if len(guess) >= 3 and not self._is_scene_release_code(guess):
+                return guess, "RELEASE_FILENAME", "TENTATIVE"
+
+        return None
 
     def _name_similarity(self, left: str, right: str) -> int:
         if HAS_FUZZ:
@@ -391,8 +445,18 @@ class IdentifyMixin:
                 return False
         return True
 
+    @staticmethod
+    def _looks_like_sample_kit_part(name: str) -> bool:
+        return bool(GENERIC_SAMPLE_NAME_PATTERN.search(name.strip()))
+
+    def _skip_standalone_target(self, path: Path, section: str) -> bool:
+        if not self._is_sample_pack_section(section):
+            return False
+        return self._looks_like_sample_kit_part(path.name)
+
     def get_software_targets(self, bin_path: Path) -> list[Path]:
         targets: set[Path] = set()
+        section = bin_path.name
         try:
             entries = list(bin_path.iterdir())
         except (OSError, PermissionError) as exc:
@@ -401,7 +465,7 @@ class IdentifyMixin:
             return []
 
         for item in entries:
-            if item.name.startswith("_"):
+            if item.name.startswith("_") and not is_underscore_scannable(item.name, item):
                 continue
 
             if item.is_file() and item.suffix.lower() in ARCHIVE_EXTS:
@@ -411,6 +475,9 @@ class IdentifyMixin:
             if not item.is_dir():
                 continue
 
+            if self._skip_standalone_target(item, section):
+                continue
+
             if self.is_vendor_grouping(item):
                 try:
                     sub_entries = list(item.iterdir())
@@ -418,12 +485,22 @@ class IdentifyMixin:
                     continue
                 for sub in sub_entries:
                     if sub.is_dir():
+                        if self._skip_standalone_target(sub, section):
+                            continue
                         targets.add(self.resolve_wrapper(sub))
                     elif sub.is_file() and sub.suffix.lower() in ARCHIVE_EXTS:
                         targets.add(sub)
             else:
                 resolved = self.resolve_wrapper(item)
                 targets.add(resolved)
+                try:
+                    for sub in item.iterdir():
+                        if not sub.is_dir():
+                            continue
+                        if self._is_scene_release_code(sub.name):
+                            targets.add(self.resolve_wrapper(sub))
+                except (OSError, PermissionError):
+                    pass
                 if resolved != item:
                     self.nested_issues.append(
                         {
@@ -438,6 +515,40 @@ class IdentifyMixin:
                     )
 
         return list(targets)
+
+    def expand_single_target(self, path: Path, section: str) -> list[Path]:
+        """Expand one ad-hoc rescan path the same way bin discovery would."""
+        if not path.exists():
+            return []
+        if path.is_file():
+            return [path]
+        if self._skip_standalone_target(path, section):
+            return []
+
+        targets: list[Path] = []
+        if self.is_vendor_grouping(path):
+            try:
+                sub_entries = list(path.iterdir())
+            except (OSError, PermissionError):
+                return [self.resolve_wrapper(path)]
+            for sub in sub_entries:
+                if sub.is_dir():
+                    if self._skip_standalone_target(sub, section):
+                        continue
+                    targets.append(self.resolve_wrapper(sub))
+                elif sub.is_file() and sub.suffix.lower() in ARCHIVE_EXTS:
+                    targets.append(sub)
+            return targets or [self.resolve_wrapper(path)]
+
+        resolved = self.resolve_wrapper(path)
+        targets.append(resolved)
+        try:
+            for sub in path.iterdir():
+                if sub.is_dir() and self._is_scene_release_code(sub.name):
+                    targets.append(self.resolve_wrapper(sub))
+        except (OSError, PermissionError):
+            pass
+        return list(dict.fromkeys(targets))
 
     # ------------------------------------------------------------------
     # Vendor identification
@@ -565,6 +676,14 @@ class IdentifyMixin:
             vendor, strong = match
             return vendor, "NAME_STRONG" if strong else "NAME_PRODUCT", "CONFIRMED"
 
+        release_match = self._identify_from_release_filename(item_path.name)
+        if release_match:
+            return release_match
+
+        parent_match = self._identify_from_parent_path(item_path)
+        if parent_match:
+            return parent_match
+
         content_match: tuple[str, bool] | None = None
         if info is not None:
             # Free tier first: child names were already collected by the scan.
@@ -595,6 +714,38 @@ class IdentifyMixin:
                 return company, "NAME_SPLIT", "TENTATIVE"
 
         return None, "NONE", "UNKNOWN"
+
+    def _identify_from_parent_path(self, item_path: Path) -> tuple[str, str, str] | None:
+        """Inherit vendor from an ancestor folder name (e.g. .../Arturia/7935P/)."""
+        root = getattr(self, "root_dir", None)
+        if root is None:
+            return None
+        try:
+            rel = item_path.resolve().relative_to(Path(root).resolve())
+        except (OSError, ValueError):
+            return None
+        if len(rel.parts) < 2:
+            return None
+        root_path = Path(root).resolve()
+        parts = rel.parts[:-1]
+        for i in range(len(parts) - 1, -1, -1):
+            part = parts[i]
+            if len(part) <= 2:
+                continue
+            partial = root_path.joinpath(*parts[: i + 1])
+            if part.startswith("_") and not is_underscore_scannable(part, partial):
+                continue
+            if part.lower() in LIBRARY_INTERNAL_DIRS:
+                continue
+            candidate = part.lstrip("_").replace(".", " ").replace("_", " ").strip()
+            if not candidate:
+                continue
+            match = self._match_vendor_detailed(candidate)
+            if match:
+                vendor, strong = match
+                conf = "CONFIRMED" if strong else "TENTATIVE"
+                return vendor, "PARENT_PATH", conf
+        return None
 
     # ------------------------------------------------------------------
     # Name fingerprinting

@@ -163,8 +163,10 @@ def apply_override_to_paths(
     override = get_dest_override(current_path, store)
     if not override:
         return dest_path, relative_dest
-    rel = override.replace("\\", "/").strip("/")
-    new_dest = root / Path(*rel.split("/"))
+    from api.security import _sanitize_relative_dest
+
+    rel = _sanitize_relative_dest(override, root.resolve())
+    new_dest = root.resolve() / Path(*rel.split("/"))
     return new_dest, rel
 
 

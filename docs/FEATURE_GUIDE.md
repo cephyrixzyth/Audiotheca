@@ -138,16 +138,40 @@ Scene-hash folders (`_scene_release_id`) are prime candidates for **Phase 1.6 pe
 
 ### 12. Web UI & API (v0.2)
 
-FastAPI on `http://127.0.0.1:8787` serves dry-run reports and runs scan jobs.
+FastAPI on `http://127.0.0.1:8787` serves dry-run reports and runs scan jobs. Bearer token auth — see [Security](SECURITY.md).
+
+#### Tabs
+
+| Tab | Purpose |
+| --- | --- |
+| Dashboard | Run stats, gauges, run compare, reorderable panels |
+| Scan | Job trigger, processing flow presets, WebSocket progress |
+| Investigation | Bucket triage, bulk correct, feedback export |
+| Duplicates | Keeper selection, staging, rejections |
+| Restructure | Route preview, live section execute |
+| Archives | Archive peek verdicts |
+| Scene renames | Hash rename plan |
+| Scan audit | Per-item identification table |
+| Skipped files | Coverage gaps, cache, coexistence, rescan |
+| Space recovery | Underscore whitelist, coexistence queue |
+| Vendors | Gaps, harvest, user keywords |
+
+#### Key API areas
 
 | Endpoint area | Purpose |
 | --- | --- |
-| `/api/runs/{stamp}/*` | Investigation, duplicates, restructure, archives, scene renames |
-| `/api/jobs` + WebSocket | Trigger scan; stream phase progress |
-| `/api/decisions` | Save duplicate keeper choices → `approved_{stamp}.json` |
-| `/api/explorer` | Open path in Windows Explorer |
+| `/api/runs/{stamp}/*` | Reports: investigation, duplicates, restructure, archives, … |
+| `/api/jobs` + WebSocket | Scan jobs + phase progress |
+| `/api/underscore-vendors` | Underscore whitelist CRUD |
+| `/api/runs/{stamp}/underscore/*` | Bulk whitelist + full rescan |
+| `/api/runs/{stamp}/space-recovery/summary` | Coexistence aggregates |
+| `/api/decisions` | Duplicate keeper → `approved_{stamp}.json` |
+| `/api/explorer` | Open path in Explorer (Windows) |
+| `/api/security/library-roots` | Configured library allowlist |
 
 Launch: `.\start-ui.ps1` or `python -m api.server` + `cd ui && npm run dev`.
+
+External tester checklist: [Testing Guide](TESTING.md).
 
 ---
 
@@ -183,20 +207,14 @@ All in `dedupe_reports/` with timestamp `YYYYMMDD_HHMM`. Copied to `{ROOT}/_dedu
 ```python
 ENGINE_VERSION = "9.8.0"
 CACHE_SCHEMA = "9.7.1"
-ROOT_DIR = r"Z:\_software\_audio"
-DRY_RUN = False                    # Stage 1 live; use --dry-run to override
-MAX_WALK_DEPTH = 8
-PROBE_DEPTH = 8
-MAX_WORKERS = 8
-ENABLE_ARCHIVE_PEEK = True
-ENABLE_SCENE_ARCHIVE_PEEK = True
-SCENE_AUTO_RENAME = False          # Stage 2
-SCENE_PEEK_MIN_SIZE_MB = 500
-SCENE_RENAME_MIN_SIZE_MB = 1000
-ACTION_MODE = "section"            # Stage 1
+# Prefer env: AUDIOTHECA_LIBRARY_ROOT
+ROOT_DIR = r"Z:\_software\_audio"   # default only — override for your system
+DRY_RUN = True                     # Safe default; use --live when ready
 ```
 
-CLI: `python main.py --dry-run`, `--live`, `--root PATH`.
+CLI: `python main.py --dry-run`, `--live`, `--root PATH`. Environment: [Configuration](CONFIGURATION.md).
+
+Other tunables (`MAX_WORKERS`, `PROBE_DEPTH`, `SCENE_AUTO_RENAME`, `ACTION_MODE`, …): `audiotheca/config.py` and [Install Guide](INSTALL.md).
 
 ---
 

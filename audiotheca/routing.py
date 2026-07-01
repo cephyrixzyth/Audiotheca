@@ -55,6 +55,15 @@ class RoutingMixin:
         return any(_squash(vendor) == squashed for vendor in self.vendor_aliases)
 
     @staticmethod
+    def _is_sample_pack_section(section: str) -> bool:
+        lowered = (section or "").lower()
+        return any(marker in lowered for marker in SAMPLE_PACK_SECTION_MARKERS)
+
+    @staticmethod
+    def _looks_like_sample_kit_part(name: str) -> bool:
+        return bool(GENERIC_SAMPLE_NAME_PATTERN.search(name.strip()))
+
+    @staticmethod
     def _is_scene_release_code(name: str) -> bool:
         stem = name.strip("= #")
         if SCENE_RELEASE_PATTERN.match(stem):
@@ -113,6 +122,16 @@ class RoutingMixin:
             )
 
         if self._is_scene_release_code(item["original_name"]):
+            path_str = str(item.get("path", ""))
+            if path_str:
+                parent_name = Path(path_str).parent.name
+                if parent_name and not self._is_scene_release_code(parent_name):
+                    parent_match = self._match_vendor_detailed(parent_name)
+                    if parent_match:
+                        return "_likely_component", (
+                            f"{INVESTIGATION_BUCKETS['_likely_component']} "
+                            f"(scene id under {parent_name})"
+                        )
             return "_scene_release_id", INVESTIGATION_BUCKETS["_scene_release_id"]
 
         size_mb = item.get("size", 0) / (1024 * 1024)
@@ -122,8 +141,26 @@ class RoutingMixin:
         ):
             return "_preset_or_snippet", INVESTIGATION_BUCKETS["_preset_or_snippet"]
 
+        section = item.get("source_bin", "")
+        if self._is_sample_pack_section(section):
+            name = item["original_name"]
+            company_key = _squash(item.get("company") or "")
+            if self._looks_like_sample_kit_part(name):
+                return "_sample_pack", INVESTIGATION_BUCKETS["_sample_pack"]
+            if company_key in RELEASE_FILENAME_BLOCKLIST:
+                return "_sample_pack", INVESTIGATION_BUCKETS["_sample_pack"]
+            if not item.get("company") and len(name.split()) <= 3:
+                return "_sample_pack", INVESTIGATION_BUCKETS["_sample_pack"]
+
         if len(base) < MIN_BASE_NAME_LEN or base in GENERIC_BASE_NAMES:
             return "_generic_name", INVESTIGATION_BUCKETS["_generic_name"]
+
+        if (
+            not item.get("company")
+            and self._is_sample_pack_section(section)
+            and self._looks_like_sample_kit_part(item["original_name"])
+        ):
+            return "_sample_pack", INVESTIGATION_BUCKETS["_sample_pack"]
 
         return "_unknown_vendor", INVESTIGATION_BUCKETS["_unknown_vendor"]
 

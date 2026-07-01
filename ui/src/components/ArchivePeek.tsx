@@ -1,6 +1,14 @@
 import { useEffect, useState } from "react";
-import { fetchArchivePeek } from "../api/client";
+import {
+  confirmArchiveDelete,
+  executeArchiveStaging,
+  fetchArchiveFeedback,
+  fetchArchivePeek,
+  rejectArchiveVerdict,
+  setArchiveKeeper,
+} from "../api/client";
 import type { ArchivePeekItem } from "../types";
+import { useLibraryRoot } from "../hooks/useLibraryRoot";
 import { PathLink } from "./PathLink";
 
 interface Props {
@@ -8,6 +16,7 @@ interface Props {
 }
 
 export function ArchivePeek({ stamp }: Props) {
+  const libraryRoot = useLibraryRoot();
   const [items, setItems] = useState<ArchivePeekItem[]>([]);
   const [total, setTotal] = useState(0);
   const [verdictCounts, setVerdictCounts] = useState<Record<string, number>>({});
@@ -16,6 +25,24 @@ export function ArchivePeek({ stamp }: Props) {
   const [verdict, setVerdict] = useState("MATCHES_EXTRACTED_FOLDER");
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [rejected, setRejected] = useState<Record<string, string>>({});
+  const [confirmed, setConfirmed] = useState<Record<string, string>>({});
+  const [keepers, setKeepers] = useState<Record<string, string>>({});
+  const [msg, setMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchArchiveFeedback(stamp)
+      .then((state) => {
+        setRejected(state.rejected_archives ?? {});
+        setConfirmed(state.confirmed_deletes ?? {});
+        setKeepers(state.keeper_choice ?? {});
+      })
+      .catch(() => {
+        setRejected({});
+        setConfirmed({});
+        setKeepers({});
+      });
+  }, [stamp]);
 
   useEffect(() => {
     setLoading(true);
@@ -37,6 +64,62 @@ export function ArchivePeek({ stamp }: Props) {
     return () => clearTimeout(timer);
   }, [stamp, verdict, query]);
 
+  async function handleReject(row: ArchivePeekItem) {
+    await rejectArchiveVerdict(stamp, {
+      archive_path: row.archive_path,
+      archive_name: row.archive_name,
+      item_name: row.item_name,
+      reason: "not_redundant",
+    });
+    setRejected((prev) => ({ ...prev, [row.archive_path]: "not_redundant" }));
+    setConfirmed((prev) => {
+      const next = { ...prev };
+      delete next[row.archive_path];
+      return next;
+    });
+    setMsg(`Marked ${row.archive_name} as not redundant`);
+  }
+
+  async function handleConfirm(row: ArchivePeekItem) {
+    await confirmArchiveDelete(stamp, {
+      archive_path: row.archive_path,
+      archive_name: row.archive_name,
+      item_name: row.item_name,
+    });
+    setConfirmed((prev) => ({ ...prev, [row.archive_path]: stamp }));
+    setMsg(`Confirmed delete for ${row.archive_name}`);
+  }
+
+  async function handleKeeper(row: ArchivePeekItem, keeper: "archive" | "folder") {
+    await setArchiveKeeper(stamp, {
+      archive_path: row.archive_path,
+      keeper,
+      archive_name: row.archive_name,
+      item_name: row.item_name,
+    });
+    setKeepers((prev) => ({ ...prev, [row.archive_path]: keeper }));
+    setMsg(`Keeper set to ${keeper} for ${row.archive_name}`);
+  }
+
+  async function handleExecute(dryRun: boolean, confirmLive = false) {
+    const res = await executeArchiveStaging(stamp, {
+      dry_run: dryRun,
+      confirm_live: confirmLive || undefined,
+      root: libraryRoot || undefined,
+    });
+    if (res.error) {
+      setMsg(res.error);
+      return;
+    }
+    setMsg(
+      dryRun
+        ? `Dry run: ${res.staged} archive(s) would stage to _delete-canidates`
+        : `Live: ${res.staged} archive(s) staged (${res.failed} failed)`,
+    );
+  }
+
+  const confirmedCount = Object.keys(confirmed).length;
+
   return (
     <div>
       <div className="kpi-grid" style={{ marginBottom: "1rem" }}>
@@ -48,6 +131,33 @@ export function ArchivePeek({ stamp }: Props) {
           <div className="label">Recoverable</div>
           <div className="value">{(deleteMb / 1024).toFixed(1)} GB</div>
         </div>
+        <div className="kpi">
+          <div className="label">Confirmed</div>
+          <div className="value">{confirmedCount}</div>
+        </div>
+      </div>
+
+      <div className="toolbar" style={{ marginBottom: "1rem" }}>
+        <button type="button" className="keeper-btn" onClick={() => void handleExecute(true)}>
+          Dry-run confirmed
+        </button>
+        <button
+          type="button"
+          className="primary-btn"
+          onClick={() => {
+            if (
+              window.confirm(
+                "Stage confirmed archives to _delete-canidates? Files will be moved on disk.",
+              )
+            ) {
+              void handleExecute(false, true);
+            }
+          }}
+          disabled={confirmedCount === 0}
+        >
+          Stage confirmed ({confirmedCount})
+        </button>
+        {msg && <span className="count-muted">{msg}</span>}
       </div>
 
       <div className="bucket-grid" style={{ marginBottom: "1rem" }}>
@@ -99,32 +209,76 @@ export function ArchivePeek({ stamp }: Props) {
               <th>Archive</th>
               <th>Size</th>
               <th>Extracted folder</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {items.map((row) => (
-              <tr key={row.archive_path}>
-                <td>
-                  <span
-                    className={`badge ${
-                      row.verdict === "MATCHES_EXTRACTED_FOLDER" ? "ready" : "bucket"
-                    }`}
-                  >
-                    {row.verdict}
-                  </span>
-                </td>
-                <td>
-                  <div>{row.item_name}</div>
-                  <PathLink path={row.item_path} />
-                </td>
-                <td>
-                  <div>{row.archive_name}</div>
-                  <PathLink path={row.archive_path} />
-                </td>
-                <td>{row.archive_size_mb != null ? `${row.archive_size_mb} MB` : "—"}</td>
-                <td>{row.extracted_folder}</td>
-              </tr>
-            ))}
+            {items.map((row) => {
+              const isRejected = row.archive_path in rejected;
+              const isConfirmed = row.archive_path in confirmed;
+              const keeper = keepers[row.archive_path];
+              return (
+                <tr key={row.archive_path}>
+                  <td>
+                    <span
+                      className={`badge ${
+                        row.verdict === "MATCHES_EXTRACTED_FOLDER" ? "ready" : "bucket"
+                      }`}
+                    >
+                      {row.verdict}
+                    </span>
+                    {isRejected && <span className="badge bucket">rejected</span>}
+                    {isConfirmed && <span className="badge ready">confirmed</span>}
+                    {keeper && <span className="badge bucket">keep {keeper}</span>}
+                  </td>
+                  <td>
+                    <div>{row.item_name}</div>
+                    <PathLink path={row.item_path} />
+                  </td>
+                  <td>
+                    <div>{row.archive_name}</div>
+                    <PathLink path={row.archive_path} />
+                  </td>
+                  <td>{row.archive_size_mb != null ? `${row.archive_size_mb} MB` : "—"}</td>
+                  <td>{row.extracted_folder}</td>
+                  <td>
+                    {row.verdict === "MATCHES_EXTRACTED_FOLDER" && !isRejected && (
+                      <>
+                        <button
+                          type="button"
+                          className="keeper-btn"
+                          onClick={() => void handleConfirm(row)}
+                        >
+                          Confirm delete
+                        </button>{" "}
+                        <button
+                          type="button"
+                          className="keeper-btn"
+                          onClick={() => void handleReject(row)}
+                        >
+                          Not redundant
+                        </button>{" "}
+                        <button
+                          type="button"
+                          className="keeper-btn"
+                          onClick={() => void handleKeeper(row, "folder")}
+                        >
+                          Keep folder
+                        </button>{" "}
+                        <button
+                          type="button"
+                          className="keeper-btn"
+                          onClick={() => void handleKeeper(row, "archive")}
+                        >
+                          Keep archive
+                        </button>
+                      </>
+                    )}
+                    {isRejected && <span className="count-muted">Skipped next run</span>}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       )}

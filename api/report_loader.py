@@ -1,20 +1,34 @@
 from __future__ import annotations
 
 import csv
+import json
 import re
+from collections import defaultdict
 from pathlib import Path
 
+from audiotheca.identification_metrics import compare_run_metrics, compute_run_metrics
 from api.paths import report_dir
 from api.models import (
     ArchiveDeleteItem,
     ArchivePeekItem,
+    CacheHitItem,
+    CoexistenceItem,
+    CoverageGapItem,
     DuplicateGroup,
     DuplicateMember,
+    InventoryItem,
     InvestigationItem,
+    NestedIssueItem,
+    ProbeTruncationItem,
     RestructureItem,
+    RunComparisonDelta,
     RunListItem,
     RunSummary,
+    ScanAuditItem,
+    ScanFailureItem,
     SceneRenameItem,
+    SkipPhaseImpact,
+    SkippedItem,
 )
 
 REPORT_DIR = report_dir()
@@ -61,7 +75,10 @@ def discover_runs() -> list[RunListItem]:
 
 
 def _report_path(stamp: str, prefix: str, suffix: str = ".csv") -> Path:
-    return REPORT_DIR / f"{prefix}_{stamp}{suffix}"
+    from api.security import normalize_stamp, safe_report_path
+
+    stamp = normalize_stamp(stamp)
+    return safe_report_path(REPORT_DIR.resolve(), f"{prefix}_{stamp}{suffix}")
 
 
 def load_run_summary(stamp: str) -> RunSummary:
@@ -130,6 +147,14 @@ def load_run_summary(stamp: str) -> RunSummary:
             data["duplicate_high"] = _int(value) or 0
         elif key == "MEDIUM confidence":
             data["duplicate_medium"] = _int(value) or 0
+        elif key == "Coverage gaps":
+            data["coverage_gaps"] = _int(value) or 0
+        elif key == "Cache hit paths":
+            data["cache_hit_paths"] = _int(value) or 0
+        elif key == "Probe truncations":
+            data["probe_truncations"] = _int(value) or 0
+        elif key == "Feedback skipped groups":
+            data["feedback_skipped"] = _int(value) or 0
 
     restructure = _report_path(stamp, "Restructure_Plan")
     if restructure.is_file():
@@ -245,6 +270,74 @@ def load_duplicates(
     groups.sort(key=lambda g: (-(g.members[0].size_mb or 0), g.dedup_key))
     total = len(groups)
     return groups[offset : offset + limit], total
+
+
+def load_scan_audit(
+    stamp: str,
+    *,
+    status: str | None = None,
+    flags: str | None = None,
+    query: str | None = None,
+    limit: int = 500,
+    offset: int = 0,
+) -> tuple[list[ScanAuditItem], int]:
+    rows = _read_csv(stamp, "Scan_Audit")
+    if not rows:
+        rows = _read_csv(stamp, "Restructure_Plan")
+        items = [
+            ScanAuditItem(
+                section=row.get("Section", ""),
+                item_name=row.get("Item Name", ""),
+                current_path=row.get("Current Path", ""),
+                vendor=row.get("Vendor", ""),
+                id_method=row.get("ID Method", ""),
+                id_confidence=row.get("ID Confidence", ""),
+                fingerprint=row.get("Fingerprint", ""),
+                version_key=row.get("Version Key", ""),
+                size_mb=_float(row.get("Size MB")),
+                status=row.get("Status", ""),
+                investigation_bucket=row.get("Investigation Bucket", ""),
+                planned_destination=row.get("Planned Destination", ""),
+                flags="",
+            )
+            for row in rows
+        ]
+    else:
+        items = [
+            ScanAuditItem(
+                section=row.get("Section", ""),
+                item_name=row.get("Item Name", ""),
+                current_path=row.get("Current Path", ""),
+                vendor=row.get("Vendor", ""),
+                id_method=row.get("ID Method", ""),
+                id_confidence=row.get("ID Confidence", ""),
+                fingerprint=row.get("Fingerprint", ""),
+                version_key=row.get("Version Key", ""),
+                size_mb=_float(row.get("Size MB")),
+                status=row.get("Status", ""),
+                investigation_bucket=row.get("Investigation Bucket", ""),
+                planned_destination=row.get("Planned Destination", ""),
+                flags=row.get("Flags", ""),
+            )
+            for row in rows
+        ]
+    if status:
+        items = [item for item in items if item.status == status]
+    if flags:
+        needle = flags.lower()
+        items = [item for item in items if needle in item.flags.lower()]
+    if query:
+        q = query.lower()
+        items = [
+            item
+            for item in items
+            if q in item.item_name.lower()
+            or q in item.current_path.lower()
+            or q in item.vendor.lower()
+            or q in item.fingerprint.lower()
+        ]
+    total = len(items)
+    return items[offset : offset + limit], total
 
 
 def load_restructure(
@@ -389,3 +482,556 @@ def list_sections(stamp: str, report: str = "Investigation_Breakdown") -> dict[s
         section = row.get("Section", "")
         counts[section] = counts.get(section, 0) + 1
     return dict(sorted(counts.items(), key=lambda pair: -pair[1]))
+
+
+def load_scan_failures(
+    stamp: str,
+    *,
+    query: str | None = None,
+    limit: int = 500,
+    offset: int = 0,
+) -> tuple[list[ScanFailureItem], int]:
+    rows = _read_csv(stamp, "Scan_Failures")
+    if not rows:
+        audit, _ = load_scan_audit(stamp, status="SCAN_FAILED", limit=10000)
+        items = [
+            ScanFailureItem(
+                section=row.section,
+                item_name=row.item_name,
+                path=row.current_path,
+                error=row.flags.replace("error:", "", 1) if row.flags.startswith("error:") else row.flags,
+            )
+            for row in audit
+        ]
+    else:
+        items = [
+            ScanFailureItem(
+                section=row.get("Section", ""),
+                item_name=row.get("Item Name", ""),
+                path=row.get("Full Path", ""),
+                error=row.get("Error", ""),
+            )
+            for row in rows
+        ]
+    if query:
+        q = query.lower()
+        items = [
+            item
+            for item in items
+            if q in item.item_name.lower() or q in item.path.lower() or q in item.error.lower()
+        ]
+    total = len(items)
+    return items[offset : offset + limit], total
+
+
+def load_nested_issues(
+    stamp: str,
+    *,
+    issue_type: str | None = None,
+    query: str | None = None,
+    limit: int = 500,
+    offset: int = 0,
+) -> tuple[list[NestedIssueItem], int]:
+    rows = _read_csv(stamp, "Nested_Folder_Issues")
+    items = [
+        NestedIssueItem(
+            section=row.get("Section", ""),
+            item_name=row.get("Item Name", ""),
+            issue_type=row.get("Issue Type", ""),
+            nested_path=row.get("Nested Path", ""),
+            repeated_name=row.get("Repeated Name", ""),
+            depth=_int(row.get("Depth")),
+            suggested_fix=row.get("Suggested Fix", ""),
+        )
+        for row in rows
+    ]
+    if issue_type:
+        items = [item for item in items if item.issue_type == issue_type]
+    if query:
+        q = query.lower()
+        items = [
+            item
+            for item in items
+            if q in item.item_name.lower()
+            or q in item.nested_path.lower()
+            or q in item.issue_type.lower()
+        ]
+    total = len(items)
+    return items[offset : offset + limit], total
+
+
+def load_coexistence(
+    stamp: str,
+    *,
+    issue_type: str | None = None,
+    query: str | None = None,
+    limit: int = 500,
+    offset: int = 0,
+) -> tuple[list[CoexistenceItem], int]:
+    rows = _read_csv(stamp, "Archive_Coexistence")
+    items = [
+        CoexistenceItem(
+            section=row.get("Section", ""),
+            item_name=row.get("Item Name", ""),
+            item_path=row.get("Item Path", ""),
+            issue_type=row.get("Issue Type", ""),
+            parent_path=row.get("Parent Path", ""),
+            archive_or_installer=row.get("Archive / Installer", ""),
+            extracted_folder=row.get("Extracted Folder", ""),
+            depth=_int(row.get("Depth")),
+            name_similarity_pct=_float(row.get("Name Similarity %")),
+            suggested_action=row.get("Suggested Action", ""),
+        )
+        for row in rows
+    ]
+    if issue_type:
+        items = [item for item in items if item.issue_type == issue_type]
+    if query:
+        q = query.lower()
+        items = [
+            item
+            for item in items
+            if q in item.item_name.lower()
+            or q in item.item_path.lower()
+            or q in item.issue_type.lower()
+        ]
+    total = len(items)
+    return items[offset : offset + limit], total
+
+
+def load_inventory(
+    stamp: str,
+    *,
+    vendor: str | None = None,
+    query: str | None = None,
+    limit: int = 500,
+    offset: int = 0,
+) -> tuple[list[InventoryItem], int]:
+    rows = _read_csv(stamp, "Library_Inventory_Dump")
+    items = [
+        InventoryItem(
+            root_bin=row.get("Root Bin", ""),
+            item_name=row.get("Item Name", ""),
+            fingerprint=row.get("Extracted Fingerprint", ""),
+            version_key=row.get("Version Key", ""),
+            item_type=row.get("Type", ""),
+            vendor=row.get("Detected Vendor", ""),
+            id_method=row.get("ID Method", ""),
+            tonex=row.get("Tonex", ""),
+        )
+        for row in rows
+    ]
+    if vendor:
+        items = [item for item in items if item.vendor.upper() == vendor.upper()]
+    if query:
+        q = query.lower()
+        items = [
+            item
+            for item in items
+            if q in item.item_name.lower()
+            or q in item.fingerprint.lower()
+            or q in item.vendor.lower()
+        ]
+    total = len(items)
+    return items[offset : offset + limit], total
+
+
+def load_cache_hits(
+    stamp: str,
+    *,
+    query: str | None = None,
+    limit: int = 500,
+    offset: int = 0,
+) -> tuple[list[CacheHitItem], int]:
+    rows = _read_csv(stamp, "Cache_Hits")
+    if not rows:
+        audit, _ = load_scan_audit(stamp, status="CACHE_HIT", limit=10000)
+        items = [
+            CacheHitItem(section=row.section, path=row.current_path, name=row.item_name)
+            for row in audit
+        ]
+    else:
+        items = [
+            CacheHitItem(
+                section=row.get("Section", ""),
+                path=row.get("Path", ""),
+                name=row.get("Name", ""),
+                mtime=_float(row.get("Mtime")),
+            )
+            for row in rows
+        ]
+    if query:
+        q = query.lower()
+        items = [item for item in items if q in item.name.lower() or q in item.path.lower()]
+    total = len(items)
+    return items[offset : offset + limit], total
+
+
+def load_coverage_gaps(
+    stamp: str,
+    *,
+    reason: str | None = None,
+    query: str | None = None,
+    limit: int = 500,
+    offset: int = 0,
+) -> tuple[list[CoverageGapItem], int]:
+    rows = _read_csv(stamp, "Coverage_Gaps")
+    items = [
+        CoverageGapItem(
+            section=row.get("Section", ""),
+            path=row.get("Path", ""),
+            name=row.get("Name", ""),
+            reason=row.get("Reason", ""),
+            detail=row.get("Detail", ""),
+        )
+        for row in rows
+    ]
+    if reason:
+        items = [item for item in items if item.reason == reason]
+    if query:
+        q = query.lower()
+        items = [
+            item
+            for item in items
+            if q in item.name.lower() or q in item.path.lower() or q in item.reason.lower()
+        ]
+    total = len(items)
+    return items[offset : offset + limit], total
+
+
+def load_probe_truncations(
+    stamp: str,
+    *,
+    kind: str | None = None,
+    query: str | None = None,
+    limit: int = 500,
+    offset: int = 0,
+) -> tuple[list[ProbeTruncationItem], int]:
+    rows = _read_csv(stamp, "Probe_Truncations")
+    items = [
+        ProbeTruncationItem(
+            section=row.get("Section", ""),
+            item_path=row.get("Item Path", ""),
+            item_name=row.get("Item Name", ""),
+            kind=row.get("Kind", ""),
+            truncated_path=row.get("Truncated Path", ""),
+            relative_path=row.get("Relative Path", ""),
+            depth=_int(row.get("Depth")),
+            limit=_int(row.get("Limit")),
+            detail=row.get("Detail", ""),
+        )
+        for row in rows
+    ]
+    if kind:
+        items = [item for item in items if item.kind == kind]
+    if query:
+        q = query.lower()
+        items = [
+            item
+            for item in items
+            if q in item.item_name.lower()
+            or q in item.item_path.lower()
+            or q in item.truncated_path.lower()
+        ]
+    total = len(items)
+    return items[offset : offset + limit], total
+
+
+def load_skip_phase_impact(stamp: str) -> list[SkipPhaseImpact]:
+    path = REPORT_DIR / f"Skip_Phase_Impact_{stamp}.json"
+    if not path.is_file():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    return [
+        SkipPhaseImpact(phase=phase, count=int(info.get("count", 0)), detail=str(info.get("detail", "")))
+        for phase, info in sorted(data.items())
+    ]
+
+
+def load_feedback_skipped(stamp: str) -> list[dict]:
+    path = REPORT_DIR / f"Feedback_Skipped_{stamp}.json"
+    if not path.is_file():
+        return []
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+
+
+def load_skipped_items(
+    stamp: str,
+    *,
+    reason: str | None = None,
+    query: str | None = None,
+    limit: int = 500,
+    offset: int = 0,
+) -> tuple[list[SkippedItem], int, dict[str, int]]:
+    """Aggregate all skip sources into a unified list."""
+    items: list[SkippedItem] = []
+    counts: dict[str, int] = defaultdict(int)
+
+    failures, _ = load_scan_failures(stamp, limit=10000)
+    for row in failures:
+        items.append(
+            SkippedItem(
+                reason="SCAN_FAILED",
+                section=row.section,
+                item_name=row.item_name,
+                path=row.path,
+                detail=row.error,
+                source="scan_failures",
+            )
+        )
+        counts["SCAN_FAILED"] += 1
+
+    gaps, _ = load_coverage_gaps(stamp, limit=10000)
+    for row in gaps:
+        if row.reason == "UNDERSCORE_PREFIX":
+            continue
+        items.append(
+            SkippedItem(
+                reason=row.reason,
+                section=row.section,
+                item_name=row.name,
+                path=row.path,
+                detail=row.detail,
+                source="coverage_gaps",
+            )
+        )
+        counts[row.reason] = counts.get(row.reason, 0) + 1
+
+    cache, _ = load_cache_hits(stamp, limit=10000)
+    for row in cache:
+        items.append(
+            SkippedItem(
+                reason="CACHE_HIT",
+                section=row.section,
+                item_name=row.name,
+                path=row.path,
+                detail="Served from scan cache — no fresh tree walk",
+                source="cache_hits",
+            )
+        )
+        counts["CACHE_HIT"] += 1
+
+    truncs, _ = load_probe_truncations(stamp, limit=10000)
+    for row in truncs:
+        items.append(
+            SkippedItem(
+                reason=f"PROBE_{row.kind}",
+                section=row.section,
+                item_name=row.item_name,
+                path=row.truncated_path or row.item_path,
+                detail=row.detail,
+                source="probe_truncations",
+            )
+        )
+        counts[f"PROBE_{row.kind}"] = counts.get(f"PROBE_{row.kind}", 0) + 1
+
+    groups, _ = load_duplicates(stamp, limit=10000)
+    for group in groups:
+        if group.content_check.upper() == "SKIPPED":
+            for member in group.members:
+                items.append(
+                    SkippedItem(
+                        reason="CONTENT_CHECK_SKIPPED",
+                        section=member.section,
+                        item_name=member.item_name,
+                        path=member.full_path,
+                        detail=f"Dedup key {group.dedup_key} ({group.confidence})",
+                        source="duplicates",
+                    )
+                )
+                counts["CONTENT_CHECK_SKIPPED"] += 1
+
+    for record in load_feedback_skipped(stamp):
+        for path in record.get("paths") or []:
+            items.append(
+                SkippedItem(
+                    reason="FEEDBACK_SKIPPED",
+                    section="",
+                    item_name=Path(path).name if path else "",
+                    path=str(path),
+                    detail=f"User rejected match: {record.get('dedup_key', '')}",
+                    source="feedback_skipped",
+                )
+            )
+            counts["FEEDBACK_SKIPPED"] += 1
+
+    restructure, _ = load_restructure(stamp, limit=10000)
+    for row in restructure:
+        if row.status == "SKIPPED BY USER":
+            items.append(
+                SkippedItem(
+                    reason="SKIPPED_BY_USER",
+                    section=row.section,
+                    item_name=row.item_name,
+                    path=row.current_path,
+                    detail="Section not approved during live restructure",
+                    source="restructure",
+                )
+            )
+            counts["SKIPPED_BY_USER"] += 1
+
+    for impact in load_skip_phase_impact(stamp):
+        if impact.count <= 0:
+            continue
+        items.append(
+            SkippedItem(
+                reason=f"PHASE_SKIPPED_{impact.phase.upper()}",
+                section="",
+                item_name=impact.phase,
+                path="",
+                detail=impact.detail or f"{impact.count} items affected",
+                source="skip_phase_impact",
+            )
+        )
+        counts[f"PHASE_SKIPPED_{impact.phase.upper()}"] = impact.count
+
+    if reason:
+        items = [item for item in items if item.reason == reason or item.reason.startswith(reason)]
+    if query:
+        q = query.lower()
+        items = [
+            item
+            for item in items
+            if q in item.item_name.lower()
+            or q in item.path.lower()
+            or q in item.detail.lower()
+            or q in item.reason.lower()
+        ]
+
+    total = len(items)
+    return items[offset : offset + limit], total, dict(counts)
+
+
+def load_investigation_groups(
+    stamp: str,
+    *,
+    bucket: str | None = None,
+    group_by: str = "prefix",
+    limit: int = 100,
+) -> tuple[list[dict], int]:
+    """Group investigation rows by vendor prefix or fingerprint for bulk actions."""
+    from vendor_gaps import _extract_prefix
+
+    items, _total = load_investigation(stamp, bucket=bucket, limit=100000, offset=0)
+    groups: dict[str, dict] = {}
+
+    for item in items:
+        if group_by == "fingerprint" and item.fingerprint:
+            key = item.fingerprint
+        elif group_by == "section":
+            key = item.section or "unknown"
+        else:
+            key = _extract_prefix(item.item_name, item.id_method)
+
+        entry = groups.setdefault(
+            key,
+            {
+                "group_key": key,
+                "count": 0,
+                "bucket": item.investigation_bucket,
+                "id_method": item.id_method,
+                "sample_items": [],
+                "paths": [],
+                "sections": {},
+            },
+        )
+        entry["count"] += 1
+        if len(entry["sample_items"]) < 4:
+            entry["sample_items"].append(item.item_name)
+        if len(entry["paths"]) < 200:
+            entry["paths"].append(item.current_path)
+        sec = item.section or ""
+        entry["sections"][sec] = entry["sections"].get(sec, 0) + 1
+
+    rows = sorted(groups.values(), key=lambda row: (-row["count"], row["group_key"].lower()))
+    total = len(rows)
+    return rows[:limit], total
+
+
+def compare_runs(stamp_a: str, stamp_b: str) -> dict[str, object]:
+    """Compare two run stamps — new failures, status changes, cache shifts."""
+    deltas: list[RunComparisonDelta] = []
+
+    audit_a = {row.current_path: row for row in _load_audit_map(stamp_a)}
+    audit_b = {row.current_path: row for row in _load_audit_map(stamp_b)}
+
+    paths_a = set(audit_a)
+    paths_b = set(audit_b)
+
+    for path in sorted(paths_b - paths_a):
+        row = audit_b[path]
+        deltas.append(
+            RunComparisonDelta(
+                path=path,
+                change_type="NEW",
+                new_value=row.status,
+                section=row.section,
+            )
+        )
+
+    for path in sorted(paths_a - paths_b):
+        row = audit_a[path]
+        deltas.append(
+            RunComparisonDelta(
+                path=path,
+                change_type="REMOVED",
+                old_value=row.status,
+                section=row.section,
+            )
+        )
+
+    for path in sorted(paths_a & paths_b):
+        old = audit_a[path]
+        new = audit_b[path]
+        if old.status != new.status:
+            deltas.append(
+                RunComparisonDelta(
+                    path=path,
+                    change_type="STATUS_CHANGED",
+                    old_value=old.status,
+                    new_value=new.status,
+                    section=new.section,
+                )
+            )
+        elif old.vendor != new.vendor:
+            deltas.append(
+                RunComparisonDelta(
+                    path=path,
+                    change_type="VENDOR_CHANGED",
+                    old_value=old.vendor,
+                    new_value=new.vendor,
+                    section=new.section,
+                )
+            )
+
+    failures_a = {f.path for f in load_scan_failures(stamp_a, limit=10000)[0]}
+    failures_b = {f.path for f in load_scan_failures(stamp_b, limit=10000)[0]}
+    new_failures = failures_b - failures_a
+    resolved_failures = failures_a - failures_b
+
+    cache_a = {c.path for c in load_cache_hits(stamp_a, limit=10000)[0]}
+    cache_b = {c.path for c in load_cache_hits(stamp_b, limit=10000)[0]}
+
+    return {
+        "stamp_a": stamp_a,
+        "stamp_b": stamp_b,
+        "deltas": deltas,
+        "new_failures": sorted(new_failures),
+        "resolved_failures": sorted(resolved_failures),
+        "new_cache_hits": sorted(cache_b - cache_a),
+        "fresh_scans": sorted(cache_a - cache_b),
+        "summary_a": load_run_summary(stamp_a).__dict__,
+        "summary_b": load_run_summary(stamp_b).__dict__,
+        "metrics": compare_run_metrics(stamp_a, stamp_b),
+    }
+
+
+def _load_audit_map(stamp: str) -> list[ScanAuditItem]:
+    items, _ = load_scan_audit(stamp, limit=100000)
+    return items

@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>Audiotheca</Name>
+  <Repository>audiotheca/unraid:latest</Repository>
+  <Registry>Local build</Registry>
+  <Network>bridge</Network>
+  <Shell>bash</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://forums.unraid.net/</Support>
+  <Project>https://github.com/audiotheca/audiotheca</Project>
+  <Overview>Audiotheca scans, deduplicates, and restructures large audio sample libraries on local disk. Includes browser UI and API in one container.[br][br][b]Before adding:[/b] build the image once on Unraid: [code]bash /path/to/audiotheca/deploy/unraid/build-image.sh[/code][br]Or install the template: [code]bash deploy/unraid/install-template.sh[/code]</Overview>
+  <Category>Tools:Utilities MediaApp:Other</Category>
+  <WebUI>http://[IP]:[PORT:4210]/</WebUI>
+  <Icon>/boot/config/plugins/dockerMan/templates-user/audiotheca-icon.png</Icon>
+  <ExtraParams>--restart=unless-stopped</ExtraParams>
+  <Requires>Self-built image [b]audiotheca/unraid:latest[/b] — run deploy/unraid/build-image.sh on Unraid first.</Requires>
+  <Description>
+    Audiotheca library scan and organization for Unraid.[br][br]
+    [b]Web UI[/b] — port 4210 (nginx, proxies /api internally)[br]
+    [b]API[/b] — optional direct access on port 4211[br][br]
+    [b]Appdata[/b] (/data) — reports, scan cache, API token, feedback JSON[br]
+    [b]Library[/b] (/library) — local array path to _software/_audio (read-only recommended)[br][br]
+    [b]Setup[/b][br]
+    1. Copy repo to Unraid (or git clone)[br]
+    2. [code]bash deploy/unraid/build-image.sh[/code][br]
+    3. [code]bash deploy/unraid/install-template.sh[/code][br]
+    4. Docker → Add Container → Template: Audiotheca → Apply[br]
+  </Description>
+  <Config Name="Appdata" Target="/data" Default="/mnt/user/appdata/audiotheca" Mode="rw" Description="Reports, scan cache, API token, feedback (AUDIOTHECA_HOME)" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/audiotheca</Config>
+  <Config Name="Library" Target="/library" Default="/mnt/user/infernal-data-streams/_software/_audio" Mode="ro" Description="Local audio library on array — not an SMB path from another PC" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/infernal-data-streams/_software/_audio</Config>
+  <Config Name="WebUI" Target="80" Default="4210" Mode="tcp" Description="Browser UI (nginx)" Type="Port" Display="always" Required="true" Mask="false">4210</Config>
+  <Config Name="API" Target="8787" Default="4211" Mode="tcp" Description="Direct API access (optional; UI proxy is usually enough)" Type="Port" Display="advanced" Required="false" Mask="false">4211</Config>
+  <Config Name="AUDIOTHECA_LIBRARY_ROOT" Target="AUDIOTHECA_LIBRARY_ROOT" Default="/library" Mode="" Description="Container library root (match Library path mount)" Type="Variable" Display="advanced-hide" Required="false" Mask="false">/library</Config>
+  <Config Name="AUDIOTHECA_LIBRARY_ROOTS" Target="AUDIOTHECA_LIBRARY_ROOTS" Default="/library" Mode="" Description="Comma-separated path allowlist" Type="Variable" Display="advanced-hide" Required="false" Mask="false">/library</Config>
+  <Config Name="AUDIOTHECA_HOME" Target="AUDIOTHECA_HOME" Default="/data" Mode="" Description="Workspace for reports and cache" Type="Variable" Display="advanced-hide" Required="false" Mask="false">/data</Config>
+  <Config Name="AUDIOTHECA_API_TOKEN" Target="AUDIOTHECA_API_TOKEN" Default="" Mode="" Description="Optional fixed API token (auto-generated in appdata if empty)" Type="Variable" Display="advanced" Required="false" Mask="true"/>
+</Container>

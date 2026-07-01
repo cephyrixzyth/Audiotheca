@@ -62,6 +62,14 @@ class PhaseProgress:
 
     def update(self, amount: int = 1, detail: str = "") -> None:
         self.done = min(self.done + amount, self.total)
+        if os.environ.get("AUDIOTHECA_CONTROL_FILE"):
+            from job_control import PhaseStopRequested, cooperative_checkpoint
+
+            cooperative_checkpoint(
+                self.phase.lower().replace(" ", "_")[:48],
+                self.phase,
+            )
+
         now = time.monotonic()
         if now - self._last_print < 0.4 and self.done < self.total:
             return

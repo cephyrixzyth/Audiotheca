@@ -3,6 +3,9 @@ import react from "@vitejs/plugin-react";
 
 const host = process.env.TAURI_DEV_HOST;
 
+const apiPort = process.env.VITE_API_PORT || "8787";
+const apiTarget = `http://127.0.0.1:${apiPort}`;
+
 export default defineConfig({
   plugins: [react()],
   clearScreen: false,
@@ -23,7 +26,7 @@ export default defineConfig({
     },
     proxy: {
       "/api": {
-        target: "http://127.0.0.1:8787",
+        target: apiTarget,
         changeOrigin: true,
         ws: true,
       },

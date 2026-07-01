@@ -64,6 +64,12 @@ class ReportsMixin:
             "scene_archive_peek_csv": REPORT_DIR / f"Scene_Archive_Peek_{self.run_stamp}.csv",
             "multipart_diag_csv": REPORT_DIR / f"Multipart_Archive_Diagnostic_{self.run_stamp}.csv",
             "scene_rename_csv": REPORT_DIR / f"Scene_Rename_Plan_{self.run_stamp}.csv",
+            "scan_audit_csv": REPORT_DIR / f"Scan_Audit_{self.run_stamp}.csv",
+            "coverage_gaps_csv": REPORT_DIR / f"Coverage_Gaps_{self.run_stamp}.csv",
+            "cache_hits_csv": REPORT_DIR / f"Cache_Hits_{self.run_stamp}.csv",
+            "probe_truncations_csv": REPORT_DIR / f"Probe_Truncations_{self.run_stamp}.csv",
+            "skip_impact_json": REPORT_DIR / f"Skip_Phase_Impact_{self.run_stamp}.json",
+            "feedback_skipped_json": REPORT_DIR / f"Feedback_Skipped_{self.run_stamp}.json",
         }
 
         if self.root_dir.exists():
@@ -278,6 +284,133 @@ class ReportsMixin:
             investigation_rows,
         )
 
+        audit_rows = [
+            [
+                row["section"],
+                row["item_name"],
+                row["current_path"],
+                row["vendor"],
+                row["id_method"],
+                row["id_confidence"],
+                row["fingerprint"],
+                row["version_key"],
+                row["size_mb"],
+                row["status"],
+                row["investigation_bucket"],
+                row["planned_destination"],
+                row["flags"],
+            ]
+            for row in self.audit_rows
+        ]
+        for row in self.scan_failures:
+            path_key = row.get("path", "")
+            if path_key and path_key in getattr(self, "audit_index_by_path", {}):
+                continue
+            audit_rows.append(
+                [
+                    row.get("source_bin", ""),
+                    row.get("original_name", ""),
+                    row.get("path", ""),
+                    "UNKNOWN",
+                    "SCAN_FAILED",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "SCAN_FAILED",
+                    "",
+                    "",
+                    f"error:{row.get('error', '')}",
+                ]
+            )
+        if audit_rows:
+            self._write_csv(
+                paths["scan_audit_csv"],
+                [
+                    "Section",
+                    "Item Name",
+                    "Current Path",
+                    "Vendor",
+                    "ID Method",
+                    "ID Confidence",
+                    "Fingerprint",
+                    "Version Key",
+                    "Size MB",
+                    "Status",
+                    "Investigation Bucket",
+                    "Planned Destination",
+                    "Flags",
+                ],
+                audit_rows,
+            )
+
+        if self.coverage_gaps:
+            self._write_csv(
+                paths["coverage_gaps_csv"],
+                ["Section", "Path", "Name", "Reason", "Detail"],
+                [
+                    [g["section"], g["path"], g["name"], g["reason"], g.get("detail", "")]
+                    for g in self.coverage_gaps
+                ],
+            )
+
+        if self.cache_hit_records:
+            self._write_csv(
+                paths["cache_hits_csv"],
+                ["Section", "Path", "Name", "Mtime"],
+                [
+                    [
+                        r["section"],
+                        r["path"],
+                        r["name"],
+                        r.get("mtime", ""),
+                    ]
+                    for r in self.cache_hit_records
+                ],
+            )
+
+        if self.probe_truncations:
+            self._write_csv(
+                paths["probe_truncations_csv"],
+                [
+                    "Section",
+                    "Item Path",
+                    "Item Name",
+                    "Kind",
+                    "Truncated Path",
+                    "Relative Path",
+                    "Depth",
+                    "Limit",
+                    "Detail",
+                ],
+                [
+                    [
+                        r["section"],
+                        r["item_path"],
+                        r["item_name"],
+                        r["kind"],
+                        r["path"],
+                        r["relative_path"],
+                        r["depth"],
+                        r["limit"],
+                        r.get("detail", ""),
+                    ]
+                    for r in self.probe_truncations
+                ],
+            )
+
+        if self.skip_phase_impact:
+            paths["skip_impact_json"].write_text(
+                json.dumps(self.skip_phase_impact, indent=2),
+                encoding="utf-8",
+            )
+
+        if self.feedback_skipped_records:
+            paths["feedback_skipped_json"].write_text(
+                json.dumps(self.feedback_skipped_records, indent=2),
+                encoding="utf-8",
+            )
+
         by_section: dict[str, list[dict]] = defaultdict(list)
         for entry in self.restructure_plan:
             by_section[entry["source_bin"]].append(entry)
@@ -412,6 +545,10 @@ class ReportsMixin:
             f"Duplicate groups (review): {len(self.duplicate_groups)}",
             f"  HIGH confidence: {sum(1 for g in self.duplicate_groups if g['confidence'] == 'HIGH')}",
             f"  MEDIUM confidence: {sum(1 for g in self.duplicate_groups if g['confidence'] == 'MEDIUM')}",
+            f"Coverage gaps: {len(self.coverage_gaps)}",
+            f"Cache hit paths: {len(self.cache_hit_records)}",
+            f"Probe truncations: {len(self.probe_truncations)}",
+            f"Feedback skipped groups: {len(self.feedback_skipped_records)}",
             "",
             "Reports:",
             f"  Preview markdown: {paths['preview_md']}",
@@ -431,6 +568,14 @@ class ReportsMixin:
             summary_lines.append(f"  Multipart diag CSV: {paths['multipart_diag_csv']}")
         if self.scene_rename_plan:
             summary_lines.append(f"  Scene rename CSV:   {paths['scene_rename_csv']}")
+        if self.coverage_gaps:
+            summary_lines.append(f"  Coverage gaps CSV:  {paths['coverage_gaps_csv']}")
+        if self.cache_hit_records:
+            summary_lines.append(f"  Cache hits CSV:     {paths['cache_hits_csv']}")
+        if self.probe_truncations:
+            summary_lines.append(f"  Probe trunc CSV:    {paths['probe_truncations_csv']}")
+        if self.skip_phase_impact:
+            summary_lines.append(f"  Skip impact JSON:   {paths['skip_impact_json']}")
         paths["summary_txt"].write_text("\n".join(summary_lines), encoding="utf-8")
 
         report_keys = [
@@ -439,6 +584,12 @@ class ReportsMixin:
         ]
         for optional in (
             "scan_failures_csv",
+            "scan_audit_csv",
+            "coverage_gaps_csv",
+            "cache_hits_csv",
+            "probe_truncations_csv",
+            "skip_impact_json",
+            "feedback_skipped_json",
             "archive_peek_csv",
             "scene_archive_peek_csv",
             "multipart_diag_csv",

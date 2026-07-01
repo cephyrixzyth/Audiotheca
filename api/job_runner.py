@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import re
+import secrets
 import subprocess
 import sys
 import time
@@ -12,10 +13,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from api import report_loader
+from api import service as api_service
 from api.paths import engine_executable, workspace_root
+from scan_options import SKIPPABLE_PHASES, ScanOptions
+from system_metrics import collect_metrics
 
 PROJECT_ROOT = workspace_root()
 from audiotheca.config import ROOT_DIR as DEFAULT_ROOT
+
 STAMP_RE = re.compile(r"Run_Summary_(\d{8}_\d{4})\.txt$")
 
 
@@ -26,11 +31,17 @@ class JobState:
     dry_run: bool
     root: str
     started_at: float
+    auth_token: str = ""
     stamp: str | None = None
     exit_code: int | None = None
     error: str | None = None
+    current_phase: str | None = None
+    scan_options: dict = field(default_factory=dict)
     events: list[dict] = field(default_factory=list)
+    user_stopped: bool = False
     _queues: list[asyncio.Queue] = field(default_factory=list, repr=False)
+    _control_path: Path | None = field(default=None, repr=False)
+    _progress_path: Path | None = field(default=None, repr=False)
 
     def snapshot(self) -> dict:
         return {
@@ -41,6 +52,8 @@ class JobState:
             "stamp": self.stamp,
             "exit_code": self.exit_code,
             "error": self.error,
+            "current_phase": self.current_phase,
+            "scan_options": self.scan_options,
             "event_count": len(self.events),
         }
 
@@ -52,27 +65,60 @@ class JobManager:
     def get(self, job_id: str) -> JobState | None:
         return self._jobs.get(job_id)
 
+    def get_events(self, job_id: str, *, after: int = 0) -> list[dict]:
+        job = self._jobs.get(job_id)
+        if not job:
+            raise KeyError(job_id)
+        start = max(0, after)
+        return job.events[start:]
+
     def list_jobs(self) -> list[dict]:
         return [job.snapshot() for job in sorted(self._jobs.values(), key=lambda j: -j.started_at)]
 
     def running_job(self) -> JobState | None:
         for job in self._jobs.values():
-            if job.status == "running":
+            if job.status in {"running", "paused", "pause_pending", "stop_pending"}:
                 return job
         return None
 
-    async def subscribe(self, job_id: str) -> asyncio.Queue:
+    def _prune_old_jobs(self) -> None:
+        if len(self._jobs) <= api_service.MAX_RETAINED_JOBS:
+            return
+        finished = [
+            (job_id, job)
+            for job_id, job in self._jobs.items()
+            if job.status not in {"running", "paused", "pause_pending", "stop_pending"}
+        ]
+        finished.sort(key=lambda pair: pair[1].started_at)
+        while len(self._jobs) > api_service.MAX_RETAINED_JOBS and finished:
+            job_id, _job = finished.pop(0)
+            self._jobs.pop(job_id, None)
+
+    async def subscribe(self, job_id: str, *, auth_token: str) -> asyncio.Queue:
         job = self._jobs.get(job_id)
         if not job:
             raise KeyError(job_id)
+        if job.auth_token and not secrets.compare_digest(job.auth_token, auth_token):
+            raise PermissionError("Job subscription token mismatch")
         queue: asyncio.Queue = asyncio.Queue()
         job._queues.append(queue)
-        for event in job.events[-50:]:
+        for event in job.events[-200:]:
             await queue.put(event)
         return queue
 
     async def _broadcast(self, job: JobState, event: dict) -> None:
         job.events.append(event)
+        if event.get("type") == "phase_start":
+            job.current_phase = str(event.get("phase", ""))
+        if event.get("type") == "phase_paused":
+            job.status = "paused"
+            job.current_phase = str(event.get("phase", job.current_phase or ""))
+        if event.get("type") == "phase_resumed":
+            job.status = "running"
+        if event.get("type") == "phase_stopped":
+            job.user_stopped = True
+            job.status = "stop_pending"
+            job.current_phase = str(event.get("phase", job.current_phase or ""))
         dead: list[asyncio.Queue] = []
         for queue in job._queues:
             try:
@@ -83,27 +129,73 @@ class JobManager:
             if queue in job._queues:
                 job._queues.remove(queue)
 
-    async def start(self, *, dry_run: bool = True, root: str | None = None) -> JobState:
+    async def control(self, job_id: str, action: str) -> dict:
+        job = self._jobs.get(job_id)
+        if not job:
+            raise KeyError(job_id)
+        if job.status not in {"running", "paused", "pause_pending", "stop_pending"}:
+            raise RuntimeError(f"Job is not active (status={job.status})")
+        if not job._control_path:
+            raise RuntimeError("Control file missing for job")
+
+        payload = {
+            "command": {"pause": "pause", "stop": "stop", "continue": "continue"}[action],
+            "updated": time.time(),
+        }
+        job._control_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+        if action == "pause":
+            job.status = "pause_pending"
+        elif action == "stop":
+            job.status = "stop_pending"
+        elif action == "continue":
+            job.status = "running"
+        else:
+            raise ValueError(f"Unknown control action: {action}")
+
+        await self._broadcast(job, {"type": "control_ack", "action": action})
+        return job.snapshot()
+
+    async def start(
+        self,
+        *,
+        dry_run: bool = True,
+        root: str | None = None,
+        scan_options: dict | None = None,
+        auth_token: str = "",
+    ) -> JobState:
         if self.running_job():
             raise RuntimeError("A scan is already running")
 
         job_id = uuid.uuid4().hex[:12]
         root_dir = root or DEFAULT_ROOT
+        root_path = Path(root_dir)
+        if not root_path.exists():
+            raise RuntimeError(f"Library root does not exist: {root_dir}")
+        options = ScanOptions.from_dict(scan_options or {})
         progress_file = report_loader.REPORT_DIR / f".progress_{job_id}.jsonl"
+        control_file = report_loader.REPORT_DIR / f".control_{job_id}.json"
         progress_file.unlink(missing_ok=True)
+        control_file.unlink(missing_ok=True)
+        control_file.write_text(json.dumps({"command": "run"}, indent=2), encoding="utf-8")
 
         env = os.environ.copy()
         env["AUDIOTHECA_PROGRESS_FILE"] = str(progress_file)
+        env["AUDIOTHECA_CONTROL_FILE"] = str(control_file)
+        env["AUDIOTHECA_SCAN_OPTIONS"] = json.dumps(options.to_dict())
         env["PYTHONUNBUFFERED"] = "1"
 
         cmd = _engine_command(root_dir, dry_run)
+
+        stderr_log = report_loader.REPORT_DIR / f".engine_stderr_{job_id}.log"
+        stderr_handle = stderr_log.open("w", encoding="utf-8")
 
         proc = subprocess.Popen(
             cmd,
             cwd=str(PROJECT_ROOT),
             env=env,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stderr=stderr_handle,
         )
 
         job = JobState(
@@ -112,14 +204,40 @@ class JobManager:
             dry_run=dry_run,
             root=root_dir,
             started_at=time.time(),
+            auth_token=auth_token,
+            scan_options=options.to_dict(),
+            _control_path=control_file,
+            _progress_path=progress_file,
         )
         self._jobs[job_id] = job
-        asyncio.create_task(self._watch(job, proc, progress_file))
-        await self._broadcast(job, {"type": "job_start", "job_id": job_id, "dry_run": dry_run, "root": root_dir})
+        self._prune_old_jobs()
+        asyncio.create_task(
+            self._watch(job, proc, progress_file, control_file, root_dir, stderr_log, stderr_handle)
+        )
+        await self._broadcast(
+            job,
+            {
+                "type": "job_start",
+                "job_id": job_id,
+                "dry_run": dry_run,
+                "root": root_dir,
+                "scan_options": options.to_dict(),
+            },
+        )
         return job
 
-    async def _watch(self, job: JobState, proc: subprocess.Popen, progress_file: Path) -> None:
+    async def _watch(
+        self,
+        job: JobState,
+        proc: subprocess.Popen,
+        progress_file: Path,
+        control_file: Path,
+        root_dir: str,
+        stderr_log: Path,
+        stderr_handle,
+    ) -> None:
         offset = 0
+        last_metrics = 0.0
         try:
             while proc.poll() is None:
                 if progress_file.is_file():
@@ -131,11 +249,23 @@ class JobManager:
                         except json.JSONDecodeError:
                             offset += 1
                             continue
+                        if event.get("type") == "phase_paused":
+                            job.status = "paused"
+                        elif event.get("type") == "phase_resumed":
+                            job.status = "running"
+                        elif event.get("type") == "phase_stopped":
+                            job.user_stopped = True
+                            job.status = "stop_pending"
                         await self._broadcast(job, event)
                         offset += 1
+
+                now = time.monotonic()
+                if now - last_metrics >= 2.0:
+                    metrics = collect_metrics(path=Path(root_dir))
+                    await self._broadcast(job, {"type": "system_metrics", **metrics})
+                    last_metrics = now
                 await asyncio.sleep(0.5)
 
-            # Drain remaining lines
             if progress_file.is_file():
                 text = progress_file.read_text(encoding="utf-8")
                 lines = text.splitlines()
@@ -149,15 +279,42 @@ class JobManager:
 
             job.exit_code = proc.returncode
             job.stamp = self._detect_stamp(job.started_at)
-            if proc.returncode == 0 and job.stamp:
+            if job.user_stopped or proc.returncode == 2:
+                job.status = "stopped"
+                job.error = job.error or "Scan stopped by user"
+                await self._broadcast(
+                    job,
+                    {
+                        "type": "job_stopped",
+                        "exit_code": proc.returncode,
+                        "error": job.error,
+                        "stamp": job.stamp,
+                    },
+                )
+            elif proc.returncode == 0 and job.stamp:
                 job.status = "done"
                 await self._broadcast(
                     job,
                     {"type": "job_done", "stamp": job.stamp, "exit_code": proc.returncode},
                 )
-            else:
+            elif proc.returncode == 0:
+                job.status = "stopped"
+                job.error = "Engine exited before reports were written"
+                await self._broadcast(
+                    job,
+                    {
+                        "type": "job_stopped",
+                        "exit_code": proc.returncode,
+                        "error": job.error,
+                        "stamp": job.stamp,
+                    },
+                )
+            elif proc.returncode != 0:
                 job.status = "failed"
+                tail = _read_log_tail(stderr_log)
                 job.error = f"Engine exited with code {proc.returncode}"
+                if tail:
+                    job.error = f"{job.error}: {tail}"
                 await self._broadcast(
                     job,
                     {
@@ -172,7 +329,14 @@ class JobManager:
             job.error = str(exc)
             await self._broadcast(job, {"type": "job_failed", "error": str(exc)})
         finally:
+            try:
+                stderr_handle.close()
+            except Exception:
+                pass
+            if stderr_log.is_file() and stderr_log.stat().st_size == 0:
+                stderr_log.unlink(missing_ok=True)
             progress_file.unlink(missing_ok=True)
+            control_file.unlink(missing_ok=True)
 
     def _detect_stamp(self, started_at: float) -> str | None:
         candidates = sorted(
@@ -186,6 +350,26 @@ class JobManager:
                 if match:
                     return match.group(1)
         return None
+
+
+def _read_log_tail(path: Path, *, max_bytes: int = 4096, max_lines: int = 8) -> str:
+    if not path.is_file():
+        return ""
+    try:
+        size = path.stat().st_size
+        with path.open("rb") as handle:
+            if size > max_bytes:
+                handle.seek(size - max_bytes)
+            raw = handle.read()
+    except OSError:
+        return ""
+    text = raw.decode("utf-8", errors="replace").strip()
+    if not text:
+        return ""
+    lines = text.splitlines()
+    if len(lines) > max_lines:
+        lines = lines[-max_lines:]
+    return " | ".join(line.strip() for line in lines if line.strip())
 
 
 def _engine_command(root_dir: str, dry_run: bool) -> list[str]:

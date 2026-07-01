@@ -24,6 +24,14 @@ export interface RunSummary {
   ready_count: number | null;
   needs_review_count: number | null;
   merge_count: number | null;
+  coverage_gaps?: number;
+  cache_hit_paths?: number;
+  probe_truncations?: number;
+  feedback_skipped?: number;
+    scan_failures?: number;
+  route_ready_pct?: number | null;
+  identification_pct?: number | null;
+  one_action_pct?: number | null;
 }
 
 export interface InvestigationItem {
@@ -109,6 +117,43 @@ export interface ArchivePeekResponse {
   delete_candidate_mb: number;
 }
 
+export interface ScanAuditItem {
+  section: string;
+  item_name: string;
+  current_path: string;
+  vendor: string;
+  id_method: string;
+  id_confidence: string;
+  fingerprint: string;
+  version_key: string;
+  size_mb: number | null;
+  status: string;
+  investigation_bucket: string;
+  planned_destination: string;
+  flags: string;
+}
+
+export interface SystemMetrics {
+  type?: string;
+  disk_path?: string;
+  cpu_percent?: number;
+  ram_total_gb?: number;
+  ram_used_gb?: number;
+  ram_available_gb?: number;
+  ram_used_pct?: number;
+  disk_total_gb?: number;
+  disk_used_gb?: number;
+  disk_free_gb?: number;
+  disk_used_pct?: number;
+  disk_free_pct?: number;
+  psutil?: boolean;
+}
+
+export interface ScanOptionsInfo {
+  skippable_phases: string[];
+  phase_descriptions: Record<string, string>;
+}
+
 export interface JobSnapshot {
   job_id: string;
   status: string;
@@ -117,6 +162,8 @@ export interface JobSnapshot {
   stamp: string | null;
   exit_code: number | null;
   error: string | null;
+  current_phase?: string | null;
+  scan_options?: Record<string, unknown>;
 }
 
 export interface ProgressEvent {
@@ -133,6 +180,108 @@ export interface ProgressEvent {
   eta_s?: number | null;
   stamp?: string;
   error?: string;
+  action?: string;
+}
+
+export interface SkippedItem {
+  reason: string;
+  section: string;
+  item_name: string;
+  path: string;
+  detail: string;
+  source: string;
+}
+
+export interface ScanFailureItem {
+  section: string;
+  item_name: string;
+  path: string;
+  error: string;
+}
+
+export interface NestedIssueItem {
+  section: string;
+  item_name: string;
+  issue_type: string;
+  nested_path: string;
+  repeated_name: string;
+  depth: number | null;
+  suggested_fix: string;
+}
+
+export interface CoexistenceItem {
+  section: string;
+  item_name: string;
+  item_path: string;
+  issue_type: string;
+  parent_path: string;
+  archive_or_installer: string;
+  extracted_folder: string;
+  depth: number | null;
+  name_similarity_pct: number | null;
+  suggested_action: string;
+}
+
+export interface InventoryItem {
+  root_bin: string;
+  item_name: string;
+  fingerprint: string;
+  version_key: string;
+  item_type: string;
+  vendor: string;
+  id_method: string;
+  tonex: string;
+}
+
+export interface CacheHitItem {
+  section: string;
+  path: string;
+  name: string;
+  mtime: number | null;
+}
+
+export interface CoverageGapItem {
+  section: string;
+  path: string;
+  name: string;
+  reason: string;
+  detail: string;
+}
+
+export interface ProbeTruncationItem {
+  section: string;
+  item_path: string;
+  item_name: string;
+  kind: string;
+  truncated_path: string;
+  relative_path: string;
+  depth: number | null;
+  limit: number | null;
+  detail: string;
+}
+
+export interface SkipPhaseImpact {
+  phase: string;
+  count: number;
+  detail: string;
+}
+
+export interface RunComparisonDelta {
+  path: string;
+  change_type: string;
+  old_value: string;
+  new_value: string;
+  section: string;
+}
+
+export interface RunComparison {
+  stamp_a: string;
+  stamp_b: string;
+  deltas: RunComparisonDelta[];
+  new_failures: string[];
+  resolved_failures: string[];
+  new_cache_hits: string[];
+  fresh_scans: string[];
 }
 
 export type TabId =
@@ -143,4 +292,7 @@ export type TabId =
   | "restructure"
   | "archives"
   | "scene-renames"
-  | "vendors";
+  | "scan-audit"
+  | "skipped"
+  | "vendors"
+  | "space-recovery";

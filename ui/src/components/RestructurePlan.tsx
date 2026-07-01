@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   approveRestructureSection,
+  executeRestructure,
   fetchRestructure,
   fetchRestructureFeedback,
   overrideRestructureDest,
 } from "../api/client";
 import type { RestructureItem } from "../types";
+import { useLibraryRoot } from "../hooks/useLibraryRoot";
 import { PathLink } from "./PathLink";
 
 interface Props {
@@ -13,6 +15,7 @@ interface Props {
 }
 
 export function RestructurePlan({ stamp }: Props) {
+  const libraryRoot = useLibraryRoot();
   const [items, setItems] = useState<RestructureItem[]>([]);
   const [total, setTotal] = useState(0);
   const [status, setStatus] = useState("READY");
@@ -81,11 +84,45 @@ export function RestructurePlan({ stamp }: Props) {
     setMsg(`Destination override saved for ${row.item_name}`);
   }
 
+  async function handleExecute(dryRun: boolean, confirmLive = false) {
+    const res = await executeRestructure(stamp, {
+      dry_run: dryRun,
+      confirm_live: confirmLive || undefined,
+      root: libraryRoot || undefined,
+    });
+    if (res.error) {
+      setMsg(res.error);
+      return;
+    }
+    setMsg(
+      dryRun
+        ? `Dry run: ${res.moved} move(s) in sections ${res.approved_sections?.join(", ")}`
+        : `Live: ${res.moved} move(s) applied (${res.failed} failed)`,
+    );
+  }
+
   return (
     <div>
       <div className="banner dry">
-        Approve sections here to skip CLI prompts on <code>python cli.py --live</code>.
-        Destination overrides apply on the next scan.
+        Approve sections here for CLI or UI execute. Destination overrides apply on the next scan.
+      </div>
+
+      <div className="toolbar" style={{ marginBottom: "0.5rem" }}>
+        <button type="button" className="keeper-btn" onClick={() => void handleExecute(true)}>
+          Dry-run approved sections
+        </button>
+        <button
+          type="button"
+          className="primary-btn"
+          onClick={() => {
+            if (window.confirm("Move READY items in approved sections on disk?")) {
+              void handleExecute(false, true);
+            }
+          }}
+          disabled={approvedSections.length === 0}
+        >
+          Execute approved ({approvedSections.length} sections)
+        </button>
       </div>
 
       {sections.length > 0 && (

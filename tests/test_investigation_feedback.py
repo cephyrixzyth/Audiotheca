@@ -58,15 +58,18 @@ def test_export_csv(feedback_tmp):
     assert "MARK_RESOLVED" in text
 
 
-def test_api_correct(tmp_path, monkeypatch):
+def test_api_correct(tmp_path, monkeypatch, api_token):
+    from api import security
     from api.server import app
     from fastapi.testclient import TestClient
 
     monkeypatch.setattr(inv, "FEEDBACK_DIR", tmp_path)
     monkeypatch.setattr(inv, "GLOBAL_PATH", tmp_path / "investigation_feedback.json")
     monkeypatch.setattr(inv, "HINTS_PATH", tmp_path / "investigation_hints.json")
+    monkeypatch.setattr(security, "library_roots", lambda: [__import__("pathlib").Path(r"Z:\test")])
 
     client = TestClient(app)
+    client.headers.update({"Authorization": f"Bearer {api_token}"})
     res = client.post(
         "/api/runs/20260611_0208/investigation/correct",
         json={

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 
 from audiotheca.config import DRY_RUN, MAX_WORKERS, ROOT_DIR
 from audiotheca.engine import DeduplicationEngine
@@ -38,7 +39,9 @@ def main(argv: list[str] | None = None) -> None:
     args = build_parser().parse_args(argv)
     dry_run = DRY_RUN if args.dry_run is None else args.dry_run
     engine = DeduplicationEngine(root_dir=args.root, dry_run=dry_run, max_workers=MAX_WORKERS)
-    engine.run()
+    result = engine.run()
+    if result == "stopped":
+        sys.exit(2)
 
 
 if __name__ == "__main__":

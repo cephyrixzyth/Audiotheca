@@ -155,6 +155,58 @@ class TestClassifyInvestigation:
         assert bucket == "_likely_component"
         assert "Spectrasonics" in reason
 
+    def test_sample_pack_in_loops_section(self, engine):
+        item = {
+            "original_name": "kick drums",
+            "base_name": "kickdrums",
+            "company": None,
+            "source_bin": "_Loops, Samples, Etc",
+            "size": 10 * 1024 * 1024,
+        }
+        bucket, _reason = engine.classify_investigation(
+            item, conflict_bases=set(), confirmed_bases={}
+        )
+        assert bucket == "_sample_pack"
+
+    def test_numbered_kit_part(self, engine):
+        item = {
+            "original_name": "1. Kick",
+            "base_name": "kick",
+            "company": None,
+            "source_bin": "_Loops, Samples, Etc",
+            "size": 5 * 1024 * 1024,
+        }
+        bucket, _reason = engine.classify_investigation(
+            item, conflict_bases=set(), confirmed_bases={}
+        )
+        assert bucket == "_sample_pack"
+
+    def test_chords_stabs_in_loops(self, engine):
+        item = {
+            "original_name": "chords & stabs",
+            "base_name": "chordsstabs",
+            "company": None,
+            "source_bin": "_Loops, Samples, Etc",
+            "size": 20 * 1024 * 1024,
+        }
+        bucket, _reason = engine.classify_investigation(
+            item, conflict_bases=set(), confirmed_bases={}
+        )
+        assert bucket == "_sample_pack"
+
+    def test_blocklisted_vendor_in_loops_is_sample_pack(self, engine):
+        item = {
+            "original_name": "Kick Pack Vol 2",
+            "base_name": "kickpackvol2",
+            "company": "Drums",
+            "source_bin": "_Loops, Samples, Etc",
+            "size": 30 * 1024 * 1024,
+        }
+        bucket, _reason = engine.classify_investigation(
+            item, conflict_bases=set(), confirmed_bases={}
+        )
+        assert bucket == "_sample_pack"
+
 
 def _scan_info(**overrides) -> dict:
     info = {
@@ -186,6 +238,35 @@ class TestNormalizePeCompany:
 
     def test_db_match_passthrough(self, engine):
         assert engine._normalize_pe_company("Celemony") == "Celemony"
+
+
+class TestReleaseFilename:
+    def test_dotted_scene_release_tentative_vendor(self, engine):
+        company, method, confidence = engine.identify_vendor(
+            Path("2B.Played.Music.Filter.Friend.2.v1.3.Incl.Patched.and.Keygen-R2R"),
+            None,
+        )
+        assert method == "RELEASE_FILENAME"
+        assert confidence == "TENTATIVE"
+        assert company is not None
+        assert "2B" in company
+
+    def test_blocklisted_release_prefix_not_identified(self, engine):
+        company, method, confidence = engine.identify_vendor(
+            Path("Drums.Kick.Pack.v1-R2R"),
+            None,
+        )
+        assert method == "NONE"
+        assert company is None
+
+    def test_dotted_release_matches_db_vendor(self, engine):
+        company, method, confidence = engine.identify_vendor(
+            Path("Voxengo.SPAN.Plus.v2.0-R2R"),
+            None,
+        )
+        assert company == "Voxengo"
+        assert confidence == "CONFIRMED"
+        assert method in ("RELEASE_FILENAME", "NAME_STRONG", "NAME_PRODUCT")
 
 
 class TestContentVendorTier:
@@ -245,6 +326,41 @@ class TestSceneVendorBackfill:
         assert engine._backfill_scene_vendors([item]) == 1
         assert item["company"] == "Voxengo"
         assert item["id_method"] == "ARCHIVE_PEEK"
+
+    def test_backfill_dotted_inferred_product(self, engine, tmp_path):
+        folder = tmp_path / "295002"
+        item = {
+            "path": folder,
+            "company": None,
+            "id_method": "NONE",
+            "id_confidence": "UNKNOWN",
+        }
+        engine.scene_archive_rows = [
+            {
+                "inferred_product": "Voxengo.SPAN.Plus.v2.0-R2R",
+                "folder_path": str(folder),
+            }
+        ]
+        assert engine._backfill_scene_vendors([item]) == 1
+        assert item["company"] == "Voxengo"
+        assert item["id_method"] == "ARCHIVE_PEEK"
+
+    def test_backfill_name_split_inferred_product(self, engine, tmp_path):
+        folder = tmp_path / "295003"
+        item = {
+            "path": folder,
+            "company": None,
+            "id_method": "NONE",
+            "id_confidence": "UNKNOWN",
+        }
+        engine.scene_archive_rows = [
+            {
+                "inferred_product": "Celemony - Melodyne 5 Essential",
+                "folder_path": str(folder),
+            }
+        ]
+        assert engine._backfill_scene_vendors([item]) == 1
+        assert item["company"] == "Celemony"
 
     def test_does_not_override_existing_vendor(self, engine, tmp_path):
         folder = tmp_path / "295001"

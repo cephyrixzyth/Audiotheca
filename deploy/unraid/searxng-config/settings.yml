@@ -1,0 +1,17 @@
+use_default_settings: true
+
+server:
+  bind_address: "0.0.0.0"
+  port: 8080
+  base_url: "http://127.0.0.1:8081/"
+  secret_key: "unraid-local-searxng-change-me"
+  limiter: false
+
+search:
+  default_lang: "en"
+  formats:
+    - html
+    - json
+
+redis:
+  url: redis://valkey:6379/0

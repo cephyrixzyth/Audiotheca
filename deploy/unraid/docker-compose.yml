@@ -1,0 +1,133 @@
+# Audiotheca on Unraid — Docker Compose stack
+# API + nginx UI + optional SearXNG for vendor research
+
+name: audiotheca-unraid
+
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: deploy/unraid/Dockerfile.api
+      args:
+        PYTHON_VERSION: ${PYTHON_VERSION:-3.13}
+    container_name: audiotheca-api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      AUDIOTHECA_HOME: /data
+      AUDIOTHECA_LIBRARY_ROOT: ${LIBRARY_CONTAINER_PATH:-/library}
+      AUDIOTHECA_LIBRARY_ROOTS: ${LIBRARY_CONTAINER_PATH:-/library}
+      AUDIOTHECA_API_PORT: "8787"
+      AUDIOTHECA_API_HOST: "0.0.0.0"
+      AUDIOTHECA_NO_RELOAD: "1"
+      AUDIOTHECA_TRUST_INTERNAL_NETWORK: "1"
+      SEARXNG_URL: ${SEARXNG_URL:-http://searxng:8080}
+    volumes:
+      - ${APPDATA_PATH:-./appdata}:/data
+      - ${LIBRARY_HOST_PATH}:${LIBRARY_CONTAINER_PATH:-/library}:ro
+    ports:
+      - "${API_PORT:-4211}:8787"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8787/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  ui:
+    build:
+      context: ../..
+      dockerfile: deploy/unraid/Dockerfile.ui
+      args:
+        VITE_DEFAULT_LIBRARY_ROOT: ${LIBRARY_CONTAINER_PATH:-/library}
+    container_name: audiotheca-ui
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${UI_PORT:-4210}:80"
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  searxng:
+    profiles: ["search"]
+    image: docker.io/searxng/searxng:latest
+    container_name: audiotheca-searxng
+    restart: unless-stopped
+    depends_on:
+      valkey:
+        condition: service_started
+    ports:
+      - "127.0.0.1:${SEARXNG_PORT:-8081}:8080"
+    volumes:
+      - ./searxng-config:/etc/searxng:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  valkey:
+    profiles: ["search"]
+    image: docker.io/valkey/valkey:9-alpine
+    container_name: audiotheca-searxng-valkey
+    command: valkey-server --save 30 1 --loglevel warning
+    restart: unless-stopped
+
+  space-recovery:
+    profiles: ["space-recovery"]
+    build:
+      context: ../..
+      dockerfile: deploy/unraid/Dockerfile.api
+    container_name: audiotheca-space-recovery
+    env_file: .env
+    environment:
+      AUDIOTHECA_HOME: /data
+      AUDIOTHECA_LIBRARY_ROOT: ${LIBRARY_CONTAINER_PATH:-/library}
+    volumes:
+      - ${APPDATA_PATH:-./appdata}:/data
+      - ${LIBRARY_HOST_PATH}:${LIBRARY_CONTAINER_PATH:-/library}:ro
+    command:
+      - python
+      - space_recovery.py
+      - --root
+      - ${LIBRARY_CONTAINER_PATH:-/library}
+    restart: "no"
+
+  # Single-container stack (same image as Unraid Add Container template)
+  audiotheca:
+    profiles: ["single"]
+    build:
+      context: ../..
+      dockerfile: deploy/unraid/Dockerfile
+      args:
+        PYTHON_VERSION: ${PYTHON_VERSION:-3.13}
+        VITE_DEFAULT_LIBRARY_ROOT: ${LIBRARY_CONTAINER_PATH:-/library}
+    container_name: audiotheca
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      AUDIOTHECA_HOME: /data
+      AUDIOTHECA_LIBRARY_ROOT: ${LIBRARY_CONTAINER_PATH:-/library}
+      AUDIOTHECA_LIBRARY_ROOTS: ${LIBRARY_CONTAINER_PATH:-/library}
+    volumes:
+      - ${APPDATA_PATH:-./appdata}:/data
+      - ${LIBRARY_HOST_PATH}:${LIBRARY_CONTAINER_PATH:-/library}:ro
+    ports:
+      - "${UI_PORT:-4210}:80"
+      - "${API_PORT:-4211}:8787"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s

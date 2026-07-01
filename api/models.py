@@ -93,6 +93,23 @@ class ArchiveDeleteItem:
 
 
 @dataclass
+class ScanAuditItem:
+    section: str = ""
+    item_name: str = ""
+    current_path: str = ""
+    vendor: str = ""
+    id_method: str = ""
+    id_confidence: str = ""
+    fingerprint: str = ""
+    version_key: str = ""
+    size_mb: float | None = None
+    status: str = ""
+    investigation_bucket: str = ""
+    planned_destination: str = ""
+    flags: str = ""
+
+
+@dataclass
 class SceneRenameItem:
     scene_id: str = ""
     source_path: str = ""
@@ -128,3 +145,111 @@ class RunSummary:
     ready_count: int | None = None
     needs_review_count: int | None = None
     merge_count: int | None = None
+    coverage_gaps: int = 0
+    cache_hit_paths: int = 0
+    probe_truncations: int = 0
+    feedback_skipped: int = 0
+    route_ready_pct: float | None = None
+    identification_pct: float | None = None
+    one_action_pct: float | None = None
+
+
+@dataclass
+class ScanFailureItem:
+    section: str = ""
+    item_name: str = ""
+    path: str = ""
+    error: str = ""
+
+
+@dataclass
+class NestedIssueItem:
+    section: str = ""
+    item_name: str = ""
+    issue_type: str = ""
+    nested_path: str = ""
+    repeated_name: str = ""
+    depth: int | None = None
+    suggested_fix: str = ""
+
+
+@dataclass
+class CoexistenceItem:
+    section: str = ""
+    item_name: str = ""
+    item_path: str = ""
+    issue_type: str = ""
+    parent_path: str = ""
+    archive_or_installer: str = ""
+    extracted_folder: str = ""
+    depth: int | None = None
+    name_similarity_pct: float | None = None
+    suggested_action: str = ""
+
+
+@dataclass
+class InventoryItem:
+    root_bin: str = ""
+    item_name: str = ""
+    fingerprint: str = ""
+    version_key: str = ""
+    item_type: str = ""
+    vendor: str = ""
+    id_method: str = ""
+    tonex: str = ""
+
+
+@dataclass
+class CacheHitItem:
+    section: str = ""
+    path: str = ""
+    name: str = ""
+    mtime: float | None = None
+
+
+@dataclass
+class CoverageGapItem:
+    section: str = ""
+    path: str = ""
+    name: str = ""
+    reason: str = ""
+    detail: str = ""
+
+
+@dataclass
+class ProbeTruncationItem:
+    section: str = ""
+    item_path: str = ""
+    item_name: str = ""
+    kind: str = ""
+    truncated_path: str = ""
+    relative_path: str = ""
+    depth: int | None = None
+    limit: int | None = None
+    detail: str = ""
+
+
+@dataclass
+class SkippedItem:
+    reason: str = ""
+    section: str = ""
+    item_name: str = ""
+    path: str = ""
+    detail: str = ""
+    source: str = ""
+
+
+@dataclass
+class SkipPhaseImpact:
+    phase: str = ""
+    count: int = 0
+    detail: str = ""
+
+
+@dataclass
+class RunComparisonDelta:
+    path: str = ""
+    change_type: str = ""
+    old_value: str = ""
+    new_value: str = ""
+    section: str = ""

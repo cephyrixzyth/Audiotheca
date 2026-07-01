@@ -1,16 +1,20 @@
 # Audiotheca — Install Guide
 
-Engine version: **9.8.0**
+Engine version: **9.8.0** · Web UI: **0.2.0**
+
+For a step-by-step **first run on another machine**, see **[Testing Guide](TESTING.md)**.
+
+---
 
 ## Requirements
 
 | Requirement | Notes |
 | --- | --- |
-| **Python** | 3.10+ recommended (3.11+ for sidecar builds) |
-| **OS** | Windows (primary) |
-| **Storage** | Local or SMB/CIFS mapped drive |
-| **7-Zip** | **Required for archive peek** (`.rar`, `.7z`, `.iso` listing) — [7-zip.org](https://www.7-zip.org/) |
-| **Node.js 20+** | Browser UI and Tauri dev only — [nodejs.org](https://nodejs.org/) |
+| **Python** | 3.10+ (3.11+ recommended) |
+| **OS** | Windows (primary); Linux possible for engine/API with path adjustments |
+| **Storage** | Local disk or SMB/CIFS mapped drive |
+| **7-Zip** | **Required for archive peek** (`.rar`, `.7z`, `.iso`) — [7-zip.org](https://www.7-zip.org/) |
+| **Node.js 20+** | Browser UI only — [nodejs.org](https://nodejs.org/) |
 | **Rust** | Tauri desktop builds only — [rustup.rs](https://rustup.rs/) |
 | **Write access** | Live runs only (`DRY_RUN = False` or `--live`) |
 
@@ -25,6 +29,7 @@ pip install -r requirements.txt
 | `pefile` | PE `CompanyName` vendor ID |
 | `rapidfuzz` | Fuzzy duplicate name matching |
 | `tqdm` | Scan progress bar with ETA |
+| `psutil` | CPU/RAM metrics in Dashboard (optional) |
 | `fastapi` / `uvicorn` | Local API for web UI |
 | `pytest` / `httpx` | Unit tests |
 | `pyinstaller` | Sidecar builds (maintainers) |
@@ -34,7 +39,7 @@ pip install -r requirements.txt
 ## Installation
 
 ```powershell
-cd "C:\path\to\audiotheca"    # quote paths with spaces
+cd "C:\path\to\audiotheca"
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
@@ -46,46 +51,48 @@ Verify:
 python -c "import pefile; import rapidfuzz; import tqdm; print('OK')"
 where.exe 7z
 python -c "from archive_peek import find_7z; print(find_7z())"
-python -m api.server --help 2>$null; python -c "import fastapi; print('API OK')"
+python -m pytest tests/ -q
 ```
 
 Optional — Node.js for UI:
 
 ```powershell
 node --version
-npm --version
+cd ui && npm install
 ```
 
 ---
 
 ## Configuration
 
-Edit the **CONFIGURATION** block in `main.py`, or pass CLI flags:
+**Do not use the author's default path.** Set your library root before scanning:
 
 ```powershell
-python main.py --dry-run --root "Z:\_software\_audio"
-python main.py --live
+$env:AUDIOTHECA_LIBRARY_ROOT = "D:\YourLibrary\_software\_audio"
+$env:AUDIOTHECA_LIBRARY_ROOTS = $env:AUDIOTHECA_LIBRARY_ROOT
 ```
 
-```python
-ENGINE_VERSION = "9.8.0"
-CACHE_SCHEMA = "9.7.1"           # Bump only when scan tree format changes
-ROOT_DIR = r"Z:\_software\_audio"
-DRY_RUN = False                  # Stage 1 live — see staged rollout below
-MAX_WORKERS = 8
-MAX_WALK_DEPTH = 8
-PROBE_DEPTH = 8
+Or copy [.env.example](../.env.example) → `.env` and edit paths.
 
-# Archive intelligence
-ENABLE_ARCHIVE_PEEK = True
-ENABLE_SCENE_ARCHIVE_PEEK = True
-SCENE_AUTO_RENAME = False        # Stage 2: set True for live renames
-SCENE_PEEK_MIN_SIZE_MB = 500
-SCENE_RENAME_MIN_SIZE_MB = 1000
+Full reference: **[Configuration](CONFIGURATION.md)**
 
-ACTION_MODE = "section"          # ask | section | item | auto
-GENERATE_INVENTORY_DUMP = True
+### Engine (code or CLI)
+
+```powershell
+python main.py --dry-run --root "D:\YourLibrary\_software\_audio"
+python main.py --live --root "D:\YourLibrary\_software\_audio"
 ```
+
+Key settings in `audiotheca/config.py`:
+
+| Setting | Default | Notes |
+| --- | --- | --- |
+| `DRY_RUN` | `True` | Safe default |
+| `MAX_WORKERS` | `8` | Use 4–8 on SMB |
+| `MAX_WALK_DEPTH` / `PROBE_DEPTH` | `8` | Lower if hangs |
+| `ENABLE_ARCHIVE_PEEK` | `True` | Needs 7-Zip |
+| `SCENE_AUTO_RENAME` | `False` | Stage 2 |
+| `ACTION_MODE` | `section` | Live approval granularity |
 
 ### Staged live rollout
 
@@ -94,9 +101,9 @@ GENERATE_INVENTORY_DUMP = True
 | **1** | `DRY_RUN=False`, `ACTION_MODE=section`, `SCENE_AUTO_RENAME=False` | Restructure + investigation routing |
 | **2** | `SCENE_AUTO_RENAME=True`, `ACTION_MODE=item` | Scene-hash renames |
 | **3** | — | `move_redundant_archives_{stamp}.ps1` |
-| **4** | — | Duplicate staging via UI `approved.json` |
+| **4** | — | Duplicate staging via UI |
 
-Bump `CACHE_SCHEMA` when `_scan_tree` output format changes. Identification-only releases keep warm `scan_cache.json`.
+Bump `CACHE_SCHEMA` only when scan tree output format changes.
 
 ---
 
@@ -105,39 +112,45 @@ Bump `CACHE_SCHEMA` when `_scan_tree` output format changes. Identification-only
 ### Engine
 
 ```powershell
-$env:PYTHONUNBUFFERED=1
-python main.py
+$env:PYTHONUNBUFFERED = "1"
+$env:AUDIOTHECA_LIBRARY_ROOT = "D:\YourLibrary\_software\_audio"
+python main.py --dry-run
 ```
 
-Terminal output shows per-phase ETA:
-
-```
-▶ Phase 1a — Resolve targets per category
-  12 / 28 section  (43%)  ·  elapsed 2m05s  ·  ETA 2m48s  ·  s: 412 targets
-```
-
-Reports: `dedupe_reports/` (copied to `{ROOT}/_dedupe_reports/` when writable).
+Reports: `dedupe_reports/` (or `$AUDIOTHECA_HOME/dedupe_reports/`).
 
 ### Web UI
 
 ```powershell
-.\start-ui.ps1          # API + browser UI
-.\start-api.ps1         # API only (no Node.js)
+$env:AUDIOTHECA_LIBRARY_ROOT = "D:\YourLibrary\_software\_audio"
+.\start-ui.ps1          # API + browser
+.\start-api.ps1         # API only
 ```
 
-Manual: `python -m api.server` + `cd ui && npm run dev`
+Manual:
 
-### Re-peek without full scan
+```powershell
+python -m api.server
+# separate terminal:
+cd ui && npm run dev
+```
+
+UI: http://localhost:5173 · API health: http://127.0.0.1:8787/api/health
+
+Non-default API port:
+
+```powershell
+$env:AUDIOTHECA_API_PORT = "8790"
+$env:VITE_API_PORT = "8790"
+```
+
+### Utilities
 
 ```powershell
 python peek_archives.py
-python peek_archives.py dedupe_reports\Archive_Coexistence_20260609_2323.csv
-```
-
-### Archive delete candidates
-
-```powershell
-python gen_archive_delete_candidates.py dedupe_reports\Archive_Peek_20260611_0208.csv
+python gen_archive_delete_candidates.py dedupe_reports\Archive_Peek_*.csv
+python space_recovery.py --root "D:\YourLibrary\_software\_audio" --no-links
+python scripts/library_probe.py
 ```
 
 ---
@@ -157,12 +170,10 @@ python gen_archive_delete_candidates.py dedupe_reports\Archive_Peek_20260611_020
 
 | `ACTION_MODE` | Behavior |
 | --- | --- |
-| `ask` | Prompt at start: section / item / auto |
-| `section` | Approve each category bin bulk |
-| `item` | Confirm every move/quarantine/rename |
+| `ask` | Prompt at start |
+| `section` | Approve each category bin |
+| `item` | Confirm every action |
 | `auto` | No prompts (use with care) |
-
-Scene auto-rename uses item-by-item approval on live runs when enabled.
 
 ---
 
@@ -171,8 +182,8 @@ Scene auto-rename uses item-by-item approval on live runs when enabled.
 1. Successful dry run with 9.8.0 header
 2. Review `Scene_Rename_Plan_*.csv` and `Archive_Peek_*.csv`
 3. Check `Multipart_Archive_Diagnostic_*.csv` for `MISSING_PART01`
-4. Backup library
-5. Stage 1: `ACTION_MODE = "section"` recommended
-6. `DRY_RUN = False` or `python main.py --live`
+4. **Backup library**
+5. Stage 1: `ACTION_MODE = "section"`
+6. `python main.py --live` or UI execute with confirmation
 
-See [Quick User Guide](USER_GUIDE.md) for the full workflow.
+See [Quick User Guide](USER_GUIDE.md) and [Testing Guide](TESTING.md).

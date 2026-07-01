@@ -37,6 +37,7 @@ from vendor_db import VENDOR_DATABASE
 
 from audiotheca.config import *  # noqa: F403
 from audiotheca.helpers import _archive_stem, _limit_walk, _squash, _walk_depth
+from audiotheca.optional_deps import HAS_PEFILE, pefile
 
 
 class ScanMixin:
@@ -63,25 +64,23 @@ class ScanMixin:
         except OSError as exc:
             self.logger.warning("Could not save scan cache: %s", exc)
 
-    def _get_scan_info(self, path: Path) -> dict:
+    def _get_scan_info(self, path: Path) -> tuple[dict, bool]:
         key = str(path)
         try:
             mtime = path.stat().st_mtime
         except OSError:
             mtime = None
 
-        # NOTE: a directory's mtime only changes when direct children are
-        # added/removed — acceptable for a mostly-static archive library.
         cached = self.scan_cache.get(key)
         if cached and mtime is not None and cached.get("mtime") == mtime:
             self._inc("cache_hits")
-            return cached["info"]
+            return cached["info"], True
 
         info = self._scan_tree(path)
         if mtime is not None:
             with self._lock:
                 self.scan_cache[key] = {"mtime": mtime, "info": info}
-        return info
+        return info, False
 
     # ------------------------------------------------------------------
     # Single-pass tree scan (replaces 4 separate os.walk passes per item)
@@ -110,6 +109,7 @@ class ScanMixin:
             "nfo_candidates": [],
             "top_files": [],
             "largest_files": [],
+            "truncations": [],
         }
         largest_heap: list[tuple[int, str, str]] = []
 
@@ -165,6 +165,19 @@ class ScanMixin:
                                             ),
                                         }
                                     )
+                    elif archive_entries and child_dirs and depth > PROBE_DEPTH:
+                        rel = str(current.relative_to(root)) if current != root else "."
+                        info["truncations"].append(
+                            {
+                                "kind": "PROBE_DEPTH",
+                                "path": str(current),
+                                "relative_path": rel,
+                                "depth": depth,
+                                "limit": PROBE_DEPTH,
+                                "archive_count": len(archive_entries),
+                                "folder_count": len(child_dirs),
+                            }
+                        )
 
                     for entry in entries_list:
                         try:
@@ -181,6 +194,19 @@ class ScanMixin:
                                     )
                                 if depth + 1 <= MAX_WALK_DEPTH:
                                     stack.append((Path(entry.path), depth + 1))
+                                else:
+                                    rel = str(current.relative_to(root)) if current != root else "."
+                                    info["truncations"].append(
+                                        {
+                                            "kind": "WALK_DEPTH",
+                                            "path": entry.path,
+                                            "relative_path": rel,
+                                            "depth": depth + 1,
+                                            "limit": MAX_WALK_DEPTH,
+                                            "child_dirs": 1,
+                                            "child_files": 0,
+                                        }
+                                    )
                                 continue
 
                             if not entry.is_file(follow_symlinks=False):
@@ -269,12 +295,17 @@ class ScanMixin:
     def _scan_worker(self, path: Path, source_bin: str) -> dict | None:
         try:
             is_dir = path.is_dir()
+            from_cache = False
             if is_dir:
-                info = self._get_scan_info(path)
+                info, from_cache = self._get_scan_info(path)
                 self._record_coexistence_findings(
                     {"source_bin": source_bin, "original_name": path.name, "path": path},
                     info,
                 )
+                if from_cache:
+                    self._record_cache_hit(path, source_bin)
+                for trunc in info.get("truncations") or []:
+                    self._record_probe_truncation(path, source_bin, trunc)
             else:
                 try:
                     size = path.stat().st_size
@@ -299,7 +330,7 @@ class ScanMixin:
             company, id_method, id_confidence = self.identify_vendor(path, info if is_dir else None)
             version_key, base_name, display_name = self.get_version_and_base(path.name, company)
 
-            return {
+            result = {
                 "path": path,
                 "is_dir": is_dir,
                 "version_key": version_key,
@@ -318,7 +349,11 @@ class ScanMixin:
                 "largest_files": info.get("largest_files") or info["top_files"],
                 "archive_count": len(info.get("archive_files") or []),
                 "installer_count": len(info.get("installer_files") or []),
+                "from_cache": from_cache,
             }
+            status = "CACHE_HIT" if from_cache else "SCANNED"
+            self._upsert_audit_row(result, status=status, inv_bucket="", destination="")
+            return result
         except Exception as exc:
             self.logger.error("Worker failed on %s: %s", path, exc)
             self._inc("errors")
@@ -332,5 +367,23 @@ class ScanMixin:
                     }
                 )
                 self.stats["scan_failures"] = self.stats.get("scan_failures", 0) + 1
+            fail_item = {
+                "path": path,
+                "source_bin": source_bin,
+                "original_name": path.name,
+                "company": "",
+                "id_method": "SCAN_FAILED",
+                "id_confidence": "",
+                "base_name": "",
+                "version_key": "",
+                "size": 0,
+            }
+            self._upsert_audit_row(
+                fail_item,
+                status="SCAN_FAILED",
+                inv_bucket="",
+                destination="",
+                extra_flags=f"error:{exc}",
+            )
             return None
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
@@ -9,7 +10,20 @@ ENGINE_VERSION = "9.8.0"
 # Bump ONLY when _scan_tree output format changes — decoupled from ENGINE_VERSION
 # so identification-only releases keep the warm scan cache (60-90 min on SMB).
 CACHE_SCHEMA = "9.7.1"
-ROOT_DIR = r"Z:\_software\_audio"
+
+
+def _resolve_root_dir() -> str:
+    return os.environ.get("AUDIOTHECA_LIBRARY_ROOT", r"Z:\_software\_audio").strip()
+
+
+def _resolve_report_dir() -> Path:
+    home = os.environ.get("AUDIOTHECA_HOME", "").strip()
+    if home:
+        return Path(home) / "dedupe_reports"
+    return Path(__file__).resolve().parent.parent / "dedupe_reports"
+
+
+ROOT_DIR = _resolve_root_dir()
 # --- Staged live rollout (see comments at SCENE_AUTO_RENAME / ACTION_MODE) ---
 # Stage 1: restructure + investigation routing — section approval, no scene renames
 # Stage 2: SCENE_AUTO_RENAME = True, ACTION_MODE = "item"
@@ -32,13 +46,13 @@ MIN_DUPE_SIZE_RATIO = 0.3
 ACTION_MODE = "section"
 # Route TENTATIVE vendor guesses not in VENDOR_DATABASE to investigation buckets
 ROUTE_UNKNOWN_TENTATIVE_TO_INVESTIGATION = True
-REPORT_DIR = Path(__file__).resolve().parent.parent / "dedupe_reports"
+REPORT_DIR = _resolve_report_dir()
 # List archive contents (7-Zip for .rar/.7z) — Archive_Peek_*.csv
 ENABLE_ARCHIVE_PEEK = True
 # Infer product names inside scene-hash folders and optionally rename in place
 ENABLE_SCENE_ARCHIVE_PEEK = True
 SCENE_AUTO_RENAME = False  # Stage 1: plan only; enable for Stage 2 renames
-SCENE_PEEK_MIN_SIZE_MB = 500
+SCENE_PEEK_MIN_SIZE_MB = 100
 SCENE_RENAME_MIN_SIZE_MB = 1000
 
 # Subfolders under _requiresinvestigation — sorted by likely fix action
@@ -51,6 +65,46 @@ INVESTIGATION_BUCKETS: dict[str, str] = {
     "_unverified_vendor": "Vendor guessed (NFO/split name) but not in vendor database",
     "_generic_name": "Name too generic after fingerprint stripping",
     "_preset_or_snippet": "Small preset/patch pack without identifiable product context",
+    "_sample_pack": "Loop/drum/sample kit part folder — link to parent pack, not a standalone product",
+}
+
+# Section bin name fragments that indicate sample/loop libraries
+SAMPLE_PACK_SECTION_MARKERS = (
+    "loops",
+    "samples",
+    "sample pack",
+    "sound kit",
+    "drum kit",
+    "music libraries",
+)
+
+# Folder names typical of kit internals (kick/snare/FX folders inside a pack)
+GENERIC_SAMPLE_NAME_PATTERN = re.compile(
+    r"(?i)(?:"
+    r"^\d+\.\s|^\d+\s*[-–]\s|"
+    r"\b(?:"
+    r"kick|snare|hat|hihat|hi[\s-]?hat|clap|percussion|drums?|cymbal|crash|"
+    r"loops?|samples?|fx|bass|lead|chord|stab|glitch|vocals?|acapella|"
+    r"midi|oneshots?|one[\s-]?shots?|stems?|tops?|bottoms?|fills?|"
+    r"chords?\s*&\s*stabs?|bonus\s+sounds?|xtra\s+bonus"
+    r")\b|"
+    r"^(?:kick|snare|hat|clap|percussion|drums|loops|samples|fx|bass|lead|"
+    r"glitch|vocals|midi|stems|fills|crash|cymbals?|tops|bottoms)$"
+    r")"
+)
+
+# Scene release group token after final hyphen (R2R, ARCADiA, …)
+RELEASE_GROUP_SUFFIX = re.compile(r"(?i)^[a-z0-9]{2,14}$")
+
+# Prefixes that must never become tentative vendors via RELEASE_FILENAME
+RELEASE_FILENAME_BLOCKLIST = {
+    "drums", "drum", "bass", "lead", "fx", "amen", "kick", "snare", "hat", "hihat",
+    "clap", "claps", "percussion", "loops", "loop", "samples", "sample", "vocals",
+    "vocal", "midi", "stems", "stem", "chords", "chord", "stabs", "stab", "crash",
+    "cymbal", "glitch", "tops", "bottoms", "fills", "legal", "germany", "munich",
+    "documentation", "readme", "update", "installer", "setup", "bonus", "extra",
+    "xtra", "pack", "vol", "volume", "part", "disc", "cd", "kit", "sound", "sounds",
+    "effects", "effect", "library", "libraries", "collection", "bundle", "edition",
 }
 
 IGNORE_BINS = {

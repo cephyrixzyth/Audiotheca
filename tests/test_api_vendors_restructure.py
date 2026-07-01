@@ -1,16 +1,8 @@
 from __future__ import annotations
 
 import pytest
-from fastapi.testclient import TestClient
-
-from api.server import app
 
 STAMP = "20260611_0208"
-
-
-@pytest.fixture
-def client():
-    return TestClient(app)
 
 
 def test_vendors_list(client):
@@ -59,7 +51,12 @@ def test_unified_feedback_export(client, tmp_path, monkeypatch):
 
 def test_restructure_feedback_roundtrip(client, tmp_path, monkeypatch):
     import restructure_feedback as rst
+    from api import security
 
+    lib = tmp_path / "lib"
+    item_path = lib / "a" / "Product"
+    item_path.mkdir(parents=True)
+    monkeypatch.setattr(security, "library_roots", lambda: [lib])
     monkeypatch.setattr(rst, "FEEDBACK_DIR", tmp_path)
     monkeypatch.setattr(rst, "GLOBAL_PATH", tmp_path / "restructure_feedback.json")
     monkeypatch.setattr(rst, "HINTS_PATH", tmp_path / "restructure_hints.json")
@@ -74,7 +71,7 @@ def test_restructure_feedback_roundtrip(client, tmp_path, monkeypatch):
     override = client.post(
         f"/api/runs/{STAMP}/restructure/override",
         json={
-            "path": r"Z:\lib\a\Product",
+            "path": str(item_path),
             "destination": "a/Vendor/Product",
             "item_name": "Product",
         },

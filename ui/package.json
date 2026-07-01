@@ -11,7 +11,8 @@
     "tauri:dev": "tauri dev",
     "sidecars": "python ../scripts/build_sidecars.py",
     "tauri:build": "npm run sidecars && tauri build",
-    "icons": "python ../scripts/setup_tauri_icons.py"
+    "icons": "python ../scripts/setup_tauri_icons.py",
+    "audit:deps": "npm audit --audit-level=moderate"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.2.0",

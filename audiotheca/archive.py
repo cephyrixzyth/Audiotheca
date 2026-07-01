@@ -25,6 +25,7 @@ from archive_peek import (
     write_peek_csv,
 )
 from duplicate_feedback import export_engine_hints, is_group_rejected, load_feedback_store
+import scene_feedback as scene_fb
 from investigation_feedback import (
     apply_hints_to_item,
     export_engine_hints as export_investigation_hints,
@@ -94,6 +95,44 @@ class ArchiveMixin:
         )
         progress.finish(f"{len(self.archive_peek_rows)} archives listed")
 
+    def _vendor_from_inferred_product(self, inferred: str) -> tuple[str, str, str] | None:
+        """Resolve vendor from archive peek product string using several strategies."""
+        inferred = (inferred or "").strip()
+        if not inferred:
+            return None
+
+        normalized = normalize_inferred_product(inferred)
+        for candidate in (normalized, inferred):
+            match = self._match_vendor_detailed(candidate)
+            if match:
+                vendor, strong = match
+                return vendor, "ARCHIVE_PEEK", "CONFIRMED" if strong else "TENTATIVE"
+
+            release = self._identify_from_release_filename(candidate)
+            if release:
+                company, _method, confidence = release
+                return company, "ARCHIVE_PEEK", confidence
+
+            if " - " in candidate:
+                prefix = candidate.split(" - ", 1)[0].strip()
+                match = self._match_vendor_detailed(prefix)
+                if match:
+                    vendor, strong = match
+                    return vendor, "ARCHIVE_PEEK", "CONFIRMED" if strong else "TENTATIVE"
+                if len(prefix) > 2 and not prefix.isdigit():
+                    company = prefix.title() if prefix.islower() else prefix
+                    return company, "ARCHIVE_PEEK", "TENTATIVE"
+
+            words = candidate.split()
+            if len(words) >= 2:
+                prefix = " ".join(words[:3])
+                match = self._match_vendor_detailed(prefix)
+                if match:
+                    vendor, strong = match
+                    return vendor, "ARCHIVE_PEEK", "CONFIRMED" if strong else "TENTATIVE"
+
+        return None
+
     def _backfill_scene_vendors(self, all_items: list[dict]) -> int:
         """Assign vendors to scene-hash folders using the product names inferred
         from their archive contents — shrinks the _scene_release_id bucket."""
@@ -107,13 +146,13 @@ class ArchiveMixin:
             item = by_path.get(folder_path)
             if item is None or item.get("company"):
                 continue
-            match = self._match_vendor_detailed(inferred)
-            if not match:
+            resolved = self._vendor_from_inferred_product(inferred)
+            if not resolved:
                 continue
-            vendor, strong = match
+            vendor, method, confidence = resolved
             item["company"] = vendor
-            item["id_method"] = "ARCHIVE_PEEK"
-            item["id_confidence"] = "CONFIRMED" if strong else "TENTATIVE"
+            item["id_method"] = method
+            item["id_confidence"] = confidence
             updated += 1
         with self._lock:
             self.stats["scene_vendor_backfill"] = updated
@@ -140,7 +179,11 @@ class ArchiveMixin:
 
         for folder_path, inferred in best_name.items():
             src = Path(folder_path)
-            new_name = self.clean_folder_name(inferred)
+            if scene_fb.is_rejected(str(src)):
+                continue
+            new_name = self.clean_folder_name(
+                scene_fb.get_proposed_name(str(src), inferred)
+            )
             if not new_name or new_name == src.name:
                 continue
             blocked = scene_rename_blocked(new_name)
@@ -165,6 +208,11 @@ class ArchiveMixin:
 
         def _rename_one(plan: dict, *, dry_run: bool = False) -> None:
             src = Path(plan["source_path"])
+            if scene_fb.is_rejected(plan["source_path"]):
+                return
+            ui_approved = scene_fb.get_approved_paths()
+            if ui_approved and scene_fb.normalize_path(plan["source_path"]) not in ui_approved:
+                return
             dest = Path(plan["destination_path"])
             status = "[DRY RUN] Would rename scene folder" if dry_run else "Renamed scene folder"
             note = f"{plan['scene_id']} -> {plan['proposed_name']}"

@@ -27,6 +27,12 @@ if (-not (Test-Command npm)) {
 }
 
 Write-Host "Starting API server in a new window..."
+if ($env:AUDIOTHECA_LIBRARY_ROOT) {
+    Write-Host "Library root: $env:AUDIOTHECA_LIBRARY_ROOT"
+} else {
+    Write-Host "Tip: set AUDIOTHECA_LIBRARY_ROOT to your library before scanning." -ForegroundColor Yellow
+    Write-Host "     See docs/TESTING.md and .env.example" -ForegroundColor Yellow
+}
 Start-Process powershell -ArgumentList @(
     "-NoExit",
     "-Command",

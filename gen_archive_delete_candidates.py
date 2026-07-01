@@ -18,6 +18,11 @@ from pathlib import Path
 
 from archive_peek import multipart_key
 
+try:
+    import archive_feedback as arch_fb
+except ImportError:
+    arch_fb = None  # type: ignore[assignment]
+
 ROOT_DIR = Path(r"Z:\_software\_audio")
 DELETE_CANDIDATES_DIR = ROOT_DIR / "_delete-canidates"
 REPORT_DIR = Path(__file__).resolve().parent / "dedupe_reports"
@@ -50,6 +55,8 @@ def load_matches(csv_path: Path) -> list[dict]:
             if row.get("verdict") != "MATCHES_EXTRACTED_FOLDER":
                 continue
             archive_path = Path(row["archive_path"])
+            if arch_fb and arch_fb.is_archive_rejected(str(archive_path)):
+                continue
             if not archive_path.is_file():
                 continue
             for path in expand_multipart_set(archive_path):

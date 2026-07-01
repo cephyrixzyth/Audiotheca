@@ -1,0 +1,33 @@
+# Audiotheca API + engine — Unraid / Docker Compose
+# syntax=docker/dockerfile:1
+
+ARG PYTHON_VERSION=3.13
+FROM python:${PYTHON_VERSION}-slim-bookworm AS runtime
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends p7zip-full curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY audiotheca/ audiotheca/
+COPY api/ api/
+COPY *.py ./
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app \
+    AUDIOTHECA_HOME=/data \
+    AUDIOTHECA_NO_RELOAD=1 \
+    AUDIOTHECA_API_HOST=0.0.0.0 \
+    AUDIOTHECA_API_PORT=8787
+
+EXPOSE 8787
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://127.0.0.1:8787/api/health || exit 1
+
+CMD ["python", "-m", "api.server"]

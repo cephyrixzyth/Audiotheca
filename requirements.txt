@@ -5,6 +5,7 @@
 pefile>=2023.2.7      # PE binary CompanyName extraction (Windows plugins/installers)
 rapidfuzz>=3.0        # Fuzzy name similarity for duplicate detection
 tqdm>=4.66            # Progress bar during parallel scan
+psutil>=5.9           # CPU/RAM metrics in scan UI (optional but recommended)
 
 # UI API (local report viewer) — optional until you run the web UI
 fastapi>=0.115.0

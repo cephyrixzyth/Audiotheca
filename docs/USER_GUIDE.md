@@ -1,8 +1,8 @@
 # Audiotheca — Quick User Guide
 
-Engine **9.8.0** · Web UI **v0.2**
+Engine **9.8.0** · Web UI **0.2.0**
 
-This guide gets you from zero to reviewing reports in the browser, then through staged live rollout on your library.
+**Testing on a new machine?** Start with **[Testing Guide](TESTING.md)** — paths, smoke tests, and checklist.
 
 ---
 
@@ -11,14 +11,22 @@ This guide gets you from zero to reviewing reports in the browser, then through 
 | Tool | Required for | Install |
 | --- | --- | --- |
 | **Python 3.10+** | Engine + API | [python.org](https://www.python.org/downloads/) |
-| **7-Zip** | Archive peek (`.rar`, `.7z`, `.iso`) | [7-zip.org](https://www.7-zip.org/) |
-| **Node.js 20+** | Browser UI only | [nodejs.org](https://nodejs.org/) or `winget install OpenJS.NodeJS.LTS` |
-| **Rust** | Tauri desktop app only | [rustup.rs](https://rustup.rs/) |
+| **7-Zip** | Archive peek | [7-zip.org](https://www.7-zip.org/) |
+| **Node.js 20+** | Browser UI | [nodejs.org](https://nodejs.org/) |
 
 ```powershell
-cd "C:\path\to\audiotheca"   # quote paths with spaces
+cd "C:\path\to\audiotheca"
 pip install -r requirements.txt
 ```
+
+Set **your** library path (required):
+
+```powershell
+$env:AUDIOTHECA_LIBRARY_ROOT = "D:\YourLibrary\_software\_audio"
+$env:AUDIOTHECA_LIBRARY_ROOTS = $env:AUDIOTHECA_LIBRARY_ROOT
+```
+
+See [Configuration](CONFIGURATION.md) for all environment variables.
 
 ---
 
@@ -26,76 +34,60 @@ pip install -r requirements.txt
 
 ### 1. Engine only (CLI)
 
-Scan and generate reports — no UI.
-
 ```powershell
-cd "C:\Users\Cephyrix Zyth\Desktop\audiotheca"
-$env:PYTHONUNBUFFERED=1
-python main.py
+$env:PYTHONUNBUFFERED = "1"
+python main.py --dry-run
+python main.py --dry-run --root "D:\YourLibrary\_software\_audio"
+python main.py --live    # only after reviewing reports
 ```
 
-CLI overrides (without editing `main.py`):
-
-```powershell
-python main.py --dry-run              # force dry run
-python main.py --live                 # force live run
-python main.py --root "Z:\_software\_audio"
-```
-
-Reports land in `dedupe_reports/` with a timestamp like `20260611_0208`.
+Reports: `dedupe_reports/Run_Summary_YYYYMMDD_HHMM.txt`
 
 ### 2. Browser UI (recommended)
 
-Dashboard for investigation, duplicates, restructure, archives, and live scan progress.
-
 ```powershell
-cd "C:\Users\Cephyrix Zyth\Desktop\audiotheca"
 .\start-ui.ps1
 ```
 
-This opens the API in a second window and starts the UI at **http://localhost:5173**.
+→ **http://localhost:5173** (API on **8787**)
 
 **API only** (no Node.js):
 
 ```powershell
 .\start-api.ps1
-# Health check: http://127.0.0.1:8787/api/health
 ```
 
-**Manual two-terminal method:**
+**Manual:**
 
 ```powershell
 # Terminal 1
 python -m api.server
 
 # Terminal 2
-cd ui
-npm install    # first time only
-npm run dev
+cd ui && npm run dev
 ```
 
 ### 3. Desktop app (Tauri)
-
-Native window; spawns API automatically. Requires Rust + Node.js.
 
 ```powershell
 .\start-tauri.ps1
 ```
 
-See [Tauri Build](TAURI_BUILD.md) for release installers and sidecars.
+See [Tauri Build](TAURI_BUILD.md).
 
 ---
 
 ## Typical workflow
 
 ```
-1. Dry run          → python main.py --dry-run   (or Scan tab in UI)
-2. Review reports   → Browser UI or CSV files in dedupe_reports/
-3. Fix vendors      → Edit vendor_db.py, re-run dry run
-4. Stage 1 live     → Restructure + investigation routing (section approval)
-5. Stage 2          → Scene renames (item approval)
-6. Stage 3          → Archive cleanup (PowerShell script)
-7. Stage 4          → Duplicate staging (optional)
+1. Dry run          → Scan tab or python main.py --dry-run
+2. Review reports   → Dashboard + CSV in dedupe_reports/
+3. Fix vendors      → Vendors tab or vendor_db.py / user_vendors.json
+4. Underscore bins  → Space recovery → whitelist _8Dio-style folders → full dry scan
+5. Stage 1 live     → Restructure (section approval)
+6. Stage 2          → Scene renames (item approval)
+7. Stage 3          → Archive cleanup (PowerShell script)
+8. Stage 4          → Duplicate staging (optional)
 ```
 
 Always review `Run_Summary_*.txt` before any live run.
@@ -106,49 +98,48 @@ Always review `Run_Summary_*.txt` before any live run.
 
 | Tab | What you do |
 | --- | --- |
-| **Dashboard** | Pick a run, see counts and quick stats |
-| **Scan** | Start a dry-run from the UI; watch phase progress (WebSocket) |
-| **Investigation** | Set vendor, reassign bucket, link parent, mark resolved, add vendor, export feedback |
-| **Duplicates** | Pick keeper, mark bad matches, stage deletes, report manual dupes, export feedback CSV |
-| **Restructure** | Preview vendor routes; open paths in Explorer |
+| **Dashboard** | Pick run, route-ready / identification gauges, compare runs, reorder panels |
+| **Scan** | Start dry-run; **Processing flow** presets (Full audit, Fast identify, …); live WebSocket progress |
+| **Investigation** | Filter buckets, bulk correct, group by prefix, export feedback |
+| **Duplicates** | Pick keeper, reject bad groups, preview/stage deletes, manual dupes |
+| **Restructure** | Preview routes; execute approved sections (live, confirmed) |
 | **Archives** | Archive peek verdicts; redundant archive size summary |
 | **Scene renames** | Hash folder → product name proposals |
+| **Scan audit** | Full per-item identification audit |
+| **Skipped files** | Scan failures, coverage gaps, cache hits, coexistence, run compare, **rescan** |
+| **Space recovery** | Coexistence summary (deep installers), **underscore vendor whitelist**, disk reclaim links |
+| **Vendors** | Vendor gaps, bulk add keywords, web harvest inbox, unified export |
 
-Decisions save to `dedupe_reports/decisions/approved_{stamp}.json`.
+Most tabs support **drag-to-reorder sections** (Dashboard, Scan); preferences persist in browser localStorage.
 
-**Duplicates workflow:**
-1. Pick **keeper** per group → **Save decisions**
-2. **Bad match…** dropdown if the engine grouped wrong items (skipped on next scan)
-3. **Preview deletes** then **Stage deletes** moves discards to `_delete-canidates`
-4. **Report manual dupe** for pairs the engine missed
-5. **Export feedback CSV** → `dedupe_reports/feedback/Duplicate_Feedback_Export_*.csv` for backend tuning
-
-Engine reads `dedupe_reports/feedback/engine_hints.json` on each scan.
+Decisions save to `dedupe_reports/decisions/approved_{stamp}.json` and `dedupe_reports/feedback/`.
 
 ---
 
-## Staged live rollout (current config)
+## Space recovery & underscore vendors
 
-`main.py` is set up for a **four-stage** rollout. Adjust before each stage.
+Folders named `_8Dio`, `_Kontakt Libraries`, etc. are skipped by default during target discovery.
+
+1. Open **Space recovery** tab
+2. **Seed known vendors** or **Whitelist all & full dry scan**
+3. After scan completes, check Dashboard for improved route-ready %
+
+Disk reclaim (optional CLI):
+
+```powershell
+python space_recovery.py --root "%AUDIOTHECA_LIBRARY_ROOT%" --no-links
+```
+
+---
+
+## Staged live rollout
 
 | Stage | What runs | Key settings |
 | --- | --- | --- |
-| **1** (active) | Restructure + investigation routing | `DRY_RUN = False`, `ACTION_MODE = "section"`, `SCENE_AUTO_RENAME = False` |
-| **2** | Scene-hash folder renames | `SCENE_AUTO_RENAME = True`, `ACTION_MODE = "item"` |
-| **3** | Delete redundant archives | Run `move_redundant_archives_{stamp}.ps1` with `$Execute = $true` |
-| **4** | Duplicate staging | Review `Duplicate_Review_*.csv`; use UI keeper export |
-
-Generate archive delete script from a dry run:
-
-```powershell
-python gen_archive_delete_candidates.py dedupe_reports\Archive_Peek_20260611_0208.csv
-```
-
-Optional space tools (after dry run review):
-
-```powershell
-python space_recovery.py --help
-```
+| **1** | Restructure + investigation | `DRY_RUN=False`, `ACTION_MODE=section`, `SCENE_AUTO_RENAME=False` |
+| **2** | Scene renames | `SCENE_AUTO_RENAME=True`, `ACTION_MODE=item` |
+| **3** | Delete redundant archives | `move_redundant_archives_{stamp}.ps1` with `$Execute=$true` |
+| **4** | Duplicate staging | UI keeper export → live stage |
 
 ---
 
@@ -156,25 +147,26 @@ python space_recovery.py --help
 
 | File | Use it for |
 | --- | --- |
-| `Run_Summary_*.txt` | Start here — counts and report index |
-| `Investigation_Breakdown_*.csv` | Why items need manual review |
-| `Duplicate_Review_*.csv` | Duplicate groups and confidence |
-| `Restructure_Plan_*.csv` | Where items will move |
-| `Archive_Peek_*.csv` | Archive vs extracted folder verdicts |
-| `Scene_Rename_Plan_*.csv` | Proposed hash → product renames |
-| `Multipart_Archive_Diagnostic_*.csv` | Incomplete multipart downloads |
+| `Run_Summary_*.txt` | Start here — counts and index |
+| `Investigation_Breakdown_*.csv` | Manual review buckets |
+| `Duplicate_Review_*.csv` | Duplicate groups |
+| `Restructure_Plan_*.csv` | Planned moves |
+| `Coverage_Gaps_*.csv` | Paths never scanned (incl. underscore) |
+| `Archive_Coexistence_*.csv` | Installers / archive siblings |
+| `Archive_Peek_*.csv` | Archive vs extracted verdicts |
+| `Scene_Rename_Plan_*.csv` | Hash → product renames |
 
-Full reference: [Feature Guide](FEATURE_GUIDE.md).
+Full list: [Feature Guide](FEATURE_GUIDE.md).
 
 ---
 
 ## Safety rules
 
-- **Dry run first** after any config or `vendor_db.py` change.
-- **No permanent deletes** — duplicates go to `_delete-canidates`; you remove manually.
-- **Backup** before Stage 1 live run.
-- **Quote paths** with spaces: `"C:\Users\Cephyrix Zyth\Desktop\audiotheca"`.
-- **One command per line** — do not paste `python -m api.server` and `cd ui` together.
+- **Dry run first** after any config or vendor change
+- **No permanent deletes** — duplicates → `_delete-canidates`
+- **Backup** before Stage 1 live
+- **Quote paths** with spaces
+- **One command per line** in terminal
 
 ---
 
@@ -182,30 +174,15 @@ Full reference: [Feature Guide](FEATURE_GUIDE.md).
 
 | Problem | Fix |
 | --- | --- |
-| `npm: not recognized` | Install Node.js; close and reopen terminal |
-| `Rust/Cargo not found` | Rust may be incomplete — see below; or use `.\start-ui.ps1` |
-| `Set-Location: positional parameter...` | Quote the path: `cd "C:\Users\...\audiotheca"` |
-| `No module named api.servercd` | Commands pasted together — run one line at a time |
-| No terminal output for minutes | `$env:PYTHONUNBUFFERED=1` before `python main.py` |
-| `NEEDS_7ZIP` in reports | Install 7-Zip; verify with `where.exe 7z` |
+| Scans wrong / empty library | Set `AUDIOTHECA_LIBRARY_ROOT` to your path |
+| `npm: not recognized` | Install Node.js; reopen terminal |
+| API 401 in UI | Restart API; UI re-fetches token from localhost |
+| Port in use | `$env:AUDIOTHECA_API_PORT=8790` + `$env:VITE_API_PORT=8790` |
+| No terminal output | `$env:PYTHONUNBUFFERED=1` |
+| `NEEDS_7ZIP` | Install 7-Zip; `where.exe 7z` |
+| UI shows old API | Match `VITE_API_PORT` to running API |
 
-### Rust says installed but `cargo` not found
-
-`rustup-init` may have run without finishing the download. Check:
-
-```powershell
-Test-Path "$env:USERPROFILE\.cargo\bin\cargo.exe"
-```
-
-If `False`, complete setup:
-
-```powershell
-& "$env:USERPROFILE\Downloads\rustup-init.exe" -y
-```
-
-Then **close and reopen** the terminal and run `.\start-tauri.ps1` again.
-
-More: [FAQ](FAQ.md) · [Debug Runbook](DEBUG_RUNBOOK.md)
+More: [FAQ](FAQ.md) · [Debug Runbook](DEBUG_RUNBOOK.md) · [Testing Guide](TESTING.md)
 
 ---
 
@@ -217,14 +194,14 @@ python -m pytest tests/ -q
 
 ---
 
-## More documentation
+## Documentation index
 
 | Guide | Contents |
 | --- | --- |
-| [Install Guide](INSTALL.md) | Full setup and configuration |
-| [Feature Guide](FEATURE_GUIDE.md) | Phases, archive peek, reports |
-| [FAQ](FAQ.md) | Common questions |
-| [Debug Runbook](DEBUG_RUNBOOK.md) | Troubleshooting |
-| [Tauri Build](TAURI_BUILD.md) | Desktop packaging |
+| [Testing Guide](TESTING.md) | External tester checklist |
+| [Configuration](CONFIGURATION.md) | Env vars, paths |
+| [Install Guide](INSTALL.md) | Full setup |
+| [Feature Guide](FEATURE_GUIDE.md) | Phases, reports, API |
+| [Security](SECURITY.md) | Token, allowlist |
+| [FAQ](FAQ.md) | Q&A |
 | [Changelog](CHANGELOG.md) | Version history |
-| [Backend Enhancement Roadmap](BACKEND_ENHANCEMENT_ROADMAP.md) | Per-module corrections & engine feedback plan |

@@ -7,17 +7,26 @@ Dev:  uvicorn api.server:app --reload --port 8787
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
+import logging
 from pathlib import Path
 
-from fastapi import Body, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import Body, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from api import decisions, duplicate_execute, report_loader
-from api.job_runner import job_manager
-from api.models import RunListItem, RunSummary, SceneRenameItem
+from api import security, skipped_actions
+from api import space_recovery_api, underscore_actions
+from api.archive_execute import stage_confirmed_archives
+from api.restructure_execute import execute_approved_sections
+from api.scene_execute import execute_approved_renames
+from api.job_runner import SKIPPABLE_PHASES, job_manager
+from api import service as api_service
+from api.models import RunListItem, RunSummary, ScanAuditItem, SceneRenameItem
 from duplicate_feedback import (
     GLOBAL_FEEDBACK_PATH,
     REJECT_REASONS,
@@ -30,15 +39,56 @@ import investigation_feedback as inv_feedback
 
 import feedback_export
 import restructure_feedback as rst_feedback
+import archive_feedback as arch_feedback
+import scene_feedback as scene_fb
+import vendor_harvest as vh
+from audiotheca.identification_metrics import compute_run_metrics
 from audiotheca.vendor_overrides import (
     add_user_vendor,
     all_known_vendors,
     load_user_vendors,
     match_keyword,
 )
+import vendor_gaps as vg
+from api.paths import report_dir
+from contextlib import asynccontextmanager
 
-app = FastAPI(title="Audiotheca API", version="0.2.0")
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    )
+    api_service.startup_checks()
+    yield
+
+
+app = FastAPI(title="Audiotheca API", version="0.2.0", lifespan=lifespan)
+
+_RUN_STAMP_SEGMENT = re.compile(r"^/api/runs/([^/]+)")
+
+
+class AuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        if request.method == "OPTIONS" or path in security.PUBLIC_HTTP_PATHS:
+            return await call_next(request)
+        token = security.extract_bearer_token(request)
+        if not security.verify_token(token):
+            security.audit("auth_failed", path=path, client=security._client_host(request))
+            return JSONResponse(status_code=401, content={"detail": "Invalid or missing API token"})
+        if path.startswith("/api/runs/") and not path.startswith("/api/runs/compare"):
+            match = _RUN_STAMP_SEGMENT.match(path)
+            if match and match.group(1) != "compare":
+                try:
+                    security.normalize_stamp(match.group(1))
+                except ValueError as exc:
+                    return JSONResponse(status_code=400, content={"detail": str(exc)})
+        return await call_next(request)
+
+
+app.add_middleware(AuthMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -56,14 +106,31 @@ app.add_middleware(
 )
 
 
+@app.get("/api/auth/token")
+def bootstrap_api_token(request: Request) -> dict[str, str]:
+    if not security.can_bootstrap_token(request):
+        raise HTTPException(status_code=403, detail="Token bootstrap not allowed for this client")
+    return {"token": security.get_api_token()}
+
+
 @app.get("/api/health")
-def health() -> dict[str, str]:
+def health() -> dict[str, object]:
     running = job_manager.running_job()
-    return {
-        "status": "ok",
-        "reports_dir": str(report_loader.REPORT_DIR),
-        "scan_running": str(running is not None),
-    }
+    running_snap = running.snapshot() if running else None
+    return api_service.health_payload(running_job=running_snap)
+
+
+@app.get("/api/security/library-roots")
+def get_library_roots() -> dict[str, object]:
+    return {"roots": [str(path) for path in security.library_roots()]}
+
+
+def _parse_live_execute(body: dict, *, action: str) -> tuple[bool, str | None]:
+    dry_run = security.parse_dry_run(body.get("dry_run"), default=True)
+    security.require_live_confirmation(body, dry_run=dry_run, action=action)
+    root_raw = body.get("root")
+    root = str(security.assert_library_path(root_raw, label="root")) if root_raw else None
+    return dry_run, root
 
 
 # --- Runs (report viewer) ---
@@ -77,7 +144,21 @@ def list_runs() -> list[RunListItem]:
 @app.get("/api/runs/{stamp}", response_model=RunSummary)
 def get_run(stamp: str) -> RunSummary:
     try:
-        return report_loader.load_run_summary(stamp)
+        summary = report_loader.load_run_summary(stamp)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    metrics = compute_run_metrics(stamp)
+    data = summary.__dict__.copy()
+    data["route_ready_pct"] = metrics.get("route_ready_pct")
+    data["identification_pct"] = metrics.get("identification_pct")
+    data["one_action_pct"] = metrics.get("one_action_pct")
+    return RunSummary(**data)  # type: ignore[arg-type]
+
+
+@app.get("/api/runs/{stamp}/metrics")
+def get_run_metrics(stamp: str) -> dict[str, object]:
+    try:
+        return compute_run_metrics(stamp)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -121,6 +202,8 @@ def correct_investigation_item(stamp: str, body: dict = Body(...)) -> dict[str, 
     action = str(body.get("action", "")).strip()
     if not path and action != "add_vendor":
         raise HTTPException(status_code=400, detail="path is required")
+    if path:
+        path = str(security.assert_library_path(path, label="path"))
     if not action:
         raise HTTPException(status_code=400, detail="action is required")
     try:
@@ -148,6 +231,66 @@ def export_investigation_feedback(stamp: str) -> FileResponse:
     return FileResponse(path, filename=path.name, media_type="text/csv")
 
 
+@app.get("/api/runs/{stamp}/investigation/groups")
+def get_investigation_groups(
+    stamp: str,
+    bucket: str | None = None,
+    group_by: str = Query(default="prefix"),
+    limit: int = Query(default=100, le=500),
+) -> dict[str, object]:
+    groups, total = report_loader.load_investigation_groups(
+        stamp, bucket=bucket, group_by=group_by, limit=limit
+    )
+    return {"groups": groups, "total": total, "group_by": group_by}
+
+
+@app.post("/api/runs/{stamp}/investigation/bulk-correct")
+def bulk_correct_investigation(stamp: str, body: dict = Body(...)) -> dict[str, object]:
+    paths_raw = body.get("paths") or []
+    if not isinstance(paths_raw, list) or not paths_raw:
+        raise HTTPException(status_code=400, detail="paths list required")
+    action = str(body.get("action", "")).strip()
+    if not action:
+        raise HTTPException(status_code=400, detail="action is required")
+    paths = [str(security.assert_library_path(str(p), label="path")) for p in paths_raw]
+    parent = body.get("value", "")
+    if action == "link_parent" and parent:
+        parent = str(security.assert_library_path(str(parent), label="parent"))
+    try:
+        inv_feedback.apply_bulk_correction(
+            paths=paths,
+            action=action,
+            value=str(parent or body.get("value", "")),
+            reason=str(body.get("reason", "other")),
+            note=str(body.get("note", "")),
+            stamp=stamp,
+            keywords=body.get("keywords") or [],
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    security.audit("bulk_investigation", stamp=stamp, action=action, count=len(paths))
+    return {"ok": True, "count": len(paths), "state": inv_feedback.get_state_for_ui(stamp)}
+
+
+@app.get("/api/runs/{stamp}/vendor-gaps")
+def get_vendor_gaps(
+    stamp: str,
+    min_count: int = Query(default=1, ge=1),
+) -> dict[str, object]:
+    gaps = vg.harvest_vendor_gaps(stamp, min_count=min_count)
+    return {"gaps": gaps, "total": len(gaps), "stamp": stamp}
+
+
+@app.post("/api/runs/{stamp}/vendor-gaps/bulk-add")
+def bulk_add_vendor_gaps(stamp: str, body: dict = Body(...)) -> dict[str, object]:
+    prefixes = body.get("prefixes") or []
+    if not isinstance(prefixes, list) or not prefixes:
+        raise HTTPException(status_code=400, detail="prefixes list required")
+    result = vg.bulk_add_vendor_gaps([str(p) for p in prefixes], stamp)
+    security.audit("bulk_vendor_gaps", stamp=stamp, count=result.get("count", 0))
+    return {"ok": True, **result, "known": all_known_vendors()}
+
+
 @app.get("/api/runs/{stamp}/duplicates")
 def get_duplicates(
     stamp: str,
@@ -160,6 +303,324 @@ def get_duplicates(
         stamp, confidence=confidence, query=q, limit=limit, offset=offset
     )
     return {"groups": groups, "total": total, "limit": limit, "offset": offset}
+
+
+@app.get("/api/runs/{stamp}/audit")
+def get_scan_audit(
+    stamp: str,
+    status: str | None = None,
+    flags: str | None = None,
+    q: str | None = None,
+    limit: int = Query(default=500, le=2000),
+    offset: int = Query(default=0, ge=0),
+) -> dict[str, object]:
+    items, total = report_loader.load_scan_audit(
+        stamp, status=status, flags=flags, query=q, limit=limit, offset=offset
+    )
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
+
+
+@app.get("/api/runs/{stamp}/scan-failures")
+def get_scan_failures(
+    stamp: str,
+    q: str | None = None,
+    limit: int = Query(default=500, le=2000),
+    offset: int = Query(default=0, ge=0),
+) -> dict[str, object]:
+    items, total = report_loader.load_scan_failures(stamp, query=q, limit=limit, offset=offset)
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
+
+
+@app.get("/api/runs/{stamp}/nested-issues")
+def get_nested_issues(
+    stamp: str,
+    issue_type: str | None = None,
+    q: str | None = None,
+    limit: int = Query(default=500, le=2000),
+    offset: int = Query(default=0, ge=0),
+) -> dict[str, object]:
+    items, total = report_loader.load_nested_issues(
+        stamp, issue_type=issue_type, query=q, limit=limit, offset=offset
+    )
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
+
+
+@app.get("/api/runs/{stamp}/coexistence")
+def get_coexistence(
+    stamp: str,
+    issue_type: str | None = None,
+    q: str | None = None,
+    limit: int = Query(default=500, le=2000),
+    offset: int = Query(default=0, ge=0),
+) -> dict[str, object]:
+    items, total = report_loader.load_coexistence(
+        stamp, issue_type=issue_type, query=q, limit=limit, offset=offset
+    )
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
+
+
+@app.get("/api/underscore-vendors")
+def get_underscore_vendors(stamp: str | None = Query(default=None)) -> dict[str, object]:
+    return underscore_actions.list_candidates(stamp)
+
+
+@app.post("/api/underscore-vendors")
+def add_underscore_vendors(body: dict = Body(...)) -> dict[str, object]:
+    folders = body.get("folders") or []
+    paths = body.get("paths") or []
+    if not folders and not paths:
+        raise HTTPException(status_code=400, detail="folders or paths required")
+    from audiotheca.underscore_whitelist import add_entries
+
+    result = add_entries(folders=[str(x) for x in folders], paths=[str(x) for x in paths])
+    security.audit("underscore_whitelist_add", folders=len(result.get("added_folders") or []))
+    return {"ok": True, **result}
+
+
+@app.post("/api/underscore-vendors/remove")
+def remove_underscore_vendors(body: dict = Body(...)) -> dict[str, object]:
+    from audiotheca.underscore_whitelist import remove_entries
+
+    result = remove_entries(
+        folders=[str(x) for x in (body.get("folders") or [])],
+        paths=[str(x) for x in (body.get("paths") or [])],
+    )
+    security.audit("underscore_whitelist_remove", folders=len(result.get("removed_folders") or []))
+    return {"ok": True, **result}
+
+
+@app.post("/api/underscore-vendors/seed-known")
+def seed_underscore_known(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from audiotheca.underscore_whitelist import seed_known_vendors
+
+    extra = [str(x) for x in (body.get("folders") or []) if str(x).strip()]
+    result = seed_known_vendors(extra_folders=extra)
+    security.audit("underscore_seed_known", added=len(result.get("added_folders") or []))
+    return {"ok": True, **result}
+
+
+@app.post("/api/runs/{stamp}/underscore/bulk-whitelist-all")
+async def bulk_whitelist_all_underscore(stamp: str, request: Request, body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    security.rate_limiter.check("underscore_rescan", limit=4, window_s=60.0)
+    result = underscore_actions.bulk_whitelist_all(stamp)
+    paths = [str(p) for p in (result.get("paths") or [])]
+    if body.get("invalidate_cache", True) is not False and paths:
+        skipped_actions.invalidate_cache_paths(paths)
+    scan_options = underscore_actions.rescan_options_for(paths, full_library=True)
+    root_raw = body.get("root")
+    root = str(security.assert_library_path(root_raw, label="root")) if root_raw else None
+    token = security.extract_bearer_token(request) or ""
+    try:
+        job = await job_manager.start(
+            dry_run=security.parse_dry_run(body.get("dry_run"), default=True),
+            root=root,
+            scan_options=scan_options,
+            auth_token=token,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    security.audit("underscore_bulk_whitelist", stamp=stamp, count=result.get("count", 0), job_id=job.job_id)
+    return {"ok": True, "job": job.snapshot(), "scan_options": scan_options, **result}
+
+
+@app.post("/api/runs/{stamp}/underscore/rescan")
+async def rescan_underscore_paths(stamp: str, request: Request, body: dict = Body(...)) -> dict[str, object]:
+    paths = [str(p).strip() for p in (body.get("paths") or []) if str(p).strip()]
+    if not paths:
+        raise HTTPException(status_code=400, detail="paths is required")
+    security.assert_library_paths(paths, label="path")
+    security.rate_limiter.check("underscore_rescan", limit=6, window_s=60.0)
+    underscore_actions.bulk_whitelist_and_rescan_paths(paths)
+    invalidate = body.get("invalidate_cache", True) is not False
+    if invalidate:
+        skipped_actions.invalidate_cache_paths(paths)
+    full_library = body.get("full_library", True) is not False
+    scan_options = underscore_actions.rescan_options_for(paths, full_library=full_library)
+    root_raw = body.get("root")
+    root = str(security.assert_library_path(root_raw, label="root")) if root_raw else None
+    token = security.extract_bearer_token(request) or ""
+    try:
+        job = await job_manager.start(
+            dry_run=security.parse_dry_run(body.get("dry_run"), default=True),
+            root=root,
+            scan_options=scan_options,
+            auth_token=token,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    security.audit("underscore_rescan", stamp=stamp, paths=len(paths), job_id=job.job_id)
+    return {"ok": True, "job": job.snapshot(), "scan_options": scan_options}
+
+
+@app.get("/api/runs/{stamp}/space-recovery/summary")
+def space_recovery_summary(stamp: str) -> dict[str, object]:
+    summary = space_recovery_api.summarize_coexistence(stamp)
+    summary["merge_route_count"] = space_recovery_api.merge_route_count(stamp)
+    summary["offline_reports"] = space_recovery_api.list_offline_reports()
+    return summary
+
+
+@app.get("/api/space-recovery/reports")
+def space_recovery_reports() -> dict[str, object]:
+    return space_recovery_api.list_offline_reports()
+
+
+@app.get("/api/space-recovery/reports/{filename}")
+def download_space_recovery_report(filename: str) -> FileResponse:
+    if ".." in filename or "/" in filename or "\\" in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    allowed_prefixes = ("Hardlink_Plan_", "Bloat_Report_", "make_hardlinks_", "move_bloat_")
+    if not any(filename.startswith(prefix) for prefix in allowed_prefixes):
+        raise HTTPException(status_code=404, detail="Unknown report file")
+    path = report_dir() / filename
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Report file not found")
+    media = "text/csv" if filename.endswith(".csv") else "text/plain"
+    return FileResponse(path, filename=path.name, media_type=media)
+
+
+@app.get("/api/runs/{stamp}/inventory")
+def get_inventory(
+    stamp: str,
+    vendor: str | None = None,
+    q: str | None = None,
+    limit: int = Query(default=500, le=2000),
+    offset: int = Query(default=0, ge=0),
+) -> dict[str, object]:
+    items, total = report_loader.load_inventory(stamp, vendor=vendor, query=q, limit=limit, offset=offset)
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
+
+
+@app.get("/api/runs/{stamp}/cache-hits")
+def get_cache_hits(
+    stamp: str,
+    q: str | None = None,
+    limit: int = Query(default=500, le=2000),
+    offset: int = Query(default=0, ge=0),
+) -> dict[str, object]:
+    items, total = report_loader.load_cache_hits(stamp, query=q, limit=limit, offset=offset)
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
+
+
+@app.get("/api/runs/{stamp}/coverage-gaps")
+def get_coverage_gaps(
+    stamp: str,
+    reason: str | None = None,
+    q: str | None = None,
+    limit: int = Query(default=500, le=2000),
+    offset: int = Query(default=0, ge=0),
+) -> dict[str, object]:
+    items, total = report_loader.load_coverage_gaps(stamp, reason=reason, query=q, limit=limit, offset=offset)
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
+
+
+@app.get("/api/runs/{stamp}/probe-truncations")
+def get_probe_truncations(
+    stamp: str,
+    kind: str | None = None,
+    q: str | None = None,
+    limit: int = Query(default=500, le=2000),
+    offset: int = Query(default=0, ge=0),
+) -> dict[str, object]:
+    items, total = report_loader.load_probe_truncations(stamp, kind=kind, query=q, limit=limit, offset=offset)
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
+
+
+@app.get("/api/runs/{stamp}/skip-impact")
+def get_skip_impact(stamp: str) -> dict[str, object]:
+    items = report_loader.load_skip_phase_impact(stamp)
+    feedback = report_loader.load_feedback_skipped(stamp)
+    return {"phases": items, "feedback_skipped": feedback}
+
+
+@app.get("/api/runs/{stamp}/skipped")
+def get_skipped_items(
+    stamp: str,
+    reason: str | None = None,
+    q: str | None = None,
+    limit: int = Query(default=500, le=2000),
+    offset: int = Query(default=0, ge=0),
+) -> dict[str, object]:
+    items, total, counts = report_loader.load_skipped_items(
+        stamp, reason=reason, query=q, limit=limit, offset=offset
+    )
+    return {"items": items, "total": total, "counts": counts, "limit": limit, "offset": offset}
+
+
+@app.get("/api/runs/compare")
+def compare_runs(
+    stamp_a: str = Query(...),
+    stamp_b: str = Query(...),
+) -> dict[str, object]:
+    stamp_a = security.validate_stamp(stamp_a)
+    stamp_b = security.validate_stamp(stamp_b)
+    try:
+        return report_loader.compare_runs(stamp_a, stamp_b)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/api/cache/invalidate")
+def invalidate_cache(body: dict = Body(...)) -> dict[str, object]:
+    paths = [str(p).strip() for p in (body.get("paths") or []) if str(p).strip()]
+    if not paths:
+        raise HTTPException(status_code=400, detail="paths is required")
+    security.audit("cache_invalidate", count=len(paths))
+    return skipped_actions.invalidate_cache_paths(paths)
+
+
+@app.post("/api/runs/{stamp}/skipped/rescan")
+async def rescan_skipped_paths(stamp: str, request: Request, body: dict = Body(...)) -> dict[str, object]:
+    paths = [str(p).strip() for p in (body.get("paths") or []) if str(p).strip()]
+    if not paths:
+        raise HTTPException(status_code=400, detail="paths is required")
+    security.assert_library_paths(paths, label="path")
+    security.rate_limiter.check("rescan", limit=6, window_s=60.0)
+    invalidate = body.get("invalidate_cache", True) is not False
+    if invalidate:
+        skipped_actions.invalidate_cache_paths(paths)
+    scan_options = skipped_actions.build_rescan_options(
+        paths,
+        invalidate_cache=invalidate,
+        skip_phases=body.get("skip_phases"),
+    )
+    root_raw = body.get("root")
+    root = str(security.assert_library_path(root_raw, label="root")) if root_raw else None
+    token = security.extract_bearer_token(request) or ""
+    try:
+        job = await job_manager.start(
+            dry_run=security.parse_dry_run(body.get("dry_run"), default=True),
+            root=root,
+            scan_options=scan_options,
+            auth_token=token,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    security.audit("skipped_rescan", stamp=stamp, paths=len(paths), job_id=job.job_id)
+    return {"ok": True, "job": job.snapshot(), "scan_options": scan_options}
+
+
+@app.post("/api/runs/{stamp}/skipped/queue-investigation")
+def queue_skipped_investigation(stamp: str, body: dict = Body(...)) -> dict[str, object]:
+    paths = [str(p).strip() for p in (body.get("paths") or []) if str(p).strip()]
+    bucket = str(body.get("bucket", "_manual_rescan")).strip()
+    if not paths:
+        raise HTTPException(status_code=400, detail="paths is required")
+    security.assert_library_paths(paths, label="path")
+    applied = 0
+    for path in paths:
+        try:
+            inv_feedback.apply_correction(
+                path=path,
+                action="reassign_bucket",
+                value=bucket,
+                stamp=stamp,
+                reason="skipped_analysis",
+            )
+            applied += 1
+        except ValueError:
+            continue
+    return {"ok": True, "applied": applied, "state": inv_feedback.get_state_for_ui(stamp)}
 
 
 @app.get("/api/runs/{stamp}/restructure")
@@ -188,9 +649,14 @@ def restructure_override(stamp: str, body: dict = Body(...)) -> dict[str, object
     destination = str(body.get("destination", "")).strip()
     if not path or not destination:
         raise HTTPException(status_code=400, detail="path and destination are required")
+    item_path = security.assert_library_path(path, must_exist=True, label="path")
+    library_root = next(
+        root for root in security.library_roots() if security.is_path_under(item_path, root)
+    )
+    safe_dest = security.sanitize_relative_dest(destination, library_root)
     rst_feedback.apply_dest_override(
-        path=path,
-        relative_dest=destination,
+        path=str(item_path),
+        relative_dest=safe_dest,
         stamp=stamp,
         item_name=str(body.get("item_name", "")),
         old_destination=str(body.get("old_destination", "")),
@@ -218,6 +684,88 @@ def get_scene_renames(stamp: str) -> list[SceneRenameItem]:
     return report_loader.load_scene_renames(stamp)
 
 
+@app.get("/api/runs/{stamp}/scene-renames/feedback")
+def get_scene_feedback(stamp: str) -> dict[str, object]:
+    return scene_fb.get_state_for_ui(stamp)
+
+
+@app.post("/api/runs/{stamp}/scene-renames/approve")
+def scene_approve_rename(stamp: str, body: dict = Body(...)) -> dict[str, object]:
+    source_path = str(body.get("source_path", "")).strip()
+    if not source_path:
+        raise HTTPException(status_code=400, detail="source_path is required")
+    try:
+        scene_fb.approve_rename(
+            stamp=stamp,
+            source_path=source_path,
+            scene_id=str(body.get("scene_id", "")),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, "state": scene_fb.get_state_for_ui(stamp)}
+
+
+@app.delete("/api/runs/{stamp}/scene-renames/approve")
+def scene_clear_approval(stamp: str, body: dict = Body(...)) -> dict[str, object]:
+    source_path = str(body.get("source_path", "")).strip()
+    if not source_path:
+        raise HTTPException(status_code=400, detail="source_path is required")
+    scene_fb.clear_approval(stamp=stamp, source_path=source_path)
+    return {"ok": True, "state": scene_fb.get_state_for_ui(stamp)}
+
+
+@app.post("/api/runs/{stamp}/scene-renames/reject")
+def scene_reject_rename(stamp: str, body: dict = Body(...)) -> dict[str, object]:
+    source_path = str(body.get("source_path", "")).strip()
+    if not source_path:
+        raise HTTPException(status_code=400, detail="source_path is required")
+    scene_fb.reject_rename(
+        source_path=source_path,
+        reason=str(body.get("reason", "bad_inference")),
+        note=str(body.get("note", "")),
+        stamp=stamp,
+        scene_id=str(body.get("scene_id", "")),
+    )
+    return {"ok": True, "state": scene_fb.get_state_for_ui(stamp)}
+
+
+@app.post("/api/runs/{stamp}/scene-renames/override")
+def scene_override_name(stamp: str, body: dict = Body(...)) -> dict[str, object]:
+    source_path = str(body.get("source_path", "")).strip()
+    proposed_name = str(body.get("proposed_name", "")).strip()
+    if not source_path or not proposed_name:
+        raise HTTPException(status_code=400, detail="source_path and proposed_name are required")
+    scene_fb.override_name(
+        source_path=source_path,
+        proposed_name=proposed_name,
+        stamp=stamp,
+        scene_id=str(body.get("scene_id", "")),
+        old_name=str(body.get("old_name", "")),
+    )
+    return {"ok": True, "state": scene_fb.get_state_for_ui(stamp)}
+
+
+@app.post("/api/runs/{stamp}/scene-renames/missing-part01")
+def scene_flag_missing_part01(stamp: str, body: dict = Body(...)) -> dict[str, object]:
+    source_path = str(body.get("source_path", "")).strip()
+    if not source_path:
+        raise HTTPException(status_code=400, detail="source_path is required")
+    scene_fb.flag_missing_part01(
+        source_path=source_path,
+        stamp=stamp,
+        scene_id=str(body.get("scene_id", "")),
+    )
+    return {"ok": True, "state": scene_fb.get_state_for_ui(stamp)}
+
+
+@app.post("/api/runs/{stamp}/scene-renames/execute")
+def execute_scene_renames(stamp: str, body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    dry_run = security.parse_dry_run(body.get("dry_run"), default=True)
+    security.require_live_confirmation(body, dry_run=dry_run, action="scene renames")
+    security.audit("execute_scene_renames", stamp=stamp, dry_run=dry_run)
+    return execute_approved_renames(stamp, dry_run=dry_run)
+
+
 @app.get("/api/runs/{stamp}/archive-peek")
 def get_archive_peek(
     stamp: str,
@@ -241,6 +789,78 @@ def get_archive_peek(
         "delete_candidate_files": len(delete_rows),
         "delete_candidate_mb": round(delete_mb, 1),
     }
+
+
+@app.get("/api/runs/{stamp}/archive-peek/feedback")
+def get_archive_feedback(stamp: str) -> dict[str, object]:
+    return arch_feedback.get_state_for_ui(stamp)
+
+
+@app.post("/api/runs/{stamp}/archive-peek/reject")
+def archive_reject_verdict(stamp: str, body: dict = Body(...)) -> dict[str, object]:
+    archive_path = str(body.get("archive_path", "")).strip()
+    if not archive_path:
+        raise HTTPException(status_code=400, detail="archive_path is required")
+    arch_feedback.reject_verdict(
+        archive_path=archive_path,
+        reason=str(body.get("reason", "not_redundant")),
+        note=str(body.get("note", "")),
+        stamp=stamp,
+        archive_name=str(body.get("archive_name", "")),
+        item_name=str(body.get("item_name", "")),
+    )
+    return {"ok": True, "state": arch_feedback.get_state_for_ui(stamp)}
+
+
+@app.post("/api/runs/{stamp}/archive-peek/confirm")
+def archive_confirm_delete(stamp: str, body: dict = Body(...)) -> dict[str, object]:
+    archive_path = str(body.get("archive_path", "")).strip()
+    if not archive_path:
+        raise HTTPException(status_code=400, detail="archive_path is required")
+    try:
+        arch_feedback.confirm_delete(
+            archive_path=archive_path,
+            stamp=stamp,
+            archive_name=str(body.get("archive_name", "")),
+            item_name=str(body.get("item_name", "")),
+            note=str(body.get("note", "")),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, "state": arch_feedback.get_state_for_ui(stamp)}
+
+
+@app.post("/api/runs/{stamp}/archive-peek/keeper")
+def archive_set_keeper(stamp: str, body: dict = Body(...)) -> dict[str, object]:
+    archive_path = str(body.get("archive_path", "")).strip()
+    keeper = str(body.get("keeper", "")).strip()
+    if not archive_path or not keeper:
+        raise HTTPException(status_code=400, detail="archive_path and keeper are required")
+    try:
+        arch_feedback.set_keeper(
+            archive_path=archive_path,
+            keeper=keeper,
+            stamp=stamp,
+            archive_name=str(body.get("archive_name", "")),
+            item_name=str(body.get("item_name", "")),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, "state": arch_feedback.get_state_for_ui(stamp)}
+
+
+@app.post("/api/runs/{stamp}/archive-peek/execute")
+def execute_archive_staging(stamp: str, body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    dry_run, root = _parse_live_execute(body, action="archive staging")
+    security.audit("execute_archive_staging", stamp=stamp, dry_run=dry_run, root=root)
+    return stage_confirmed_archives(stamp, dry_run=dry_run, root=root)
+
+
+@app.post("/api/runs/{stamp}/restructure/execute")
+def execute_restructure(stamp: str, body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    dry_run, root = _parse_live_execute(body, action="restructure")
+    security.audit("execute_restructure", stamp=stamp, dry_run=dry_run, root=root)
+    return execute_approved_sections(stamp, dry_run=dry_run, root=root)
 
 
 @app.get("/api/runs/{stamp}/decisions")
@@ -294,6 +914,8 @@ def add_manual_duplicate(stamp: str, body: dict = Body(...)) -> dict[str, object
     path_b = str(body.get("path_b", "")).strip()
     if not path_a or not path_b:
         raise HTTPException(status_code=400, detail="path_a and path_b are required")
+    path_a = str(security.assert_library_path(path_a, label="path_a"))
+    path_b = str(security.assert_library_path(path_b, label="path_b"))
     add_manual_finding(
         path_a,
         path_b,
@@ -306,13 +928,9 @@ def add_manual_duplicate(stamp: str, body: dict = Body(...)) -> dict[str, object
 
 @app.post("/api/runs/{stamp}/duplicates/execute")
 def execute_duplicate_staging(stamp: str, body: dict = Body(default_factory=dict)) -> dict[str, object]:
-    dry_run = body.get("dry_run", True)
-    root = body.get("root")
-    return duplicate_execute.stage_approved_duplicates(
-        stamp,
-        dry_run=bool(dry_run),
-        root=str(root) if root else None,
-    )
+    dry_run, root = _parse_live_execute(body, action="duplicate staging")
+    security.audit("execute_duplicate_staging", stamp=stamp, dry_run=dry_run, root=root)
+    return duplicate_execute.stage_approved_duplicates(stamp, dry_run=dry_run, root=root)
 
 
 @app.get("/api/runs/{stamp}/decisions/download")
@@ -386,6 +1004,79 @@ def test_vendor_keyword(body: dict = Body(...)) -> dict[str, object]:
     return match_keyword(keyword, sample)
 
 
+@app.get("/api/vendors/harvest/sources")
+def vendor_harvest_sources() -> dict[str, object]:
+    return {
+        "presets": vh.list_source_presets(),
+        "categories": vh.HARVEST_CATEGORIES,
+        "default_urls": vh.DEFAULT_SEED_URLS,
+    }
+
+
+@app.get("/api/vendors/harvest/candidates")
+def vendor_harvest_candidates(
+    include_known: bool = Query(default=True),
+) -> dict[str, object]:
+    store = vh.load_candidates()
+    pending = vh.list_pending_candidates(include_known=include_known)
+    return {
+        "pending": pending,
+        "total_pending": len(pending),
+        "last_run": store.get("last_run"),
+        "updated": store.get("updated"),
+    }
+
+
+@app.post("/api/vendors/harvest")
+def vendor_harvest_run(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    security.rate_limiter.check("vendor_harvest", limit=3, window_s=120.0)
+    urls = body.get("urls") or []
+    if isinstance(urls, str):
+        urls = [u.strip() for u in urls.replace("\n", ",").split(",") if u.strip()]
+    preset_id = body.get("preset_id")
+    if preset_id and not urls:
+        try:
+            return vh.run_preset(str(preset_id), include_known=bool(body.get("include_known")))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not urls:
+        urls = list(vh.DEFAULT_SEED_URLS)
+    category = str(body.get("category") or "User_Added")
+    try:
+        return vh.run_harvest(
+            list(urls),
+            default_category=category,
+            include_known=bool(body.get("include_known")),
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.post("/api/vendors/harvest/approve")
+def vendor_harvest_approve(body: dict = Body(...)) -> dict[str, object]:
+    ids = body.get("harvest_ids") or []
+    if not isinstance(ids, list) or not ids:
+        raise HTTPException(status_code=400, detail="harvest_ids required")
+    return vh.approve_candidates([str(i) for i in ids])
+
+
+@app.post("/api/vendors/harvest/reject")
+def vendor_harvest_reject(body: dict = Body(...)) -> dict[str, object]:
+    ids = body.get("harvest_ids") or []
+    if not isinstance(ids, list) or not ids:
+        raise HTTPException(status_code=400, detail="harvest_ids required")
+    return vh.reject_candidates([str(i) for i in ids])
+
+
+@app.get("/api/vendors/harvest/export")
+def vendor_harvest_export(
+    include_known: bool = Query(default=False),
+    status: str = Query(default="pending"),
+) -> FileResponse:
+    path = vh.export_candidates_csv(include_known=include_known, status=status)
+    return FileResponse(path, filename=path.name, media_type="text/csv")
+
+
 @app.get("/api/runs/{stamp}/reports/{name}")
 def download_report(stamp: str, name: str) -> FileResponse:
     allowed = {
@@ -413,12 +1104,9 @@ def download_report(stamp: str, name: str) -> FileResponse:
 @app.post("/api/explorer")
 def open_in_explorer(body: dict = Body(...)) -> dict[str, bool]:
     path_str = body.get("path", "")
-    if not path_str:
-        raise HTTPException(status_code=400, detail="path is required")
-    target = Path(path_str)
-    if not target.exists():
-        raise HTTPException(status_code=404, detail=f"Path not found: {path_str}")
+    target = security.assert_library_path(str(path_str), must_exist=True, label="path")
     resolved = str(target.resolve())
+    security.audit("open_in_explorer", path=resolved)
     if sys.platform == "win32":
         subprocess.Popen(["explorer", "/select,", resolved])  # noqa: S603
     elif sys.platform == "darwin":
@@ -444,31 +1132,122 @@ def get_job(job_id: str) -> dict:
     return job.snapshot()
 
 
-@app.post("/api/jobs")
-async def start_job(body: dict = Body(default_factory=dict)) -> dict:
-    dry_run = body.get("dry_run", True)
-    root = body.get("root")
+@app.get("/api/jobs/{job_id}/events")
+def get_job_events(job_id: str, after: int = Query(default=0, ge=0)) -> dict[str, object]:
     try:
-        job = await job_manager.start(dry_run=bool(dry_run), root=root)
+        events = job_manager.get_events(job_id, after=after)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Job not found") from exc
+    job = job_manager.get(job_id)
+    total = len(job.events) if job else after + len(events)
+    return {"events": events, "total": total, "after": after}
+
+
+@app.post("/api/jobs")
+async def start_job(request: Request, body: dict = Body(default_factory=dict)) -> dict:
+    security.rate_limiter.check("start_job", limit=4, window_s=60.0)
+    dry_run = security.parse_dry_run(body.get("dry_run"), default=True)
+    root_raw = body.get("root")
+    root = str(security.assert_library_path(root_raw, label="root")) if root_raw else None
+    scan_options = body.get("scan_options") or {
+        "pause_between_phases": body.get("pause_between_phases", False),
+        "skip_phases": body.get("skip_phases") or [],
+        "staging_root": body.get("staging_root") or "",
+        "extra_scan_roots": body.get("extra_scan_roots") or [],
+        "target_paths": body.get("target_paths") or [],
+        "invalidate_cache_paths": body.get("invalidate_cache_paths") or [],
+    }
+    if scan_options.get("staging_root"):
+        scan_options["staging_root"] = str(
+            security.assert_library_path(str(scan_options["staging_root"]), label="staging_root")
+        )
+    if scan_options.get("extra_scan_roots"):
+        scan_options["extra_scan_roots"] = [
+            str(security.assert_library_path(str(item), label="extra_scan_root"))
+            for item in scan_options["extra_scan_roots"]
+        ]
+    if scan_options.get("target_paths"):
+        scan_options["target_paths"] = [
+            str(p) for p in security.assert_library_paths(scan_options["target_paths"], label="target_path")
+        ]
+    if scan_options.get("invalidate_cache_paths"):
+        scan_options["invalidate_cache_paths"] = [
+            str(p)
+            for p in security.assert_library_paths(
+                scan_options["invalidate_cache_paths"],
+                label="invalidate_cache_path",
+            )
+        ]
+    token = security.extract_bearer_token(request) or ""
+    try:
+        job = await job_manager.start(
+            dry_run=dry_run,
+            root=root,
+            scan_options=scan_options,
+            auth_token=token,
+        )
     except RuntimeError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    security.audit("start_job", job_id=job.job_id, dry_run=dry_run, root=root)
     return job.snapshot()
 
 
+@app.post("/api/jobs/{job_id}/control")
+async def control_job(job_id: str, body: dict = Body(...)) -> dict:
+    action = str(body.get("action", "")).strip()
+    if action not in {"pause", "stop", "continue"}:
+        raise HTTPException(status_code=400, detail="action must be pause, stop, or continue")
+    try:
+        return await job_manager.control(job_id, action)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Job not found") from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get("/api/scan/options")
+def scan_options_help() -> dict[str, object]:
+    return {
+        "skippable_phases": sorted(SKIPPABLE_PHASES),
+        "phase_descriptions": {
+            "scene_peek": "Skip listing archives inside scene-hash folders",
+            "archive_peek": "Skip archive vs extracted-folder listing (7-Zip)",
+            "quarantine": "Skip moving Mac/Linux-only items to quarantine",
+            "duplicates": "Skip duplicate group review (restructure still runs)",
+            "restructure_live": "Skip live restructure moves (dry-run plan only)",
+            "purge": "Skip empty wrapper directory purge",
+        },
+    }
+
+
+@app.get("/api/system/metrics")
+def system_metrics(root: str | None = Query(default=None)) -> dict[str, object]:
+    from system_metrics import collect_metrics
+
+    path = security.assert_library_path(root, label="root") if root else None
+    return collect_metrics(path=path)
+
+
 @app.websocket("/api/jobs/{job_id}/events")
-async def job_events(websocket: WebSocket, job_id: str) -> None:
+async def job_events(websocket: WebSocket, job_id: str, token: str = Query(default="")) -> None:
+    if not security.verify_token(token):
+        await websocket.close(code=4401)
+        return
     await websocket.accept()
     try:
-        queue = await job_manager.subscribe(job_id)
+        queue = await job_manager.subscribe(job_id, auth_token=token)
     except KeyError:
         await websocket.close(code=4404)
+        return
+    except PermissionError:
+        await websocket.close(code=4403)
         return
 
     try:
         while True:
             event = await queue.get()
             await websocket.send_json(event)
-            if event.get("type") in {"job_done", "job_failed"}:
+            if event.get("type") in {"job_done", "job_failed", "job_stopped"}:
                 break
     except WebSocketDisconnect:
         pass
@@ -483,8 +1262,15 @@ def main() -> None:
 
     import uvicorn
 
+    from api.security import TOKEN_PATH, get_api_token
+
+    token = get_api_token()
+    if not os.environ.get("AUDIOTHECA_API_TOKEN"):
+        print(f"API token (localhost bootstrap): see {TOKEN_PATH}")
     reload = os.environ.get("AUDIOTHECA_NO_RELOAD") != "1"
-    uvicorn.run("api.server:app", host="127.0.0.1", port=8787, reload=reload)
+    port = int(os.environ.get("AUDIOTHECA_API_PORT", "8787"))
+    host = os.environ.get("AUDIOTHECA_API_HOST", "127.0.0.1")
+    uvicorn.run("api.server:app", host=host, port=port, reload=reload)
 
 
 if __name__ == "__main__":

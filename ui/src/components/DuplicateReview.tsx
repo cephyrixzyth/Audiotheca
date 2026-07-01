@@ -11,7 +11,7 @@ import {
   type ManualDuplicateFinding,
 } from "../api/client";
 import type { DuplicateGroup } from "../types";
-import { DEFAULT_LIBRARY_ROOT } from "../platform";
+import { useLibraryRoot } from "../hooks/useLibraryRoot";
 import { PathLink } from "./PathLink";
 
 interface Props {
@@ -27,6 +27,7 @@ const REJECT_LABELS: Record<string, string> = {
 };
 
 export function DuplicateReview({ stamp }: Props) {
+  const libraryRoot = useLibraryRoot();
   const [groups, setGroups] = useState<DuplicateGroup[]>([]);
   const [total, setTotal] = useState(0);
   const [confidence, setConfidence] = useState("HIGH");
@@ -120,7 +121,7 @@ export function DuplicateReview({ stamp }: Props) {
   async function handlePreviewDeletes() {
     const res = await executeDuplicateStaging(stamp, {
       dry_run: true,
-      root: DEFAULT_LIBRARY_ROOT,
+      root: libraryRoot,
     });
     if (!res.ok) {
       setActionMsg(res.error ?? "Save keeper decisions first, then preview staging");
@@ -142,7 +143,8 @@ export function DuplicateReview({ stamp }: Props) {
     }
     const res = await executeDuplicateStaging(stamp, {
       dry_run: false,
-      root: DEFAULT_LIBRARY_ROOT,
+      confirm_live: true,
+      root: libraryRoot,
     });
     if (!res.ok) {
       setActionMsg(res.error ?? `Staging failed (${res.failed} errors)`);

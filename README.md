@@ -2,77 +2,94 @@
 
 **Audio Library Dedupe & Routing Engine** — scan, classify, peek inside archives, deduplicate, and reorganize large VST/sample/installer libraries on local or network shares.
 
-Current engine version: **9.8.0** · Web UI: **v0.2**
+Current engine version: **9.8.0** · Web UI: **0.2.0**
 
 ## What it does
 
-Audiotheca walks your audio software root (for example `Z:\_software\_audio`), identifies vendors and products, **lists archive contents without extracting**, diagnoses scene-hash multipart sets, flags duplicates and structural issues, and produces detailed reports before any files are moved. Live runs support per-section or per-item approval with **per-phase ETA** in the terminal.
+Audiotheca walks your audio software root, identifies vendors and products, **lists archive contents without extracting**, diagnoses scene-hash multipart sets, flags duplicates and structural issues, and produces detailed reports before any files are moved. Live runs support per-section or per-item approval with **per-phase ETA** in the terminal.
 
-A **browser dashboard** lets you triage investigation items, pick duplicate keepers, preview restructure routes, and trigger scans with live progress.
+A **browser dashboard** lets you triage investigation items, pick duplicate keepers, preview restructure routes, manage vendor keywords, recover disk space, and trigger scans with live progress.
+
+## New here?
+
+| Audience | Start here |
+|----------|------------|
+| **Testing on your own PC** | **[Testing guide](docs/TESTING.md)** — clone, configure paths, smoke test, checklist |
+| **Daily use** | [Quick User Guide](docs/USER_GUIDE.md) |
+| **Install & deps** | [Install Guide](docs/INSTALL.md) |
+| **All env vars** | [Configuration](docs/CONFIGURATION.md) |
+
+Copy [.env.example](.env.example) and set `AUDIOTHECA_LIBRARY_ROOT` to **your** library path before scanning.
 
 ## Quick start
-
-**New users:** start with the [Quick User Guide](docs/USER_GUIDE.md).
 
 ### Engine (CLI)
 
 ```powershell
-cd "C:\path\to\audiotheca"    # always quote paths with spaces
+cd "C:\path\to\audiotheca"
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 
-# Install 7-Zip for .rar/.7z archive listing
-# https://www.7-zip.org/
+# Install 7-Zip for .rar/.7z archive listing — https://www.7-zip.org/
 
-$env:PYTHONUNBUFFERED=1
+$env:AUDIOTHECA_LIBRARY_ROOT = "D:\YourLibrary\_software\_audio"
+$env:PYTHONUNBUFFERED = "1"
 python main.py --dry-run
 ```
 
-Always dry-run first and review reports in `dedupe_reports/`.
+Reports appear in `dedupe_reports/`. Always dry-run first.
 
 ### Browser UI
 
 Requires [Node.js 20+](https://nodejs.org/).
 
 ```powershell
+$env:AUDIOTHECA_LIBRARY_ROOT = "D:\YourLibrary\_software\_audio"
 .\start-ui.ps1
 ```
 
-Opens **http://localhost:5173** (API on port 8787). API-only without Node: `.\start-api.ps1`.
+Opens **http://localhost:5173** (API on port **8787**). API-only without Node: `.\start-api.ps1`.
 
-### Other commands
+### Verify install
 
 ```powershell
-python peek_archives.py                              # Re-peek archives from last CSV
-python gen_archive_delete_candidates.py <peek.csv>   # Redundant archive cleanup script
-python -m pytest tests/ -q                           # Unit tests
+python -m pytest tests/ -q
 ```
 
 ## Documentation
 
 | Guide | Description |
 | --- | --- |
-| **[Quick User Guide](docs/USER_GUIDE.md)** | **Start here** — install, run, UI, staged rollout |
-| [Install Guide](docs/INSTALL.md) | Requirements, 7-Zip, setup, configuration |
-| [Feature Guide](docs/FEATURE_GUIDE.md) | Phases, archive peek, scene rename, reports |
-| [FAQ](docs/FAQ.md) | Common questions and decisions |
-| [Debug Runbook](docs/DEBUG_RUNBOOK.md) | Troubleshooting, multipart archives, hung scans |
+| **[Testing on your system](docs/TESTING.md)** | **External testers** — setup, checklist, smoke tests |
+| **[Configuration](docs/CONFIGURATION.md)** | Environment variables, paths, scan options |
+| [Documentation index](docs/README.md) | All guides in one list |
+| [Quick User Guide](docs/USER_GUIDE.md) | Install, run, UI workflow, staged rollout |
+| [Install Guide](docs/INSTALL.md) | Requirements, 7-Zip, performance tuning |
+| [Feature Guide](docs/FEATURE_GUIDE.md) | Phases, archive peek, reports, API |
+| [FAQ](docs/FAQ.md) | Common questions |
+| [Security](docs/SECURITY.md) | API token, path allowlist, live-run guards |
+| [Debug Runbook](docs/DEBUG_RUNBOOK.md) | Troubleshooting, hung scans |
 | [Changelog](docs/CHANGELOG.md) | Version history |
 | [Tauri Build](docs/TAURI_BUILD.md) | Desktop app packaging |
-| [Architecture & UI Roadmap](docs/ARCHITECTURE_AND_UI_ROADMAP.md) | Engine/UI architecture |
-| [Backend Enhancement Roadmap](docs/BACKEND_ENHANCEMENT_ROADMAP.md) | Per-module corrections & feedback to refine the engine |
+| [Unraid deploy (skeleton)](deploy/unraid/README.md) | Docker compose for NAS |
+| [SearXNG (optional)](docker/searxng/README.md) | Private web search for vendor research |
 
 ## Web UI (v0.2)
 
 | Tab | Capability |
 | --- | --- |
-| **Dashboard** | Run picker, summary stats |
-| **Scan** | Start dry-run from UI; live WebSocket phase progress |
-| **Investigation** | Filter buckets, search, Open in Explorer |
-| **Duplicates** | Pick keeper per group; save/download `approved_{stamp}.json` |
-| **Archives** | Archive peek verdicts + delete-candidate size summary |
-| **Restructure / Scene** | Route preview with Explorer links |
+| **Dashboard** | Run picker, route-ready gauges, run compare, reorderable panels |
+| **Scan** | Dry-run jobs, processing flow editor, skippable phases |
+| **Investigation** | Bucket filter, bulk correct, group-by-prefix, feedback export |
+| **Duplicates** | Keeper selection, bad-match rejection, stage deletes |
+| **Restructure** | Route preview, section execute (live, confirmed) |
+| **Archives** | Archive peek verdicts, delete candidates |
+| **Scene renames** | Hash → product rename plan |
+| **Scan audit** | Full identification audit table |
+| **Skipped files** | Coverage gaps, cache hits, coexistence, rescan |
+| **Space recovery** | Underscore vendor whitelist, coexistence queue, disk reclaim |
+| **Vendors** | Vendor gaps, harvest, user keywords, unified export |
 
 **Launchers:**
 
@@ -84,14 +101,14 @@ python -m pytest tests/ -q                           # Unit tests
 
 ### Desktop app (Tauri)
 
-Requires Rust ([rustup.rs](https://rustup.rs/)) and Node.js. Bundled Python sidecars for release builds.
+Requires Rust ([rustup.rs](https://rustup.rs/)) and Node.js.
 
 ```powershell
-python scripts/build_sidecars.py   # api-server + engine exes
-cd ui && npm run tauri:build       # MSI/NSIS installer
+python scripts/build_sidecars.py
+cd ui && npm run tauri:build
 ```
 
-Full guide: [Tauri Build](docs/TAURI_BUILD.md)
+See [Tauri Build](docs/TAURI_BUILD.md).
 
 ## Project layout
 
@@ -99,30 +116,39 @@ Full guide: [Tauri Build](docs/TAURI_BUILD.md)
 audiotheca/
 ├── main.py                      # Engine entry point
 ├── api/                         # FastAPI report viewer + job runner
-├── ui/                          # React + Vite + Tauri desktop shell
-│   └── src-tauri/binaries/      # PyInstaller sidecars (release)
+├── ui/                          # React + Vite + Tauri shell
+├── audiotheca/                  # Engine modules (config, routing, scan, …)
 ├── archive_peek.py              # Archive listing, scene identity
-├── progress.py                  # Phase progress + ETA
 ├── space_recovery.py            # Hardlink dedup + bloat finder
-├── gen_archive_delete_candidates.py
-├── peek_archives.py             # Standalone archive peek CLI
-├── vendor_db.py                 # Vendor keyword database (~700+ vendors)
-├── start-ui.ps1 / start-api.ps1 / start-tauri.ps1
-├── tests/                       # pytest unit tests
-├── dedupe_reports/              # Generated CSV/Markdown reports (gitignored)
+├── scripts/                     # Helpers (searx_search, library_probe, …)
+├── docker/searxng/              # Optional private web search
+├── deploy/unraid/               # NAS Docker skeleton
+├── tests/                       # pytest suite
+├── dedupe_reports/              # Generated reports (gitignored)
 └── docs/                        # Documentation
+```
+
+## Other commands
+
+```powershell
+python peek_archives.py                              # Re-peek archives from last CSV
+python gen_archive_delete_candidates.py <peek.csv>   # Redundant archive cleanup script
+python space_recovery.py --help                      # Disk reclaim planning
+python scripts/searx_search.py --list-presets        # Optional vendor research search
+python scripts/library_probe.py                      # Lightweight library stats
 ```
 
 ## Staged live rollout
 
-`main.py` documents a four-stage rollout (restructure → scene renames → archive cleanup → duplicates). Current defaults target **Stage 1** (live restructure, section approval, scene renames plan-only). See [User Guide — Staged rollout](docs/USER_GUIDE.md#staged-live-rollout-current-config).
+Four-stage rollout (restructure → scene renames → archive cleanup → duplicates). Defaults target **Stage 1** (plan + section approval, scene renames plan-only). See [User Guide — Staged rollout](docs/USER_GUIDE.md#staged-live-rollout).
 
 ## Safety defaults
 
-- Review dry-run reports before disabling `--dry-run`
+- Review dry-run reports before `--live` or UI live execute
 - Duplicate deletes go to **`_delete-canidates`**, not permanent deletion
 - Scene auto-rename is opt-in via `SCENE_AUTO_RENAME`
 - Network share scans use depth limits to avoid SMB timeouts
+- API is localhost-only by default; see [Security](docs/SECURITY.md)
 
 ## License
 

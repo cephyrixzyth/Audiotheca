@@ -8,6 +8,7 @@ import type {
   RunListItem,
   RunSummary,
   SceneRenameItem,
+  ScanAuditItem,
 } from "../types";
 
 async function apiUrl(path: string): Promise<string> {
@@ -15,8 +16,29 @@ async function apiUrl(path: string): Promise<string> {
   return `${base}${path}`;
 }
 
+let cachedToken: string | null = null;
+
+async function ensureApiToken(): Promise<string> {
+  if (cachedToken) return cachedToken;
+  const res = await fetch(await apiUrl("/auth/token"));
+  if (!res.ok) {
+    throw new Error("Failed to obtain API token — is the API running on 127.0.0.1:8787?");
+  }
+  const data = (await res.json()) as { token: string };
+  cachedToken = data.token;
+  return cachedToken;
+}
+
+async function authHeaders(extra?: HeadersInit): Promise<HeadersInit> {
+  const token = await ensureApiToken();
+  return {
+    ...extra,
+    Authorization: `Bearer ${token}`,
+  };
+}
+
 async function getJson<T>(path: string): Promise<T> {
-  const res = await fetch(await apiUrl(path));
+  const res = await fetch(await apiUrl(path), { headers: await authHeaders() });
   if (!res.ok) {
     const detail = await res.text();
     throw new Error(detail || res.statusText);
@@ -27,7 +49,7 @@ async function getJson<T>(path: string): Promise<T> {
 async function postJson<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(await apiUrl(path), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: await authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -43,6 +65,60 @@ export function fetchRuns(): Promise<RunListItem[]> {
 
 export function fetchRun(stamp: string): Promise<RunSummary> {
   return getJson(`/runs/${stamp}`);
+}
+
+export interface VendorGap {
+  prefix: string;
+  suggested_company: string;
+  count: number;
+  keywords: string[];
+  id_methods: Record<string, number>;
+  sample_items: string[];
+}
+
+export interface InvestigationGroup {
+  group_key: string;
+  count: number;
+  bucket: string;
+  id_method: string;
+  sample_items: string[];
+  paths: string[];
+  sections: Record<string, number>;
+}
+
+export function fetchVendorGaps(stamp: string, minCount = 1): Promise<{ gaps: VendorGap[]; total: number }> {
+  return getJson(`/runs/${stamp}/vendor-gaps?min_count=${minCount}`);
+}
+
+export function bulkAddVendorGaps(
+  stamp: string,
+  prefixes: string[],
+): Promise<{ ok: boolean; added: string[]; count: number }> {
+  return postJson(`/runs/${stamp}/vendor-gaps/bulk-add`, { prefixes });
+}
+
+export function fetchInvestigationGroups(
+  stamp: string,
+  opts?: { bucket?: string; group_by?: string; limit?: number },
+): Promise<{ groups: InvestigationGroup[]; total: number; group_by: string }> {
+  const qs = new URLSearchParams();
+  if (opts?.bucket) qs.set("bucket", opts.bucket);
+  if (opts?.group_by) qs.set("group_by", opts.group_by);
+  if (opts?.limit) qs.set("limit", String(opts.limit));
+  return getJson(`/runs/${stamp}/investigation/groups?${qs}`);
+}
+
+export function bulkCorrectInvestigation(
+  stamp: string,
+  payload: {
+    paths: string[];
+    action: string;
+    value?: string;
+    reason?: string;
+    keywords?: string[];
+  },
+): Promise<{ ok: boolean; count: number; state: InvestigationFeedbackState }> {
+  return postJson(`/runs/${stamp}/investigation/bulk-correct`, payload);
 }
 
 export function fetchBuckets(stamp: string): Promise<Record<string, number>> {
@@ -150,8 +226,125 @@ export function approveRestructureSection(
   return postJson(`/runs/${stamp}/restructure/approve-section`, { section });
 }
 
+export function executeRestructure(
+  stamp: string,
+  payload: { dry_run?: boolean; root?: string; confirm_live?: boolean },
+): Promise<{
+  ok: boolean;
+  dry_run: boolean;
+  moved: number;
+  failed: number;
+  approved_sections: string[];
+  results: Array<Record<string, unknown>>;
+  error?: string;
+}> {
+  return postJson(`/runs/${stamp}/restructure/execute`, payload);
+}
+
 export function fetchSceneRenames(stamp: string): Promise<SceneRenameItem[]> {
   return getJson(`/runs/${stamp}/scene-renames`);
+}
+
+export function fetchSceneFeedback(stamp: string): Promise<{
+  approved_renames: string[];
+  rejected_paths: Record<string, string>;
+  name_overrides: Record<string, string>;
+  missing_part01: Record<string, string>;
+  reject_reasons: string[];
+}> {
+  return getJson(`/runs/${stamp}/scene-renames/feedback`);
+}
+
+export function approveSceneRename(
+  stamp: string,
+  payload: { source_path: string; scene_id?: string },
+): Promise<{ ok: boolean; state: { approved_renames: string[] } }> {
+  return postJson(`/runs/${stamp}/scene-renames/approve`, payload);
+}
+
+export function rejectSceneRename(
+  stamp: string,
+  payload: { source_path: string; scene_id?: string; reason?: string; note?: string },
+): Promise<{ ok: boolean }> {
+  return postJson(`/runs/${stamp}/scene-renames/reject`, payload);
+}
+
+export function overrideSceneName(
+  stamp: string,
+  payload: { source_path: string; proposed_name: string; scene_id?: string; old_name?: string },
+): Promise<{ ok: boolean; state: { name_overrides: Record<string, string> } }> {
+  return postJson(`/runs/${stamp}/scene-renames/override`, payload);
+}
+
+export function flagSceneMissingPart01(
+  stamp: string,
+  payload: { source_path: string; scene_id?: string },
+): Promise<{ ok: boolean }> {
+  return postJson(`/runs/${stamp}/scene-renames/missing-part01`, payload);
+}
+
+export function executeSceneRenames(
+  stamp: string,
+  payload: { dry_run?: boolean; confirm_live?: boolean },
+): Promise<{
+  ok: boolean;
+  dry_run: boolean;
+  renamed: number;
+  failed: number;
+  results: Array<Record<string, unknown>>;
+  error?: string;
+}> {
+  return postJson(`/runs/${stamp}/scene-renames/execute`, payload);
+}
+
+export function fetchArchiveFeedback(stamp: string): Promise<{
+  rejected_archives: Record<string, string>;
+  confirmed_deletes: Record<string, string>;
+  keeper_choice: Record<string, string>;
+  reject_reasons: string[];
+}> {
+  return getJson(`/runs/${stamp}/archive-peek/feedback`);
+}
+
+export function rejectArchiveVerdict(
+  stamp: string,
+  payload: {
+    archive_path: string;
+    archive_name?: string;
+    item_name?: string;
+    reason?: string;
+    note?: string;
+  },
+): Promise<{ ok: boolean }> {
+  return postJson(`/runs/${stamp}/archive-peek/reject`, payload);
+}
+
+export function confirmArchiveDelete(
+  stamp: string,
+  payload: { archive_path: string; archive_name?: string; item_name?: string; note?: string },
+): Promise<{ ok: boolean }> {
+  return postJson(`/runs/${stamp}/archive-peek/confirm`, payload);
+}
+
+export function setArchiveKeeper(
+  stamp: string,
+  payload: { archive_path: string; keeper: "archive" | "folder"; archive_name?: string; item_name?: string },
+): Promise<{ ok: boolean }> {
+  return postJson(`/runs/${stamp}/archive-peek/keeper`, payload);
+}
+
+export function executeArchiveStaging(
+  stamp: string,
+  payload: { dry_run?: boolean; root?: string; confirm_live?: boolean },
+): Promise<{
+  ok: boolean;
+  dry_run: boolean;
+  staged: number;
+  failed: number;
+  results: Array<Record<string, unknown>>;
+  error?: string;
+}> {
+  return postJson(`/runs/${stamp}/archive-peek/execute`, payload);
 }
 
 export function fetchArchivePeek(
@@ -225,7 +418,7 @@ export function addManualDuplicate(
 
 export function executeDuplicateStaging(
   stamp: string,
-  payload: { dry_run?: boolean; root?: string },
+  payload: { dry_run?: boolean; root?: string; confirm_live?: boolean },
 ): Promise<{
   ok: boolean;
   dry_run: boolean;
@@ -291,15 +484,318 @@ export function testVendorKeyword(
   return postJson("/vendors/test", { keyword, sample });
 }
 
+export interface HarvestCandidate {
+  harvest_id: string;
+  company: string;
+  keywords: string[];
+  category: string;
+  source_url: string;
+  source_label: string;
+  confidence: string;
+  notes: string;
+  status: string;
+  already_known: boolean;
+}
+
+export interface HarvestSourcePreset {
+  id: string;
+  label: string;
+  urls: string[];
+  default_category: string;
+  notes?: string;
+}
+
+export function fetchHarvestSources(): Promise<{
+  presets: HarvestSourcePreset[];
+  categories: string[];
+  default_urls: string[];
+}> {
+  return getJson("/vendors/harvest/sources");
+}
+
+export function fetchHarvestCandidates(includeKnown = true): Promise<{
+  pending: HarvestCandidate[];
+  total_pending: number;
+  last_run: Record<string, unknown> | null;
+  updated: string;
+}> {
+  return getJson(`/vendors/harvest/candidates?include_known=${includeKnown ? "true" : "false"}`);
+}
+
+export function runVendorHarvest(params: {
+  urls?: string[];
+  preset_id?: string;
+  category?: string;
+  include_known?: boolean;
+}): Promise<{ ok: boolean; added: number; total_pending: number; results: Array<Record<string, unknown>> }> {
+  return postJson("/vendors/harvest", params);
+}
+
+export function approveHarvestCandidates(
+  harvestIds: string[],
+): Promise<{ ok: boolean; count: number }> {
+  return postJson("/vendors/harvest/approve", { harvest_ids: harvestIds });
+}
+
+export function rejectHarvestCandidates(
+  harvestIds: string[],
+): Promise<{ ok: boolean; rejected: number }> {
+  return postJson("/vendors/harvest/reject", { harvest_ids: harvestIds });
+}
+
+export function vendorResearchExportUrl(includeKnown = false): string {
+  return `/api/vendors/harvest/export?include_known=${includeKnown ? "true" : "false"}&status=pending`;
+}
+
+export function fetchJobs(): Promise<JobSnapshot[]> {
+  return getJson("/jobs");
+}
+
+export function fetchJob(jobId: string): Promise<JobSnapshot> {
+  return getJson(`/jobs/${jobId}`);
+}
+
+export function fetchJobEvents(
+  jobId: string,
+  after = 0,
+): Promise<{ events: ProgressEvent[]; total: number; after: number }> {
+  return getJson(`/jobs/${jobId}/events?after=${after}`);
+}
+
 export function startScan(params: {
   dry_run?: boolean;
   root?: string;
+  scan_options?: {
+    pause_between_phases?: boolean;
+    skip_phases?: string[];
+    staging_root?: string;
+    extra_scan_roots?: string[];
+    target_paths?: string[];
+    invalidate_cache_paths?: string[];
+  };
 }): Promise<JobSnapshot> {
   return postJson("/jobs", params);
 }
 
-export function jobEventsUrl(jobId: string): string {
-  return `${getWsBase()}/api/jobs/${jobId}/events`;
+export function controlScanJob(
+  jobId: string,
+  action: "pause" | "stop" | "continue",
+): Promise<JobSnapshot> {
+  return postJson(`/jobs/${jobId}/control`, { action });
+}
+
+export function fetchScanOptions(): Promise<{
+  skippable_phases: string[];
+  phase_descriptions: Record<string, string>;
+}> {
+  return getJson("/scan/options");
+}
+
+export function fetchSystemMetrics(root?: string): Promise<{
+  cpu_percent?: number;
+  ram_total_gb?: number;
+  ram_used_gb?: number;
+  ram_used_pct?: number;
+  disk_free_gb?: number;
+  disk_used_pct?: number;
+  disk_free_pct?: number;
+  psutil?: boolean;
+}> {
+  const qs = root ? `?root=${encodeURIComponent(root)}` : "";
+  return getJson(`/system/metrics${qs}`);
+}
+
+export function fetchScanAudit(
+  stamp: string,
+  params: { status?: string; flags?: string; q?: string; limit?: number },
+): Promise<{ items: ScanAuditItem[]; total: number }> {
+  const qs = new URLSearchParams();
+  if (params.status) qs.set("status", params.status);
+  if (params.flags) qs.set("flags", params.flags);
+  if (params.q) qs.set("q", params.q);
+  if (params.limit) qs.set("limit", String(params.limit));
+  return getJson(`/runs/${stamp}/audit?${qs}`);
+}
+
+export function fetchSkippedItems(
+  stamp: string,
+  params: { reason?: string; q?: string; limit?: number; offset?: number },
+): Promise<{ items: import("../types").SkippedItem[]; total: number; counts: Record<string, number> }> {
+  const qs = new URLSearchParams();
+  if (params.reason) qs.set("reason", params.reason);
+  if (params.q) qs.set("q", params.q);
+  if (params.limit) qs.set("limit", String(params.limit));
+  if (params.offset) qs.set("offset", String(params.offset));
+  return getJson(`/runs/${stamp}/skipped?${qs}`);
+}
+
+export function fetchScanFailures(
+  stamp: string,
+  params: { q?: string; limit?: number } = {},
+): Promise<{ items: import("../types").ScanFailureItem[]; total: number }> {
+  const qs = new URLSearchParams();
+  if (params.q) qs.set("q", params.q);
+  if (params.limit) qs.set("limit", String(params.limit));
+  return getJson(`/runs/${stamp}/scan-failures?${qs}`);
+}
+
+export function fetchNestedIssues(
+  stamp: string,
+  params: { issue_type?: string; q?: string; limit?: number } = {},
+): Promise<{ items: import("../types").NestedIssueItem[]; total: number }> {
+  const qs = new URLSearchParams();
+  if (params.issue_type) qs.set("issue_type", params.issue_type);
+  if (params.q) qs.set("q", params.q);
+  if (params.limit) qs.set("limit", String(params.limit));
+  return getJson(`/runs/${stamp}/nested-issues?${qs}`);
+}
+
+export function fetchCoexistence(
+  stamp: string,
+  params: { issue_type?: string; q?: string; limit?: number } = {},
+): Promise<{ items: import("../types").CoexistenceItem[]; total: number }> {
+  const qs = new URLSearchParams();
+  if (params.issue_type) qs.set("issue_type", params.issue_type);
+  if (params.q) qs.set("q", params.q);
+  if (params.limit) qs.set("limit", String(params.limit));
+  return getJson(`/runs/${stamp}/coexistence?${qs}`);
+}
+
+export function fetchInventory(
+  stamp: string,
+  params: { vendor?: string; q?: string; limit?: number } = {},
+): Promise<{ items: import("../types").InventoryItem[]; total: number }> {
+  const qs = new URLSearchParams();
+  if (params.vendor) qs.set("vendor", params.vendor);
+  if (params.q) qs.set("q", params.q);
+  if (params.limit) qs.set("limit", String(params.limit));
+  return getJson(`/runs/${stamp}/inventory?${qs}`);
+}
+
+export function fetchCacheHits(
+  stamp: string,
+  params: { q?: string; limit?: number } = {},
+): Promise<{ items: import("../types").CacheHitItem[]; total: number }> {
+  const qs = new URLSearchParams();
+  if (params.q) qs.set("q", params.q);
+  if (params.limit) qs.set("limit", String(params.limit));
+  return getJson(`/runs/${stamp}/cache-hits?${qs}`);
+}
+
+export function fetchCoverageGaps(
+  stamp: string,
+  params: { reason?: string; q?: string; limit?: number } = {},
+): Promise<{ items: import("../types").CoverageGapItem[]; total: number }> {
+  const qs = new URLSearchParams();
+  if (params.reason) qs.set("reason", params.reason);
+  if (params.q) qs.set("q", params.q);
+  if (params.limit) qs.set("limit", String(params.limit));
+  return getJson(`/runs/${stamp}/coverage-gaps?${qs}`);
+}
+
+export function fetchProbeTruncations(
+  stamp: string,
+  params: { kind?: string; q?: string; limit?: number } = {},
+): Promise<{ items: import("../types").ProbeTruncationItem[]; total: number }> {
+  const qs = new URLSearchParams();
+  if (params.kind) qs.set("kind", params.kind);
+  if (params.q) qs.set("q", params.q);
+  if (params.limit) qs.set("limit", String(params.limit));
+  return getJson(`/runs/${stamp}/probe-truncations?${qs}`);
+}
+
+export function fetchSkipImpact(
+  stamp: string,
+): Promise<{ phases: import("../types").SkipPhaseImpact[]; feedback_skipped: unknown[] }> {
+  return getJson(`/runs/${stamp}/skip-impact`);
+}
+
+export function compareRuns(
+  stampA: string,
+  stampB: string,
+): Promise<import("../types").RunComparison> {
+  return getJson(`/runs/compare?stamp_a=${encodeURIComponent(stampA)}&stamp_b=${encodeURIComponent(stampB)}`);
+}
+
+export function invalidateCache(paths: string[]): Promise<{ ok: boolean; removed: string[] }> {
+  return postJson("/cache/invalidate", { paths });
+}
+
+export function rescanPaths(
+  stamp: string,
+  payload: { paths: string[]; invalidate_cache?: boolean; dry_run?: boolean },
+): Promise<{ ok: boolean; job: JobSnapshot }> {
+  return postJson(`/runs/${stamp}/skipped/rescan`, payload);
+}
+
+export function queueSkippedInvestigation(
+  stamp: string,
+  payload: { paths: string[]; bucket?: string },
+): Promise<{ ok: boolean; applied: number }> {
+  return postJson(`/runs/${stamp}/skipped/queue-investigation`, payload);
+}
+
+export interface UnderscoreVendorRow {
+  name: string;
+  path: string;
+  section: string;
+  source: string;
+  whitelisted: boolean;
+}
+
+export function fetchUnderscoreVendors(
+  stamp?: string,
+): Promise<{ items: UnderscoreVendorRow[]; total: number; whitelisted_count: number }> {
+  const qs = stamp ? `?stamp=${encodeURIComponent(stamp)}` : "";
+  return getJson(`/underscore-vendors${qs}`);
+}
+
+export function addUnderscoreVendors(payload: {
+  folders?: string[];
+  paths?: string[];
+}): Promise<{ ok: boolean; added_folders: string[]; added_paths: string[] }> {
+  return postJson("/underscore-vendors", payload);
+}
+
+export function removeUnderscoreVendors(payload: {
+  folders?: string[];
+  paths?: string[];
+}): Promise<{ ok: boolean; removed_folders: string[]; removed_paths: string[] }> {
+  return postJson("/underscore-vendors/remove", payload);
+}
+
+export function rescanUnderscorePaths(
+  stamp: string,
+  payload: { paths: string[]; invalidate_cache?: boolean; dry_run?: boolean; full_library?: boolean },
+): Promise<{ ok: boolean; job: JobSnapshot }> {
+  return postJson(`/runs/${stamp}/underscore/rescan`, payload);
+}
+
+export function seedKnownUnderscoreVendors(
+  folders?: string[],
+): Promise<{ ok: boolean; added_folders: string[]; total_folders?: number }> {
+  return postJson("/underscore-vendors/seed-known", { folders: folders || [] });
+}
+
+export function bulkWhitelistAllUnderscore(
+  stamp: string,
+  payload?: { dry_run?: boolean; invalidate_cache?: boolean },
+): Promise<{ ok: boolean; job: JobSnapshot; count: number; paths: string[] }> {
+  return postJson(`/runs/${stamp}/underscore/bulk-whitelist-all`, payload || {});
+}
+
+export function fetchSpaceRecoverySummary(stamp: string): Promise<Record<string, unknown>> {
+  return getJson(`/runs/${stamp}/space-recovery/summary`);
+}
+
+export async function spaceRecoveryReportUrl(filename: string): Promise<string> {
+  const token = await ensureApiToken();
+  return `${await apiUrl(`/space-recovery/reports/${encodeURIComponent(filename)}`)}?token=${encodeURIComponent(token)}`;
+}
+
+export async function jobEventsUrl(jobId: string): Promise<string> {
+  const token = await ensureApiToken();
+  return `${getWsBase()}/api/jobs/${jobId}/events?token=${encodeURIComponent(token)}`;
 }
 
 export async function openInExplorer(path: string): Promise<void> {
