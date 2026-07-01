@@ -4,16 +4,22 @@ from __future__ import annotations
 
 import os
 import re
+import sys
 from pathlib import Path
 
-ENGINE_VERSION = "9.8.0"
+ENGINE_VERSION = "9.9.0"
 # Bump ONLY when _scan_tree output format changes — decoupled from ENGINE_VERSION
 # so identification-only releases keep the warm scan cache (60-90 min on SMB).
 CACHE_SCHEMA = "9.7.1"
 
 
 def _resolve_root_dir() -> str:
-    return os.environ.get("AUDIOTHECA_LIBRARY_ROOT", r"Z:\_software\_audio").strip()
+    env = os.environ.get("AUDIOTHECA_LIBRARY_ROOT", "").strip()
+    if env:
+        return env
+    if sys.platform == "win32":
+        return r"Z:\_software\_audio"
+    return os.path.expanduser("~/audiotheca-library")
 
 
 def _resolve_report_dir() -> Path:
@@ -113,6 +119,9 @@ IGNORE_BINS = {
     "_delete-canidates",
     "_non_pc_quarantine",
     "_quarantine_mac_linux",
+    "_mac",
+    "_linux",
+    "_windows",
     "_tonex libraries",
     "_older_versions_review",
     "_dedupe_reports",

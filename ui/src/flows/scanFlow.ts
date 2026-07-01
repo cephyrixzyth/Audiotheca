@@ -64,9 +64,9 @@ export const SCAN_FLOW_PHASES: FlowPhase[] = [
   },
   {
     id: "quarantine",
-    label: "Quarantine non-PC",
-    description: "Flag Mac-only or incompatible payloads for review.",
-    enginePhase: "Quarantine",
+    label: "OS lanes",
+    description: "Route Mac/Linux/Windows-only items under _mac, _linux, or _windows.",
+    enginePhase: "OS lanes",
     skipKey: "quarantine",
     group: "analyze",
     estimatedWeight: 4,
@@ -126,7 +126,7 @@ export const FLOW_PRESETS: FlowPreset[] = [
   {
     id: "identify",
     label: "Identify only",
-    description: "Scan + restructure plan; skip dupes, quarantine, and peeks.",
+    description: "Scan + restructure plan; skip OS lanes, dupes, and peeks.",
     skipPhases: ["archive_peek", "scene_peek", "quarantine", "duplicates"],
     pauseBetweenPhases: false,
   },

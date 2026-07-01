@@ -531,7 +531,7 @@ class ReportsMixin:
                 f"  {bucket}: {count}"
                 for bucket, count in sorted(self.investigation_stats.items())
             ],
-            f"Quarantined: {self.stats['quarantined']}",
+            f"OS lanes (_mac/_linux/_windows): {self.stats['quarantined']}",
             f"Reconciled vendors: {self.stats['reconciled']}",
             f"Vendor conflicts: {len(self.vendor_conflicts)}",
             f"Nested issues: {len(self.nested_issues)}",

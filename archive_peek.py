@@ -34,17 +34,34 @@ SCENE_JUNK_DIRS = {
 
 
 def find_7z() -> Path | None:
-    candidates = [
-        Path(r"C:\Program Files\7-Zip\7z.exe"),
-        Path(r"C:\Program Files (x86)\7-Zip\7z.exe"),
-    ]
+    import shutil
+    import sys
+
+    candidates: list[Path] = []
+    if sys.platform == "win32":
+        candidates.extend([
+            Path(r"C:\Program Files\7-Zip\7z.exe"),
+            Path(r"C:\Program Files (x86)\7-Zip\7z.exe"),
+        ])
+    elif sys.platform == "darwin":
+        candidates.extend([
+            Path("/opt/homebrew/bin/7z"),
+            Path("/usr/local/bin/7z"),
+        ])
+    else:
+        candidates.extend([
+            Path("/usr/bin/7z"),
+            Path("/usr/bin/7za"),
+            Path("/usr/local/bin/7z"),
+        ])
     for candidate in candidates:
         if candidate.is_file():
             return candidate
-    import shutil
-
-    found = shutil.which("7z")
-    return Path(found) if found else None
+    for name in ("7z", "7za", "7zr"):
+        found = shutil.which(name)
+        if found:
+            return Path(found)
+    return None
 
 
 def strip_listing_artifact(name: str) -> str:

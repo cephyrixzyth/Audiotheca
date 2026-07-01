@@ -6,6 +6,7 @@ import shutil
 from pathlib import Path
 
 from api.decisions import ApprovedPlan, load_plan
+from api.path_logic import logical_path_from_parts, logical_path_parts
 from audiotheca.config import IGNORE_BINS, INVESTIGATION_BUCKETS
 from duplicate_feedback import ExecutedDelete, record_executed_deletes
 
@@ -28,20 +29,20 @@ def infer_library_root(path: Path) -> Path | None:
     Uses the first top-level section bin (a-z, =) after drive/wrapper segments.
     Nested single-letter folders deeper in a product tree must not shrink the root.
     """
-    parts = path.parts
+    parts = logical_path_parts(path)
     section_hits = [index for index, part in enumerate(parts) if part in SECTION_BINS]
     if section_hits:
-        return Path(*parts[: section_hits[0]])
+        return logical_path_from_parts(parts[: section_hits[0]])
 
     for index, part in enumerate(parts):
         if part == "_requiresinvestigation":
-            return Path(*parts[:index])
+            return logical_path_from_parts(parts[:index])
         if part in LIBRARY_ROOT_BINS:
-            return Path(*parts[:index])
+            return logical_path_from_parts(parts[:index])
         if part in INVESTIGATION_SUB_BUCKETS or _is_root_wrapper(part):
             continue
         if part.startswith("_"):
-            return Path(*parts[:index])
+            return logical_path_from_parts(parts[:index])
     return None
 
 

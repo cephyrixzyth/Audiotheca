@@ -47,6 +47,7 @@ from audiotheca.identify import IdentifyMixin
 from audiotheca.reports import ReportsMixin
 from audiotheca.routing import RoutingMixin
 from audiotheca.scan import ScanMixin
+from audiotheca.platform_routing import OS_LANE_DIRS
 
 from audiotheca.optional_deps import HAS_FUZZ, HAS_PEFILE, fuzz, pefile, tqdm
 
@@ -526,7 +527,6 @@ class DeduplicationEngine(
         results.sort(key=lambda r: (r["source_bin"], r["original_name"].lower()))
 
         all_items: list[dict] = []
-        quarantine_list: list[Path] = []
 
         for item in results:
             self._inc("scanned")
@@ -537,11 +537,25 @@ class DeduplicationEngine(
                 )
             self._inc("nested_issues", len(item["nested"]))
 
-            if item["os_status"] == "NON_PC_EXCLUSIVE":
-                quarantine_list.append(item["path"])
-                continue
-
             all_items.append(item)
+
+        off_lane_count = sum(1 for item in all_items if item.get("platform_lane"))
+        if off_lane_count and self.scan_options.skip("quarantine"):
+            self._record_skip_impact(
+                "quarantine",
+                off_lane_count,
+                f"{off_lane_count} off-native OS items left in category bins",
+            )
+            print(
+                f"  [SKIP] OS lane routing disabled — {off_lane_count} Mac/Linux/Windows "
+                "items will keep native paths in the restructure plan."
+            )
+        elif off_lane_count:
+            print(
+                f"  OS lane routing: {off_lane_count} items will route under "
+                f"_mac / _linux / _windows when restructure runs."
+            )
+        self._checkpoint("quarantine", "Phase 1b - OS lane routing flags")
 
         reconcile_progress = PhaseProgress("Phase 1.5 - Vendor reconciliation", len(all_items), "item")
         reconciled = self.reconcile_vendors(all_items)
@@ -594,44 +608,6 @@ class DeduplicationEngine(
             dedup_key = self.build_dedup_key(item)
             if dedup_key:
                 dedup_groups[dedup_key].append(item)
-
-        if quarantine_list and not self.scan_options.skip("quarantine"):
-            quarantine_meta = {
-                path: next(
-                    (item for item in results if item["path"] == path),
-                    {"original_name": path.name, "source_bin": path.parent.name},
-                )
-                for path in quarantine_list
-            }
-
-            def _quarantine_one(path: Path, *, dry_run: bool = False) -> None:
-                meta = quarantine_meta[path]
-                status = "[DRY RUN] Would quarantine" if dry_run else "Quarantined"
-                csv_writer.writerow(
-                    [status, meta["original_name"], meta["source_bin"], "Quarantine", "Non-PC Exclusive", ""]
-                )
-                self._inc("quarantined")
-                if not dry_run:
-                    self.quarantine_dir.mkdir(exist_ok=True)
-                    self.safe_move(path, self.quarantine_dir / path.name)
-
-            self._execute_actions(
-                "Phase 1b: Quarantine non-PC items",
-                quarantine_list,
-                lambda path, dry_run=False: _quarantine_one(path, dry_run=dry_run),
-                lambda path: (
-                    f"Quarantine {quarantine_meta[path]['original_name']} "
-                    f"({quarantine_meta[path]['source_bin']})"
-                ),
-            )
-        elif quarantine_list:
-            self._record_skip_impact(
-                "quarantine",
-                len(quarantine_list),
-                f"{len(quarantine_list)} non-PC items left in place",
-            )
-            print(f"  [SKIP] Quarantine phase disabled — {len(quarantine_list)} non-PC items left in place.")
-        self._checkpoint("quarantine", "Phase 1b - Quarantine non-PC items")
 
         feedback_store = load_feedback_store()
 
@@ -911,10 +887,16 @@ class DeduplicationEngine(
         self._checkpoint("restructure_live", "Phase 3 - Restructure moves")
 
         if not self.dry_run and not self.scan_options.skip("purge"):
-            purge_roots = [
-                category_bin for category_bin in self.root_dir.iterdir()
-                if category_bin.is_dir() and category_bin.name not in IGNORE_BINS
-            ]
+            purge_roots: list[Path] = []
+            for top in self.root_dir.iterdir():
+                if not top.is_dir():
+                    continue
+                if top.name in OS_LANE_DIRS:
+                    purge_roots.extend(
+                        child for child in top.iterdir() if child.is_dir()
+                    )
+                elif top.name not in IGNORE_BINS:
+                    purge_roots.append(top)
 
             def _purge_bin(category_bin: Path, *, dry_run: bool = False) -> None:
                 if dry_run:
@@ -1066,7 +1048,7 @@ class DeduplicationEngine(
         else:
             print()
         print(
-            f"  Quarantined: {self.stats['quarantined']} | "
+            f"  OS lanes (_mac/_linux/_windows): {self.stats['quarantined']} | "
             f"Nested: {len(self.nested_issues)} | Coexistence: {len(self.coexistence_pairs)} | "
             f"Errors: {self.stats['errors']}"
         )

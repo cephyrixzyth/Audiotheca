@@ -316,7 +316,7 @@ export function ScanPanel({ onRunComplete }: Props) {
               <input type="text" value={root} onChange={(e) => setRoot(e.target.value)} style={{ width: "100%" }} />
             </label>
             <label>
-              Alternate staging root (for _delete-canidates / quarantine when primary disk is full)
+              Alternate staging root (for _delete-canidates when primary disk is full)
               <input
                 type="text"
                 placeholder="e.g. D:\\audiotheca_staging"

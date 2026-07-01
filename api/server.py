@@ -1212,7 +1212,7 @@ def scan_options_help() -> dict[str, object]:
         "phase_descriptions": {
             "scene_peek": "Skip listing archives inside scene-hash folders",
             "archive_peek": "Skip archive vs extracted-folder listing (7-Zip)",
-            "quarantine": "Skip moving Mac/Linux-only items to quarantine",
+            "quarantine": "Skip routing off-native OS items to _mac / _linux / _windows lanes",
             "duplicates": "Skip duplicate group review (restructure still runs)",
             "restructure_live": "Skip live restructure moves (dry-run plan only)",
             "purge": "Skip empty wrapper directory purge",

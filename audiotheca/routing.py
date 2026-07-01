@@ -37,6 +37,7 @@ from vendor_db import VENDOR_DATABASE
 
 from audiotheca.config import *  # noqa: F403
 from audiotheca.helpers import _archive_stem, _limit_walk, _squash, _walk_depth
+from audiotheca.platform_routing import off_lane, prefix_destination
 
 
 class RoutingMixin:
@@ -205,7 +206,9 @@ class RoutingMixin:
                 confirmed_bases=confirmed_bases or {},
             )
             dest_path = self.investigate_dir / bucket / item["original_name"]
-            return dest_path, f"_requiresinvestigation/{bucket}", "NEEDS REVIEW", bucket
+            relative_dest = f"_requiresinvestigation/{bucket}/{item['original_name']}"
+            dest_path, relative_dest = self._apply_platform_lane(item, dest_path, relative_dest)
+            return dest_path, relative_dest, "NEEDS REVIEW", bucket
         elif safe_company:
             target_bin = self.root_dir / item["source_bin"]
         else:
@@ -215,15 +218,32 @@ class RoutingMixin:
                 confirmed_bases=confirmed_bases or {},
             )
             dest_path = self.investigate_dir / bucket / item["original_name"]
-            return dest_path, f"_requiresinvestigation/{bucket}", "NEEDS REVIEW", bucket
+            relative_dest = f"_requiresinvestigation/{bucket}/{item['original_name']}"
+            dest_path, relative_dest = self._apply_platform_lane(item, dest_path, relative_dest)
+            return dest_path, relative_dest, "NEEDS REVIEW", bucket
 
         dest_dir = target_bin / safe_company
         if safe_company.lower() == item["original_name"].lower():
             dest_path = dest_dir
+            relative_dest = f"{target_bin.name}/{safe_company}"
         else:
             dest_path = dest_dir / item["original_name"]
+            relative_dest = f"{target_bin.name}/{safe_company}/{item['original_name']}"
 
-        return dest_path, f"{target_bin.name}/{safe_company}", "READY", ""
+        dest_path, relative_dest = self._apply_platform_lane(item, dest_path, relative_dest)
+        return dest_path, relative_dest, "READY", ""
+
+    def _apply_platform_lane(
+        self,
+        item: dict,
+        dest_path: Path,
+        relative_dest: str,
+    ) -> tuple[Path, str]:
+        lane = item.get("platform_lane")
+        if lane and not self.scan_options.skip("quarantine"):
+            self._inc("quarantined")
+            return prefix_destination(self.root_dir, dest_path, relative_dest, lane)
+        return dest_path, relative_dest
 
     def move_and_merge(self, src: str | Path, dst: str | Path) -> bool:
         src_path = Path(src)

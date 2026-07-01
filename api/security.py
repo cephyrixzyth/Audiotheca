@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 
 from fastapi import HTTPException, Request
 
+from api.path_logic import is_logical_path_under
 from api.paths import report_dir, workspace_root
 from audiotheca.config import ROOT_DIR as DEFAULT_LIBRARY_ROOT
 
@@ -154,7 +155,7 @@ def is_path_under(child: Path, parent: Path) -> bool:
         child.resolve().relative_to(parent.resolve())
         return True
     except (OSError, ValueError):
-        return False
+        return is_logical_path_under(child, parent)
 
 
 def library_roots() -> list[Path]:
@@ -183,10 +184,12 @@ def library_roots() -> list[Path]:
 def assert_library_path(raw: str, *, must_exist: bool = False, label: str = "path") -> Path:
     if not raw or not str(raw).strip():
         raise HTTPException(status_code=400, detail=f"{label} is required")
-    try:
-        path = Path(str(raw)).expanduser().resolve()
-    except OSError as exc:
-        raise HTTPException(status_code=400, detail=f"Invalid {label}: {exc}") from exc
+    path = Path(str(raw)).expanduser()
+    if path.exists():
+        try:
+            path = path.resolve()
+        except OSError as exc:
+            raise HTTPException(status_code=400, detail=f"Invalid {label}: {exc}") from exc
     if not any(is_path_under(path, root) for root in library_roots()):
         audit("library_path_denied", path=str(path), label=label)
         raise HTTPException(

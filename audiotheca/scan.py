@@ -38,6 +38,7 @@ from vendor_db import VENDOR_DATABASE
 from audiotheca.config import *  # noqa: F403
 from audiotheca.helpers import _archive_stem, _limit_walk, _squash, _walk_depth
 from audiotheca.optional_deps import HAS_PEFILE, pefile
+from audiotheca.platform_routing import off_lane, os_status_label, platform_flags
 
 
 class ScanMixin:
@@ -282,11 +283,7 @@ class ScanMixin:
 
     @staticmethod
     def _os_status(info: dict) -> str:
-        if info["has_windows"] or info["has_assets"]:
-            return "PC_COMPATIBLE"
-        if info["has_mac"] or info["has_linux"]:
-            return "NON_PC_EXCLUSIVE"
-        return "UNDETERMINED"
+        return os_status_label(platform_flags(info))
 
     # ------------------------------------------------------------------
     # Scan worker (runs in thread pool — never raises)
@@ -330,6 +327,7 @@ class ScanMixin:
             company, id_method, id_confidence = self.identify_vendor(path, info if is_dir else None)
             version_key, base_name, display_name = self.get_version_and_base(path.name, company)
 
+            flags = platform_flags(info) if is_dir else {}
             result = {
                 "path": path,
                 "is_dir": is_dir,
@@ -343,6 +341,8 @@ class ScanMixin:
                 "source_bin": source_bin,
                 "is_tonex": bool(info["is_tonex"]),
                 "size": info["size"],
+                "platform_flags": flags,
+                "platform_lane": off_lane(flags) if is_dir else None,
                 "os_status": self._os_status(info) if is_dir else None,
                 "nested": info["nested"],
                 "top_files": info["top_files"],

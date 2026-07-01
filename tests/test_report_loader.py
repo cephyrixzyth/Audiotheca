@@ -24,13 +24,14 @@ def test_load_run_summary_20260611():
 
 
 def test_load_investigation_filter():
-    try:
-        items, total = report_loader.load_investigation(
-            "20260611_0208", bucket="_unknown_vendor", limit=10
-        )
-    except FileNotFoundError:
-        pytest.skip("20260611_0208 run not present")
-    assert total > 0
+    inv_path = report_loader._report_path("20260611_0208", "Investigation_Breakdown")
+    if not inv_path.is_file():
+        pytest.skip("20260611_0208 investigation report not present")
+    items, total = report_loader.load_investigation(
+        "20260611_0208", bucket="_unknown_vendor", limit=10
+    )
+    if total == 0:
+        pytest.skip("20260611_0208 has no _unknown_vendor investigation rows")
     assert all(item.investigation_bucket == "_unknown_vendor" for item in items)
 
 

@@ -378,11 +378,9 @@ class IdentifyMixin:
 
     @staticmethod
     def _os_status(info: dict) -> str:
-        if info["has_windows"] or info["has_assets"]:
-            return "PC_COMPATIBLE"
-        if info["has_mac"] or info["has_linux"]:
-            return "NON_PC_EXCLUSIVE"
-        return "UNDETERMINED"
+        from audiotheca.platform_routing import os_status_label, platform_flags
+
+        return os_status_label(platform_flags(info))
 
     # ------------------------------------------------------------------
     # Structure resolution
