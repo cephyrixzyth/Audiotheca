@@ -1,15 +1,20 @@
-"""Query a SearXNG instance (JSON API) for library / vendor research.
+"""Query a local SearXNG instance (JSON API) for vendor and space-recovery research.
 
-Requires JSON format enabled on the instance (see docker/searxng/core-config/settings.yml).
+Designed for humans and Cursor agents — use presets for common Audiotheca tasks.
 
 Usage:
+  python scripts/searx_search.py --health
   python scripts/searx_search.py "8Dio kontakt library naming"
   python scripts/searx_search.py --preset vendor --arg "Native Instruments"
-  python scripts/searx_search.py --preset workflow --arg "Native Instruments"
-  python scripts/searx_search.py -q "site:vi-control.net kontakt custom library path" --limit 5
+  python scripts/searx_search.py --preset space-recovery --arg "duplicate installers"
+  python scripts/searx_search.py --preset vendor --arg "Spitfire" --format compact
 
 Environment:
   SEARXNG_URL   Base URL (default http://127.0.0.1:8080)
+
+Start SearXNG:
+  cd docker/searxng && .\\start.ps1    # Windows
+  cd docker/searxng && ./start.sh     # Linux / macOS / WSL
 """
 
 from __future__ import annotations
@@ -26,13 +31,32 @@ from typing import Any
 DEFAULT_BASE = os.environ.get("SEARXNG_URL", "http://127.0.0.1:8080").rstrip("/")
 
 PRESETS: dict[str, str] = {
-    "vendor": "{arg} audio software sample library vendor folder organization",
+    "vendor": "{arg} audio software sample library vendor company folder organization",
     "kontakt": "Native Instruments Kontakt library install folder structure {arg}",
     "underscore": "audio library underscore prefix folder vendor naming convention {arg}",
-    "workflow": "library deduplicate organize audio plugins {arg}",
+    "workflow": "library deduplicate organize audio plugins sample libraries {arg}",
     "space": "remove duplicate sample libraries reclaim disk space installers {arg}",
+    "space-recovery": "hardlink deduplicate audio library reclaim disk space bloat {arg}",
     "ucs": "Universal Category System UCS sound library folder naming {arg}",
+    "vi-control": "site:vi-control.net {arg} kontakt library path organization",
 }
+
+
+def ping(*, base_url: str = DEFAULT_BASE, timeout: float = 5.0) -> dict[str, Any]:
+    """Lightweight health check — no search query."""
+    url = f"{base_url.rstrip('/')}/healthz"
+    req = urllib.request.Request(url, headers={"User-Agent": "Audiotheca/1.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body = resp.read().decode(errors="replace").strip()
+            return {"ok": True, "url": base_url, "status": resp.status, "body": body or "ok"}
+    except urllib.error.URLError as exc:
+        return {
+            "ok": False,
+            "url": base_url,
+            "error": str(exc.reason),
+            "hint": "Start SearXNG: cd docker/searxng && .\\start.ps1",
+        }
 
 
 def search(
@@ -77,6 +101,29 @@ def search(
         ) from exc
 
 
+def compact_results(data: dict[str, Any], *, limit: int) -> dict[str, Any]:
+    """Agent-friendly minimal JSON — easy to parse in automation."""
+    rows = []
+    for row in (data.get("results") or [])[:limit]:
+        snippet = (row.get("content") or "").strip().replace("\n", " ")
+        if len(snippet) > 280:
+            snippet = snippet[:277] + "..."
+        rows.append(
+            {
+                "title": (row.get("title") or "").strip(),
+                "url": (row.get("url") or "").strip(),
+                "engine": row.get("engine") or "",
+                "snippet": snippet,
+            }
+        )
+    return {
+        "ok": True,
+        "query": data.get("query") or "",
+        "count": len(rows),
+        "results": rows,
+    }
+
+
 def format_results(data: dict[str, Any], *, limit: int) -> str:
     lines: list[str] = []
     query = data.get("query") or ""
@@ -116,7 +163,9 @@ def build_query(args: argparse.Namespace) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Search via local SearXNG JSON API")
+    parser = argparse.ArgumentParser(
+        description="Search via local SearXNG JSON API (vendor / space-recovery research)",
+    )
     parser.add_argument("query", nargs="*", help="Search query")
     parser.add_argument("--preset", choices=sorted(PRESETS), help="Audiotheca research preset")
     parser.add_argument("--arg", nargs="*", help="Extra text for preset templates")
@@ -126,26 +175,51 @@ def main() -> int:
     parser.add_argument("--language", default="en")
     parser.add_argument("--time-range", choices=["day", "week", "month", "year"])
     parser.add_argument("--limit", type=int, default=8)
-    parser.add_argument("--json", action="store_true", help="Print raw JSON response")
+    parser.add_argument("--health", action="store_true", help="Ping SearXNG /healthz only")
+    parser.add_argument(
+        "--format",
+        choices=["text", "json", "compact"],
+        default="text",
+        help="Output: human text, raw SearXNG JSON, or compact agent JSON",
+    )
+    parser.add_argument("--json", action="store_true", help=argparse.SUPPRESS)  # legacy alias
     parser.add_argument("--list-presets", action="store_true")
     args = parser.parse_args()
 
+    base = args.url.rstrip("/")
+
     if args.list_presets:
         for name, template in sorted(PRESETS.items()):
-            print(f"{name:12} {template}")
+            print(f"{name:16} {template}")
         return 0
+
+    if args.health:
+        status = ping(base_url=base)
+        if args.format in ("json", "compact") or args.json:
+            print(json.dumps(status, indent=2))
+        elif status.get("ok"):
+            print(f"SearXNG OK at {base}")
+        else:
+            print(f"SearXNG unreachable at {base}: {status.get('error')}", file=sys.stderr)
+            print(status.get("hint", ""), file=sys.stderr)
+            return 1
+        return 0 if status.get("ok") else 1
 
     q = build_query(args)
     data = search(
         q,
-        base_url=args.url.rstrip("/"),
+        base_url=base,
         categories=args.categories,
         engines=args.engines,
         language=args.language,
         time_range=args.time_range,
     )
-    if args.json:
+
+    out_format = "json" if args.json else args.format
+    if out_format == "json":
         print(json.dumps(data, indent=2))
+    elif out_format == "compact":
+        print(json.dumps(compact_results(data, limit=args.limit), indent=2))
     else:
         print(format_results(data, limit=args.limit))
     return 0

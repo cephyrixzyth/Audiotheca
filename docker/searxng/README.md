@@ -24,14 +24,22 @@ cd docker\searxng
 docker compose down
 ```
 
-## Search from terminal
+## Search from terminal (agents & humans)
 
 ```powershell
 cd ..\..   # audiotheca root
+python scripts/searx_search.py --health
 python scripts/searx_search.py --preset vendor --arg "8Dio"
+python scripts/searx_search.py --preset space-recovery --arg "duplicate installers"
 python scripts/searx_search.py --preset kontakt
 python scripts/searx_search.py "site:vi-control.net library folder structure"
 python scripts/searx_search.py --list-presets
+```
+
+**Agent-friendly compact JSON:**
+
+```powershell
+python scripts/searx_search.py --preset vendor --arg "Spitfire" --format compact
 ```
 
 Set `SEARXNG_URL` if not using default `http://127.0.0.1:8080`.
