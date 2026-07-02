@@ -342,7 +342,8 @@ export type TabId =
   | "vendors"
   | "space-recovery"
   | "security"
-  | "environment";
+  | "environment"
+  | "help";
 
 export type DependencyCategory = "required" | "recommended" | "optional";
 export type DependencyStatusKind = "ok" | "missing" | "degraded" | "skipped";
@@ -402,5 +403,7 @@ export interface MalwareFinding {
   reasons: string[];
   sha256: string;
   lookup?: Record<string, string>;
+  clamav?: { status: string; engine?: string | null; detail?: string };
+  /** @deprecated Legacy scan reports may include defender instead of clamav */
   defender?: { status: string; detail?: string };
 }

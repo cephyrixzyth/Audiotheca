@@ -864,7 +864,7 @@ export async function listArchiveContents(path: string, limit = 200): Promise<{
 
 export function startSecurityScan(params: {
   root: string;
-  use_defender?: boolean;
+  use_clamav?: boolean;
   max_files?: number;
 }): Promise<{ ok: boolean; findings: import("../types").MalwareFinding[]; total: number; report: string }> {
   return postJson("/security/scan", params);

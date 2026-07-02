@@ -16,7 +16,7 @@ RUN npm run build
 FROM python:${PYTHON_VERSION}-slim-bookworm
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends nginx p7zip-full curl tini \
+    && apt-get install -y --no-install-recommends nginx p7zip-full curl tini clamav \
     && rm -rf /var/lib/apt/lists/* \
     && rm -f /etc/nginx/sites-enabled/default
 

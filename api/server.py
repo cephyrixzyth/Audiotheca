@@ -1416,11 +1416,11 @@ async def security_scan(body: dict = Body(...)) -> dict[str, object]:
     if not root_raw:
         raise HTTPException(status_code=400, detail="root is required")
     root = Path(str(security.assert_library_path(str(root_raw), label="root")))
-    use_defender = bool(body.get("use_defender"))
+    use_clamav = bool(body.get("use_clamav") or body.get("use_defender"))
     max_files = int(body.get("max_files") or 25_000)
 
     def _run_scan() -> dict[str, object]:
-        findings = ms.scan_tree(root, max_files=max_files, use_defender=use_defender)
+        findings = ms.scan_tree(root, max_files=max_files, use_clamav=use_clamav)
         report_path = ms.write_scan_report(root, findings)
         return {
             "ok": True,

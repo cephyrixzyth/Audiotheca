@@ -184,36 +184,45 @@ def _probe_python_package(dep_id: str, name: str, import_name: str, *, category:
     )
 
 
-def _probe_defender() -> DependencyStatus:
-    if sys.platform != "win32":
-        return DependencyStatus(
-            id="defender",
-            name="Windows Defender",
-            category="optional",
-            status="skipped",
-            detail="Windows-only optional AV integration",
-        )
-    candidates = [
-        Path(r"C:\Program Files\Windows Defender\MpCmdRun.exe"),
-        Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Windows Defender" / "MpCmdRun.exe",
+def _probe_clamav() -> DependencyStatus:
+    from malware_scanner import find_clamdscan, find_clamscan
+
+    hints = [
+        "Windows: winget install ClamAV.ClamAV or download from https://www.clamav.net/downloads",
+        "macOS: brew install clamav && freshclam",
+        "Linux: sudo apt install clamav clamav-daemon && sudo freshclam",
+        "Docker: enable the clamav profile in deploy/unraid/docker-compose.yml",
+        "Set CLAMSCAN_PATH or CLAMDSCAN_PATH if the binary is not on PATH",
     ]
-    for candidate in candidates:
-        if candidate.is_file():
-            return DependencyStatus(
-                id="defender",
-                name="Windows Defender",
-                category="optional",
-                status="ok",
-                detail="MpCmdRun.exe available for Security tab scans",
-                path=str(candidate),
-            )
+    clamdscan = find_clamdscan()
+    if clamdscan is not None:
+        return DependencyStatus(
+            id="clamav",
+            name="ClamAV (clamdscan)",
+            category="optional",
+            status="ok",
+            detail="ClamAV daemon client available for Security tab deep scans",
+            path=str(clamdscan),
+            install_hints=hints,
+        )
+    clamscan = find_clamscan()
+    if clamscan is not None:
+        return DependencyStatus(
+            id="clamav",
+            name="ClamAV (clamscan)",
+            category="optional",
+            status="ok",
+            detail="ClamAV CLI available for Security tab deep scans",
+            path=str(clamscan),
+            install_hints=hints,
+        )
     return DependencyStatus(
-        id="defender",
-        name="Windows Defender",
+        id="clamav",
+        name="ClamAV",
         category="optional",
         status="missing",
-        detail="MpCmdRun.exe not found — heuristic scan still works",
-        install_hints=["Built into Windows; enable Windows Security"],
+        detail="clamscan/clamdscan not found — heuristic scan still works",
+        install_hints=hints,
     )
 
 
@@ -311,7 +320,7 @@ def probe_environment() -> dict[str, Any]:
         _probe_python_package("psutil", "psutil", "psutil", category="recommended"),
         _probe_python_package("rapidfuzz", "RapidFuzz", "rapidfuzz", category="recommended"),
         _probe_python_package("watchdog", "watchdog", "watchdog", category="optional"),
-        _probe_defender(),
+        _probe_clamav(),
         _probe_docker(),
         _probe_sidecar_engine(),
     ]
