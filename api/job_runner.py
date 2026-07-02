@@ -15,11 +15,14 @@ from pathlib import Path
 from api import report_loader
 from api import service as api_service
 from api.paths import engine_executable, workspace_root
+from api.security import ensure_library_path
 from scan_options import SKIPPABLE_PHASES, ScanOptions
 from system_metrics import collect_metrics
 
 PROJECT_ROOT = workspace_root()
 from audiotheca.config import ROOT_DIR as DEFAULT_ROOT
+
+ENGINE_MAX_RUNTIME_S = int(os.environ.get("AUDIOTHECA_ENGINE_MAX_RUNTIME_S", "43200"))
 
 STAMP_RE = re.compile(r"Run_Summary_(\d{8}_\d{4})\.txt$")
 # PhaseProgress counter lines, e.g. "  1,234 / 5,000 item  ( 25%)  |  elapsed ..."
@@ -173,9 +176,11 @@ class JobManager:
 
         job_id = uuid.uuid4().hex[:12]
         root_dir = root or DEFAULT_ROOT
-        root_path = Path(root_dir)
-        if not root_path.exists():
-            raise RuntimeError(f"Library root does not exist: {root_dir}")
+        try:
+            root_path = ensure_library_path(str(root_dir), must_exist=True, label="root")
+        except ValueError as exc:
+            raise RuntimeError(str(exc)) from exc
+        root_dir = str(root_path)
         options = ScanOptions.from_dict(scan_options or {})
         progress_file = report_loader.REPORT_DIR / f".progress_{job_id}.jsonl"
         control_file = report_loader.REPORT_DIR / f".control_{job_id}.json"
@@ -202,6 +207,7 @@ class JobManager:
             env=env,
             stdout=stdout_handle,
             stderr=stderr_handle,
+            shell=False,
         )
 
         job = JobState(
@@ -283,6 +289,17 @@ class JobManager:
 
         try:
             while proc.poll() is None:
+                elapsed = time.time() - job.started_at
+                if elapsed > ENGINE_MAX_RUNTIME_S:
+                    proc.kill()
+                    job.status = "failed"
+                    job.error = f"Engine exceeded max runtime ({ENGINE_MAX_RUNTIME_S}s)"
+                    await self._broadcast(
+                        job,
+                        {"type": "job_error", "error": job.error},
+                    )
+                    break
+
                 if progress_file.is_file():
                     text = progress_file.read_text(encoding="utf-8")
                     lines = text.splitlines()

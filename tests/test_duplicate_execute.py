@@ -38,6 +38,10 @@ def test_stage_approved_duplicates_uses_inferred_root(tmp_path, monkeypatch):
         "api.duplicate_execute.load_plan",
         lambda _stamp: FakePlan(),
     )
+    monkeypatch.setattr(
+        "api.security.library_roots",
+        lambda: [library],
+    )
 
     res = stage_approved_duplicates(stamp, dry_run=True)
     assert res["ok"] is True

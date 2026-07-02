@@ -47,3 +47,24 @@ def test_verify_token(api_token):
 
 def test_redact_path():
     assert security.redact_path(r"Z:\a\b\c\ProductName").endswith("c/ProductName")
+
+
+def test_ensure_library_path_rejects_outside(tmp_path, monkeypatch):
+    library = tmp_path / "library"
+    library.mkdir()
+    outside = tmp_path / "outside.txt"
+    outside.write_text("x", encoding="utf-8")
+    monkeypatch.setattr(security, "library_roots", lambda: [library])
+    with pytest.raises(ValueError):
+        security.ensure_library_path(str(outside))
+
+
+def test_library_roots_requires_auth():
+    from fastapi.testclient import TestClient
+
+    from api.server import app
+
+    with TestClient(app) as anon:
+        response = anon.get("/api/security/library-roots")
+    assert response.status_code == 401
+

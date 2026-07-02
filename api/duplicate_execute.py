@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
+from api.execute_paths import validate_execute_path
 from api.decisions import ApprovedPlan, load_plan
 from api.path_logic import logical_path_from_parts, logical_path_parts
 from audiotheca.config import IGNORE_BINS, INVESTIGATION_BUCKETS
+from audiotheca.transaction_ledger import guarded_move, new_batch_id
 from duplicate_feedback import ExecutedDelete, record_executed_deletes
 
 SECTION_BINS = frozenset("abcdefghijklmnopqrstuvwxyz=")
@@ -60,7 +61,13 @@ def stage_approved_duplicates(
             "results": [],
         }
 
-    library_root: Path | None = Path(root) if root else None
+    library_root: Path | None = None
+    if root:
+        validated_root, root_err = validate_execute_path(root, must_exist=True, label="root")
+        if root_err:
+            return {"ok": False, "error": root_err, "results": []}
+        library_root = validated_root
+
     if library_root is None:
         for row in plan.duplicate_decisions:
             for candidate in [row.keeper_path, *row.discard_paths]:
@@ -82,16 +89,17 @@ def stage_approved_duplicates(
     delete_dir = library_root / "_delete-canidates"
     results: list[dict] = []
     executed_rows: list[ExecutedDelete] = []
+    batch_id = new_batch_id()
 
     for decision in plan.duplicate_decisions:
         for discard in decision.discard_paths:
-            src = Path(discard)
-            if not src.exists():
+            src, path_err = validate_execute_path(discard, must_exist=True)
+            if path_err or src is None:
                 results.append({
                     "dedup_key": decision.dedup_key,
                     "path": discard,
                     "ok": False,
-                    "error": "path not found",
+                    "error": path_err or "invalid path",
                 })
                 continue
 
@@ -112,22 +120,29 @@ def stage_approved_duplicates(
                     "staged_to": str(dst),
                 })
             else:
-                try:
-                    delete_dir.mkdir(parents=True, exist_ok=True)
-                    shutil.move(str(src), str(dst))
+                ok, move_err = guarded_move(
+                    src,
+                    dst,
+                    batch_id=batch_id,
+                    op="stage_duplicate",
+                    dry_run=False,
+                    meta={"dedup_key": decision.dedup_key, "stamp": stamp},
+                )
+                if ok:
                     results.append({
                         "dedup_key": decision.dedup_key,
                         "path": str(src),
                         "ok": True,
                         "dry_run": False,
                         "staged_to": str(dst),
+                        "batch_id": batch_id,
                     })
-                except OSError as exc:
+                else:
                     results.append({
                         "dedup_key": decision.dedup_key,
                         "path": str(src),
                         "ok": False,
-                        "error": str(exc),
+                        "error": move_err or "move failed",
                     })
                     continue
 
@@ -151,6 +166,7 @@ def stage_approved_duplicates(
         "dry_run": dry_run,
         "library_root": str(library_root),
         "delete_dir": str(delete_dir),
+        "batch_id": batch_id,
         "staged": ok_count,
         "failed": len(results) - ok_count,
         "results": results,

@@ -138,6 +138,7 @@ def peek_7z(archive: Path, seven_zip: Path, limit: int) -> tuple[list[str], str 
             errors="replace",
             timeout=180,
             check=False,
+            shell=False,
         )
         if proc.returncode != 0 and not proc.stdout.strip():
             err = (proc.stderr or proc.stdout or "").strip()

@@ -5,6 +5,7 @@ from __future__ import annotations
 import ipaddress
 import json
 import os
+import os.path
 import re
 import secrets
 import socket
@@ -48,7 +49,7 @@ _BLOCKED_NETS = (
     ipaddress.ip_network("fe80::/10"),
 )
 
-PUBLIC_HTTP_PATHS = frozenset({"/api/health", "/api/auth/token", "/api/security/library-roots"})
+PUBLIC_HTTP_PATHS = frozenset({"/api/health", "/api/auth/token"})
 
 
 class RateLimiter:
@@ -150,9 +151,22 @@ def normalize_stamp(stamp: str) -> str:
     return stamp
 
 
+def canonical_path(path: Path) -> Path:
+    """Resolve symlinks via realpath when the path exists; otherwise resolve logically."""
+    try:
+        if path.exists() or path.is_symlink():
+            return Path(os.path.realpath(path))
+    except OSError:
+        pass
+    try:
+        return path.expanduser().resolve()
+    except OSError:
+        return path.expanduser()
+
+
 def is_path_under(child: Path, parent: Path) -> bool:
     try:
-        child.resolve().relative_to(parent.resolve())
+        canonical_path(child).relative_to(canonical_path(parent))
         return True
     except (OSError, ValueError):
         return is_logical_path_under(child, parent)
@@ -174,31 +188,33 @@ def library_roots() -> list[Path]:
         roots = [Path(DEFAULT_LIBRARY_ROOT)]
     resolved: list[Path] = []
     for root in roots:
-        try:
-            resolved.append(root.expanduser().resolve())
-        except OSError:
-            resolved.append(root.expanduser())
+        resolved.append(canonical_path(root.expanduser()))
     return resolved
 
 
-def assert_library_path(raw: str, *, must_exist: bool = False, label: str = "path") -> Path:
+def _validate_library_path(raw: str, *, must_exist: bool = False, label: str = "path") -> Path:
     if not raw or not str(raw).strip():
-        raise HTTPException(status_code=400, detail=f"{label} is required")
-    path = Path(str(raw)).expanduser()
-    if path.exists():
-        try:
-            path = path.resolve()
-        except OSError as exc:
-            raise HTTPException(status_code=400, detail=f"Invalid {label}: {exc}") from exc
+        raise ValueError(f"{label} is required")
+    path = canonical_path(Path(str(raw)).expanduser())
     if not any(is_path_under(path, root) for root in library_roots()):
         audit("library_path_denied", path=str(path), label=label)
-        raise HTTPException(
-            status_code=403,
-            detail=f"{label} must be under a configured library root",
-        )
+        raise ValueError(f"{label} must be under a configured library root")
     if must_exist and not path.exists():
-        raise HTTPException(status_code=404, detail=f"{label} not found: {path}")
+        raise ValueError(f"{label} not found: {path}")
     return path
+
+
+def ensure_library_path(raw: str, *, must_exist: bool = False, label: str = "path") -> Path:
+    """Validate a path against library roots — raises ValueError (for execute modules)."""
+    return _validate_library_path(raw, must_exist=must_exist, label=label)
+
+
+def assert_library_path(raw: str, *, must_exist: bool = False, label: str = "path") -> Path:
+    try:
+        return _validate_library_path(raw, must_exist=must_exist, label=label)
+    except ValueError as exc:
+        status = 404 if "not found" in str(exc) else 400 if "required" in str(exc) else 403
+        raise HTTPException(status_code=status, detail=str(exc)) from exc
 
 
 def assert_library_paths(paths: list[str], *, must_exist: bool = False, label: str = "path") -> list[Path]:
@@ -227,10 +243,10 @@ def _sanitize_relative_dest(relative_dest: str, library_root: Path) -> str:
     if any(part == ".." for part in parts):
         raise ValueError("destination cannot contain '..'")
     try:
-        dest = (library_root.resolve() / Path(*parts)).resolve()
+        dest = canonical_path(library_root / Path(*parts))
     except OSError as exc:
         raise ValueError(f"Invalid destination: {exc}") from exc
-    if not is_path_under(dest, library_root.resolve()):
+    if not is_path_under(dest, library_root):
         raise ValueError("destination escapes library root")
     return "/".join(parts)
 

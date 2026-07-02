@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
 from api import report_loader
+from api.execute_paths import validate_execute_path
+from audiotheca.transaction_ledger import guarded_move, new_batch_id
 import scene_feedback as scene_fb
 
 
@@ -34,11 +35,30 @@ def execute_approved_renames(
         }
 
     results: list[dict] = []
+    batch_id = new_batch_id()
 
     for row in targets:
-        src = Path(row.source_path)
+        src, src_err = validate_execute_path(row.source_path, must_exist=True)
+        if src_err or src is None:
+            results.append({
+                "path": row.source_path,
+                "scene_id": row.scene_id,
+                "ok": False,
+                "error": src_err or "invalid source path",
+            })
+            continue
+
         proposed = scene_fb.get_proposed_name(row.source_path, row.proposed_name, store)
         dest = src.parent / proposed
+        _, dest_err = validate_execute_path(str(dest), must_exist=False, label="destination")
+        if dest_err:
+            results.append({
+                "path": row.source_path,
+                "scene_id": row.scene_id,
+                "ok": False,
+                "error": dest_err,
+            })
+            continue
 
         if not src.exists():
             results.append({
@@ -70,8 +90,15 @@ def execute_approved_renames(
             })
             continue
 
-        try:
-            shutil.move(str(src), str(dest))
+        ok, move_err = guarded_move(
+            src,
+            dest,
+            batch_id=batch_id,
+            op="scene_rename",
+            dry_run=False,
+            meta={"scene_id": row.scene_id, "stamp": stamp},
+        )
+        if ok:
             results.append({
                 "path": row.source_path,
                 "scene_id": row.scene_id,
@@ -79,13 +106,14 @@ def execute_approved_renames(
                 "dry_run": False,
                 "proposed_name": proposed,
                 "destination": str(dest),
+                "batch_id": batch_id,
             })
-        except OSError as exc:
+        else:
             results.append({
                 "path": row.source_path,
                 "scene_id": row.scene_id,
                 "ok": False,
-                "error": str(exc),
+                "error": move_err or "move failed",
             })
 
     ok_count = sum(1 for row in results if row.get("ok"))
@@ -93,6 +121,7 @@ def execute_approved_renames(
         "ok": ok_count > 0,
         "dry_run": dry_run,
         "stamp": stamp,
+        "batch_id": batch_id,
         "renamed": ok_count,
         "failed": len(results) - ok_count,
         "results": results,

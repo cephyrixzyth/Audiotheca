@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
 from api import report_loader
 from api.duplicate_execute import infer_library_root
+from api.execute_paths import validate_execute_path
+from audiotheca.transaction_ledger import guarded_move, new_batch_id
 import restructure_feedback as rst_fb
 
 
@@ -35,11 +36,27 @@ def execute_approved_sections(
             "results": [],
         }
 
-    library_root: Path | None = Path(root) if root else None
+    library_root: Path | None = None
+    if root:
+        validated_root, root_err = validate_execute_path(root, must_exist=True, label="root")
+        if root_err:
+            return {"ok": False, "error": root_err, "results": []}
+        library_root = validated_root
+
     results: list[dict] = []
+    batch_id = new_batch_id()
 
     for row in targets:
-        src = Path(row.current_path)
+        src, src_err = validate_execute_path(row.current_path, must_exist=True)
+        if src_err or src is None:
+            results.append({
+                "path": row.current_path,
+                "section": row.section,
+                "ok": False,
+                "error": src_err or "invalid source path",
+            })
+            continue
+
         if library_root is None:
             library_root = infer_library_root(src)
 
@@ -65,6 +82,16 @@ def execute_approved_sections(
             store,
         )
 
+        _, dest_err = validate_execute_path(str(dest), must_exist=False, label="destination")
+        if dest_err:
+            results.append({
+                "path": row.current_path,
+                "section": row.section,
+                "ok": False,
+                "error": dest_err,
+            })
+            continue
+
         if not src.exists():
             results.append({
                 "path": row.current_path,
@@ -74,7 +101,7 @@ def execute_approved_sections(
             })
             continue
 
-        if dest.exists() and src.resolve() != dest.resolve():
+        if dest.exists() and src != dest:
             results.append({
                 "path": row.current_path,
                 "section": row.section,
@@ -95,12 +122,15 @@ def execute_approved_sections(
             })
             continue
 
-        try:
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            if src.is_dir():
-                shutil.move(str(src), str(dest))
-            else:
-                shutil.move(str(src), str(dest))
+        ok, move_err = guarded_move(
+            src,
+            dest,
+            batch_id=batch_id,
+            op="restructure",
+            dry_run=False,
+            meta={"section": row.section, "stamp": stamp},
+        )
+        if ok:
             results.append({
                 "path": row.current_path,
                 "section": row.section,
@@ -108,13 +138,14 @@ def execute_approved_sections(
                 "dry_run": False,
                 "destination": str(dest),
                 "relative_dest": rel,
+                "batch_id": batch_id,
             })
-        except OSError as exc:
+        else:
             results.append({
                 "path": row.current_path,
                 "section": row.section,
                 "ok": False,
-                "error": str(exc),
+                "error": move_err or "move failed",
             })
 
     ok_count = sum(1 for row in results if row.get("ok"))
@@ -124,6 +155,7 @@ def execute_approved_sections(
         "stamp": stamp,
         "approved_sections": sorted(approved),
         "library_root": str(library_root) if library_root else None,
+        "batch_id": batch_id,
         "moved": ok_count,
         "failed": len(results) - ok_count,
         "results": results,

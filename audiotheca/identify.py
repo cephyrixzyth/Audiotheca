@@ -37,6 +37,7 @@ from progress import PhaseProgress, tqdm_bar
 from vendor_db import VENDOR_DATABASE
 
 from audiotheca.config import *  # noqa: F403
+from audiotheca.binary_arch import inspect_binary, merge_arch_flags
 from audiotheca.helpers import _archive_stem, _limit_walk, _squash, _walk_depth
 from audiotheca.optional_deps import HAS_FUZZ, HAS_PEFILE, fuzz, pefile
 
@@ -239,6 +240,10 @@ class IdentifyMixin:
             "nfo_candidates": [],
             "top_files": [],
             "largest_files": [],
+            "arch_x86": False,
+            "arch_x64": False,
+            "arch_arm64": False,
+            "legacy_32bit": False,
         }
         largest_heap: list[tuple[int, str, str]] = []
 
@@ -381,6 +386,10 @@ class IdentifyMixin:
 
         largest_heap.sort(key=lambda row: row[0], reverse=True)
         info["largest_files"] = [(size, rel_name) for size, _name, rel_name in largest_heap[:8]]
+
+        for _size, pe_path in info["pe_candidates"][:6]:
+            merge_arch_flags(info, inspect_binary(Path(pe_path)))
+
         return info
 
     @staticmethod

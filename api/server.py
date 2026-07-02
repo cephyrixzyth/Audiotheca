@@ -7,6 +7,7 @@ Dev:  uvicorn api.server:app --reload --port 8787
 
 from __future__ import annotations
 
+import asyncio
 import re
 import subprocess
 import sys
@@ -53,15 +54,31 @@ import vendor_gaps as vg
 from api.paths import report_dir
 from contextlib import asynccontextmanager
 
+_library_watcher = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global _library_watcher
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
     )
     api_service.startup_checks()
+    from audiotheca.watcher import LibraryWatcher, watcher_enabled
+
+    if watcher_enabled():
+        _library_watcher = LibraryWatcher(
+            security.library_roots(),
+            on_change=lambda path: security.audit("library_file_changed", path=path),
+        )
+        if not _library_watcher.start():
+            logging.warning("Library watcher requested but watchdog is not installed")
+            _library_watcher = None
     yield
+    if _library_watcher is not None:
+        _library_watcher.stop()
+        _library_watcher = None
 
 
 app = FastAPI(title="Audiotheca API", version="0.2.0", lifespan=lifespan)
@@ -731,6 +748,7 @@ def scene_approve_rename(stamp: str, body: dict = Body(...)) -> dict[str, object
     source_path = str(body.get("source_path", "")).strip()
     if not source_path:
         raise HTTPException(status_code=400, detail="source_path is required")
+    security.assert_library_path(source_path, label="source_path")
     try:
         scene_fb.approve_rename(
             stamp=stamp,
@@ -796,11 +814,11 @@ def scene_flag_missing_part01(stamp: str, body: dict = Body(...)) -> dict[str, o
 
 
 @app.post("/api/runs/{stamp}/scene-renames/execute")
-def execute_scene_renames(stamp: str, body: dict = Body(default_factory=dict)) -> dict[str, object]:
+async def execute_scene_renames(stamp: str, body: dict = Body(default_factory=dict)) -> dict[str, object]:
     dry_run = security.parse_dry_run(body.get("dry_run"), default=True)
     security.require_live_confirmation(body, dry_run=dry_run, action="scene renames")
     security.audit("execute_scene_renames", stamp=stamp, dry_run=dry_run)
-    return execute_approved_renames(stamp, dry_run=dry_run)
+    return await asyncio.to_thread(execute_approved_renames, stamp, dry_run=dry_run)
 
 
 @app.get("/api/runs/{stamp}/archive-peek")
@@ -838,6 +856,7 @@ def archive_reject_verdict(stamp: str, body: dict = Body(...)) -> dict[str, obje
     archive_path = str(body.get("archive_path", "")).strip()
     if not archive_path:
         raise HTTPException(status_code=400, detail="archive_path is required")
+    security.assert_library_path(archive_path, label="archive_path")
     arch_feedback.reject_verdict(
         archive_path=archive_path,
         reason=str(body.get("reason", "not_redundant")),
@@ -854,6 +873,7 @@ def archive_confirm_delete(stamp: str, body: dict = Body(...)) -> dict[str, obje
     archive_path = str(body.get("archive_path", "")).strip()
     if not archive_path:
         raise HTTPException(status_code=400, detail="archive_path is required")
+    security.assert_library_path(archive_path, label="archive_path")
     try:
         arch_feedback.confirm_delete(
             archive_path=archive_path,
@@ -873,6 +893,7 @@ def archive_set_keeper(stamp: str, body: dict = Body(...)) -> dict[str, object]:
     keeper = str(body.get("keeper", "")).strip()
     if not archive_path or not keeper:
         raise HTTPException(status_code=400, detail="archive_path and keeper are required")
+    security.assert_library_path(archive_path, label="archive_path")
     try:
         arch_feedback.set_keeper(
             archive_path=archive_path,
@@ -887,17 +908,17 @@ def archive_set_keeper(stamp: str, body: dict = Body(...)) -> dict[str, object]:
 
 
 @app.post("/api/runs/{stamp}/archive-peek/execute")
-def execute_archive_staging(stamp: str, body: dict = Body(default_factory=dict)) -> dict[str, object]:
+async def execute_archive_staging(stamp: str, body: dict = Body(default_factory=dict)) -> dict[str, object]:
     dry_run, root = _parse_live_execute(body, action="archive staging")
     security.audit("execute_archive_staging", stamp=stamp, dry_run=dry_run, root=root)
-    return stage_confirmed_archives(stamp, dry_run=dry_run, root=root)
+    return await asyncio.to_thread(stage_confirmed_archives, stamp, dry_run=dry_run, root=root)
 
 
 @app.post("/api/runs/{stamp}/restructure/execute")
-def execute_restructure(stamp: str, body: dict = Body(default_factory=dict)) -> dict[str, object]:
+async def execute_restructure(stamp: str, body: dict = Body(default_factory=dict)) -> dict[str, object]:
     dry_run, root = _parse_live_execute(body, action="restructure")
     security.audit("execute_restructure", stamp=stamp, dry_run=dry_run, root=root)
-    return execute_approved_sections(stamp, dry_run=dry_run, root=root)
+    return await asyncio.to_thread(execute_approved_sections, stamp, dry_run=dry_run, root=root)
 
 
 @app.get("/api/runs/{stamp}/decisions")
@@ -964,10 +985,15 @@ def add_manual_duplicate(stamp: str, body: dict = Body(...)) -> dict[str, object
 
 
 @app.post("/api/runs/{stamp}/duplicates/execute")
-def execute_duplicate_staging(stamp: str, body: dict = Body(default_factory=dict)) -> dict[str, object]:
+async def execute_duplicate_staging(stamp: str, body: dict = Body(default_factory=dict)) -> dict[str, object]:
     dry_run, root = _parse_live_execute(body, action="duplicate staging")
     security.audit("execute_duplicate_staging", stamp=stamp, dry_run=dry_run, root=root)
-    return duplicate_execute.stage_approved_duplicates(stamp, dry_run=dry_run, root=root)
+    return await asyncio.to_thread(
+        duplicate_execute.stage_approved_duplicates,
+        stamp,
+        dry_run=dry_run,
+        root=root,
+    )
 
 
 @app.get("/api/runs/{stamp}/decisions/download")
@@ -1168,11 +1194,11 @@ def open_in_explorer(body: dict = Body(...)) -> dict[str, bool]:
     resolved = str(target.resolve())
     security.audit("open_in_explorer", path=resolved)
     if sys.platform == "win32":
-        subprocess.Popen(["explorer", "/select,", resolved])  # noqa: S603
+        subprocess.Popen(["explorer", "/select,", resolved], shell=False)  # noqa: S603
     elif sys.platform == "darwin":
-        subprocess.Popen(["open", "-R", resolved])  # noqa: S603
+        subprocess.Popen(["open", "-R", resolved], shell=False)  # noqa: S603
     else:
-        subprocess.Popen(["xdg-open", str(target.parent)])  # noqa: S603
+        subprocess.Popen(["xdg-open", str(target.parent)], shell=False)  # noqa: S603
     return {"ok": True}
 
 
@@ -1284,7 +1310,7 @@ def scan_options_help() -> dict[str, object]:
 
 
 @app.post("/api/security/scan")
-def security_scan(body: dict = Body(...)) -> dict[str, object]:
+async def security_scan(body: dict = Body(...)) -> dict[str, object]:
     import malware_scanner as ms
 
     root_raw = body.get("root")
@@ -1293,16 +1319,21 @@ def security_scan(body: dict = Body(...)) -> dict[str, object]:
     root = Path(str(security.assert_library_path(str(root_raw), label="root")))
     use_defender = bool(body.get("use_defender"))
     max_files = int(body.get("max_files") or 25_000)
-    findings = ms.scan_tree(root, max_files=max_files, use_defender=use_defender)
-    report_path = ms.write_scan_report(root, findings)
-    security.audit("malware_scan", root=str(root), findings=len(findings))
-    return {
-        "ok": True,
-        "root": str(root),
-        "findings": findings,
-        "total": len(findings),
-        "report": report_path.name,
-    }
+
+    def _run_scan() -> dict[str, object]:
+        findings = ms.scan_tree(root, max_files=max_files, use_defender=use_defender)
+        report_path = ms.write_scan_report(root, findings)
+        return {
+            "ok": True,
+            "root": str(root),
+            "findings": findings,
+            "total": len(findings),
+            "report": report_path.name,
+        }
+
+    result = await asyncio.to_thread(_run_scan)
+    security.audit("malware_scan", root=str(root), findings=result["total"])
+    return result
 
 
 @app.get("/api/security/latest")
@@ -1331,7 +1362,7 @@ def security_lookup(hash: str = Query(..., min_length=64, max_length=64)) -> dic
 
 
 @app.post("/api/security/quarantine")
-def security_quarantine(body: dict = Body(...)) -> dict[str, object]:
+async def security_quarantine(body: dict = Body(...)) -> dict[str, object]:
     import malware_scanner as ms
 
     if not body.get("confirm_live"):
@@ -1344,13 +1375,13 @@ def security_quarantine(body: dict = Body(...)) -> dict[str, object]:
         raise HTTPException(status_code=400, detail="root is required")
     root = Path(str(security.assert_library_path(str(root_raw), label="root")))
     paths = [str(security.assert_library_path(str(p), label="path")) for p in paths_raw]
-    results = ms.quarantine_paths(paths, root=root)
+    results = await asyncio.to_thread(ms.quarantine_paths, paths, root=root)
     security.audit("malware_quarantine", count=len(paths))
     return {"ok": True, "results": results}
 
 
 @app.post("/api/security/delete")
-def security_delete(body: dict = Body(...)) -> dict[str, object]:
+async def security_delete(body: dict = Body(...)) -> dict[str, object]:
     import malware_scanner as ms
 
     if not body.get("confirm_live"):
@@ -1359,9 +1390,22 @@ def security_delete(body: dict = Body(...)) -> dict[str, object]:
     if not isinstance(paths_raw, list) or not paths_raw:
         raise HTTPException(status_code=400, detail="paths list required")
     paths = [str(security.assert_library_path(str(p), label="path")) for p in paths_raw]
-    results = ms.delete_paths(paths)
+    results = await asyncio.to_thread(ms.delete_paths, paths)
     security.audit("malware_delete", count=len(paths))
     return {"ok": True, "results": results}
+
+
+@app.post("/api/transactions/rollback")
+async def rollback_transaction_batch(body: dict = Body(...)) -> dict[str, object]:
+    from audiotheca.transaction_ledger import rollback_batch
+
+    batch_id = str(body.get("batch_id", "")).strip()
+    if not batch_id:
+        raise HTTPException(status_code=400, detail="batch_id is required")
+    dry_run = security.parse_dry_run(body.get("dry_run"), default=True)
+    security.require_live_confirmation(body, dry_run=dry_run, action="transaction rollback")
+    security.audit("transaction_rollback", batch_id=batch_id, dry_run=dry_run)
+    return await asyncio.to_thread(rollback_batch, batch_id, dry_run=dry_run)
 
 
 @app.get("/api/system/metrics")

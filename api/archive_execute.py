@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
 import archive_feedback as arch_fb
 from archive_peek import multipart_key
 from api.duplicate_execute import infer_library_root
+from api.execute_paths import validate_execute_path
+from audiotheca.transaction_ledger import guarded_move, new_batch_id
 from gen_archive_delete_candidates import expand_multipart_set
 
 
@@ -26,8 +27,15 @@ def stage_confirmed_archives(
             "results": [],
         }
 
-    library_root: Path | None = Path(root) if root else None
+    library_root: Path | None = None
+    if root:
+        validated_root, root_err = validate_execute_path(root, must_exist=True, label="root")
+        if root_err:
+            return {"ok": False, "error": root_err, "results": []}
+        library_root = validated_root
+
     results: list[dict] = []
+    batch_id = new_batch_id()
 
     for archive_path_str in confirmed:
         if arch_fb.is_archive_rejected(archive_path_str, store):
@@ -38,7 +46,15 @@ def stage_confirmed_archives(
             })
             continue
 
-        archive_path = Path(archive_path_str)
+        archive_path, path_err = validate_execute_path(archive_path_str, must_exist=True)
+        if path_err or archive_path is None:
+            results.append({
+                "path": archive_path_str,
+                "ok": False,
+                "error": path_err or "invalid path",
+            })
+            continue
+
         if library_root is None:
             library_root = infer_library_root(archive_path)
 
@@ -69,6 +85,15 @@ def stage_confirmed_archives(
 
         delete_dir = library_root / "_delete-canidates"
         for part_path in expand_multipart_set(archive_path):
+            validated_part, part_err = validate_execute_path(str(part_path), must_exist=True)
+            if part_err or validated_part is None:
+                results.append({
+                    "path": str(part_path),
+                    "ok": False,
+                    "error": part_err or "invalid path",
+                })
+                continue
+            part_path = validated_part
             dst = delete_dir / part_path.name
             if dst.exists():
                 stem = part_path.stem
@@ -86,21 +111,28 @@ def stage_confirmed_archives(
                     "multipart": multipart_key(part_path.name) is not None,
                 })
             else:
-                try:
-                    delete_dir.mkdir(parents=True, exist_ok=True)
-                    shutil.move(str(part_path), str(dst))
+                ok, move_err = guarded_move(
+                    part_path,
+                    dst,
+                    batch_id=batch_id,
+                    op="stage_archive",
+                    dry_run=False,
+                    meta={"stamp": stamp},
+                )
+                if ok:
                     results.append({
                         "path": str(part_path),
                         "ok": True,
                         "dry_run": False,
                         "staged_to": str(dst),
                         "multipart": multipart_key(part_path.name) is not None,
+                        "batch_id": batch_id,
                     })
-                except OSError as exc:
+                else:
                     results.append({
                         "path": str(part_path),
                         "ok": False,
-                        "error": str(exc),
+                        "error": move_err or "move failed",
                     })
 
     ok_count = sum(1 for row in results if row.get("ok"))
@@ -108,6 +140,7 @@ def stage_confirmed_archives(
         "ok": ok_count > 0,
         "dry_run": dry_run,
         "stamp": stamp,
+        "batch_id": batch_id,
         "library_root": str(library_root) if library_root else None,
         "delete_dir": str(library_root / "_delete-canidates") if library_root else None,
         "staged": ok_count,
