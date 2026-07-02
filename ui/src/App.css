@@ -1743,3 +1743,73 @@ tr.inv-vendor-set {
   margin: 0;
 }
 
+/* --- Environment panel --- */
+.environment-panel .env-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.env-badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
+
+.env-badge.env-ok {
+  color: var(--success);
+  border-color: var(--accent-dim);
+}
+
+.env-badge.env-missing,
+.env-badge.env-degraded {
+  color: #ffb4b4;
+  border-color: #7a3030;
+}
+
+.env-badge.env-skipped {
+  color: var(--text-muted);
+}
+
+.env-hints {
+  margin: 0.35rem 0 0;
+  padding-left: 1rem;
+  font-size: 0.72rem;
+}
+
+.env-path-value {
+  font-size: 0.72rem;
+  word-break: break-all;
+}
+
+.env-manifest-editor {
+  width: 100%;
+  margin-top: 0.75rem;
+  font-family: ui-monospace, monospace;
+  font-size: 0.72rem;
+  min-height: 12rem;
+}
+
+.env-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.78rem;
+}
+
+.env-log li {
+  padding: 0.25rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.env-row-actions {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+

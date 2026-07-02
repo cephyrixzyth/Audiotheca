@@ -19,6 +19,7 @@ import type {
 } from "../types";
 import { formatCompact, formatDiskFree, formatGb, formatPct } from "../utils/format";
 import { ReorderableSections } from "./ReorderableSections";
+import { EnvironmentSummaryWidget } from "./EnvironmentPanel";
 
 interface Props {
   summary: RunSummary;
@@ -348,29 +349,36 @@ export function Dashboard({ summary, runs, onNavigate }: Props) {
         id: "host-metrics",
         title: "Host metrics",
         subtitle: metrics?.disk_path ?? libraryRoot,
-        content: metrics ? (
-          <div className="gauge-stack">
-            {metrics.cpu_percent != null && (
-              <GaugeBar label="CPU" value={metrics.cpu_percent} detail={formatPct(metrics.cpu_percent, 0)} />
+        content: (
+          <>
+            {metrics ? (
+              <div className="gauge-stack">
+                {metrics.cpu_percent != null && (
+                  <GaugeBar label="CPU" value={metrics.cpu_percent} detail={formatPct(metrics.cpu_percent, 0)} />
+                )}
+                {metrics.ram_used_pct != null && (
+                  <GaugeBar
+                    label="RAM"
+                    value={metrics.ram_used_pct}
+                    detail={`${formatGb(metrics.ram_used_gb, 1)} / ${formatGb(metrics.ram_total_gb, 1)}`}
+                    tone={metrics.ram_used_pct > 85 ? "warning" : "accent"}
+                  />
+                )}
+                <GaugeBar
+                  label="Disk"
+                  value={metrics.disk_used_pct ?? 0}
+                  detail={formatDiskFree(metrics)}
+                  tone={(metrics.disk_free_pct ?? 100 - (metrics.disk_used_pct ?? 0)) < 10 ? "danger" : "accent"}
+                />
+                {!metrics.psutil && <p className="count-muted">Install psutil for CPU/RAM metrics</p>}
+              </div>
+            ) : (
+              <p className="count-muted">Loading metrics…</p>
             )}
-            {metrics.ram_used_pct != null && (
-              <GaugeBar
-                label="RAM"
-                value={metrics.ram_used_pct}
-                detail={`${formatGb(metrics.ram_used_gb, 1)} / ${formatGb(metrics.ram_total_gb, 1)}`}
-                tone={metrics.ram_used_pct > 85 ? "warning" : "accent"}
-              />
-            )}
-            <GaugeBar
-              label="Disk"
-              value={metrics.disk_used_pct ?? 0}
-              detail={formatDiskFree(metrics)}
-              tone={(metrics.disk_free_pct ?? 100 - (metrics.disk_used_pct ?? 0)) < 10 ? "danger" : "accent"}
-            />
-            {!metrics.psutil && <p className="count-muted">Install psutil for CPU/RAM metrics</p>}
-          </div>
-        ) : (
-          <p className="count-muted">Loading metrics…</p>
+            <div className="stat-grid compact" style={{ marginTop: "0.75rem" }}>
+              <EnvironmentSummaryWidget onNavigate={() => onNavigate?.("environment")} />
+            </div>
+          </>
         ),
       },
       {

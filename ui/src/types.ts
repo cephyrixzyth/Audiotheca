@@ -341,7 +341,57 @@ export type TabId =
   | "skipped"
   | "vendors"
   | "space-recovery"
-  | "security";
+  | "security"
+  | "environment";
+
+export type DependencyCategory = "required" | "recommended" | "optional";
+export type DependencyStatusKind = "ok" | "missing" | "degraded" | "skipped";
+
+export interface EnvironmentDependency {
+  id: string;
+  name: string;
+  category: DependencyCategory;
+  status: DependencyStatusKind;
+  detail: string;
+  path?: string | null;
+  version?: string | null;
+  install_hints: string[];
+  repair_action?: string | null;
+}
+
+export interface EnvironmentSummary {
+  total: number;
+  ok: number;
+  missing: number;
+  degraded: number;
+  required_missing: number;
+  recommended_missing: number;
+  healthy: boolean;
+}
+
+export interface EnvironmentPayload {
+  platform: string;
+  checked_at: string;
+  workspace: string;
+  manifest_path: string;
+  dependencies: EnvironmentDependency[];
+  summary: EnvironmentSummary;
+  manifest: Record<string, unknown>;
+  recent_operations: Array<Record<string, unknown>>;
+  repair_actions: Record<string, string>;
+}
+
+export interface EnvironmentManifest {
+  version: number;
+  updated: string;
+  library_roots: string[];
+  tool_preferences: {
+    seven_zip?: string;
+    fpcalc_path?: string;
+  };
+  scheduled_checks_enabled?: boolean;
+  last_scheduled_check?: string | null;
+}
 
 export interface MalwareFinding {
   path: string;

@@ -8,6 +8,8 @@ Dev:  uvicorn api.server:app --reload --port 8787
 from __future__ import annotations
 
 import asyncio
+import logging
+import os
 import re
 import subprocess
 import sys
@@ -55,11 +57,24 @@ from api.paths import report_dir
 from contextlib import asynccontextmanager
 
 _library_watcher = None
+_env_check_task: asyncio.Task | None = None
+ENV_CHECK_INTERVAL_S = int(os.environ.get("AUDIOTHECA_ENV_CHECK_INTERVAL_S", "21600"))
+
+
+async def _environment_check_loop() -> None:
+    from audiotheca.environment import run_scheduled_check
+
+    while True:
+        await asyncio.sleep(ENV_CHECK_INTERVAL_S)
+        try:
+            await asyncio.to_thread(run_scheduled_check)
+        except Exception as exc:
+            logging.getLogger("audiotheca.api").warning("Scheduled environment check failed: %s", exc)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _library_watcher
+    global _library_watcher, _env_check_task
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
@@ -75,7 +90,15 @@ async def lifespan(app: FastAPI):
         if not _library_watcher.start():
             logging.warning("Library watcher requested but watchdog is not installed")
             _library_watcher = None
+    _env_check_task = asyncio.create_task(_environment_check_loop())
     yield
+    if _env_check_task is not None:
+        _env_check_task.cancel()
+        try:
+            await _env_check_task
+        except asyncio.CancelledError:
+            pass
+        _env_check_task = None
     if _library_watcher is not None:
         _library_watcher.stop()
         _library_watcher = None
@@ -135,6 +158,82 @@ def health() -> dict[str, object]:
     running = job_manager.running_job()
     running_snap = running.snapshot() if running else None
     return api_service.health_payload(running_job=running_snap)
+
+
+@app.get("/api/environment")
+def get_environment() -> dict[str, object]:
+    from audiotheca.environment import list_repair_actions, load_manifest, probe_environment, recent_operations
+
+    return {
+        **probe_environment(),
+        "manifest": load_manifest(),
+        "recent_operations": recent_operations(limit=15),
+        "repair_actions": list_repair_actions(),
+    }
+
+
+@app.post("/api/environment/repair")
+async def environment_repair(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from audiotheca.environment import run_repair
+
+    action = str(body.get("action", "")).strip()
+    if not action:
+        raise HTTPException(status_code=400, detail="action is required")
+    dry_run = security.parse_dry_run(body.get("dry_run"), default=True)
+    security.require_live_confirmation(body, dry_run=dry_run, action=f"environment repair ({action})")
+    security.audit("environment_repair", action=action, dry_run=dry_run)
+    return await asyncio.to_thread(run_repair, action, dry_run=dry_run)
+
+
+@app.post("/api/environment/repair-all")
+async def environment_repair_all(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from audiotheca.environment import repair_all
+
+    dry_run = security.parse_dry_run(body.get("dry_run"), default=True)
+    security.require_live_confirmation(body, dry_run=dry_run, action="environment repair-all")
+    security.audit("environment_repair_all", dry_run=dry_run)
+    return await asyncio.to_thread(repair_all, dry_run=dry_run)
+
+
+@app.get("/api/environment/manifest")
+def get_environment_manifest() -> dict[str, object]:
+    from audiotheca.environment import load_manifest
+
+    return load_manifest()
+
+
+@app.put("/api/environment/manifest")
+def put_environment_manifest(body: dict = Body(...)) -> dict[str, object]:
+    from audiotheca.environment import save_manifest
+
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="manifest body must be a JSON object")
+    security.audit("environment_manifest_update")
+    return save_manifest(body)
+
+
+@app.post("/api/environment/manifest/export")
+def export_environment_manifest() -> dict[str, object]:
+    from audiotheca.environment import export_manifest
+
+    return export_manifest()
+
+
+@app.post("/api/environment/manifest/import")
+def import_environment_manifest(body: dict = Body(...)) -> dict[str, object]:
+    from audiotheca.environment import import_manifest
+
+    manifest = body.get("manifest", body)
+    if not isinstance(manifest, dict):
+        raise HTTPException(status_code=400, detail="manifest must be a JSON object")
+    dry_run = security.parse_dry_run(body.get("dry_run"), default=False)
+    if not dry_run:
+        security.require_live_confirmation(body, dry_run=False, action="environment manifest import")
+    if dry_run:
+        return {"ok": True, "dry_run": True, "would_import": manifest}
+    security.audit("environment_manifest_import")
+    saved = import_manifest(manifest)
+    return {"ok": True, "manifest": saved}
 
 
 @app.get("/api/security/library-roots")

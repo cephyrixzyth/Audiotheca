@@ -898,3 +898,44 @@ export function deleteSecurityThreats(params: {
 }): Promise<{ ok: boolean; results: { path: string; status: string; detail?: string }[] }> {
   return postJson("/security/delete", params);
 }
+
+export function fetchEnvironment(): Promise<import("../types").EnvironmentPayload> {
+  return getJson("/environment");
+}
+
+export function fetchHealth(): Promise<{
+  status: string;
+  engine_version: string;
+  archive_tool: string | null;
+  environment?: import("../types").EnvironmentSummary;
+  warnings: string[];
+}> {
+  return getJson("/health");
+}
+
+export function repairEnvironment(params: {
+  action: string;
+  dry_run?: boolean;
+  confirm_live?: boolean;
+}): Promise<Record<string, unknown>> {
+  return postJson("/environment/repair", params);
+}
+
+export function repairAllEnvironment(params: {
+  dry_run?: boolean;
+  confirm_live?: boolean;
+}): Promise<Record<string, unknown>> {
+  return postJson("/environment/repair-all", params);
+}
+
+export function exportEnvironmentManifest(): Promise<Record<string, unknown>> {
+  return postJson("/environment/manifest/export", {});
+}
+
+export function importEnvironmentManifest(params: {
+  manifest: Record<string, unknown>;
+  dry_run?: boolean;
+  confirm_live?: boolean;
+}): Promise<Record<string, unknown>> {
+  return postJson("/environment/manifest/import", params);
+}
