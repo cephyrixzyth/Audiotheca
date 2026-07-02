@@ -13,6 +13,7 @@ import {
 } from "../api/client";
 import type { InvestigationItem } from "../types";
 import { useContextSidebar, useSidebarFilters } from "./ContextSidebar";
+import { HoverMenu } from "./HoverMenu";
 import { PathLink } from "./PathLink";
 
 interface Props {
@@ -423,15 +424,31 @@ export function InvestigationInbox({ stamp }: Props) {
                     <div className="path">{row.id_confidence}</div>
                     <div className="count-muted">{row.size_mb != null ? `${row.size_mb} MB` : ""}</div>
                   </td>
-                  <td className="inv-actions">
-                    <button
-                      type="button"
-                      className="keeper-btn"
-                      title="Override vendor for this item on the next scan"
-                      onClick={() => void handleSetVendor(row)}
+                  <td className="inv-actions row-actions-cell">
+                    <HoverMenu
+                      actions={[
+                        {
+                          id: "vendor",
+                          label: "Set vendor",
+                          onClick: () => void handleSetVendor(row),
+                        },
+                        {
+                          id: "parent",
+                          label: "Link parent",
+                          onClick: () => void handleLinkParent(row),
+                        },
+                        {
+                          id: "resolved",
+                          label: "Resolved",
+                          tone: "accent",
+                          onClick: () => void handleResolved(row),
+                        },
+                      ]}
                     >
-                      Set vendor
-                    </button>
+                      <span className="row-actions-trigger" aria-label="Actions">
+                        ⋮
+                      </span>
+                    </HoverMenu>
                     <select
                       className="reject-select"
                       defaultValue=""
@@ -453,22 +470,6 @@ export function InvestigationInbox({ stamp }: Props) {
                       ))}
                       <option value="__new__">+ New bucket…</option>
                     </select>
-                    <button
-                      type="button"
-                      className="keeper-btn"
-                      title="Mark as a component or sample belonging to a parent product"
-                      onClick={() => void handleLinkParent(row)}
-                    >
-                      Link parent
-                    </button>
-                    <button
-                      type="button"
-                      className="text-btn"
-                      title="False positive — remove from investigation without changing vendor"
-                      onClick={() => void handleResolved(row)}
-                    >
-                      Resolved
-                    </button>
                   </td>
                 </tr>
               );

@@ -153,7 +153,7 @@ export function useSectionOrder(layoutId: string, defaultOrder: string[]) {
   );
 
   const resetOrder = useCallback(() => {
-    commitOrder([...defaultOrder]);
+    setOrder(() => commitOrder([...defaultOrder]));
   }, [defaultOrder, commitOrder]);
 
   const orderedIds = useMemo(

@@ -15,6 +15,7 @@ import type { DuplicateGroup } from "../types";
 import { useLibraryRoot } from "../hooks/useLibraryRoot";
 import { PathLink } from "./PathLink";
 import { useContextSidebar } from "./ContextSidebar";
+import { HoverMenu } from "./HoverMenu";
 
 interface Props {
   stamp: string;
@@ -301,24 +302,18 @@ export function DuplicateReview({ stamp }: Props) {
                 <span className="badge ready">keeper set</span>
               )}
               {rejected && <span className="badge review">bad match</span>}
-              <select
-                className="reject-select"
-                defaultValue=""
-                onChange={(e) => {
-                  if (e.target.value) {
-                    void handleReject(group, e.target.value);
-                    e.target.value = "";
-                  }
-                }}
-                title="Mark as bad match"
+              <HoverMenu
+                actions={rejectReasons.map((reason) => ({
+                  id: reason,
+                  label: REJECT_LABELS[reason] ?? reason,
+                  tone: reason === "bad_match" ? "danger" : undefined,
+                  onClick: () => void handleReject(group, reason),
+                }))}
               >
-                <option value="">Bad match…</option>
-                {rejectReasons.map((reason) => (
-                  <option key={reason} value={reason}>
-                    {REJECT_LABELS[reason] ?? reason}
-                  </option>
-                ))}
-              </select>
+                <span className="row-actions-trigger" aria-label="Mark bad match">
+                  ⋮
+                </span>
+              </HoverMenu>
             </header>
             {group.members.map((member) => {
               const isKeeper = keepers[group.dedup_key] === member.full_path;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   approveSceneRename,
   executeSceneRenames,
@@ -9,6 +9,7 @@ import {
   rejectSceneRename,
 } from "../api/client";
 import type { SceneRenameItem } from "../types";
+import { useContextSidebar } from "./ContextSidebar";
 import { PathLink } from "./PathLink";
 
 interface Props {
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export function SceneRenames({ stamp }: Props) {
+  const { query } = useContextSidebar();
   const [items, setItems] = useState<SceneRenameItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [approved, setApproved] = useState<string[]>([]);
@@ -104,8 +106,23 @@ export function SceneRenames({ stamp }: Props) {
     );
   }
 
+  const visibleItems = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter(
+      (row) =>
+        row.scene_id.toLowerCase().includes(q) ||
+        row.proposed_name.toLowerCase().includes(q) ||
+        row.source_path.toLowerCase().includes(q) ||
+        (overrides[row.source_path] ?? "").toLowerCase().includes(q),
+    );
+  }, [items, query, overrides]);
+
   if (loading) return <div className="count-muted">Loading scene renames…</div>;
   if (items.length === 0) return <div className="empty">No scene rename plans for this run.</div>;
+  if (visibleItems.length === 0) {
+    return <div className="empty">No scene renames match your search.</div>;
+  }
 
   return (
     <div>
@@ -149,7 +166,7 @@ export function SceneRenames({ stamp }: Props) {
           </tr>
         </thead>
         <tbody>
-          {items.map((row) => {
+          {visibleItems.map((row) => {
             const isApproved = approved.includes(row.source_path);
             const isRejected = row.source_path in rejected;
             const displayName = overrides[row.source_path] ?? row.proposed_name;

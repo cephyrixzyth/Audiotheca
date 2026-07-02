@@ -88,6 +88,18 @@ export function useSidebarFilters(defs: SidebarFilterDef[]) {
   return { filters, setFilter };
 }
 
+const SEARCH_TABS = new Set<TabId>([
+  "scan",
+  "investigation",
+  "duplicates",
+  "restructure",
+  "archives",
+  "scan-audit",
+  "skipped",
+  "security",
+  "scene-renames",
+]);
+
 const TAB_HINTS: Partial<Record<TabId, string>> = {
   scan: "Filter progress log lines (phase names, paths, errors).",
   investigation: "Search items and groups by name, path, bucket, or reason.",
@@ -97,7 +109,12 @@ const TAB_HINTS: Partial<Record<TabId, string>> = {
   "scan-audit": "Search audit rows by vendor, path, or fingerprint.",
   skipped: "Search skipped paths and failure reasons.",
   security: "Filter findings by file name or path (after scan).",
+  environment: "Environment tab uses in-panel controls — no sidebar search.",
+  help: "Browse built-in guides for install, deploy, and daily use.",
   dashboard: "Search not available on Dashboard — use tab filters on data views.",
+  vendors: "Use in-panel vendor tools — sidebar search not used here.",
+  "scene-renames": "Filter by scene ID, proposed name, or source path.",
+  "space-recovery": "Use Space Recovery panel filters.",
 };
 
 export function ContextSidebar({ stamp }: { stamp?: string }) {
@@ -111,17 +128,23 @@ export function ContextSidebar({ stamp }: { stamp?: string }) {
         <span className="count-muted">Library dedupe &amp; routing</span>
       </div>
 
-      <label className="context-field">
-        <span className="context-label">Search</span>
-        <input
-          type="search"
-          className="field-input"
-          placeholder="Filter this view…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          title={TAB_HINTS[tab] ?? "Context search for the active tab"}
-        />
-      </label>
+      {SEARCH_TABS.has(tab) && (
+        <label className="context-field">
+          <span className="context-label">Search</span>
+          <input
+            type="search"
+            className="field-input"
+            placeholder="Filter this view…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            title={TAB_HINTS[tab] ?? "Context search for the active tab"}
+          />
+        </label>
+      )}
+
+      {!SEARCH_TABS.has(tab) && TAB_HINTS[tab] && (
+        <p className="count-muted context-search-hint">{TAB_HINTS[tab]}</p>
+      )}
 
       {filterDefs.length > 0 && (
         <div className="context-sidebar-section">

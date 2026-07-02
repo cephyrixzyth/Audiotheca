@@ -1,7 +1,8 @@
 import { useMemo, useState, type DragEvent, type ReactNode } from "react";
 import { isSpacerId, useSectionOrder } from "../hooks/useSectionOrder";
+import { useLayoutPresets } from "../hooks/useLayoutPresets";
 
-function bindWidgetDrag(
+function bindHandleDrag(
   sectionId: string,
   onDragStart: (id: string) => void,
   onDragEnd: () => void,
@@ -9,15 +10,34 @@ function bindWidgetDrag(
   return {
     draggable: true,
     onDragStart: (e: DragEvent) => {
-      if ((e.target as HTMLElement).closest("button, input, select, textarea, a, .no-drag")) {
-        e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", sectionId);
+      onDragStart(sectionId);
+    },
+    onDragEnd: (e: DragEvent) => {
+      e.stopPropagation();
+      onDragEnd();
+    },
+  };
+}
+
+function bindHeaderDrag(
+  sectionId: string,
+  onDragStart: (id: string) => void,
+  onDragEnd: () => void,
+) {
+  return {
+    draggable: true,
+    onDragStart: (e: DragEvent) => {
+      if ((e.target as HTMLElement).closest(".section-drag-handle, button, input, select, textarea, a")) {
         return;
       }
       e.dataTransfer.effectAllowed = "move";
       e.dataTransfer.setData("text/plain", sectionId);
       onDragStart(sectionId);
     },
-    onDragEnd,
+    onDragEnd: onDragEnd,
   };
 }
 
@@ -96,6 +116,8 @@ function DragControls({
   total,
   onMoveUp,
   onMoveDown,
+  onDragStart,
+  onDragEnd,
 }: {
   sectionId: string;
   title: string;
@@ -103,16 +125,18 @@ function DragControls({
   total: number;
   onMoveUp: (id: string) => void;
   onMoveDown: (id: string) => void;
-  onDragStart?: (id: string) => void;
-  onDragEnd?: () => void;
+  onDragStart: (id: string) => void;
+  onDragEnd: () => void;
 }) {
+  const handleDrag = bindHandleDrag(sectionId, onDragStart, onDragEnd);
   return (
     <div className="section-drag-controls" onClick={(e) => e.stopPropagation()}>
       <button
         type="button"
-        className="section-drag-handle no-drag"
+        className="section-drag-handle"
         title={`Drag panel to reorder: ${title}`}
         aria-label={`Drag handle ${title}`}
+        {...handleDrag}
       >
         ⠿
       </button>
@@ -241,7 +265,7 @@ function SectionShell({
   };
 
   if (layout === "grid") {
-    const dragProps = bindWidgetDrag(section.id, onDragStart, onDragEnd);
+    const dragProps = bindHeaderDrag(section.id, onDragStart, onDragEnd);
     return (
       <section
         className={`dash-panel span-${section.span ?? 1} reorder-section ${dragState}${fullWidth}`.trim()}
@@ -275,7 +299,7 @@ function SectionShell({
     );
   }
 
-  const dragProps = bindWidgetDrag(section.id, onDragStart, onDragEnd);
+  const dragProps = bindHeaderDrag(section.id, onDragStart, onDragEnd);
   return (
     <section className={`reorder-section stack-section ${dragState}${fullWidth}`.trim()} {...handleProps}>
       <header className="reorder-section-header compact-header widget-drag-surface" {...dragProps}>
@@ -322,9 +346,14 @@ export function ReorderableSections({
     reorder,
     reorderAfter,
     insertSpacerAfter,
+    removeSpacer,
     resetOrder,
     applyOrder,
   } = useSectionOrder(layoutId, defaultOrder);
+  const { list: listPresets, save: savePreset, load: loadPreset, remove: removePreset } =
+    useLayoutPresets(layoutId);
+  const [presetName, setPresetName] = useState("");
+  const [presetMsg, setPresetMsg] = useState<string | null>(null);
 
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
@@ -422,13 +451,32 @@ export function ReorderableSections({
 
   function renderBlock(block: RenderBlock) {
     if (block.kind === "gap") {
-      return <div key={block.id} className="reorder-gap-space" aria-hidden title="Empty space" />;
+      const gapDrag = bindHandleDrag(block.id, setDragId, () => {
+        setDragId(null);
+        setOverId(null);
+        setDropSlot(null);
+      });
+      return (
+        <div key={block.id} className="reorder-gap-space" title="Empty space — drag ⠿ or click × to remove">
+          <button type="button" className="section-drag-handle gap-handle" aria-label="Drag space tile" {...gapDrag}>
+            ⠿
+          </button>
+          <button
+            type="button"
+            className="section-remove-btn"
+            title="Remove space tile"
+            onClick={() => removeSpacer(block.id)}
+          >
+            ×
+          </button>
+        </div>
+      );
     }
 
     if (block.kind === "group") {
       const firstId = block.sections[0]?.id ?? block.id;
       const idx = blockIndexOf(firstId);
-      const dragProps = bindWidgetDrag(firstId, setDragId, () => {
+      const dragProps = bindHeaderDrag(firstId, setDragId, () => {
         setDragId(null);
         setOverId(null);
         setDropSlot(null);
@@ -497,6 +545,39 @@ export function ReorderableSections({
     );
   }
 
+  function wrapClass(block: RenderBlock): string {
+    if (layout !== "grid") return "reorder-item-wrap";
+    if (block.kind === "section") {
+      if (block.section.fullWidth) return "reorder-item-wrap wrap-full";
+      if ((block.section.span ?? 1) >= 2) return "reorder-item-wrap wrap-span-2";
+    }
+    if (block.kind === "group") return "reorder-item-wrap wrap-full";
+    return "reorder-item-wrap";
+  }
+
+  function handleSavePreset() {
+    const name = presetName.trim();
+    if (!name) return;
+    savePreset(name, orderedIds, collapsed);
+    setPresetMsg(`Saved layout “${name}”`);
+    setPresetName("");
+  }
+
+  function handleLoadPreset(name: string) {
+    const snap = loadPreset(name);
+    if (!snap) return;
+    applyOrder(snap.order);
+    setCollapsed(snap.collapsed);
+    try {
+      localStorage.setItem(`audiotheca.collapsed.${layoutId}`, JSON.stringify(snap.collapsed));
+    } catch {
+      /* ignore */
+    }
+    setPresetMsg(`Loaded layout “${name}”`);
+  }
+
+  const presetNames = listPresets();
+
   return (
     <div className="reorderable-layout">
       <div className="reorderable-hint">
@@ -512,6 +593,59 @@ export function ReorderableSections({
           </button>
         </div>
       </div>
+      <div className="layout-preset-bar">
+        <input
+          type="text"
+          className="field-input layout-preset-name"
+          placeholder="Layout preset name…"
+          value={presetName}
+          onChange={(e) => setPresetName(e.target.value)}
+        />
+        <button type="button" className="text-btn" onClick={handleSavePreset} disabled={!presetName.trim()}>
+          Save layout
+        </button>
+        {presetNames.length > 0 && (
+          <select
+            className="field-input layout-preset-select"
+            defaultValue=""
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val) handleLoadPreset(val);
+              e.target.value = "";
+            }}
+          >
+            <option value="">Load layout…</option>
+            {presetNames.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        )}
+        {presetNames.length > 0 && (
+          <select
+            className="field-input layout-preset-select"
+            defaultValue=""
+            title="Delete a saved layout"
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val && window.confirm(`Delete layout preset “${val}”?`)) {
+                removePreset(val);
+                setPresetMsg(`Deleted “${val}”`);
+              }
+              e.target.value = "";
+            }}
+          >
+            <option value="">Delete layout…</option>
+            {presetNames.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+      {presetMsg && <p className="count-muted layout-preset-msg">{presetMsg}</p>}
       <div className={containerClass}>
         {blocks.map((block, blockIndex) => {
           const anchorId =
@@ -522,7 +656,7 @@ export function ReorderableSections({
                 : block.section.id;
           const slotKey = `before-${anchorId}`;
           return (
-            <div key={`wrap-${anchorId}-${blockIndex}`} className="reorder-item-wrap">
+            <div key={`wrap-${anchorId}-${blockIndex}`} className={wrapClass(block)}>
               <DropSlot
                 active={dropSlot === slotKey}
                 onDragOver={() => setDropSlot(slotKey)}

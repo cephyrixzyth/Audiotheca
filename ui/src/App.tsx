@@ -14,6 +14,8 @@ import { SceneRenames } from "./components/SceneRenames";
 import { SpaceRecovery } from "./components/SpaceRecovery";
 import { MalwarePanel } from "./components/MalwarePanel";
 import { EnvironmentPanel } from "./components/EnvironmentPanel";
+import { HelpPanel } from "./components/HelpPanel";
+import { ProcessBanner } from "./components/ProcessBanner";
 import { VendorTools } from "./components/VendorTools";
 import { FileExplorerProvider } from "./contexts/FileExplorerContext";
 import type { RunListItem, RunSummary, TabId } from "./types";
@@ -31,6 +33,7 @@ const TABS: { id: TabId; label: string; title: string }[] = [
   { id: "space-recovery", label: "Space recovery", title: "Hardlink dedup and bloat detection plans" },
   { id: "security", label: "Security", title: "Malware heuristics, quarantine, hash lookup" },
   { id: "environment", label: "Environment", title: "Toolchain health, repairs, manifest backup" },
+  { id: "help", label: "Help", title: "Install, deploy, workflow, and layout guides" },
   { id: "vendors", label: "Vendors", title: "Add vendor keywords, harvest gaps, and export feedback" },
 ];
 
@@ -123,6 +126,7 @@ export default function App() {
             <ContextSidebar stamp={stamp || undefined} />
 
             <main className="main">
+              <ProcessBanner />
               {tab !== "scan" && (
                 <div className="toolbar compact-toolbar">
                   <label className="field-label-inline">
@@ -169,6 +173,7 @@ export default function App() {
               {stamp && tab === "space-recovery" && <SpaceRecovery stamp={stamp} />}
               {tab === "security" && <MalwarePanel stamp={stamp || undefined} />}
               {tab === "environment" && <EnvironmentPanel />}
+              {tab === "help" && <HelpPanel />}
               {tab === "vendors" && <VendorTools stamp={stamp || undefined} />}
             </main>
           </div>

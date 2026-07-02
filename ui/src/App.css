@@ -264,8 +264,28 @@
 }
 
 .reorder-gap-space {
-  height: 1.25rem;
+  position: relative;
+  min-height: 1.25rem;
   flex-shrink: 0;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.reorder-gap-space .gap-handle {
+  opacity: 0.55;
+  padding: 0.1rem 0.35rem;
+}
+
+.reorder-gap-space .section-remove-btn {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  line-height: 1;
 }
 
 .log-panel-full {
@@ -1811,5 +1831,114 @@ tr.inv-vendor-set {
   display: flex;
   gap: 0.35rem;
   flex-wrap: wrap;
+}
+
+.dash-grid > .reorder-item-wrap.wrap-span-2 {
+  grid-column: span 2;
+}
+
+.dash-grid > .reorder-item-wrap.wrap-full {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 768px) {
+  .dash-grid > .reorder-item-wrap.wrap-span-2 {
+    grid-column: span 1;
+  }
+}
+
+.layout-preset-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+  margin-bottom: 0.35rem;
+}
+
+.layout-preset-name {
+  min-width: 10rem;
+  flex: 1 1 140px;
+}
+
+.layout-preset-select {
+  min-width: 8rem;
+}
+
+.layout-preset-msg {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+}
+
+.process-banner {
+  margin-bottom: 0.65rem;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid var(--accent-dim);
+  border-radius: 10px;
+  background: rgba(72, 224, 154, 0.06);
+}
+
+.process-banner-text {
+  margin-bottom: 0.35rem;
+  font-size: 0.82rem;
+}
+
+.context-search-hint {
+  font-size: 0.75rem;
+  margin: 0 0 0.65rem;
+  line-height: 1.35;
+}
+
+.help-layout {
+  display: grid;
+  grid-template-columns: minmax(160px, 220px) 1fr;
+  gap: 1rem;
+  min-height: 420px;
+}
+
+.help-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.help-nav-btn {
+  text-align: left;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.help-nav-btn.active,
+.help-nav-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.help-article {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem 1.1rem;
+  min-width: 0;
+}
+
+.help-body {
+  white-space: pre-wrap;
+  font-family: ui-monospace, monospace;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  margin: 0.75rem 0 0;
+  color: var(--text-muted);
+}
+
+@media (max-width: 900px) {
+  .help-layout {
+    grid-template-columns: 1fr;
+  }
 }
 
