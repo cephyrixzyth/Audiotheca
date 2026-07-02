@@ -145,6 +145,13 @@ export function useSectionOrder(layoutId: string, defaultOrder: string[]) {
     [commitOrder],
   );
 
+  const applyOrder = useCallback(
+    (next: string[]) => {
+      setOrder(() => commitOrder(next));
+    },
+    [commitOrder],
+  );
+
   const resetOrder = useCallback(() => {
     commitOrder([...defaultOrder]);
   }, [defaultOrder, commitOrder]);
@@ -163,5 +170,6 @@ export function useSectionOrder(layoutId: string, defaultOrder: string[]) {
     insertSpacerAfter,
     removeSpacer,
     resetOrder,
+    applyOrder,
   };
 }

@@ -10,6 +10,7 @@ import {
 import type { ArchivePeekItem } from "../types";
 import { useLibraryRoot } from "../hooks/useLibraryRoot";
 import { PathLink } from "./PathLink";
+import { useContextSidebar } from "./ContextSidebar";
 
 interface Props {
   stamp: string;
@@ -17,13 +18,13 @@ interface Props {
 
 export function ArchivePeek({ stamp }: Props) {
   const libraryRoot = useLibraryRoot();
+  const { query } = useContextSidebar();
   const [items, setItems] = useState<ArchivePeekItem[]>([]);
   const [total, setTotal] = useState(0);
   const [verdictCounts, setVerdictCounts] = useState<Record<string, number>>({});
   const [deleteFiles, setDeleteFiles] = useState(0);
   const [deleteMb, setDeleteMb] = useState(0);
   const [verdict, setVerdict] = useState("MATCHES_EXTRACTED_FOLDER");
-  const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [rejected, setRejected] = useState<Record<string, string>>({});
   const [confirmed, setConfirmed] = useState<Record<string, string>>({});
@@ -190,16 +191,6 @@ export function ArchivePeek({ stamp }: Props) {
       </div>
 
       <div className="toolbar">
-        <label title="Filter by archive path or product name">
-          Search
-          <input
-            type="search"
-            placeholder="Archive path, product…"
-            title="Search archive path or product name"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </label>
         <span className="count-muted">
           {loading ? "Loading…" : `${total} archive rows`}
         </span>

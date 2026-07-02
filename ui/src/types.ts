@@ -181,6 +181,9 @@ export interface ProgressEvent {
   stamp?: string;
   error?: string;
   action?: string;
+  /** engine_log events: raw engine stdout line + severity */
+  line?: string;
+  level?: "info" | "warn" | "error" | "detail";
 }
 
 export interface SkippedItem {
@@ -190,6 +193,48 @@ export interface SkippedItem {
   path: string;
   detail: string;
   source: string;
+}
+
+export interface DeepIdentifyItem {
+  section: string;
+  item_name: string;
+  path: string;
+  method: string;
+  vendor: string;
+  score: string;
+  evidence: string;
+  previous_vendor: string;
+}
+
+export interface VerificationFinding {
+  check: string;
+  severity: string;
+  subject: string;
+  path: string;
+  detail: string;
+  suggestion: string;
+}
+
+export interface QualityScorecard {
+  total_items?: number;
+  identified_confirmed?: number;
+  identified_tentative?: number;
+  identified_unknown?: number;
+  identification_rate_pct?: number;
+  confirmed_rate_pct?: number;
+  dedupe_eligible?: number;
+  dedupe_eligible_pct?: number;
+  duplicate_groups?: number;
+  duplicate_groups_high?: number;
+  routes_ready?: number;
+  routes_needing_review?: number;
+  route_ready_pct?: number;
+  investigation_items?: number;
+  investigation_pct?: number;
+  investigation_buckets?: Record<string, number>;
+  findings_total?: number;
+  findings_warnings?: number;
+  findings_suggestions?: number;
 }
 
 export interface ScanFailureItem {
@@ -295,4 +340,17 @@ export type TabId =
   | "scan-audit"
   | "skipped"
   | "vendors"
-  | "space-recovery";
+  | "space-recovery"
+  | "security";
+
+export interface MalwareFinding {
+  path: string;
+  relative_path: string;
+  name: string;
+  size: number;
+  severity: string;
+  reasons: string[];
+  sha256: string;
+  lookup?: Record<string, string>;
+  defender?: { status: string; detail?: string };
+}

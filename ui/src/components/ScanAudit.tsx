@@ -2,6 +2,22 @@ import { useEffect, useState } from "react";
 import { correctInvestigation, fetchInvestigationFeedback, fetchScanAudit } from "../api/client";
 import type { ScanAuditItem } from "../types";
 import { PathLink } from "./PathLink";
+import { useContextSidebar, useSidebarFilters } from "./ContextSidebar";
+
+const STATUS_FILTER_DEFS = [
+  {
+    key: "status",
+    label: "Status",
+    title: "Route status from the scan audit CSV",
+    options: [
+      { value: "", label: "All statuses" },
+      { value: "READY", label: "READY" },
+      { value: "NEEDS REVIEW", label: "NEEDS REVIEW" },
+      { value: "DEST EXISTS (merge)", label: "DEST EXISTS (merge)" },
+      { value: "SCAN_FAILED", label: "SCAN_FAILED" },
+    ],
+  },
+];
 
 interface Props {
   stamp: string;
@@ -15,11 +31,12 @@ const QUICK_FILTERS = [
 ];
 
 export function ScanAudit({ stamp }: Props) {
+  const { query } = useContextSidebar();
+  const { filters, setFilter } = useSidebarFilters(STATUS_FILTER_DEFS);
+  const status = filters.status ?? "";
   const [items, setItems] = useState<ScanAuditItem[]>([]);
   const [total, setTotal] = useState(0);
-  const [status, setStatus] = useState("");
   const [flags, setFlags] = useState("");
-  const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<string | null>(null);
   const [bucketOptions, setBucketOptions] = useState<string[]>([]);
@@ -80,7 +97,7 @@ export function ScanAudit({ stamp }: Props) {
             }
             title={filter.title ?? filter.label}
             onClick={() => {
-              setStatus(filter.status ?? "");
+              setFilter("status", filter.status ?? "");
               setFlags(filter.flags ?? "");
             }}
           >
@@ -91,7 +108,7 @@ export function ScanAudit({ stamp }: Props) {
           type="button"
           className="keeper-btn"
           title="Clear status and flag filters"
-          onClick={() => { setStatus(""); setFlags(""); }}
+          onClick={() => { setFilter("status", ""); setFlags(""); }}
         >
           All rows
         </button>
@@ -99,32 +116,13 @@ export function ScanAudit({ stamp }: Props) {
           type="button"
           className="keeper-btn"
           title="Show only routes ready to move on next live run"
-          onClick={() => { setStatus("READY"); setFlags(""); }}
+          onClick={() => { setFilter("status", "READY"); setFlags(""); }}
         >
           READY only
         </button>
       </div>
 
       <div className="toolbar">
-        <label>
-          Status
-          <select value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">All</option>
-            <option value="READY">READY</option>
-            <option value="NEEDS REVIEW">NEEDS REVIEW</option>
-            <option value="DEST EXISTS (merge)">DEST EXISTS (merge)</option>
-            <option value="SCAN_FAILED">SCAN_FAILED</option>
-          </select>
-        </label>
-        <label>
-          Search
-          <input
-            type="search"
-            placeholder="Name, path, vendor, fingerprint…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </label>
         <span className="count-muted">
           {loading ? "Loading…" : `${total.toLocaleString()} audit rows`}
         </span>

@@ -105,6 +105,13 @@ class IdentifyMixin:
             return name
         left, right = name.rsplit("-", 1)
         token = right.strip()
+        try:
+            from release_groups import is_known_release_group
+
+            if is_known_release_group(token):
+                return left.strip()
+        except ImportError:
+            pass
         if RELEASE_GROUP_SUFFIX.match(token) and not re.search(r"(?i)\bwin\b|\bmac\b", token):
             return left.strip()
         return name

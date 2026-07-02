@@ -40,7 +40,9 @@ from vendor_db import VENDOR_DATABASE
 
 from audiotheca.config import *  # noqa: F403
 from audiotheca.coverage import discover_coverage_gaps
+from audiotheca.deep_identify import find_renamed_archive_dupes, needs_deep_identify, run_deep_identify
 from audiotheca.helpers import _archive_stem, _limit_walk, _squash, _walk_depth
+from audiotheca.verification import run_verification
 from audiotheca.archive import ArchiveMixin
 from audiotheca.dedupe import DedupeMixin
 from audiotheca.identify import IdentifyMixin
@@ -105,6 +107,9 @@ class DeduplicationEngine(
         self.probe_truncations: list[dict] = []
         self.skip_phase_impact: dict[str, dict] = {}
         self.feedback_skipped_records: list[dict] = []
+        self.deep_identify_rows: list[dict] = []
+        self.verification_findings: list[dict] = []
+        self.quality_scorecard: dict = {}
         self.scan_options: ScanOptions = load_scan_options()
         self._seven_zip = find_7z()
         self.action_mode = "preview"
@@ -120,6 +125,7 @@ class DeduplicationEngine(
             "duplicates_confirmed": 0,
             "nested_issues": 0,
             "reconciled": 0,
+            "deep_identified": 0,
             "errors": 0,
             "feedback_skipped": 0,
         }
@@ -273,7 +279,7 @@ class DeduplicationEngine(
         elif item.get("id_confidence") == "TENTATIVE":
             flags.append("tentative_id")
         method = item.get("id_method", "")
-        if method in {"NFO", "NAME_SPLIT", "RECONCILED"}:
+        if method in {"NFO", "NAME_SPLIT", "RECONCILED", "FUZZY_VENDOR", "SIBLING_INFERENCE"}:
             flags.append(f"weak:{method.lower()}")
         if inv_bucket:
             flags.append(f"inv:{inv_bucket}")
@@ -564,6 +570,33 @@ class DeduplicationEngine(
         )
         self._checkpoint("reconciliation", "Phase 1.5 - Vendor reconciliation")
 
+        if not self.scan_options.skip("deep_identify"):
+            candidates = sum(1 for item in all_items if needs_deep_identify(item))
+            deep_progress = PhaseProgress(
+                "Phase 1.7 - Deep identification", max(candidates, 1), "item"
+            )
+            self.deep_identify_rows = run_deep_identify(
+                all_items,
+                self.vendor_aliases,
+                self._name_similarity,
+                progress_cb=lambda detail: deep_progress.update(1, detail=detail),
+            )
+            with self._lock:
+                self.stats["deep_identified"] = len(self.deep_identify_rows)
+            deep_progress.finish(
+                f"{len(self.deep_identify_rows)} vendors recovered "
+                f"(fuzzy + sibling inference) from {candidates} candidates"
+            )
+        else:
+            candidates = sum(1 for item in all_items if needs_deep_identify(item))
+            self._record_skip_impact(
+                "deep_identify",
+                candidates,
+                f"{candidates} unknown/tentative items not deep-identified",
+            )
+            print("  [SKIP] Deep identification disabled by scan options.")
+        self._checkpoint("deep_identify", "Phase 1.7 - Deep identification")
+
         if ENABLE_SCENE_ARCHIVE_PEEK and not self.scan_options.skip("scene_peek"):
             self._run_scene_archive_phase(all_items, csv_writer)
         elif self.scan_options.skip("scene_peek"):
@@ -644,6 +677,35 @@ class DeduplicationEngine(
                 print(f"  [{idx}] [{kind}] {item['original_name']} ({size_mb:.1f} MB){rec}")
 
         dupe_candidates = [items for items in dedup_groups.values() if len(items) >= 2]
+
+        if not self.scan_options.skip("duplicates"):
+            renamed_groups = find_renamed_archive_dupes(all_items, self.sparse_hash)
+            for group in renamed_groups:
+                pair_paths = [str(item["path"]) for item in group["items"]]
+                if frozenset(item["path"] for item in group["items"]) in archive_pair_path_sets:
+                    continue
+                if is_group_rejected(group["dedup_key"], pair_paths, feedback_store):
+                    self._inc("feedback_skipped")
+                    self.feedback_skipped_records.append(
+                        {
+                            "dedup_key": group["dedup_key"],
+                            "kind": "renamed_copy",
+                            "paths": pair_paths,
+                            "confidence": group["confidence"],
+                        }
+                    )
+                    continue
+                self.duplicate_groups.append(group)
+                self._inc("duplicates_suspected")
+                print(
+                    f"\n[RENAMED COPY {group['confidence']}] {group['dedup_key']} "
+                    f"— byte-identical archives with different names"
+                )
+                for idx, item in enumerate(group["items"], 1):
+                    size_mb = item["size"] / (1024 * 1024)
+                    rec = " <-- suggested keep" if item["path"] == group["recommended_keep"]["path"] else ""
+                    print(f"  [{idx}] {item['original_name']} ({size_mb:.1f} MB) in {item['source_bin']}{rec}")
+
         items_to_delete: list[dict] = []
         if self.scan_options.skip("duplicates"):
             skipped_groups = len(dupe_candidates)
@@ -787,82 +849,111 @@ class DeduplicationEngine(
         conflict_bases = {c["base_name"] for c in self.vendor_conflicts}
         confirmed_bases = self._confirmed_base_vendors(all_items)
 
-        for item in all_items:
-            if item["path"] in delete_paths:
-                continue
+        if self.scan_options.skip("restructure"):
+            print("[!] Phase 3 restructure plan skipped (scan options).")
+            self.logger.info("Phase 3 restructure plan skipped via scan options.")
+        else:
+            for item in all_items:
+                if item["path"] in delete_paths:
+                    continue
 
-            dest_path, relative_dest, route_status, inv_bucket = self.compute_destination(
-                item,
-                conflict_bases=conflict_bases,
-                confirmed_bases=confirmed_bases,
-            )
-            if not inv_bucket:
-                dest_path, relative_dest = apply_override_to_paths(
-                    self.root_dir,
-                    str(item["path"]),
-                    dest_path,
-                    relative_dest,
-                    self.restructure_store,
-                )
-            vendor = item["company"] or "UNKNOWN"
-            if inv_bucket:
-                _bucket, reason = self.classify_investigation(
+                dest_path, relative_dest, route_status, inv_bucket = self.compute_destination(
                     item,
                     conflict_bases=conflict_bases,
                     confirmed_bases=confirmed_bases,
                 )
-                status = route_status
-                self._inc("investigation")
-                self.investigation_stats[inv_bucket] += 1
-                self.investigation_plan.append(
+                if not inv_bucket:
+                    dest_path, relative_dest = apply_override_to_paths(
+                        self.root_dir,
+                        str(item["path"]),
+                        dest_path,
+                        relative_dest,
+                        self.restructure_store,
+                    )
+                vendor = item["company"] or "UNKNOWN"
+                if inv_bucket:
+                    _bucket, reason = self.classify_investigation(
+                        item,
+                        conflict_bases=conflict_bases,
+                        confirmed_bases=confirmed_bases,
+                    )
+                    status = route_status
+                    self._inc("investigation")
+                    self.investigation_stats[inv_bucket] += 1
+                    self.investigation_plan.append(
+                        {
+                            "source_bin": item["source_bin"],
+                            "original_name": item["original_name"],
+                            "current_path": str(item["path"]),
+                            "destination": str(dest_path),
+                            "bucket": inv_bucket,
+                            "reason": reason,
+                            "id_method": item["id_method"],
+                            "id_confidence": item["id_confidence"],
+                            "base_name": item["base_name"],
+                            "size_mb": round(item["size"] / (1024 * 1024), 1),
+                        }
+                    )
+                elif dest_path.exists():
+                    status = "DEST EXISTS (merge)"
+                else:
+                    status = route_status if route_status != "READY" else "READY"
+
+                self.restructure_plan.append(
                     {
                         "source_bin": item["source_bin"],
                         "original_name": item["original_name"],
                         "current_path": str(item["path"]),
                         "destination": str(dest_path),
-                        "bucket": inv_bucket,
-                        "reason": reason,
+                        "relative_dest": relative_dest,
+                        "vendor": vendor,
                         "id_method": item["id_method"],
                         "id_confidence": item["id_confidence"],
+                        "display_name": item["display_name"],
+                        "version_key": item["version_key"],
                         "base_name": item["base_name"],
                         "size_mb": round(item["size"] / (1024 * 1024), 1),
+                        "status": status,
+                        "investigation_bucket": inv_bucket,
+                        "_item": item,
+                        "_dest_path": dest_path,
                     }
                 )
-            elif dest_path.exists():
-                status = "DEST EXISTS (merge)"
-            else:
-                status = route_status if route_status != "READY" else "READY"
+                self._append_audit_row(
+                    item,
+                    status=status,
+                    inv_bucket=inv_bucket or "",
+                    destination=str(dest_path),
+                )
+                restructure_progress.update(1, detail=item["original_name"][:36])
 
-            self.restructure_plan.append(
-                {
-                    "source_bin": item["source_bin"],
-                    "original_name": item["original_name"],
-                    "current_path": str(item["path"]),
-                    "destination": str(dest_path),
-                    "relative_dest": relative_dest,
-                    "vendor": vendor,
-                    "id_method": item["id_method"],
-                    "id_confidence": item["id_confidence"],
-                    "display_name": item["display_name"],
-                    "version_key": item["version_key"],
-                    "base_name": item["base_name"],
-                    "size_mb": round(item["size"] / (1024 * 1024), 1),
-                    "status": status,
-                    "investigation_bucket": inv_bucket,
-                    "_item": item,
-                    "_dest_path": dest_path,
-                }
-            )
-            self._append_audit_row(
-                item,
-                status=status,
-                inv_bucket=inv_bucket or "",
-                destination=str(dest_path),
-            )
-            restructure_progress.update(1, detail=item["original_name"][:36])
-
-        restructure_progress.finish(f"{len(self.restructure_plan)} routes, {self.stats['investigation']} investigation")
+            restructure_progress.finish(f"{len(self.restructure_plan)} routes, {self.stats['investigation']} investigation")
         self._checkpoint("restructure", "Phase 3 - Restructure plan")
+
+        if not self.scan_options.skip("verification"):
+            verify_progress = PhaseProgress("Phase 3.5 - Verification", 1, "pass")
+            self.quality_scorecard, self.verification_findings = run_verification(
+                all_items,
+                duplicate_groups=self.duplicate_groups,
+                investigation_plan=self.investigation_plan,
+                restructure_plan=self.restructure_plan,
+                vendor_aliases=self.vendor_aliases,
+                build_dedup_key=self.build_dedup_key,
+            )
+            score = self.quality_scorecard
+            verify_progress.finish(
+                f"identification {score['identification_rate_pct']}% "
+                f"({score['confirmed_rate_pct']}% confirmed), "
+                f"routes ready {score['route_ready_pct']}%, "
+                f"{score['findings_warnings']} warnings, "
+                f"{score['findings_suggestions']} suggestions"
+            )
+            for finding in self.verification_findings:
+                marker = "[!]" if finding["severity"] == "WARNING" else "[i]"
+                print(f"  {marker} {finding['check']}: {finding['detail'][:110]}")
+        else:
+            print("  [SKIP] Verification pass disabled by scan options.")
+        self._checkpoint("verification", "Phase 3.5 - Verification")
 
         if self.dry_run:
             for entry in self.restructure_plan:

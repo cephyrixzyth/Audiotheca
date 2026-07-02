@@ -22,6 +22,10 @@ PROJECT_ROOT = workspace_root()
 from audiotheca.config import ROOT_DIR as DEFAULT_ROOT
 
 STAMP_RE = re.compile(r"Run_Summary_(\d{8}_\d{4})\.txt$")
+# PhaseProgress counter lines, e.g. "  1,234 / 5,000 item  ( 25%)  |  elapsed ..."
+_COUNTER_RE = re.compile(r"^\s+[\d,]+ / [\d,]+ \S+\s+")
+# PhaseProgress.finish lines duplicate structured phase_finish events
+_FINISH_RE = re.compile(r"^\[OK\] .+ finished in ")
 
 
 @dataclass
@@ -189,12 +193,14 @@ class JobManager:
 
         stderr_log = report_loader.REPORT_DIR / f".engine_stderr_{job_id}.log"
         stderr_handle = stderr_log.open("w", encoding="utf-8")
+        stdout_log = report_loader.REPORT_DIR / f".engine_stdout_{job_id}.log"
+        stdout_handle = stdout_log.open("w", encoding="utf-8")
 
         proc = subprocess.Popen(
             cmd,
             cwd=str(PROJECT_ROOT),
             env=env,
-            stdout=subprocess.DEVNULL,
+            stdout=stdout_handle,
             stderr=stderr_handle,
         )
 
@@ -212,7 +218,17 @@ class JobManager:
         self._jobs[job_id] = job
         self._prune_old_jobs()
         asyncio.create_task(
-            self._watch(job, proc, progress_file, control_file, root_dir, stderr_log, stderr_handle)
+            self._watch(
+                job,
+                proc,
+                progress_file,
+                control_file,
+                root_dir,
+                stderr_log,
+                stderr_handle,
+                stdout_log,
+                stdout_handle,
+            )
         )
         await self._broadcast(
             job,
@@ -235,9 +251,36 @@ class JobManager:
         root_dir: str,
         stderr_log: Path,
         stderr_handle,
+        stdout_log: Path,
+        stdout_handle,
     ) -> None:
         offset = 0
+        stdout_offset = 0
         last_metrics = 0.0
+
+        async def drain_stdout() -> None:
+            nonlocal stdout_offset
+            if not stdout_log.is_file():
+                return
+            try:
+                text = stdout_log.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                return
+            lines = text.splitlines()
+            while stdout_offset < len(lines):
+                line = lines[stdout_offset].rstrip()
+                stdout_offset += 1
+                if not line or set(line) <= {"-", "="}:
+                    continue
+                # Phase banners and counter lines already arrive as structured
+                # phase_start / phase_progress / phase_finish events.
+                if line.startswith(">>> ") or _COUNTER_RE.match(line) or _FINISH_RE.match(line):
+                    continue
+                await self._broadcast(
+                    job,
+                    {"type": "engine_log", "line": line[:400], "level": _log_level(line)},
+                )
+
         try:
             while proc.poll() is None:
                 if progress_file.is_file():
@@ -264,6 +307,7 @@ class JobManager:
                     metrics = collect_metrics(path=Path(root_dir))
                     await self._broadcast(job, {"type": "system_metrics", **metrics})
                     last_metrics = now
+                await drain_stdout()
                 await asyncio.sleep(0.5)
 
             if progress_file.is_file():
@@ -276,6 +320,7 @@ class JobManager:
                     except json.JSONDecodeError:
                         pass
                     offset += 1
+            await drain_stdout()
 
             job.exit_code = proc.returncode
             job.stamp = self._detect_stamp(job.started_at)
@@ -333,8 +378,13 @@ class JobManager:
                 stderr_handle.close()
             except Exception:
                 pass
+            try:
+                stdout_handle.close()
+            except Exception:
+                pass
             if stderr_log.is_file() and stderr_log.stat().st_size == 0:
                 stderr_log.unlink(missing_ok=True)
+            stdout_log.unlink(missing_ok=True)
             progress_file.unlink(missing_ok=True)
             control_file.unlink(missing_ok=True)
 
@@ -350,6 +400,17 @@ class JobManager:
                 if match:
                     return match.group(1)
         return None
+
+
+def _log_level(line: str) -> str:
+    lowered = line.lower()
+    if "[!!]" in line or "error" in lowered or "failed" in lowered or "traceback" in lowered:
+        return "error"
+    if "[!]" in line or "warn" in lowered or "skipped" in lowered:
+        return "warn"
+    if line.startswith(">>>") or "[OK]" in line:
+        return "info"
+    return "detail"
 
 
 def _read_log_tail(path: Path, *, max_bytes: int = 4096, max_lines: int = 8) -> str:
@@ -380,6 +441,8 @@ def _engine_command(root_dir: str, dry_run: bool) -> list[str]:
         cmd = [sys.executable, str(PROJECT_ROOT / "main.py"), "--root", root_dir]
     if dry_run:
         cmd.append("--dry-run")
+    else:
+        cmd.append("--live")
     return cmd
 
 

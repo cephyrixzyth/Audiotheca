@@ -9,6 +9,7 @@ import {
 import type { RestructureItem } from "../types";
 import { useLibraryRoot } from "../hooks/useLibraryRoot";
 import { PathLink } from "./PathLink";
+import { useContextSidebar } from "./ContextSidebar";
 
 interface Props {
   stamp: string;
@@ -16,10 +17,10 @@ interface Props {
 
 export function RestructurePlan({ stamp }: Props) {
   const libraryRoot = useLibraryRoot();
+  const { query } = useContextSidebar();
   const [items, setItems] = useState<RestructureItem[]>([]);
   const [total, setTotal] = useState(0);
   const [status, setStatus] = useState("READY");
-  const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [approvedSections, setApprovedSections] = useState<string[]>([]);
   const [destOverrides, setDestOverrides] = useState<Record<string, string>>({});
@@ -163,15 +164,6 @@ export function RestructurePlan({ stamp }: Props) {
             <option value="NEEDS REVIEW">NEEDS REVIEW</option>
             <option value="DEST EXISTS (merge)">DEST EXISTS (merge)</option>
           </select>
-        </label>
-        <label>
-          Search
-          <input
-            type="search"
-            placeholder="Name, vendor, path…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
         </label>
         <span className="count-muted">
           {loading ? "Loading…" : `${total.toLocaleString()} routes`}

@@ -236,10 +236,11 @@ def get_investigation_groups(
     stamp: str,
     bucket: str | None = None,
     group_by: str = Query(default="prefix"),
+    q: str | None = None,
     limit: int = Query(default=100, le=500),
 ) -> dict[str, object]:
     groups, total = report_loader.load_investigation_groups(
-        stamp, bucket=bucket, group_by=group_by, limit=limit
+        stamp, bucket=bucket, group_by=group_by, query=q, limit=limit
     )
     return {"groups": groups, "total": total, "group_by": group_by}
 
@@ -531,6 +532,42 @@ def get_skip_impact(stamp: str) -> dict[str, object]:
     items = report_loader.load_skip_phase_impact(stamp)
     feedback = report_loader.load_feedback_skipped(stamp)
     return {"phases": items, "feedback_skipped": feedback}
+
+
+@app.get("/api/runs/{stamp}/deep-identify")
+def get_deep_identify(
+    stamp: str,
+    method: str | None = None,
+    q: str | None = None,
+    limit: int = Query(default=500, le=2000),
+    offset: int = Query(default=0, ge=0),
+) -> dict[str, object]:
+    items, total = report_loader.load_deep_identify(
+        stamp, method=method, query=q, limit=limit, offset=offset
+    )
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
+
+
+@app.get("/api/runs/{stamp}/verification")
+def get_verification(
+    stamp: str,
+    check: str | None = None,
+    severity: str | None = None,
+    q: str | None = None,
+    limit: int = Query(default=500, le=2000),
+    offset: int = Query(default=0, ge=0),
+) -> dict[str, object]:
+    items, total = report_loader.load_verification(
+        stamp, check=check, severity=severity, query=q, limit=limit, offset=offset
+    )
+    scorecard = report_loader.load_quality_scorecard(stamp)
+    return {
+        "items": items,
+        "total": total,
+        "scorecard": scorecard,
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 @app.get("/api/runs/{stamp}/skipped")
@@ -1088,6 +1125,8 @@ def download_report(stamp: str, name: str) -> FileResponse:
         "archive_peek": ("Archive_Peek", ".csv"),
         "scene_renames": ("Scene_Rename_Plan", ".csv"),
         "archive_delete": ("Archive_Delete_Candidates", ".csv"),
+        "deep_identify": ("Deep_Identify", ".csv"),
+        "verification": ("Verification_Findings", ".csv"),
     }
     if name not in allowed:
         raise HTTPException(status_code=404, detail=f"Unknown report: {name}")
@@ -1234,11 +1273,95 @@ def scan_options_help() -> dict[str, object]:
             "scene_peek": "Skip listing archives inside scene-hash folders",
             "archive_peek": "Skip archive vs extracted-folder listing (7-Zip)",
             "quarantine": "Skip routing off-native OS items to _mac / _linux / _windows lanes",
+            "deep_identify": "Skip fuzzy vendor matching and sibling inference for unknown items",
             "duplicates": "Skip duplicate group review (restructure still runs)",
+            "restructure": "Skip computing the restructure plan (identify-only run)",
             "restructure_live": "Skip live restructure moves (dry-run plan only)",
+            "verification": "Skip the post-plan quality scorecard and QA findings",
             "purge": "Skip empty wrapper directory purge",
         },
     }
+
+
+@app.post("/api/security/scan")
+def security_scan(body: dict = Body(...)) -> dict[str, object]:
+    import malware_scanner as ms
+
+    root_raw = body.get("root")
+    if not root_raw:
+        raise HTTPException(status_code=400, detail="root is required")
+    root = Path(str(security.assert_library_path(str(root_raw), label="root")))
+    use_defender = bool(body.get("use_defender"))
+    max_files = int(body.get("max_files") or 25_000)
+    findings = ms.scan_tree(root, max_files=max_files, use_defender=use_defender)
+    report_path = ms.write_scan_report(root, findings)
+    security.audit("malware_scan", root=str(root), findings=len(findings))
+    return {
+        "ok": True,
+        "root": str(root),
+        "findings": findings,
+        "total": len(findings),
+        "report": report_path.name,
+    }
+
+
+@app.get("/api/security/latest")
+def security_latest() -> dict[str, object]:
+    import malware_scanner as ms
+
+    report = ms.latest_scan_report()
+    if report is None:
+        return {"report": None, "findings": [], "total": 0}
+    return {
+        "report": report.get("stamp"),
+        "root": report.get("root"),
+        "scanned_at": report.get("scanned_at"),
+        "findings": report.get("findings") or [],
+        "total": report.get("total_findings", 0),
+    }
+
+
+@app.get("/api/security/lookup")
+def security_lookup(hash: str = Query(..., min_length=64, max_length=64)) -> dict[str, object]:
+    import malware_scanner as ms
+
+    if not re.fullmatch(r"[a-fA-F0-9]{64}", hash):
+        raise HTTPException(status_code=400, detail="hash must be SHA-256 hex")
+    return {"hash": hash.lower(), "urls": ms.lookup_urls(hash.lower())}
+
+
+@app.post("/api/security/quarantine")
+def security_quarantine(body: dict = Body(...)) -> dict[str, object]:
+    import malware_scanner as ms
+
+    if not body.get("confirm_live"):
+        raise HTTPException(status_code=400, detail="confirm_live required")
+    paths_raw = body.get("paths") or []
+    if not isinstance(paths_raw, list) or not paths_raw:
+        raise HTTPException(status_code=400, detail="paths list required")
+    root_raw = body.get("root")
+    if not root_raw:
+        raise HTTPException(status_code=400, detail="root is required")
+    root = Path(str(security.assert_library_path(str(root_raw), label="root")))
+    paths = [str(security.assert_library_path(str(p), label="path")) for p in paths_raw]
+    results = ms.quarantine_paths(paths, root=root)
+    security.audit("malware_quarantine", count=len(paths))
+    return {"ok": True, "results": results}
+
+
+@app.post("/api/security/delete")
+def security_delete(body: dict = Body(...)) -> dict[str, object]:
+    import malware_scanner as ms
+
+    if not body.get("confirm_live"):
+        raise HTTPException(status_code=400, detail="confirm_live required")
+    paths_raw = body.get("paths") or []
+    if not isinstance(paths_raw, list) or not paths_raw:
+        raise HTTPException(status_code=400, detail="paths list required")
+    paths = [str(security.assert_library_path(str(p), label="path")) for p in paths_raw]
+    results = ms.delete_paths(paths)
+    security.audit("malware_delete", count=len(paths))
+    return {"ok": True, "results": results}
 
 
 @app.get("/api/system/metrics")

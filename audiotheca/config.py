@@ -125,6 +125,7 @@ IGNORE_BINS = {
     "_tonex libraries",
     "_older_versions_review",
     "_dedupe_reports",
+    "_malware_quarantine",
 }
 
 # Folder names that are internals of a single product (e.g. KONTAKT libraries) —

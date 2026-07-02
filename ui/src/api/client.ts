@@ -99,11 +99,12 @@ export function bulkAddVendorGaps(
 
 export function fetchInvestigationGroups(
   stamp: string,
-  opts?: { bucket?: string; group_by?: string; limit?: number },
+  opts?: { bucket?: string; group_by?: string; q?: string; limit?: number },
 ): Promise<{ groups: InvestigationGroup[]; total: number; group_by: string }> {
   const qs = new URLSearchParams();
   if (opts?.bucket) qs.set("bucket", opts.bucket);
   if (opts?.group_by) qs.set("group_by", opts.group_by);
+  if (opts?.q) qs.set("q", opts.q);
   if (opts?.limit) qs.set("limit", String(opts.limit));
   return getJson(`/runs/${stamp}/investigation/groups?${qs}`);
 }
@@ -710,6 +711,33 @@ export function fetchSkipImpact(
   return getJson(`/runs/${stamp}/skip-impact`);
 }
 
+export function fetchDeepIdentify(
+  stamp: string,
+  params: { method?: string; q?: string; limit?: number } = {},
+): Promise<{ items: import("../types").DeepIdentifyItem[]; total: number }> {
+  const qs = new URLSearchParams();
+  if (params.method) qs.set("method", params.method);
+  if (params.q) qs.set("q", params.q);
+  if (params.limit) qs.set("limit", String(params.limit));
+  return getJson(`/runs/${stamp}/deep-identify?${qs}`);
+}
+
+export function fetchVerification(
+  stamp: string,
+  params: { check?: string; severity?: string; q?: string; limit?: number } = {},
+): Promise<{
+  items: import("../types").VerificationFinding[];
+  total: number;
+  scorecard: import("../types").QualityScorecard;
+}> {
+  const qs = new URLSearchParams();
+  if (params.check) qs.set("check", params.check);
+  if (params.severity) qs.set("severity", params.severity);
+  if (params.q) qs.set("q", params.q);
+  if (params.limit) qs.set("limit", String(params.limit));
+  return getJson(`/runs/${stamp}/verification?${qs}`);
+}
+
 export function compareRuns(
   stampA: string,
   stampB: string,
@@ -832,4 +860,41 @@ export async function listArchiveContents(path: string, limit = 200): Promise<{
 }> {
   const qs = new URLSearchParams({ path, limit: String(limit) });
   return getJson(`/archive/list?${qs}`);
+}
+
+export function startSecurityScan(params: {
+  root: string;
+  use_defender?: boolean;
+  max_files?: number;
+}): Promise<{ ok: boolean; findings: import("../types").MalwareFinding[]; total: number; report: string }> {
+  return postJson("/security/scan", params);
+}
+
+export function fetchLatestSecurityScan(): Promise<{
+  report: string | null;
+  root?: string;
+  scanned_at?: string;
+  findings: import("../types").MalwareFinding[];
+  total: number;
+}> {
+  return getJson("/security/latest");
+}
+
+export function lookupSecurityHash(hash: string): Promise<{ hash: string; urls: Record<string, string> }> {
+  return getJson(`/security/lookup?hash=${encodeURIComponent(hash)}`);
+}
+
+export function quarantineSecurityThreats(params: {
+  root: string;
+  paths: string[];
+  confirm_live: boolean;
+}): Promise<{ ok: boolean; results: { path: string; status: string; destination?: string; detail?: string }[] }> {
+  return postJson("/security/quarantine", params);
+}
+
+export function deleteSecurityThreats(params: {
+  paths: string[];
+  confirm_live: boolean;
+}): Promise<{ ok: boolean; results: { path: string; status: string; detail?: string }[] }> {
+  return postJson("/security/delete", params);
 }

@@ -80,9 +80,10 @@ export function FlowEditor({
   return (
     <div className="flow-editor">
       <div className="flow-editor-toolbar">
-        <label title="Pick a scan preset — each enables or skips engine phases">
+        <label className="field-label-inline" title="Pick a scan preset — each enables or skips engine phases">
           Preset
           <select
+            className="field-input flow-preset-select"
             value={presetId}
             onChange={(e) => {
               const preset = FLOW_PRESETS.find((p) => p.id === e.target.value);
@@ -195,7 +196,7 @@ export function FlowEditor({
 
       <p className="count-muted flow-hint">
         Linear scan pipeline with skippable phases. Required steps always run.
-        Turn OFF peek, duplicate, or OS-lane nodes for faster identify-only passes.
+        Toggle restructure OFF for identify-only passes; turn OFF peek or duplicate nodes to save time.
       </p>
     </div>
   );

@@ -28,6 +28,7 @@ import type {
   SkippedItem,
 } from "../types";
 import { PathLink } from "./PathLink";
+import { useContextSidebar } from "./ContextSidebar";
 
 interface Props {
   stamp: string;
@@ -58,8 +59,8 @@ const REASON_LABELS: Record<string, string> = {
 };
 
 export function SkippedFiles({ stamp, runs }: Props) {
+  const { query } = useContextSidebar();
   const [view, setView] = useState<SubView>("hub");
-  const [query, setQuery] = useState("");
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<string | null>(null);
@@ -219,16 +220,9 @@ export function SkippedFiles({ stamp, runs }: Props) {
 
       {view !== "compare" && (
         <div className="toolbar">
-          <input
-            type="search"
-            placeholder="Search paths…"
-            title="Search skipped file paths"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            style={{ minWidth: "16rem" }}
-          />
           {view === "hub" && (
             <select
+              className="field-input"
               value={reason}
               title="Filter by why the engine skipped or deferred this path"
               onChange={(e) => setReason(e.target.value)}

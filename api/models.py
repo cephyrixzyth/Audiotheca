@@ -230,6 +230,28 @@ class ProbeTruncationItem:
 
 
 @dataclass
+class DeepIdentifyItem:
+    section: str = ""
+    item_name: str = ""
+    path: str = ""
+    method: str = ""
+    vendor: str = ""
+    score: str = ""
+    evidence: str = ""
+    previous_vendor: str = ""
+
+
+@dataclass
+class VerificationFinding:
+    check: str = ""
+    severity: str = ""
+    subject: str = ""
+    path: str = ""
+    detail: str = ""
+    suggestion: str = ""
+
+
+@dataclass
 class SkippedItem:
     reason: str = ""
     section: str = ""

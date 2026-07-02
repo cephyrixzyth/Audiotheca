@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   addManualDuplicate,
+  downloadDecisionsUrl,
   executeDuplicateStaging,
   fetchDecisions,
   fetchDuplicates,
@@ -13,6 +14,7 @@ import {
 import type { DuplicateGroup } from "../types";
 import { useLibraryRoot } from "../hooks/useLibraryRoot";
 import { PathLink } from "./PathLink";
+import { useContextSidebar } from "./ContextSidebar";
 
 interface Props {
   stamp: string;
@@ -28,10 +30,10 @@ const REJECT_LABELS: Record<string, string> = {
 
 export function DuplicateReview({ stamp }: Props) {
   const libraryRoot = useLibraryRoot();
+  const { query } = useContextSidebar();
   const [groups, setGroups] = useState<DuplicateGroup[]>([]);
   const [total, setTotal] = useState(0);
   const [confidence, setConfidence] = useState("HIGH");
-  const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [keepers, setKeepers] = useState<Record<string, string>>({});
   const [rejections, setRejections] = useState<DuplicateRejection[]>([]);
@@ -87,7 +89,6 @@ export function DuplicateReview({ stamp }: Props) {
     const res = await saveDecisions(stamp, keepers);
     setSavedCount(res.count);
     setSaveMsg(`Saved ${res.count} keeper decisions`);
-    const { downloadDecisionsUrl } = await import("../api/client");
     setDownloadUrl(await downloadDecisionsUrl(stamp));
     setFeedbackUrl(await feedbackExportUrl(stamp));
   }
@@ -188,16 +189,6 @@ export function DuplicateReview({ stamp }: Props) {
             <option value="HIGH">HIGH</option>
             <option value="MEDIUM">MEDIUM</option>
           </select>
-        </label>
-        <label title="Search product name or full path">
-          Search
-          <input
-            type="search"
-            placeholder="Product name or path…"
-            title="Search product name or full path"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
         </label>
         <label className="checkbox-label" title="Hide groups you marked as bad matches">
           <input

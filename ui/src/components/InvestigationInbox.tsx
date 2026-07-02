@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   bulkAddVendorGaps,
   bulkCorrectInvestigation,
@@ -12,6 +12,7 @@ import {
   type InvestigationFeedbackState,
 } from "../api/client";
 import type { InvestigationItem } from "../types";
+import { useContextSidebar, useSidebarFilters } from "./ContextSidebar";
 import { PathLink } from "./PathLink";
 
 interface Props {
@@ -39,13 +40,31 @@ function methodClass(method: string, confidence: string) {
 }
 
 export function InvestigationInbox({ stamp }: Props) {
+  const { query } = useContextSidebar();
   const [view, setView] = useState<"list" | "groups">("groups");
   const [items, setItems] = useState<InvestigationItem[]>([]);
   const [groups, setGroups] = useState<InvestigationGroup[]>([]);
   const [total, setTotal] = useState(0);
   const [buckets, setBuckets] = useState<Record<string, number>>({});
-  const [bucket, setBucket] = useState("");
-  const [query, setQuery] = useState("");
+  const bucketFilterDefs = useMemo(
+    () => [
+      {
+        key: "bucket",
+        label: "Bucket",
+        title: "Investigation bucket assigned when the engine could not route confidently",
+        options: [
+          { value: "", label: `All (${Object.values(buckets).reduce((a, b) => a + b, 0)})` },
+          ...Object.entries(buckets).map(([name, count]) => ({
+            value: name,
+            label: `${name} (${count})`,
+          })),
+        ],
+      },
+    ],
+    [buckets],
+  );
+  const { filters } = useSidebarFilters(bucketFilterDefs);
+  const bucket = filters.bucket ?? "";
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<InvestigationFeedbackState | null>(null);
@@ -72,6 +91,7 @@ export function InvestigationInbox({ stamp }: Props) {
         fetchInvestigationGroups(stamp, {
           bucket: bucket || undefined,
           group_by: "prefix",
+          q: query || undefined,
           limit: 150,
         })
           .then((res) => {
@@ -93,7 +113,7 @@ export function InvestigationInbox({ stamp }: Props) {
           .catch((err: Error) => setError(err.message))
           .finally(() => setLoading(false));
       }
-    }, query && view === "list" ? 250 : 0);
+    }, query ? 250 : 0);
     return () => clearTimeout(timer);
   }, [stamp, bucket, query, view]);
 
@@ -247,29 +267,6 @@ export function InvestigationInbox({ stamp }: Props) {
             <option value="list">All items</option>
           </select>
         </label>
-        <label title="Investigation bucket assigned when the engine could not route confidently">
-          Bucket
-          <select value={bucket} onChange={(e) => setBucket(e.target.value)}>
-            <option value="">All ({Object.values(buckets).reduce((a, b) => a + b, 0)})</option>
-            {Object.entries(buckets).map(([name, count]) => (
-              <option key={name} value={name}>
-                {name} ({count})
-              </option>
-            ))}
-          </select>
-        </label>
-        {view === "list" && (
-          <label title="Search item name, path, or fingerprint">
-            Search
-            <input
-              type="search"
-              placeholder="Name, path, fingerprint…"
-              title="Search item name, path, or fingerprint"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </label>
-        )}
         <span className="count-muted">
           {loading ? "Loading…" : `${total.toLocaleString()} ${view === "groups" ? "groups" : "items"}`}
           {feedback ? ` · ${feedback.corrections.length} corrections` : ""}

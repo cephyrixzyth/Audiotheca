@@ -70,6 +70,9 @@ class ReportsMixin:
             "probe_truncations_csv": REPORT_DIR / f"Probe_Truncations_{self.run_stamp}.csv",
             "skip_impact_json": REPORT_DIR / f"Skip_Phase_Impact_{self.run_stamp}.json",
             "feedback_skipped_json": REPORT_DIR / f"Feedback_Skipped_{self.run_stamp}.json",
+            "deep_identify_csv": REPORT_DIR / f"Deep_Identify_{self.run_stamp}.csv",
+            "verification_csv": REPORT_DIR / f"Verification_Findings_{self.run_stamp}.csv",
+            "scorecard_json": REPORT_DIR / f"Quality_Scorecard_{self.run_stamp}.json",
         }
 
         if self.root_dir.exists():
@@ -411,6 +414,57 @@ class ReportsMixin:
                 encoding="utf-8",
             )
 
+        if self.deep_identify_rows:
+            self._write_csv(
+                paths["deep_identify_csv"],
+                [
+                    "Section",
+                    "Item Name",
+                    "Path",
+                    "Method",
+                    "Vendor",
+                    "Score",
+                    "Evidence",
+                    "Previous Vendor",
+                ],
+                [
+                    [
+                        row["section"],
+                        row["item_name"],
+                        row["path"],
+                        row["method"],
+                        row["vendor"],
+                        row["score"],
+                        row["evidence"],
+                        row["previous_vendor"],
+                    ]
+                    for row in self.deep_identify_rows
+                ],
+            )
+
+        if self.verification_findings:
+            self._write_csv(
+                paths["verification_csv"],
+                ["Check", "Severity", "Subject", "Path", "Detail", "Suggestion"],
+                [
+                    [
+                        row["check"],
+                        row["severity"],
+                        row["subject"],
+                        row["path"],
+                        row["detail"],
+                        row["suggestion"],
+                    ]
+                    for row in self.verification_findings
+                ],
+            )
+
+        if self.quality_scorecard:
+            paths["scorecard_json"].write_text(
+                json.dumps(self.quality_scorecard, indent=2),
+                encoding="utf-8",
+            )
+
         by_section: dict[str, list[dict]] = defaultdict(list)
         for entry in self.restructure_plan:
             by_section[entry["source_bin"]].append(entry)
@@ -533,6 +587,7 @@ class ReportsMixin:
             ],
             f"OS lanes (_mac/_linux/_windows): {self.stats['quarantined']}",
             f"Reconciled vendors: {self.stats['reconciled']}",
+            f"Deep identified: {self.stats.get('deep_identified', 0)}",
             f"Vendor conflicts: {len(self.vendor_conflicts)}",
             f"Nested issues: {len(self.nested_issues)}",
             f"Coexistence findings: {len(self.coexistence_pairs)}",
@@ -576,6 +631,24 @@ class ReportsMixin:
             summary_lines.append(f"  Probe trunc CSV:    {paths['probe_truncations_csv']}")
         if self.skip_phase_impact:
             summary_lines.append(f"  Skip impact JSON:   {paths['skip_impact_json']}")
+        if self.deep_identify_rows:
+            summary_lines.append(f"  Deep identify CSV:  {paths['deep_identify_csv']}")
+        if self.verification_findings:
+            summary_lines.append(f"  Verification CSV:   {paths['verification_csv']}")
+        if self.quality_scorecard:
+            summary_lines.append(f"  Scorecard JSON:     {paths['scorecard_json']}")
+            summary_lines.extend(
+                [
+                    "",
+                    "Quality scorecard:",
+                    f"  Identification: {self.quality_scorecard['identification_rate_pct']}% "
+                    f"({self.quality_scorecard['confirmed_rate_pct']}% confirmed)",
+                    f"  Routes ready: {self.quality_scorecard['route_ready_pct']}%",
+                    f"  Dedupe eligible: {self.quality_scorecard['dedupe_eligible_pct']}%",
+                    f"  Findings: {self.quality_scorecard['findings_warnings']} warnings, "
+                    f"{self.quality_scorecard['findings_suggestions']} suggestions",
+                ]
+            )
         paths["summary_txt"].write_text("\n".join(summary_lines), encoding="utf-8")
 
         report_keys = [
@@ -590,6 +663,9 @@ class ReportsMixin:
             "probe_truncations_csv",
             "skip_impact_json",
             "feedback_skipped_json",
+            "deep_identify_csv",
+            "verification_csv",
+            "scorecard_json",
             "archive_peek_csv",
             "scene_archive_peek_csv",
             "multipart_diag_csv",

@@ -34,7 +34,8 @@ export default defineConfig({
   },
   build: {
     target: process.env.TAURI_PLATFORM === "windows" ? "chrome105" : "safari13",
-    minify: process.env.TAURI_DEBUG ? false : "esbuild",
+    // Vite 8 minifies with oxc (Rust) by default; "esbuild" is no longer bundled
+    minify: !process.env.TAURI_DEBUG,
     sourcemap: !!process.env.TAURI_DEBUG,
   },
 });

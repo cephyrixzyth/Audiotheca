@@ -5,9 +5,18 @@ import {
   fetchHarvestCandidates,
   fetchJobs,
   fetchSystemMetrics,
+  fetchVerification,
 } from "../api/client";
 import { useLibraryRoot } from "../hooks/useLibraryRoot";
-import type { JobSnapshot, RunListItem, RunSummary, SystemMetrics, TabId } from "../types";
+import type {
+  JobSnapshot,
+  QualityScorecard,
+  RunListItem,
+  RunSummary,
+  SystemMetrics,
+  TabId,
+  VerificationFinding,
+} from "../types";
 import { formatCompact, formatDiskFree, formatGb, formatPct } from "../utils/format";
 import { ReorderableSections } from "./ReorderableSections";
 
@@ -127,6 +136,20 @@ export function Dashboard({ summary, runs, onNavigate }: Props) {
   const [harvestPending, setHarvestPending] = useState(0);
   const [compareStamp, setCompareStamp] = useState("");
   const [compareResult, setCompareResult] = useState<Record<string, unknown> | null>(null);
+  const [scorecard, setScorecard] = useState<QualityScorecard | null>(null);
+  const [findings, setFindings] = useState<VerificationFinding[]>([]);
+
+  useEffect(() => {
+    fetchVerification(summary.stamp, { limit: 50 })
+      .then((res) => {
+        setScorecard(res.scorecard && Object.keys(res.scorecard).length ? res.scorecard : null);
+        setFindings(res.items);
+      })
+      .catch(() => {
+        setScorecard(null);
+        setFindings([]);
+      });
+  }, [summary.stamp]);
 
   useEffect(() => {
     if (!compareStamp || compareStamp === summary.stamp) {
@@ -511,6 +534,65 @@ export function Dashboard({ summary, runs, onNavigate }: Props) {
           </div>
         ),
       },
+      {
+        id: "quality-scorecard",
+        title: "Quality scorecard",
+        subtitle: "Phase 3.5 verification results",
+        span: 2,
+        content: scorecard ? (
+          <>
+            <div className="gauge-stack">
+              <GaugeBar
+                label="Identification"
+                value={scorecard.identification_rate_pct ?? 0}
+                detail={`${scorecard.identification_rate_pct ?? 0}% (${scorecard.confirmed_rate_pct ?? 0}% confirmed)`}
+                tone={(scorecard.identification_rate_pct ?? 0) < 80 ? "warning" : "accent"}
+              />
+              <GaugeBar
+                label="Dedupe-eligible"
+                value={scorecard.dedupe_eligible_pct ?? 0}
+                detail={`${scorecard.dedupe_eligible_pct ?? 0}% have a dedupe key`}
+                tone={(scorecard.dedupe_eligible_pct ?? 0) < 60 ? "warning" : "accent"}
+              />
+              <GaugeBar
+                label="Routes ready"
+                value={scorecard.route_ready_pct ?? 0}
+                detail={`${scorecard.route_ready_pct ?? 0}%`}
+                tone={(scorecard.route_ready_pct ?? 0) < 50 ? "warning" : "accent"}
+              />
+            </div>
+            <div className="stat-grid compact" style={{ marginTop: "0.75rem" }}>
+              <StatTile label="Unknown items" value={formatCompact(scorecard.identified_unknown ?? 0)} />
+              <StatTile
+                label="Warnings"
+                value={scorecard.findings_warnings ?? 0}
+                tone={(scorecard.findings_warnings ?? 0) > 0 ? "warning" : undefined}
+              />
+              <StatTile label="Suggestions" value={scorecard.findings_suggestions ?? 0} />
+              <StatTile label="Dupe groups" value={scorecard.duplicate_groups ?? 0} />
+            </div>
+            {findings.length > 0 && (
+              <ul className="finding-list">
+                {findings.slice(0, 6).map((finding, idx) => (
+                  <li key={idx} className={`finding-row sev-${finding.severity.toLowerCase()}`}>
+                    <span className="badge bucket">{finding.check}</span>
+                    <span className="finding-detail" title={finding.suggestion}>
+                      {finding.detail}
+                    </span>
+                  </li>
+                ))}
+                {findings.length > 6 && (
+                  <li className="count-muted">… and {findings.length - 6} more in Verification CSV</li>
+                )}
+              </ul>
+            )}
+          </>
+        ) : (
+          <p className="count-muted">
+            No scorecard for this run — run a scan with the verification phase enabled.
+          </p>
+        ),
+      },
     ],
     [
       activeJob,
@@ -518,6 +600,7 @@ export function Dashboard({ summary, runs, onNavigate }: Props) {
       compareResult,
       compareStamp,
       feedback,
+      findings,
       harvestPending,
       identificationPct,
       invPct,
@@ -526,6 +609,7 @@ export function Dashboard({ summary, runs, onNavigate }: Props) {
       oneActionPct,
       routeReadyPct,
       runs,
+      scorecard,
       summary,
     ],
   );

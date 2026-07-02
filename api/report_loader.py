@@ -14,6 +14,7 @@ from api.models import (
     CacheHitItem,
     CoexistenceItem,
     CoverageGapItem,
+    DeepIdentifyItem,
     DuplicateGroup,
     DuplicateMember,
     InventoryItem,
@@ -29,6 +30,7 @@ from api.models import (
     SceneRenameItem,
     SkipPhaseImpact,
     SkippedItem,
+    VerificationFinding,
 )
 
 REPORT_DIR = report_dir()
@@ -212,6 +214,9 @@ def load_investigation(
             if q in item.item_name.lower()
             or q in item.current_path.lower()
             or q in item.fingerprint.lower()
+            or q in item.investigation_bucket.lower()
+            or q in item.reason.lower()
+            or q in item.id_method.lower()
         ]
     total = len(items)
     return items[offset : offset + limit], total
@@ -761,6 +766,87 @@ def load_feedback_skipped(stamp: str) -> list[dict]:
         return []
 
 
+def load_deep_identify(
+    stamp: str,
+    *,
+    method: str | None = None,
+    query: str | None = None,
+    limit: int = 500,
+    offset: int = 0,
+) -> tuple[list[DeepIdentifyItem], int]:
+    rows = _read_csv(stamp, "Deep_Identify")
+    items = [
+        DeepIdentifyItem(
+            section=row.get("Section", ""),
+            item_name=row.get("Item Name", ""),
+            path=row.get("Path", ""),
+            method=row.get("Method", ""),
+            vendor=row.get("Vendor", ""),
+            score=row.get("Score", ""),
+            evidence=row.get("Evidence", ""),
+            previous_vendor=row.get("Previous Vendor", ""),
+        )
+        for row in rows
+    ]
+    if method:
+        items = [item for item in items if item.method == method]
+    if query:
+        q = query.lower()
+        items = [
+            item
+            for item in items
+            if q in item.item_name.lower() or q in item.path.lower() or q in item.vendor.lower()
+        ]
+    total = len(items)
+    return items[offset : offset + limit], total
+
+
+def load_verification(
+    stamp: str,
+    *,
+    check: str | None = None,
+    severity: str | None = None,
+    query: str | None = None,
+    limit: int = 500,
+    offset: int = 0,
+) -> tuple[list[VerificationFinding], int]:
+    rows = _read_csv(stamp, "Verification_Findings")
+    items = [
+        VerificationFinding(
+            check=row.get("Check", ""),
+            severity=row.get("Severity", ""),
+            subject=row.get("Subject", ""),
+            path=row.get("Path", ""),
+            detail=row.get("Detail", ""),
+            suggestion=row.get("Suggestion", ""),
+        )
+        for row in rows
+    ]
+    if check:
+        items = [item for item in items if item.check == check]
+    if severity:
+        items = [item for item in items if item.severity == severity]
+    if query:
+        q = query.lower()
+        items = [
+            item
+            for item in items
+            if q in item.subject.lower() or q in item.detail.lower() or q in item.path.lower()
+        ]
+    total = len(items)
+    return items[offset : offset + limit], total
+
+
+def load_quality_scorecard(stamp: str) -> dict:
+    path = REPORT_DIR / f"Quality_Scorecard_{stamp}.json"
+    if not path.is_file():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
 def load_skipped_items(
     stamp: str,
     *,
@@ -913,12 +999,15 @@ def load_investigation_groups(
     *,
     bucket: str | None = None,
     group_by: str = "prefix",
+    query: str | None = None,
     limit: int = 100,
 ) -> tuple[list[dict], int]:
     """Group investigation rows by vendor prefix or fingerprint for bulk actions."""
     from vendor_gaps import _extract_prefix
 
-    items, _total = load_investigation(stamp, bucket=bucket, limit=100000, offset=0)
+    items, _total = load_investigation(
+        stamp, bucket=bucket, query=query, limit=100000, offset=0
+    )
     groups: dict[str, dict] = {}
 
     for item in items:

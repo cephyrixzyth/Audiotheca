@@ -12,8 +12,11 @@ SKIPPABLE_PHASES = frozenset({
     "scene_peek",
     "archive_peek",
     "quarantine",
+    "deep_identify",
     "duplicates",
+    "restructure",
     "restructure_live",
+    "verification",
     "purge",
 })
 

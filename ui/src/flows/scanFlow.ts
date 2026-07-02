@@ -45,6 +45,15 @@ export const SCAN_FLOW_PHASES: FlowPhase[] = [
     estimatedWeight: 8,
   },
   {
+    id: "deep_identify",
+    label: "Deep identification",
+    description: "Second pass for unknowns: fuzzy vendor matching and sibling-folder inference.",
+    enginePhase: "Phase 1.7",
+    skipKey: "deep_identify",
+    group: "analyze",
+    estimatedWeight: 6,
+  },
+  {
     id: "scene_peek",
     label: "Scene archive peek",
     description: "List scene-hash multipart archives without extracting.",
@@ -85,8 +94,18 @@ export const SCAN_FLOW_PHASES: FlowPhase[] = [
     label: "Restructure plan",
     description: "Compute vendor routes and investigation buckets.",
     enginePhase: "Phase 3",
+    skipKey: "restructure",
     group: "plan",
     estimatedWeight: 20,
+  },
+  {
+    id: "verification",
+    label: "Verification",
+    description: "Quality scorecard + QA findings: vendor candidates, destination collisions, suspicious keepers.",
+    enginePhase: "Phase 3.5",
+    skipKey: "verification",
+    group: "plan",
+    estimatedWeight: 4,
   },
   {
     id: "restructure_live",
@@ -126,8 +145,8 @@ export const FLOW_PRESETS: FlowPreset[] = [
   {
     id: "identify",
     label: "Identify only",
-    description: "Scan + restructure plan; skip OS lanes, dupes, and peeks.",
-    skipPhases: ["archive_peek", "scene_peek", "quarantine", "duplicates"],
+    description: "Scan and identify only — skip routing plan, dupes, OS lanes, and peeks.",
+    skipPhases: ["archive_peek", "scene_peek", "quarantine", "duplicates", "restructure", "verification"],
     pauseBetweenPhases: false,
   },
   {

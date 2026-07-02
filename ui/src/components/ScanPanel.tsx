@@ -13,7 +13,9 @@ import { useLibraryRoot } from "../hooks/useLibraryRoot";
 import { formatDiskFree, formatGb, formatPct } from "../utils/format";
 import type { JobSnapshot, ProgressEvent, RunSummary, SystemMetrics } from "../types";
 import { FlowEditor } from "./FlowEditor";
+import { PhaseProgressBar, phasesFromEvents } from "./PhaseProgressBar";
 import { ReorderableSections } from "./ReorderableSections";
+import { useContextSidebar } from "./ContextSidebar";
 import { FLOW_PRESET_STORAGE, FLOW_PRESETS } from "../flows/scanFlow";
 
 interface Props {
@@ -31,29 +33,58 @@ function loadInitialSkipPhases(): string[] {
   }
 }
 
-function isLogEvent(e: ProgressEvent): boolean {
-  return e.type.startsWith("phase") || e.type.startsWith("job") || e.type === "control_ack";
+type LogLevel = "info" | "warn" | "error" | "detail";
+
+interface LogLine {
+  text: string;
+  level: LogLevel;
 }
 
-function formatLogEvent(e: ProgressEvent): string {
-  if (e.type === "phase_progress") {
-    return `${e.phase}: ${e.done}/${e.total} (${e.pct}%) ${e.detail ?? ""}`;
+function isLogEvent(e: ProgressEvent): boolean {
+  return (
+    e.type.startsWith("phase") ||
+    e.type.startsWith("job") ||
+    e.type === "control_ack" ||
+    e.type === "engine_log"
+  );
+}
+
+function formatLogEvent(e: ProgressEvent): LogLine {
+  const ts = e.ts ? new Date(e.ts).toLocaleTimeString() : "";
+  const prefix = ts ? `[${ts}] ` : "";
+  if (e.type === "engine_log") {
+    return { text: `${prefix}${e.line ?? ""}`, level: e.level ?? "detail" };
   }
-  if (e.type === "phase_start") return `>>> ${e.phase}`;
-  if (e.type === "phase_finish") return `[OK] ${e.phase} ${e.note ?? ""}`;
-  if (e.type === "phase_paused") return `[PAUSED] ${e.phase} — waiting for continue`;
-  if (e.type === "phase_resumed") return `[RESUMED] ${e.phase}`;
-  if (e.type === "phase_stopped") return `[STOPPED] ${e.phase}`;
-  if (e.type === "job_start") return `[START] dry-run=${String((e as { dry_run?: boolean }).dry_run)}`;
-  if (e.type === "job_done") return `[DONE] run ${e.stamp ?? "?"}`;
-  if (e.type === "job_stopped") return `[STOPPED] ${e.error ?? "user stop"}`;
-  if (e.type === "job_failed") return `[FAILED] ${e.error ?? "error"}`;
-  if (e.type === "control_ack") return `[CONTROL] ${e.action ?? ""}`;
-  return JSON.stringify(e);
+  if (e.type === "phase_progress") {
+    const rate =
+      e.elapsed_s != null && e.done != null && e.done > 0
+        ? ` · ${(e.done / Math.max(e.elapsed_s, 0.1)).toFixed(1)} ${e.unit ?? "items"}/s`
+        : "";
+    const eta = e.eta_s != null ? ` · ETA ${Math.round(e.eta_s)}s` : "";
+    return {
+      text: `${prefix}${e.phase}: ${e.done?.toLocaleString() ?? "?"}/${e.total?.toLocaleString() ?? "?"} (${e.pct ?? "?"}%)${rate}${eta}${e.detail ? ` — ${e.detail}` : ""}`,
+      level: "detail",
+    };
+  }
+  if (e.type === "phase_start") return { text: `${prefix}>>> START ${e.phase}${e.note ? ` — ${e.note}` : ""}`, level: "info" };
+  if (e.type === "phase_finish") return { text: `${prefix}[OK] ${e.phase}${e.note ? ` — ${e.note}` : ""}${e.elapsed_s != null ? ` (${e.elapsed_s}s)` : ""}`, level: "info" };
+  if (e.type === "phase_paused") return { text: `${prefix}[PAUSED] ${e.phase} — waiting for continue`, level: "warn" };
+  if (e.type === "phase_resumed") return { text: `${prefix}[RESUMED] ${e.phase}`, level: "info" };
+  if (e.type === "phase_stopped") return { text: `${prefix}[STOPPED] ${e.phase}${e.note ? ` — ${e.note}` : ""}`, level: "warn" };
+  if (e.type === "job_start") {
+    const dry = (e as { dry_run?: boolean }).dry_run;
+    return { text: `${prefix}[JOB START] dry_run=${String(dry)} root=${(e as { root?: string }).root ?? "?"}`, level: "info" };
+  }
+  if (e.type === "job_done") return { text: `${prefix}[JOB DONE] stamp=${e.stamp ?? "?"}${e.elapsed_s != null ? ` elapsed=${e.elapsed_s}s` : ""}`, level: "info" };
+  if (e.type === "job_stopped") return { text: `${prefix}[JOB STOPPED] ${e.error ?? "user stop"}${e.stamp ? ` stamp=${e.stamp}` : ""}`, level: "warn" };
+  if (e.type === "job_failed") return { text: `${prefix}[JOB FAILED] ${e.error ?? "error"}${e.stamp ? ` stamp=${e.stamp}` : ""}`, level: "error" };
+  if (e.type === "control_ack") return { text: `${prefix}[CONTROL] ${e.action ?? ""}${e.note ? ` — ${e.note}` : ""}`, level: "info" };
+  return { text: `${prefix}${e.type}: ${JSON.stringify(e)}`, level: "detail" };
 }
 
 export function ScanPanel({ onRunComplete }: Props) {
   const libraryRoot = useLibraryRoot();
+  const { query: sidebarQuery } = useContextSidebar();
   const [root, setRoot] = useState(libraryRoot);
   const [stagingRoot, setStagingRoot] = useState("");
   const [extraRoots, setExtraRoots] = useState("");
@@ -65,6 +96,13 @@ export function ScanPanel({ onRunComplete }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [completedSummary, setCompletedSummary] = useState<RunSummary | null>(null);
+  const [logLevelFilter, setLogLevelFilter] = useState<"all" | "info" | "warn" | "error">("all");
+  const [autoScroll, setAutoScroll] = useState(true);
+  const [copied, setCopied] = useState(false);
+  const [stagingDay, setStagingDay] = useState(false);
+  const [liveConfirmOpen, setLiveConfirmOpen] = useState(false);
+  const [liveConfirmText, setLiveConfirmText] = useState("");
+  const logRef = useRef<HTMLDivElement | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const eventsOffsetRef = useRef(0);
 
@@ -80,7 +118,7 @@ export function ScanPanel({ onRunComplete }: Props) {
       }
       setEvents((prev) => {
         if (prev.length && prev[prev.length - 1] === event) return prev;
-        return [...prev.slice(-200), event];
+        return [...prev.slice(-500), event];
       });
       if (event.type === "phase_start") {
         setJob((j) => (j ? { ...j, status: "running", current_phase: event.phase ?? j.current_phase } : j));
@@ -129,7 +167,7 @@ export function ScanPanel({ onRunComplete }: Props) {
         const res = await fetchJobEvents(jobId, after);
         eventsOffsetRef.current = res.total;
         if (reset) {
-          setEvents(res.events.filter((e) => e.type !== "system_metrics").slice(-200));
+          setEvents(res.events.filter((e) => e.type !== "system_metrics").slice(-500));
         } else if (res.events.length) {
           for (const event of res.events) {
             applyEvent(event);
@@ -237,17 +275,21 @@ export function ScanPanel({ onRunComplete }: Props) {
 
   useEffect(() => () => wsRef.current?.close(), []);
 
-  async function handleStart() {
+  async function handleStart(live = false) {
+    if (live && liveConfirmText.trim().toUpperCase() !== "STAGE LIVE") {
+      setError('Type STAGE LIVE in the confirmation box to proceed');
+      return;
+    }
     setStarting(true);
     setError(null);
     setEvents([]);
     setMetrics(null);
     try {
       const snapshot = await startScan({
-        dry_run: true,
+        dry_run: !live,
         root,
         scan_options: {
-          pause_between_phases: pauseBetweenPhases,
+          pause_between_phases: pauseBetweenPhases || live,
           skip_phases: skipPhases,
           staging_root: stagingRoot.trim(),
           extra_scan_roots: extraRoots
@@ -257,6 +299,8 @@ export function ScanPanel({ onRunComplete }: Props) {
         },
       });
       setJob(snapshot);
+      setLiveConfirmOpen(false);
+      setLiveConfirmText("");
       eventsOffsetRef.current = 0;
       setEvents([]);
       connectWs(snapshot.job_id);
@@ -287,14 +331,53 @@ export function ScanPanel({ onRunComplete }: Props) {
   const stopPending = job?.status === "stop_pending";
   const showContinue =
     paused || [...events].slice(-8).some((e) => e.type === "phase_paused");
-  const logLines = events.filter(isLogEvent).map(formatLogEvent).slice(-100);
+  const phaseState = useMemo(() => phasesFromEvents(events), [events]);
+  const logLines = useMemo(() => {
+    const lines = events.filter(isLogEvent).map(formatLogEvent);
+    const q = sidebarQuery.trim().toLowerCase();
+    let filtered = q ? lines.filter((line) => line.text.toLowerCase().includes(q)) : lines;
+    if (logLevelFilter === "error") {
+      filtered = filtered.filter((line) => line.level === "error");
+    } else if (logLevelFilter === "warn") {
+      filtered = filtered.filter((line) => line.level === "warn" || line.level === "error");
+    } else if (logLevelFilter === "info") {
+      filtered = filtered.filter((line) => line.level !== "detail");
+    }
+    return filtered.slice(-400);
+  }, [events, sidebarQuery, logLevelFilter]);
+
+  useEffect(() => {
+    if (!autoScroll || !logRef.current) return;
+    logRef.current.scrollTop = logRef.current.scrollHeight;
+  }, [logLines, autoScroll]);
+
+  function handleCopyLog() {
+    const text = logLines.map((l) => l.text).join("\n");
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    });
+  }
+
+  function handleDownloadLog() {
+    const text = logLines.map((l) => l.text).join("\n");
+    const blob = new Blob([text], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `audiotheca-scan-log-${new Date().toISOString().replace(/[:.]/g, "-")}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   const scanSections = useMemo(
     () => [
       {
         id: "flow",
         title: "Processing flow",
-        subtitle: "Scan pipeline — toggle phases and pick presets",
+        subtitle: "Toggle phases — restructure ON/OFF controls route planning",
+        group: "pipeline",
+        groupTitle: "Pipeline setup",
         content: (
           <FlowEditor
             skipPhases={skipPhases}
@@ -309,30 +392,31 @@ export function ScanPanel({ onRunComplete }: Props) {
         id: "paths",
         title: "Library paths",
         subtitle: "Root, staging, and extra scan trees",
+        group: "pipeline",
         content: (
-          <div className="toolbar" style={{ flexDirection: "column", alignItems: "stretch", gap: "0.75rem" }}>
-            <label>
-              Library root
-              <input type="text" value={root} onChange={(e) => setRoot(e.target.value)} style={{ width: "100%" }} />
+          <div className="field-stack">
+            <label className="context-field">
+              <span className="context-label">Library root</span>
+              <input type="text" className="field-input" value={root} onChange={(e) => setRoot(e.target.value)} />
             </label>
-            <label>
-              Alternate staging root (for _delete-canidates when primary disk is full)
+            <label className="context-field">
+              <span className="context-label">Alternate staging root</span>
               <input
                 type="text"
-                placeholder="e.g. D:\\audiotheca_staging"
+                className="field-input"
+                placeholder="e.g. D:\audiotheca_staging"
                 value={stagingRoot}
                 onChange={(e) => setStagingRoot(e.target.value)}
-                style={{ width: "100%" }}
               />
             </label>
-            <label>
-              Extra scan roots (comma or newline — additional library trees)
+            <label className="context-field">
+              <span className="context-label">Extra scan roots</span>
               <textarea
+                className="field-input field-textarea"
                 rows={2}
-                placeholder="Z:\\other_library"
+                placeholder="Z:\other_library"
                 value={extraRoots}
                 onChange={(e) => setExtraRoots(e.target.value)}
-                style={{ width: "100%" }}
               />
             </label>
           </div>
@@ -342,6 +426,8 @@ export function ScanPanel({ onRunComplete }: Props) {
         id: "controls",
         title: "Run controls",
         subtitle: "Start, pause, stop",
+        group: "run",
+        groupTitle: "Scan execution",
         content: (
           <>
             <div className="toolbar">
@@ -350,10 +436,25 @@ export function ScanPanel({ onRunComplete }: Props) {
                 className="primary-btn"
                 disabled={starting || isActive}
                 title="Queue a dry-run scan — no files moved; reports written to dedupe_reports"
-                onClick={() => void handleStart()}
+                onClick={() => void handleStart(false)}
               >
-                {starting ? "Starting…" : "Start dry-run scan"}
+                {starting && !liveConfirmOpen ? "Starting…" : "Start dry-run scan"}
               </button>
+              <label className="checkbox-inline staging-day-toggle" title="Enable live staging with extra safety checkpoints">
+                <input type="checkbox" checked={stagingDay} onChange={(e) => setStagingDay(e.target.checked)} />
+                Staging day (live)
+              </label>
+              {stagingDay && (
+                <button
+                  type="button"
+                  className="danger-btn"
+                  disabled={starting || isActive}
+                  title="Filesystem changes — moves, quarantine, duplicate staging"
+                  onClick={() => setLiveConfirmOpen(true)}
+                >
+                  Start LIVE staging run
+                </button>
+              )}
               {isActive && (
                 <>
                   <button
@@ -398,13 +499,68 @@ export function ScanPanel({ onRunComplete }: Props) {
                 Paused at <strong>{activePhase}</strong>. Review reports, then continue or stop.
               </div>
             )}
+            {stagingDay && !isActive && (
+              <div className="banner live staging-banner">
+                <strong>Staging day mode</strong> — live runs will move files, stage duplicates, and apply
+                restructure when enabled. Always dry-run first and review CSV reports.
+              </div>
+            )}
+            {liveConfirmOpen && (
+              <div className="live-confirm-panel">
+                <h4>Confirm LIVE staging run</h4>
+                <ul className="live-warn-list">
+                  <li>Files will be moved on disk — not reversible without backups.</li>
+                  <li>Duplicates may be staged to <code>_delete-canidates</code>.</li>
+                  <li>OS-lane items route to <code>_mac</code> / <code>_linux</code> / <code>_windows</code>.</li>
+                  <li>Pause-between-phases is forced ON for this run.</li>
+                </ul>
+                <label className="context-field">
+                  <span className="context-label">Type STAGE LIVE to confirm</span>
+                  <input
+                    type="text"
+                    className="field-input"
+                    value={liveConfirmText}
+                    onChange={(e) => setLiveConfirmText(e.target.value)}
+                    autoComplete="off"
+                  />
+                </label>
+                <div className="toolbar">
+                  <button
+                    type="button"
+                    className="danger-btn"
+                    disabled={starting}
+                    onClick={() => void handleStart(true)}
+                  >
+                    {starting ? "Starting…" : "Execute LIVE run"}
+                  </button>
+                  <button type="button" className="text-btn" onClick={() => setLiveConfirmOpen(false)}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </>
+        ),
+      },
+      {
+        id: "phase-progress",
+        title: "Pipeline progress",
+        subtitle: "Phase indicators for the active scan",
+        group: "run",
+        hidden: !isActive && !phaseState.completed.length,
+        content: (
+          <PhaseProgressBar
+            activePhase={activePhase ?? phaseState.active}
+            completedPhases={phaseState.completed}
+            isActive={isActive}
+          />
         ),
       },
       {
         id: "status",
         title: "Live status",
         subtitle: "Job progress and host metrics",
+        group: "run",
         hidden: !job,
         content: job ? (
           <div className="scan-status">
@@ -475,19 +631,65 @@ export function ScanPanel({ onRunComplete }: Props) {
       {
         id: "log",
         title: "Progress log",
-        subtitle: "Engine phase events",
+        subtitle: "Full engine output — phase events, warnings, and detail lines",
+        fullWidth: true,
+        minBodyHeight: 320,
         hidden: !isActive && logLines.length === 0,
         content: (
-          <div className="log-panel" style={{ margin: 0, border: "none" }}>
-            <pre>
-              {logLines.length > 0 ? logLines.join("\n") : "Waiting for progress events…"}
-            </pre>
+          <div className="log-panel log-panel-full">
+            <div className="log-toolbar">
+              <div className="log-level-filters">
+                {(["all", "info", "warn", "error"] as const).map((level) => (
+                  <button
+                    key={level}
+                    type="button"
+                    className={`log-level-btn ${logLevelFilter === level ? "active" : ""}`}
+                    title={
+                      level === "all"
+                        ? "Show every log line including per-item detail"
+                        : level === "info"
+                          ? "Hide per-item detail lines"
+                          : level === "warn"
+                            ? "Warnings and errors only"
+                            : "Errors only"
+                    }
+                    onClick={() => setLogLevelFilter(level)}
+                  >
+                    {level === "all" ? "All" : level === "info" ? "Info+" : level === "warn" ? "Warn+" : "Errors"}
+                  </button>
+                ))}
+              </div>
+              <label className="checkbox-label" title="Keep the log pinned to the newest line">
+                <input type="checkbox" checked={autoScroll} onChange={(e) => setAutoScroll(e.target.checked)} />
+                Auto-scroll
+              </label>
+              <button type="button" className="text-btn" title="Copy visible log lines" onClick={handleCopyLog}>
+                {copied ? "Copied" : "Copy"}
+              </button>
+              <button type="button" className="text-btn" title="Download visible log lines as .txt" onClick={handleDownloadLog}>
+                Download
+              </button>
+              <span className="count-muted">{logLines.length} lines</span>
+            </div>
+            <div className="log-lines" ref={logRef}>
+              {logLines.length > 0 ? (
+                logLines.map((line, i) => (
+                  <div key={i} className={`log-line log-${line.level}`}>
+                    {line.text}
+                  </div>
+                ))
+              ) : (
+                <div className="log-line log-detail">Waiting for progress events…</div>
+              )}
+            </div>
           </div>
         ),
       },
     ],
     [
       activePhase,
+      autoScroll,
+      copied,
       error,
       extraRoots,
       handleControl,
@@ -495,6 +697,7 @@ export function ScanPanel({ onRunComplete }: Props) {
       isActive,
       job,
       latestProgress,
+      logLevelFilter,
       logLines,
       metrics,
       pauseBetweenPhases,
@@ -504,16 +707,18 @@ export function ScanPanel({ onRunComplete }: Props) {
       showContinue,
       skipPhases,
       stagingRoot,
-      starting,
-      stopPending,
+      liveConfirmOpen,
+      liveConfirmText,
+      phaseState,
+      stagingDay,
     ],
   );
 
   return (
     <div>
       <div className="banner dry">
-        Scans run in <strong>dry-run</strong> mode. Configure the processing flow below, then start a scan.
-        Use presets for fast identify-only runs or full archive audits.
+        Default scans are <strong>dry-run</strong> (no filesystem changes). Enable <strong>Staging day</strong> for
+        live moves with explicit confirmation. Configure the processing flow below before starting.
       </div>
 
       {completedSummary && (
