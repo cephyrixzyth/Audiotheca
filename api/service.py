@@ -64,6 +64,11 @@ def _verify_library_root() -> list[str]:
     from api import security
 
     for root in security.library_roots():
+        raw = str(root)
+        if raw.startswith("\\\\") or raw.startswith("//"):
+            # Avoid blocking API startup on slow/unreachable SMB roots.
+            warnings.append(f"Network library root configured: {root}")
+            continue
         try:
             if not root.exists():
                 warnings.append(f"Library root missing: {root}")

@@ -24,7 +24,7 @@ WIN_ROOT = r"Z:\_software\_audio"
 PORT_MIN = 8787
 PORT_MAX = 8797
 POLL_S = 60
-API_START_WAIT_S = 8
+API_START_WAIT_S = 25
 MAX_SCAN_ATTEMPTS = 5
 
 
@@ -136,13 +136,16 @@ def api_post(port: int, path: str, body: dict, tok: str, *, timeout: float = 120
         return None
 
 
-def find_live_api_port() -> int | None:
-    for port in range(PORT_MIN, PORT_MAX + 1):
+def find_live_api_port(*, require_version: bool = True) -> int | None:
+    for port in range(PORT_MAX, PORT_MIN - 1, -1):
         if not port_listening(port):
             continue
         health = api_get(port, "/api/health", timeout=10)
-        if health and health.get("status") in {"ok", "degraded"}:
-            return port
+        if not health or health.get("status") not in {"ok", "degraded"}:
+            continue
+        if require_version and "engine_version" not in health:
+            continue
+        return port
     return None
 
 
@@ -253,6 +256,9 @@ def start_full_scan(port: int, tok: str) -> dict | None:
 
 
 def run_pytest() -> bool:
+    if os.environ.get("OVERNIGHT_SKIP_PYTEST") == "1":
+        log("Skipping pytest (OVERNIGHT_SKIP_PYTEST=1)")
+        return True
     log("Running pytest suite…")
     proc = subprocess.run(
         [sys.executable, "-m", "pytest", "tests/", "-q", "--tb=no"],
@@ -273,17 +279,16 @@ def main() -> int:
     if not run_pytest():
         log("WARNING: pytest failed — continuing anyway")
 
+    for port in range(PORT_MIN, PORT_MAX + 1):
+        free_port(port)
+
     api_proc: subprocess.Popen | None = None
-    api_port = find_live_api_port()
-    if api_port is None:
-        api_port = pick_port()
-        kill_audiotheca_processes()
-        api_proc = start_api(api_port)
-        if api_proc is None:
-            log("FATAL: could not start API")
-            return 1
-    else:
-        log(f"Using existing API on port {api_port}")
+    api_port = pick_port()
+    kill_audiotheca_processes()
+    api_proc = start_api(api_port)
+    if api_proc is None:
+        log("FATAL: could not start API")
+        return 1
 
     tok = bootstrap_token(api_port)
     scan_attempts = 0
@@ -307,7 +312,7 @@ def main() -> int:
             tok = bootstrap_token(api_port)
 
         health = api_get(api_port, "/api/health", timeout=15)
-        if not health:
+        if not health or "engine_version" not in health:
             log(f"Health check failed on port {api_port}")
             stale_checks += 1
             if stale_checks >= 3:

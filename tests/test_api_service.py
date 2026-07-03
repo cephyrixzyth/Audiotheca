@@ -60,6 +60,16 @@ def test_health_payload_includes_uptime() -> None:
     assert payload["uptime_s"] >= 9
 
 
+def test_startup_skips_unc_root_exists_check(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    nas = Path(r"\\192.168.1.1\share\audio")
+    monkeypatch.setattr(
+        "api.security.library_roots",
+        lambda: [nas],
+    )
+    warnings = api_service._verify_library_root()
+    assert any("Network library root" in w for w in warnings)
+
+
 def test_health_payload_degraded_when_warnings() -> None:
     api_service.service_state.started_at = time.time()
     api_service.service_state.startup_warnings = ["Report directory not writable"]
