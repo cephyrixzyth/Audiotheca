@@ -310,7 +310,7 @@ class JobManager:
                     break
 
                 if progress_file.is_file():
-                    text = progress_file.read_text(encoding="utf-8")
+                    text = await asyncio.to_thread(progress_file.read_text, encoding="utf-8")
                     lines = text.splitlines()
                     while offset < len(lines):
                         try:
