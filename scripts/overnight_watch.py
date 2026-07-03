@@ -25,7 +25,7 @@ PORT_MIN = 8787
 PORT_MAX = 8797
 POLL_S = 60
 API_START_WAIT_S = 25
-MAX_SCAN_ATTEMPTS = 5
+MAX_SCAN_ATTEMPTS = 12
 
 
 def _ts() -> str:
@@ -152,6 +152,15 @@ def find_live_api_port(*, require_version: bool = True) -> int | None:
 def kill_audiotheca_processes(*, keep_api_pid: int | None = None) -> None:
     if sys.platform != "win32":
         return
+    keep_engine_pid: int | None = None
+    try:
+        from api import engine_lock
+
+        active = engine_lock.read_lock()
+        if active and engine_lock.is_pid_alive(int(active.get("pid", 0))):
+            keep_engine_pid = int(active["pid"])
+    except Exception:
+        keep_engine_pid = None
     script = (
         "Get-CimInstance Win32_Process | Where-Object { "
         "$_.CommandLine -match 'audiotheca\\\\main\\.py|api\\.server' "
@@ -169,6 +178,8 @@ def kill_audiotheca_processes(*, keep_api_pid: int | None = None) -> None:
             continue
         pid = int(line)
         if keep_api_pid and pid == keep_api_pid:
+            continue
+        if keep_engine_pid and pid == keep_engine_pid:
             continue
         subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True, check=False)
         log(f"Killed process pid={pid}")
@@ -279,16 +290,25 @@ def main() -> int:
     if not run_pytest():
         log("WARNING: pytest failed — continuing anyway")
 
-    for port in range(PORT_MIN, PORT_MAX + 1):
-        free_port(port)
-
     api_proc: subprocess.Popen | None = None
-    api_port = pick_port()
-    kill_audiotheca_processes()
-    api_proc = start_api(api_port)
-    if api_proc is None:
-        log("FATAL: could not start API")
-        return 1
+    existing = find_live_api_port(require_version=True)
+    if existing:
+        health = api_get(existing, "/api/health", timeout=15)
+        if health and (health.get("scan_running") or health.get("active_engine")):
+            api_port = existing
+            log(f"Resuming watch on API port {api_port} (scan already active)")
+        else:
+            existing = None
+
+    if existing is None:
+        for port in range(PORT_MIN, PORT_MAX + 1):
+            free_port(port)
+        api_port = pick_port()
+        kill_audiotheca_processes()
+        api_proc = start_api(api_port)
+        if api_proc is None:
+            log("FATAL: could not start API")
+            return 1
 
     tok = bootstrap_token(api_port)
     scan_attempts = 0
@@ -334,6 +354,17 @@ def main() -> int:
         scan_running = bool(health.get("scan_running"))
         orphans = health.get("orphan_engine_pids") or []
         engines = engine_processes()
+
+        if orphans and not scan_running:
+            log(f"Clearing orphan engine pids: {orphans}")
+            kill_audiotheca_processes(keep_api_pid=api_proc.pid if api_proc else None)
+            time.sleep(3)
+            health = api_get(api_port, "/api/health", timeout=15) or health
+            job = health.get("job") or {}
+            status = str(job.get("status", ""))
+            scan_running = bool(health.get("scan_running"))
+            orphans = health.get("orphan_engine_pids") or []
+            engines = engine_processes()
 
         if phase != last_phase:
             log(
@@ -381,14 +412,14 @@ def main() -> int:
             continue
 
         if not scan_running and status not in {"running", "paused", "pause_pending", "stop_pending"}:
-            scan_attempts += 1
             result = start_full_scan(api_port, tok)
             if result:
+                scan_attempts += 1
                 log(f"Started scan job {result.get('job_id')} (attempt {scan_attempts})")
                 last_event_count = -1
                 last_phase = ""
             else:
-                log("Failed to start scan")
+                log("Failed to start scan — will retry next poll")
 
         time.sleep(POLL_S)
 
