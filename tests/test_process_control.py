@@ -65,3 +65,9 @@ def test_list_process_snapshot_shape(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "processes" in snap
     assert "api_ports" in snap
     assert "orphan_engine_pids" in snap
+
+
+def test_api_server_imports() -> None:
+    from api.server import app
+
+    assert app is not None

@@ -7,6 +7,10 @@ import os
 from datetime import datetime, timezone
 
 
+def verbose_enabled() -> bool:
+    return os.environ.get("AUDIOTHECA_VERBOSE_LOG", "").strip() in {"1", "true", "yes"}
+
+
 def emit_progress_event(event: dict) -> None:
     """Append JSONL event when AUDIOTHECA_PROGRESS_FILE is set (UI job runner)."""
     path = os.environ.get("AUDIOTHECA_PROGRESS_FILE")
@@ -18,3 +22,17 @@ def emit_progress_event(event: dict) -> None:
             handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
     except OSError:
         pass
+
+
+def log_step(step: str, message: str, *, level: str = "detail") -> None:
+    """Emit a step/function line to the UI progress log when verbose is on."""
+    if not verbose_enabled():
+        return
+    emit_progress_event(
+        {
+            "type": "step_log",
+            "step": step[:80],
+            "line": message[:400],
+            "level": level,
+        }
+    )

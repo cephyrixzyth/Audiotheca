@@ -6,8 +6,7 @@ import os
 import sys
 import time
 
-from audiotheca.session_log import log_step, verbose_enabled
-from progress_events import emit_progress_event
+from progress_events import emit_progress_event, log_step, verbose_enabled
 
 
 def _emit_progress_event(event: dict) -> None:
@@ -89,7 +88,7 @@ class PhaseProgress:
         if detail:
             msg += f"  |  {detail[:48]}"
         _console_print(msg)
-        if verbose_enabled() and detail:
+        if detail and verbose_enabled():
             log_step(self.phase, detail)
         _emit_progress_event(
             {
