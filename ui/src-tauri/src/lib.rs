@@ -1,11 +1,13 @@
+use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
-use tauri::{Manager, RunEvent};
+use tauri::{Manager, RunEvent, State};
 use tauri_plugin_shell::process::CommandChild;
 use tauri_plugin_shell::ShellExt;
 
-const API_PORT: u16 = 8787;
+const API_PORT_MIN: u16 = 8787;
+const API_PORT_MAX: u16 = 8797;
 
 enum ApiProcess {
     Sidecar(CommandChild),
@@ -13,6 +15,7 @@ enum ApiProcess {
 }
 
 struct ApiChild(Mutex<Option<ApiProcess>>);
+struct ApiPort(Mutex<u16>);
 
 fn workspace_root() -> PathBuf {
     if cfg!(debug_assertions) {
@@ -60,18 +63,60 @@ fn engine_resource_path(app: &tauri::App) -> Option<PathBuf> {
     None
 }
 
-fn spawn_api_server(app: &tauri::App, root: &Path) -> Option<ApiProcess> {
+fn free_port_listeners(port: u16) {
+    #[cfg(windows)]
+    {
+        let script = format!(
+            "Get-NetTCPConnection -LocalPort {port} -ErrorAction SilentlyContinue | \
+             Select-Object -ExpandProperty OwningProcess -Unique | \
+             ForEach-Object {{ Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }}"
+        );
+        let _ = Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                &script,
+            ])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+}
+
+fn can_bind(port: u16) -> bool {
+    TcpListener::bind(("127.0.0.1", port)).is_ok()
+}
+
+fn pick_api_port() -> u16 {
+    for port in API_PORT_MIN..=API_PORT_MAX {
+        free_port_listeners(port);
+        if can_bind(port) {
+            if port != API_PORT_MIN {
+                eprintln!("[audiotheca] Port {API_PORT_MIN} busy — using {port} for API");
+            }
+            return port;
+        }
+    }
+    eprintln!("[audiotheca] Warning: no free API port in {API_PORT_MIN}-{API_PORT_MAX}; defaulting to {API_PORT_MIN}");
+    API_PORT_MIN
+}
+
+fn spawn_api_server(app: &tauri::App, root: &Path, port: u16) -> Option<ApiProcess> {
+    let port_str = port.to_string();
     let (home, engine) = sidecar_env(app, root);
 
     if let Ok(mut sidecar) = app.shell().sidecar("api-server") {
         sidecar = sidecar
             .env("AUDIOTHECA_HOME", &home)
-            .env("AUDIOTHECA_NO_RELOAD", "1");
+            .env("AUDIOTHECA_NO_RELOAD", "1")
+            .env("AUDIOTHECA_API_PORT", &port_str);
         if let Some(engine_path) = &engine {
             sidecar = sidecar.env("AUDIOTHECA_ENGINE", engine_path);
         }
         if let Ok((_rx, child)) = sidecar.spawn() {
-            eprintln!("[audiotheca] API sidecar started (AUDIOTHECA_HOME={home})");
+            eprintln!("[audiotheca] API sidecar started on port {port} (AUDIOTHECA_HOME={home})");
             return Some(ApiProcess::Sidecar(child));
         }
     }
@@ -89,12 +134,13 @@ fn spawn_api_server(app: &tauri::App, root: &Path) -> Option<ApiProcess> {
         cmd.env("AUDIOTHECA_HOME", &home);
         cmd.env("PYTHONUNBUFFERED", "1");
         cmd.env("AUDIOTHECA_NO_RELOAD", "1");
+        cmd.env("AUDIOTHECA_API_PORT", &port_str);
         if let Some(engine_path) = &engine {
             cmd.env("AUDIOTHECA_ENGINE", engine_path);
         }
 
         if let Ok(child) = cmd.spawn() {
-            eprintln!("[audiotheca] API server started via {launcher}");
+            eprintln!("[audiotheca] API server started via {launcher} on port {port}");
             return Some(ApiProcess::Python(child));
         }
     }
@@ -122,8 +168,9 @@ fn stop_api_server(state: &ApiChild) {
 }
 
 #[tauri::command]
-fn api_base_url() -> String {
-    format!("http://127.0.0.1:{API_PORT}/api")
+fn api_base_url(port: State<ApiPort>) -> String {
+    let api_port = *port.0.lock().unwrap_or_else(|e| e.into_inner());
+    format!("http://127.0.0.1:{api_port}/api")
 }
 
 #[tauri::command]
@@ -139,7 +186,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![api_base_url, workspace_path])
         .setup(|app| {
             let root = workspace_root();
-            let child = spawn_api_server(app, &root);
+            let api_port = pick_api_port();
+            app.manage(ApiPort(Mutex::new(api_port)));
+            let child = spawn_api_server(app, &root, api_port);
             app.manage(ApiChild(Mutex::new(child)));
             Ok(())
         })

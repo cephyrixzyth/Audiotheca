@@ -21,7 +21,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' http://127.0.0.1:8787 ws://127.0.0.1:8787 ipc: http://localhost:5173 ws://localhost:5173 http://tauri.localhost https://tauri.localhost; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+      "csp": "default-src 'self'; connect-src 'self' http://127.0.0.1:8787 ws://127.0.0.1:8787 http://127.0.0.1:8788 ws://127.0.0.1:8788 http://127.0.0.1:8789 ws://127.0.0.1:8789 http://127.0.0.1:8790 ws://127.0.0.1:8790 http://127.0.0.1:8791 ws://127.0.0.1:8791 http://127.0.0.1:8792 ws://127.0.0.1:8792 http://127.0.0.1:8793 ws://127.0.0.1:8793 http://127.0.0.1:8794 ws://127.0.0.1:8794 http://127.0.0.1:8795 ws://127.0.0.1:8795 http://127.0.0.1:8796 ws://127.0.0.1:8796 http://127.0.0.1:8797 ws://127.0.0.1:8797 ipc: http://localhost:5173 ws://localhost:5173 http://tauri.localhost https://tauri.localhost; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
     }
   },
   "bundle": {

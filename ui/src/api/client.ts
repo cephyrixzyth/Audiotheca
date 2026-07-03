@@ -823,7 +823,7 @@ export async function spaceRecoveryReportUrl(filename: string): Promise<string> 
 
 export async function jobEventsUrl(jobId: string): Promise<string> {
   const token = await ensureApiToken();
-  return `${getWsBase()}/api/jobs/${jobId}/events?token=${encodeURIComponent(token)}`;
+  return `${await getWsBase()}/api/jobs/${jobId}/events?token=${encodeURIComponent(token)}`;
 }
 
 export async function openInExplorer(path: string): Promise<void> {

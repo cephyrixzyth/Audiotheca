@@ -330,7 +330,7 @@ class JobManager:
 
                 now = time.monotonic()
                 if now - last_metrics >= 2.0:
-                    metrics = collect_metrics(path=Path(root_dir))
+                    metrics = await asyncio.to_thread(collect_metrics, path=Path(root_dir))
                     await self._broadcast(job, {"type": "system_metrics", **metrics})
                     last_metrics = now
                 await drain_stdout()

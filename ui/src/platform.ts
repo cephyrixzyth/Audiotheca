@@ -56,9 +56,11 @@ export async function getApiBase(): Promise<string> {
   }
 }
 
-export function getWsBase(): string {
-  if (isTauri() || import.meta.env.DEV) {
-    return `ws://127.0.0.1:${API_PORT}`;
+export async function getWsBase(): Promise<string> {
+  if (!isTauri() && !import.meta.env.DEV) {
+    return `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}`;
   }
-  return `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}`;
+  const base = await getApiBase();
+  const url = new URL(base);
+  return `ws://${url.host}`;
 }
