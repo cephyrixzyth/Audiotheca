@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from api import engine_lock
+from api import process_control
 from api import report_loader
 from api import service as api_service
 from api.paths import engine_executable, workspace_root
@@ -122,6 +123,7 @@ class JobManager:
             job.events.append(event)
             if len(job.events) > MAX_STORED_JOB_EVENTS:
                 del job.events[: len(job.events) - MAX_STORED_JOB_EVENTS]
+            process_control.append_session_event(job.job_id, event)
         if event.get("type") == "phase_start":
             job.current_phase = str(event.get("phase", ""))
         if event.get("type") == "phase_paused":
@@ -201,6 +203,8 @@ class JobManager:
         env["AUDIOTHECA_CONTROL_FILE"] = str(control_file)
         env["AUDIOTHECA_SCAN_OPTIONS"] = json.dumps(options.to_dict())
         env["PYTHONUNBUFFERED"] = "1"
+        if options.verbose_log:
+            env["AUDIOTHECA_VERBOSE_LOG"] = "1"
 
         cmd = _engine_command(root_dir, dry_run)
 
@@ -291,9 +295,13 @@ class JobManager:
                 # phase_start / phase_progress / phase_finish events.
                 if line.startswith(">>> ") or _COUNTER_RE.match(line) or _FINISH_RE.match(line):
                     continue
+                verbose = bool(job.scan_options.get("verbose_log"))
+                level = _log_level(line)
+                if not verbose and level == "detail":
+                    continue
                 await self._broadcast(
                     job,
-                    {"type": "engine_log", "line": line[:400], "level": _log_level(line)},
+                    {"type": "engine_log", "line": line[:400], "level": level},
                 )
 
         try:

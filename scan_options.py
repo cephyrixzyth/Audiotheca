@@ -29,6 +29,7 @@ class ScanOptions:
     extra_scan_roots: list[str] = field(default_factory=list)
     target_paths: list[str] = field(default_factory=list)
     invalidate_cache_paths: list[str] = field(default_factory=list)
+    verbose_log: bool = False
 
     def skip(self, phase: str) -> bool:
         return phase in self.skip_phases
@@ -41,6 +42,7 @@ class ScanOptions:
             "extra_scan_roots": self.extra_scan_roots,
             "target_paths": self.target_paths,
             "invalidate_cache_paths": self.invalidate_cache_paths,
+            "verbose_log": self.verbose_log,
         }
 
     @classmethod
@@ -61,6 +63,7 @@ class ScanOptions:
             extra_scan_roots=extra,
             target_paths=targets,
             invalidate_cache_paths=invalidate,
+            verbose_log=bool(data.get("verbose_log")),
         )
 
 

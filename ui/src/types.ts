@@ -181,9 +181,11 @@ export interface ProgressEvent {
   stamp?: string;
   error?: string;
   action?: string;
-  /** engine_log events: raw engine stdout line + severity */
+  /** engine_log / step_log events */
   line?: string;
   level?: "info" | "warn" | "error" | "detail";
+  /** step_log: function or sub-step name within a phase */
+  step?: string;
 }
 
 export interface SkippedItem {

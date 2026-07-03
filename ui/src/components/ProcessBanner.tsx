@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { fetchJobEvents, fetchJobs } from "../api/client";
 import type { JobSnapshot, ProgressEvent } from "../types";
-import { PhaseProgressBar, phasesFromEvents } from "./PhaseProgressBar";
+import { PhaseProgressBar, latestPhaseProgress, phasesFromEvents } from "./PhaseProgressBar";
 
 const ACTIVE = new Set(["running", "paused", "pause_pending", "stop_pending"]);
 
@@ -38,6 +38,7 @@ export function ProcessBanner() {
   if (!job) return null;
 
   const phaseState = phasesFromEvents(events);
+  const progress = latestPhaseProgress(events);
   const dry = job.dry_run ? "dry-run" : "LIVE";
 
   return (
@@ -47,11 +48,15 @@ export function ProcessBanner() {
         <span className="count-muted">
           {job.current_phase ? ` · ${job.current_phase}` : ""} · job {job.job_id}
         </span>
+        {progress?.detail && (
+          <span className="count-muted process-banner-step"> · {progress.detail}</span>
+        )}
       </div>
       <PhaseProgressBar
         activePhase={phaseState.active}
         completedPhases={phaseState.completed}
         isActive={ACTIVE.has(job.status)}
+        progress={progress}
       />
     </div>
   );

@@ -573,6 +573,7 @@ export function startScan(params: {
     extra_scan_roots?: string[];
     target_paths?: string[];
     invalidate_cache_paths?: string[];
+    verbose_log?: boolean;
   };
 }): Promise<JobSnapshot> {
   return postJson("/jobs", params);
@@ -604,6 +605,40 @@ export function fetchSystemMetrics(root?: string): Promise<{
 }> {
   const qs = root ? `?root=${encodeURIComponent(root)}` : "";
   return getJson(`/system/metrics${qs}`);
+}
+
+export function fetchSystemProcesses(): Promise<Record<string, unknown>> {
+  return getJson("/system/processes");
+}
+
+export function hardResetSystem(body: {
+  kill_orphan_engines?: boolean;
+  kill_api_ports?: boolean;
+  keep_current_api?: boolean;
+  clear_lock?: boolean;
+  clear_artifacts?: boolean;
+}): Promise<Record<string, unknown>> {
+  return postJson("/system/hard-reset", body);
+}
+
+export function fetchSessionLogs(): Promise<
+  { id: string; kind: string; size_bytes: number; modified_at?: number }[]
+> {
+  return getJson("/system/session-logs");
+}
+
+export function fetchSessionLog(
+  logId: string,
+  tail = 2000,
+): Promise<{
+  id: string;
+  kind: string;
+  lines: string[];
+  events: ProgressEvent[];
+  truncated?: boolean;
+  total_lines?: number;
+}> {
+  return getJson(`/system/session-logs/${encodeURIComponent(logId)}?tail=${tail}`);
 }
 
 export function fetchScanAudit(

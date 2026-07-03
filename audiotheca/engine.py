@@ -40,6 +40,7 @@ from vendor_db import VENDOR_DATABASE
 
 from audiotheca.config import *  # noqa: F403
 from audiotheca.coverage import discover_coverage_gaps
+from audiotheca.session_log import log_step
 from audiotheca.deep_identify import find_renamed_archive_dupes, needs_deep_identify, run_deep_identify
 from audiotheca.helpers import _archive_stem, _limit_walk, _squash, _walk_depth
 from audiotheca.verification import run_verification
@@ -499,6 +500,7 @@ class DeduplicationEngine(
             bin_progress.finish(f"{len(payloads):,} ad-hoc targets")
         else:
             for category_bin in category_bins:
+                log_step("get_software_targets", f"Resolving bin {category_bin.name}")
                 targets = self.get_software_targets(category_bin)
                 bin_targets[category_bin.name] = targets
                 payloads.extend((target, category_bin.name) for target in targets)

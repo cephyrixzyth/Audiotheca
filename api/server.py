@@ -1301,6 +1301,57 @@ def open_in_explorer(body: dict = Body(...)) -> dict[str, bool]:
     return {"ok": True}
 
 
+# --- System / process control ---
+
+
+@app.get("/api/system/processes")
+def system_processes() -> dict[str, object]:
+    from api import process_control
+
+    return process_control.list_process_snapshot()
+
+
+@app.post("/api/system/hard-reset")
+async def system_hard_reset(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from api import process_control
+
+    security.rate_limiter.check("hard_reset", limit=6, window_s=60.0)
+    keep_api_pid: int | None = None
+    if body.get("keep_current_api"):
+        import os
+
+        keep_api_pid = os.getpid()
+    result = await asyncio.to_thread(
+        process_control.hard_shutdown,
+        kill_orphan_engines=bool(body.get("kill_orphan_engines", True)),
+        kill_api_ports=bool(body.get("kill_api_ports", False)),
+        keep_api_pid=keep_api_pid,
+        clear_lock=bool(body.get("clear_lock", True)),
+        clear_artifacts=bool(body.get("clear_artifacts", False)),
+    )
+    security.audit("hard_reset", killed=result.get("killed_pids"))
+    return result
+
+
+@app.get("/api/system/session-logs")
+def system_session_logs() -> list[dict[str, object]]:
+    from api import process_control
+
+    return process_control.list_session_logs()
+
+
+@app.get("/api/system/session-logs/{log_id}")
+def system_session_log(log_id: str, tail: int = Query(default=2000, ge=50, le=10000)) -> dict[str, object]:
+    from api import process_control
+
+    try:
+        return process_control.read_session_log(log_id, tail_lines=tail)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Log not found") from exc
+
+
 # --- Scan jobs ---
 
 

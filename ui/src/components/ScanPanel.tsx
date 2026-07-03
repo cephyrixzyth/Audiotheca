@@ -13,7 +13,8 @@ import { useLibraryRoot } from "../hooks/useLibraryRoot";
 import { formatDiskFree, formatGb, formatPct } from "../utils/format";
 import type { JobSnapshot, ProgressEvent, RunSummary, SystemMetrics } from "../types";
 import { FlowEditor } from "./FlowEditor";
-import { PhaseProgressBar, phasesFromEvents } from "./PhaseProgressBar";
+import { PhaseProgressBar, latestPhaseProgress, phasesFromEvents } from "./PhaseProgressBar";
+import { ProcessDiagnostics, type LogLine as ImportedLogLine } from "./ProcessDiagnostics";
 import { ReorderableSections } from "./ReorderableSections";
 import { useContextSidebar } from "./ContextSidebar";
 import { FLOW_PRESET_STORAGE, FLOW_PRESETS } from "../flows/scanFlow";
@@ -45,7 +46,8 @@ function isLogEvent(e: ProgressEvent): boolean {
     e.type.startsWith("phase") ||
     e.type.startsWith("job") ||
     e.type === "control_ack" ||
-    e.type === "engine_log"
+    e.type === "engine_log" ||
+    e.type === "step_log"
   );
 }
 
@@ -54,6 +56,12 @@ function formatLogEvent(e: ProgressEvent): LogLine {
   const prefix = ts ? `[${ts}] ` : "";
   if (e.type === "engine_log") {
     return { text: `${prefix}${e.line ?? ""}`, level: e.level ?? "detail" };
+  }
+  if (e.type === "step_log") {
+    return {
+      text: `${prefix}[${e.step ?? "step"}] ${e.line ?? ""}`,
+      level: e.level ?? "detail",
+    };
   }
   if (e.type === "phase_progress") {
     const rate =
@@ -102,6 +110,8 @@ export function ScanPanel({ onRunComplete }: Props) {
   const [stagingDay, setStagingDay] = useState(false);
   const [liveConfirmOpen, setLiveConfirmOpen] = useState(false);
   const [liveConfirmText, setLiveConfirmText] = useState("");
+  const [verboseLog, setVerboseLog] = useState(false);
+  const [importedLogLines, setImportedLogLines] = useState<ImportedLogLine[]>([]);
   const logRef = useRef<HTMLDivElement | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const eventsOffsetRef = useRef(0);
@@ -296,6 +306,7 @@ export function ScanPanel({ onRunComplete }: Props) {
             .split(/[\n,;]+/)
             .map((s) => s.trim())
             .filter(Boolean),
+          verbose_log: verboseLog,
         },
       });
       setJob(snapshot);
@@ -321,7 +332,7 @@ export function ScanPanel({ onRunComplete }: Props) {
     }
   }
 
-  const latestProgress = [...events].reverse().find((e) => e.type === "phase_progress");
+  const latestProgress = latestPhaseProgress(events);
   const activePhase =
     job?.current_phase ??
     [...events].reverse().find((e) => e.type === "phase_start")?.phase;
@@ -334,8 +345,9 @@ export function ScanPanel({ onRunComplete }: Props) {
   const phaseState = useMemo(() => phasesFromEvents(events), [events]);
   const logLines = useMemo(() => {
     const lines = events.filter(isLogEvent).map(formatLogEvent);
+    const merged = importedLogLines.length ? [...importedLogLines, ...lines] : lines;
     const q = sidebarQuery.trim().toLowerCase();
-    let filtered = q ? lines.filter((line) => line.text.toLowerCase().includes(q)) : lines;
+    let filtered = q ? merged.filter((line) => line.text.toLowerCase().includes(q)) : merged;
     if (logLevelFilter === "error") {
       filtered = filtered.filter((line) => line.level === "error");
     } else if (logLevelFilter === "warn") {
@@ -344,7 +356,7 @@ export function ScanPanel({ onRunComplete }: Props) {
       filtered = filtered.filter((line) => line.level !== "detail");
     }
     return filtered.slice(-400);
-  }, [events, sidebarQuery, logLevelFilter]);
+  }, [events, importedLogLines, sidebarQuery, logLevelFilter]);
 
   useEffect(() => {
     if (!autoScroll || !logRef.current) return;
@@ -443,6 +455,13 @@ export function ScanPanel({ onRunComplete }: Props) {
               <label className="checkbox-inline staging-day-toggle" title="Enable live staging with extra safety checkpoints">
                 <input type="checkbox" checked={stagingDay} onChange={(e) => setStagingDay(e.target.checked)} />
                 Staging day (live)
+              </label>
+              <label
+                className="checkbox-inline"
+                title="Emit step-level events (function/sub-step) into the progress log"
+              >
+                <input type="checkbox" checked={verboseLog} onChange={(e) => setVerboseLog(e.target.checked)} />
+                Verbose step log
               </label>
               {stagingDay && (
                 <button
@@ -543,6 +562,19 @@ export function ScanPanel({ onRunComplete }: Props) {
         ),
       },
       {
+        id: "process-diagnostics",
+        title: "Process diagnostics",
+        subtitle: "Hard-reset rogue engines, inspect listeners, load past session logs",
+        group: "run",
+        content: (
+          <ProcessDiagnostics
+            onLoadPastLog={(lines) => {
+              setImportedLogLines(lines);
+            }}
+          />
+        ),
+      },
+      {
         id: "phase-progress",
         title: "Pipeline progress",
         subtitle: "Phase indicators for the active scan",
@@ -553,6 +585,7 @@ export function ScanPanel({ onRunComplete }: Props) {
             activePhase={activePhase ?? phaseState.active}
             completedPhases={phaseState.completed}
             isActive={isActive}
+            progress={latestProgress}
           />
         ),
       },
@@ -710,7 +743,8 @@ export function ScanPanel({ onRunComplete }: Props) {
       liveConfirmOpen,
       liveConfirmText,
       phaseState,
-      stagingDay,
+      verboseLog,
+      importedLogLines,
     ],
   );
 

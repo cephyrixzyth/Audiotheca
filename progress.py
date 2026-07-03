@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
-import json
 import os
 import sys
 import time
-from datetime import datetime, timezone
+
+from audiotheca.session_log import log_step, verbose_enabled
+from progress_events import emit_progress_event
+
+
+def _emit_progress_event(event: dict) -> None:
+    emit_progress_event(event)
 
 
 def _console_print(msg: str) -> None:
@@ -17,19 +22,6 @@ def _console_print(msg: str) -> None:
         encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
         sys.stdout.buffer.write((msg + "\n").encode(encoding, errors="replace"))
         sys.stdout.buffer.flush()
-
-
-def _emit_progress_event(event: dict) -> None:
-    """Append JSONL event when AUDIOTHECA_PROGRESS_FILE is set (UI job runner)."""
-    path = os.environ.get("AUDIOTHECA_PROGRESS_FILE")
-    if not path:
-        return
-    payload = {"ts": datetime.now(timezone.utc).isoformat(), **event}
-    try:
-        with open(path, "a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
-    except OSError:
-        pass
 
 
 def format_duration(seconds: float) -> str:
@@ -97,6 +89,8 @@ class PhaseProgress:
         if detail:
             msg += f"  |  {detail[:48]}"
         _console_print(msg)
+        if verbose_enabled() and detail:
+            log_step(self.phase, detail)
         _emit_progress_event(
             {
                 "type": "phase_progress",
