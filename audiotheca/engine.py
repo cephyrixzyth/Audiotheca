@@ -506,9 +506,14 @@ class DeduplicationEngine(
             bin_progress.finish(f"{len(payloads):,} total targets")
 
         if not self.scan_options.target_paths:
+            gap_progress = PhaseProgress(
+                "Phase 1a.5 - Coverage gap scan", len(category_bins), "section"
+            )
             for category_bin in category_bins:
                 gaps = discover_coverage_gaps(category_bin, bin_targets.get(category_bin.name, []))
                 self.coverage_gaps.extend(gaps)
+                gap_progress.update(1, detail=f"{len(gaps)} gaps in {category_bin.name}")
+            gap_progress.finish(f"{len(self.coverage_gaps):,} coverage gaps")
         self._checkpoint("resolve_targets", "Phase 1a - Resolve targets per category")
 
         if not payloads:

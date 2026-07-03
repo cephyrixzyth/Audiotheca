@@ -9,6 +9,16 @@ import time
 from datetime import datetime, timezone
 
 
+def _console_print(msg: str) -> None:
+    """Print progress lines without crashing on non-ASCII names (Windows cp1252)."""
+    try:
+        print(msg, flush=True)
+    except UnicodeEncodeError:
+        encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
+        sys.stdout.buffer.write((msg + "\n").encode(encoding, errors="replace"))
+        sys.stdout.buffer.flush()
+
+
 def _emit_progress_event(event: dict) -> None:
     """Append JSONL event when AUDIOTHECA_PROGRESS_FILE is set (UI job runner)."""
     path = os.environ.get("AUDIOTHECA_PROGRESS_FILE")
@@ -46,10 +56,10 @@ class PhaseProgress:
         self._banner()
 
     def _banner(self) -> None:
-        print(f"\n{'-' * 62}", flush=True)
-        print(f">>> {self.phase}", flush=True)
-        print(f"  0 / {self.total} {self.unit}  |  ETA --:--", flush=True)
-        print(f"{'-' * 62}", flush=True)
+        _console_print(f"\n{'-' * 62}")
+        _console_print(f">>> {self.phase}")
+        _console_print(f"  0 / {self.total} {self.unit}  |  ETA --:--")
+        _console_print(f"{'-' * 62}")
         _emit_progress_event(
             {
                 "type": "phase_start",
@@ -86,7 +96,7 @@ class PhaseProgress:
         )
         if detail:
             msg += f"  |  {detail[:48]}"
-        print(msg, flush=True)
+        _console_print(msg)
         _emit_progress_event(
             {
                 "type": "phase_progress",
@@ -106,8 +116,8 @@ class PhaseProgress:
         line = f"[OK] {self.phase} finished in {format_duration(elapsed)}"
         if note:
             line += f" - {note}"
-        print(line, flush=True)
-        print(f"{'-' * 62}\n", flush=True)
+        _console_print(line)
+        _console_print(f"{'-' * 62}\n")
         _emit_progress_event(
             {
                 "type": "phase_finish",

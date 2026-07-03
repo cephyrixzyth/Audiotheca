@@ -37,3 +37,15 @@ def test_target_not_reported_as_gap(tmp_path: Path):
 
     gaps = discover_coverage_gaps(bin_path, [target])
     assert not any(g["path"] == str(target) for g in gaps)
+
+
+def test_nested_target_not_reported_as_gap(tmp_path: Path):
+    bin_path = tmp_path / "d"
+    bin_path.mkdir()
+    vendor = bin_path / "Vendor"
+    vendor.mkdir()
+    nested = vendor / "Product"
+    nested.mkdir()
+
+    gaps = discover_coverage_gaps(bin_path, [nested])
+    assert not any(g["path"] == str(nested) for g in gaps)

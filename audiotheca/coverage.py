@@ -2,21 +2,48 @@
 
 from __future__ import annotations
 
+import os
+from dataclasses import dataclass
 from pathlib import Path
 
 from audiotheca.config import ARCHIVE_EXTS, IGNORE_BINS, LIBRARY_INTERNAL_DIRS
 from audiotheca.underscore_whitelist import is_underscore_scannable
 
 
-def _is_under_target(path: Path, targets: set[Path]) -> bool:
-    resolved = path.resolve()
-    for target in targets:
-        try:
-            tr = target.resolve()
-            if resolved == tr or resolved.is_relative_to(tr):
-                return True
-        except (OSError, ValueError):
-            continue
+def _normalized_path(path: Path) -> str:
+    """Normalize a path for prefix comparisons without repeated SMB resolve()."""
+    try:
+        return os.path.normcase(os.path.normpath(str(path.resolve())))
+    except (OSError, ValueError):
+        return os.path.normcase(os.path.normpath(str(path)))
+
+
+@dataclass(frozen=True)
+class _TargetIndex:
+    roots: tuple[str, ...]
+    exact: frozenset[str]
+
+    @classmethod
+    def from_targets(cls, targets: list[Path]) -> _TargetIndex:
+        roots: list[str] = []
+        exact: set[str] = set()
+        for target in targets:
+            norm = _normalized_path(target)
+            roots.append(norm)
+            exact.add(norm)
+        # Longest prefix first so nested targets match the most specific root.
+        roots.sort(key=len, reverse=True)
+        return cls(tuple(roots), frozenset(exact))
+
+
+def _is_under_target(path: Path, index: _TargetIndex) -> bool:
+    norm = _normalized_path(path)
+    if norm in index.exact:
+        return True
+    sep = os.sep
+    for root in index.roots:
+        if norm.startswith(root + sep):
+            return True
     return False
 
 
@@ -36,7 +63,7 @@ def _looks_like_vendor_grouping(folder: Path) -> bool:
 
 def discover_coverage_gaps(bin_path: Path, targets: list[Path]) -> list[dict]:
     """Return paths under *bin_path* that were not included in *targets*."""
-    target_set = set(targets)
+    index = _TargetIndex.from_targets(targets)
     gaps: list[dict] = []
     section = bin_path.name
 
@@ -68,7 +95,7 @@ def discover_coverage_gaps(bin_path: Path, targets: list[Path]) -> list[dict]:
             )
             continue
 
-        if _is_under_target(item, target_set):
+        if _is_under_target(item, index):
             continue
 
         if item.is_file():
@@ -102,7 +129,7 @@ def discover_coverage_gaps(bin_path: Path, targets: list[Path]) -> list[dict]:
                 )
                 continue
             for sub in sub_entries:
-                if _is_under_target(sub, target_set):
+                if _is_under_target(sub, index):
                     continue
                 if sub.is_file():
                     reason = "LOOSE_ARCHIVE" if sub.suffix.lower() in ARCHIVE_EXTS else "LOOSE_FILE"

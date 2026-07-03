@@ -36,6 +36,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> None:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     args = build_parser().parse_args(argv)
     dry_run = DRY_RUN if args.dry_run is None else args.dry_run
     engine = DeduplicationEngine(root_dir=args.root, dry_run=dry_run, max_workers=MAX_WORKERS)

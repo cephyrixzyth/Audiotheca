@@ -74,3 +74,11 @@ def test_read_log_tail_helper() -> None:
     from api.job_runner import _read_log_tail
 
     assert _read_log_tail(Path("/nonexistent/log")) == ""
+
+
+def test_format_exit_code_windows_kill() -> None:
+    from api.job_runner import _format_exit_code
+
+    assert _format_exit_code(4294967295) == "terminated unexpectedly"
+    assert _format_exit_code(-1) == "terminated unexpectedly"
+    assert _format_exit_code(1) == "1"

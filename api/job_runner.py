@@ -12,6 +12,7 @@ import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from api import engine_lock
 from api import report_loader
 from api import service as api_service
 from api.paths import engine_executable, workspace_root
@@ -23,6 +24,8 @@ PROJECT_ROOT = workspace_root()
 from audiotheca.config import ROOT_DIR as DEFAULT_ROOT
 
 ENGINE_MAX_RUNTIME_S = int(os.environ.get("AUDIOTHECA_ENGINE_MAX_RUNTIME_S", "43200"))
+MAX_STORED_JOB_EVENTS = int(os.environ.get("AUDIOTHECA_MAX_STORED_JOB_EVENTS", "8000"))
+EPHEMERAL_EVENT_TYPES = frozenset({"system_metrics"})
 
 STAMP_RE = re.compile(r"Run_Summary_(\d{8}_\d{4})\.txt$")
 # PhaseProgress counter lines, e.g. "  1,234 / 5,000 item  ( 25%)  |  elapsed ..."
@@ -114,7 +117,11 @@ class JobManager:
         return queue
 
     async def _broadcast(self, job: JobState, event: dict) -> None:
-        job.events.append(event)
+        event_type = str(event.get("type", ""))
+        if event_type not in EPHEMERAL_EVENT_TYPES:
+            job.events.append(event)
+            if len(job.events) > MAX_STORED_JOB_EVENTS:
+                del job.events[: len(job.events) - MAX_STORED_JOB_EVENTS]
         if event.get("type") == "phase_start":
             job.current_phase = str(event.get("phase", ""))
         if event.get("type") == "phase_paused":
@@ -173,6 +180,7 @@ class JobManager:
     ) -> JobState:
         if self.running_job():
             raise RuntimeError("A scan is already running")
+        engine_lock.assert_engine_available()
 
         job_id = uuid.uuid4().hex[:12]
         root_dir = root or DEFAULT_ROOT
@@ -209,6 +217,7 @@ class JobManager:
             stderr=stderr_handle,
             shell=False,
         )
+        engine_lock.write_lock(job_id=job_id, pid=proc.pid, root=root_dir, dry_run=dry_run)
 
         job = JobState(
             job_id=job_id,
@@ -374,7 +383,8 @@ class JobManager:
             elif proc.returncode != 0:
                 job.status = "failed"
                 tail = _read_log_tail(stderr_log)
-                job.error = f"Engine exited with code {proc.returncode}"
+                exit_label = _format_exit_code(proc.returncode)
+                job.error = f"Engine exited with code {exit_label}"
                 if tail:
                     job.error = f"{job.error}: {tail}"
                 await self._broadcast(
@@ -404,6 +414,7 @@ class JobManager:
             stdout_log.unlink(missing_ok=True)
             progress_file.unlink(missing_ok=True)
             control_file.unlink(missing_ok=True)
+            engine_lock.clear_lock(job_id=job.job_id)
 
     def _detect_stamp(self, started_at: float) -> str | None:
         candidates = sorted(
@@ -428,6 +439,17 @@ def _log_level(line: str) -> str:
     if line.startswith(">>>") or "[OK]" in line:
         return "info"
     return "detail"
+
+
+def _format_exit_code(code: int | None) -> str:
+    if code is None:
+        return "unknown"
+    if code == 0:
+        return "0"
+    # Windows often surfaces SIGKILL / abrupt termination as unsigned -1.
+    if code in {-1, 4294967295}:
+        return "terminated unexpectedly"
+    return str(code)
 
 
 def _read_log_tail(path: Path, *, max_bytes: int = 4096, max_lines: int = 8) -> str:
