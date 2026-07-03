@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from progress import _emit_progress_event
+from progress_events import emit_progress_event as _emit_progress_event
 
 
 class PhaseStopRequested(Exception):
