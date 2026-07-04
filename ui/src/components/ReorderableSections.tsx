@@ -3,6 +3,24 @@ import { isSpacerId, useSectionOrder } from "../hooks/useSectionOrder";
 import { useSectionSpan } from "../hooks/useSectionSpan";
 import { useLayoutPresets } from "../hooks/useLayoutPresets";
 
+function bindHeaderPointerDrag(
+  sectionId: string,
+  onPointerDragStart: (id: string) => void,
+) {
+  return {
+    onPointerDown: (e: React.PointerEvent) => {
+      if (e.button !== 0) return;
+      const target = e.target as HTMLElement;
+      if (target.closest(".panel-header-toolbar, .section-drag-handle, button, input, select, textarea, a, label")) {
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      onPointerDragStart(sectionId);
+    },
+  };
+}
+
 function bindHandleDrag(
   sectionId: string,
   onDragStart: (id: string) => void,
@@ -28,11 +46,13 @@ function bindHeaderDrag(
   sectionId: string,
   onDragStart: (id: string) => void,
   onDragEnd: () => void,
+  onPointerDragStart: (id: string) => void,
 ) {
   return {
+    ...bindHeaderPointerDrag(sectionId, onPointerDragStart),
     draggable: true,
     onDragStart: (e: DragEvent) => {
-      if ((e.target as HTMLElement).closest(".panel-header-toolbar, .section-drag-handle, button, input, select, textarea, a")) {
+      if ((e.target as HTMLElement).closest(".panel-header-toolbar, .section-drag-handle, button, input, select, textarea, a, label")) {
         return;
       }
       e.dataTransfer.effectAllowed = "move";
@@ -278,7 +298,7 @@ function PanelHeader({
         showWidthControl={showWidthControl}
         onCycleWidth={onCycleWidth}
       />
-      <div className="section-header-text">
+      <div className="section-header-text widget-header-grab">
         <h3>{title}</h3>
         {subtitle && <p className="count-muted">{subtitle}</p>}
       </div>
@@ -400,7 +420,7 @@ function SectionShell({
   const handleProps = bindDropTarget(section.id, dragId, onDragOver, onDrop);
 
   if (layout === "grid") {
-    const dragProps = bindHeaderDrag(section.id, onDragStart, onDragEnd);
+    const dragProps = bindHeaderDrag(section.id, onDragStart, onDragEnd, onPointerDragStart);
     return (
       <section
         className={`dash-panel span-${span} reorder-section ${dragState}${fullWidth}`.trim()}
@@ -433,7 +453,7 @@ function SectionShell({
     );
   }
 
-  const dragProps = bindHeaderDrag(section.id, onDragStart, onDragEnd);
+  const dragProps = bindHeaderDrag(section.id, onDragStart, onDragEnd, onPointerDragStart);
   const widthClass =
     span >= 4 ? "stack-width-full" : span >= 3 ? "stack-width-wide" : span >= 2 ? "stack-width-medium" : "stack-width-narrow";
   return (
@@ -674,7 +694,7 @@ export function ReorderableSections({
     if (block.kind === "group") {
       const firstId = block.sections[0]?.id ?? block.id;
       const idx = blockIndexOf(firstId);
-      const dragProps = bindHeaderDrag(firstId, setDragId, clearDragState);
+      const dragProps = bindHeaderDrag(firstId, setDragId, clearDragState, beginPointerDrag);
       return (
         <div
           key={block.id}
@@ -780,7 +800,7 @@ export function ReorderableSections({
         <div className="reorderable-hint-main">
           <strong>Move widgets</strong>
           <span className="count-muted">
-            Drag the <strong>⠿</strong> grip onto a green drop line, drop into empty slots, or use ↑↓ arrows.
+            Drag the <strong>⠿</strong> grip or <strong>panel title</strong> onto a green drop line, drop into empty slots, or use ↑↓ arrows.
             Grid panels: <strong>↔</strong> cycles width.
           </span>
         </div>

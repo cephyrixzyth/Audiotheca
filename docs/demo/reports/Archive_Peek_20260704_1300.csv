@@ -1,0 +1,3 @@
+section,item_name,item_path,archive_name,archive_path,extracted_folder,name_similarity,archive_size_mb,verdict,inferred_product
+archives,redundant,C:\Users\Cephyrix Zyth\Desktop\audiotheca\docs\demo\library\archives,redundant.rar,C:\Users\Cephyrix Zyth\Desktop\audiotheca\docs\demo\library\archives\redundant.rar,C:\Users\Cephyrix Zyth\Desktop\audiotheca\docs\demo\library\archives\redundant_extracted,0.95,48.2,REDUNDANT_EXTRACTED,Demo Pack
+archives,mystery,C:\Users\Cephyrix Zyth\Desktop\audiotheca\docs\demo\library\archives,mystery.7z,C:\Users\Cephyrix Zyth\Desktop\audiotheca\docs\demo\library\archives\mystery.7z,,0.0,12.0,PEEK_ONLY,Unknown

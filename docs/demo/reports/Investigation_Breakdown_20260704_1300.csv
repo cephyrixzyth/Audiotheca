@@ -1,0 +1,4 @@
+Section,Item Name,Current Path,Investigation Bucket,Reason,ID Method,ID Confidence,Fingerprint,Size MB,Planned Destination
+a,MysteryPack,C:\Users\Cephyrix Zyth\Desktop\audiotheca\docs\demo\library\a\UnknownVendor\MysteryPack,_unknown_vendor,no_vendor_match,filename,LOW,fp-mystery,240.5,
+a,ObscureLib,C:\Users\Cephyrix Zyth\Desktop\audiotheca\docs\demo\library\a\UnknownVendor\ObscureLib,_unknown_vendor,no_vendor_match,nfo,LOW,fp-obscure,88.2,
+b,DrumKit,C:\Users\Cephyrix Zyth\Desktop\audiotheca\docs\demo\library\b\BetaSounds\DrumKit,_ambiguous_product,multiple_products,pe_header,MEDIUM,fp-drum,512.0,C:\Users\Cephyrix Zyth\Desktop\audiotheca\docs\demo\library\b\BetaSounds\DrumKit

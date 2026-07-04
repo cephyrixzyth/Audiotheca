@@ -6,17 +6,17 @@ Use this table when preparing documentation assets. Each row must exist at the l
 
 | Status | Path | Alt text (for README) |
 |--------|------|------------------------|
-| ☐ | `docs/assets/screenshots/ui-overview.png` | Audiotheca web UI overview |
-| ☐ | `docs/assets/screenshots/dashboard-gauges.png` | Dashboard route-ready gauges |
-| ☐ | `docs/assets/screenshots/scan-panel.png` | Scan tab with processing flow |
-| ☐ | `docs/assets/screenshots/investigation-inbox.png` | Investigation inbox |
-| ☐ | `docs/assets/screenshots/duplicates-review.png` | Duplicate keeper review |
-| ☐ | `docs/assets/screenshots/restructure-preview.png` | Restructure route preview |
-| ☐ | `docs/assets/screenshots/file-explorer.png` | In-app file explorer |
-| ☐ | `docs/assets/screenshots/archives-verdicts.png` | Archive peek verdicts |
-| ☐ | `docs/assets/screenshots/security-malware.png` | Security / malware panel |
-| ☐ | `docs/assets/screenshots/environment-themes.png` | Theme editor in Environment tab |
-| ☐ | `docs/assets/screenshots/help-panel.png` | Help tab (last in tab bar) |
+| ☑ | `docs/assets/screenshots/ui-overview.png` | Audiotheca web UI overview |
+| ☑ | `docs/assets/screenshots/dashboard-gauges.png` | Dashboard route-ready gauges |
+| ☑ | `docs/assets/screenshots/scan-panel.png` | Scan tab with processing flow |
+| ☑ | `docs/assets/screenshots/investigation-inbox.png` | Investigation inbox |
+| ☑ | `docs/assets/screenshots/duplicates-review.png` | Duplicate keeper review |
+| ☑ | `docs/assets/screenshots/restructure-preview.png` | Restructure route preview |
+| ☑ | `docs/assets/screenshots/file-explorer.png` | In-app file explorer |
+| ☑ | `docs/assets/screenshots/archives-verdicts.png` | Archive peek verdicts |
+| ☑ | `docs/assets/screenshots/security-malware.png` | Security / malware panel |
+| ☑ | `docs/assets/screenshots/environment-themes.png` | Theme editor in Environment tab |
+| ☑ | `docs/assets/screenshots/help-panel.png` | Help tab (last in tab bar) |
 
 ## Videos
 
