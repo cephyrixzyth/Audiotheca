@@ -53,6 +53,11 @@ VIDEO_CLIPS: list[tuple[str, list[str]]] = [
     ("security-and-space-recovery.mp4", ["security", "space-recovery"]),
 ]
 
+REVIEW_TAB_IDS = frozenset(
+    {"investigation", "duplicates", "restructure", "archives", "scene-renames", "scan-audit", "skipped"}
+)
+SYSTEM_TAB_IDS = frozenset({"space-recovery", "security", "environment", "vendors"})
+
 
 def _lib_path(*parts: str) -> str:
     return str(LIB.joinpath(*parts))
@@ -641,8 +646,7 @@ def capture() -> None:
                     page.wait_for_timeout(400)
 
             def click_tab(tab_id: str) -> None:
-                page.locator(f'button.top-tab:has-text("{_tab_label(tab_id)}")').click()
-                page.wait_for_timeout(900)
+                _click_tab(page, tab_id)
 
             def shot(name: str, tab_id: str) -> None:
                 if tab_id == "archives":
@@ -705,8 +709,8 @@ def capture() -> None:
                 run_select.select_option(value=STAMP)
                 vpage.wait_for_timeout(800)
                 for tab_id in tabs:
-                    vpage.locator(f'button.top-tab:has-text("{_tab_label(tab_id)}")').click()
-                    vpage.wait_for_timeout(2500)
+                    _click_tab(vpage, tab_id)
+                    vpage.wait_for_timeout(1600)
                 if "file-explorer" in video_name:
                     vpage.get_by_role("button", name="Library", exact=False).click()
                     vpage.wait_for_timeout(2000)
@@ -742,6 +746,17 @@ def _tab_label(tab_id: str) -> str:
         "help": "Help",
     }
     return labels.get(tab_id, tab_id)
+
+
+def _click_tab(page: object, tab_id: str) -> None:
+    if tab_id in REVIEW_TAB_IDS:
+        page.locator('button.top-tab:has-text("Review")').click()  # type: ignore[union-attr]
+        page.wait_for_timeout(400)  # type: ignore[union-attr]
+    elif tab_id in SYSTEM_TAB_IDS:
+        page.locator('button.top-tab:has-text("System")').click()  # type: ignore[union-attr]
+        page.wait_for_timeout(400)  # type: ignore[union-attr]
+    page.locator(f'button.top-tab:has-text("{_tab_label(tab_id)}")').click()  # type: ignore[union-attr]
+    page.wait_for_timeout(900)  # type: ignore[union-attr]
 
 
 def main() -> None:
