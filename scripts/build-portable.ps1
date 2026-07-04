@@ -21,6 +21,7 @@ $ZipPath = Join-Path $OutDir "Audiotheca-Portable-1.0.0-win64.zip"
 
 Write-Host "Building Audiotheca portable bundle..." -ForegroundColor Cyan
 
+$env:CARGO_TARGET_DIR = Join-Path $UiDir "src-tauri\target"
 Push-Location $UiDir
 if (-not (Test-Path "node_modules")) {
     npm install

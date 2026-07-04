@@ -43,6 +43,7 @@ BUNDLE_DIR="$ROOT/ui/src-tauri/target/release/bundle"
 
 echo "Building Audiotheca $PLATFORM installers (v1.0.0)..."
 
+export CARGO_TARGET_DIR="$ROOT/ui/src-tauri/target"
 cd "$ROOT/ui"
 if [[ ! -d node_modules ]]; then
   npm install

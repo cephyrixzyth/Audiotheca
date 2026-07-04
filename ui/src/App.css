@@ -2839,7 +2839,25 @@ tr.inv-vendor-set {
 .help-nav {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.65rem;
+  max-height: min(72vh, 640px);
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.help-nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.help-nav-group-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  padding: 0.35rem 0.55rem 0.15rem;
 }
 
 .help-nav-btn {

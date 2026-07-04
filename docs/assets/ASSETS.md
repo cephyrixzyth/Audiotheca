@@ -14,6 +14,7 @@ Use this table when preparing documentation assets. Each row must exist at the l
 | ☑ | `docs/assets/screenshots/restructure-preview.png` | Restructure route preview |
 | ☑ | `docs/assets/screenshots/file-explorer.png` | In-app file explorer |
 | ☑ | `docs/assets/screenshots/archives-verdicts.png` | Archive peek verdicts |
+| ☑ | `docs/assets/screenshots/archive-diff-wizard.png` | Archive diff wizard modal |
 | ☑ | `docs/assets/screenshots/security-malware.png` | Security / malware panel |
 | ☑ | `docs/assets/screenshots/environment-themes.png` | Theme editor in Environment tab |
 | ☑ | `docs/assets/screenshots/help-panel.png` | Help tab (last in tab bar) |
@@ -27,6 +28,7 @@ Use this table when preparing documentation assets. Each row must exist at the l
 | ☑ | `docs/assets/videos/investigation-and-vendors.mp4` | Investigation and vendor keywords |
 | ☑ | `docs/assets/videos/restructure-live-staging.mp4` | Restructure preview and live staging |
 | ☑ | `docs/assets/videos/file-explorer-and-archives.mp4` | File explorer and archive peek |
+| ☑ | `docs/assets/videos/archive-diff-wizard.mp4` | Archive diff wizard |
 | ☑ | `docs/assets/videos/ai-lookup-review.mp4` | AI lookup review during scan |
 | ☑ | `docs/assets/videos/security-and-space-recovery.mp4` | Security scan and space recovery |
 
@@ -41,6 +43,7 @@ Built from MP4 sources via `python scripts/build_doc_gifs.py` (~1280px wide, 10 
 | ☑ | `docs/assets/gifs/investigation-and-vendors.gif` | `investigation-and-vendors.mp4` |
 | ☑ | `docs/assets/gifs/restructure-live-staging.gif` | `restructure-live-staging.mp4` |
 | ☑ | `docs/assets/gifs/file-explorer-and-archives.gif` | `file-explorer-and-archives.mp4` |
+| ☑ | `docs/assets/gifs/archive-diff-wizard.gif` | `archive-diff-wizard.mp4` |
 | ☑ | `docs/assets/gifs/ai-lookup-review.gif` | `ai-lookup-review.mp4` |
 | ☑ | `docs/assets/gifs/security-and-space-recovery.gif` | `security-and-space-recovery.mp4` |
 

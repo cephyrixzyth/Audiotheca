@@ -679,6 +679,18 @@ def capture() -> None:
             for filename, tab_id in SCREENSHOT_PLAN:
                 shot(filename, tab_id)
 
+            dismiss_explorer()
+            click_tab("archives")
+            page.locator('button.bucket-chip:has-text("All")').click()
+            page.wait_for_timeout(600)
+            diff_btn = page.get_by_role("button", name="Diff", exact=True).first
+            if diff_btn.count():
+                diff_btn.click()
+                page.wait_for_timeout(1200)
+                wizard = page.locator(".archive-diff-wizard").first
+                if wizard.count():
+                    wizard.screenshot(path=str(SHOT_DIR / "archive-diff-wizard.png"))
+
             # File explorer screenshot — after archives; close explorer when done
             dismiss_explorer()
             click_tab("investigation")

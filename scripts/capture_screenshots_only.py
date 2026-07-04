@@ -91,6 +91,27 @@ def main() -> None:
         for filename, tab_id in SCREENSHOT_PLAN:
             shot(filename, tab_id)
 
+        def shot_archive_diff_wizard() -> None:
+            dismiss_explorer()
+            click_tab("archives")
+            page.locator('button.bucket-chip:has-text("All")').click()
+            page.wait_for_timeout(600)
+            diff_btn = page.get_by_role("button", name="Diff", exact=True).first
+            if not diff_btn.count():
+                print("  skip archive-diff-wizard.png (no Diff button)", file=sys.stderr)
+                return
+            diff_btn.click()
+            page.wait_for_timeout(1200)
+            wizard = page.locator(".archive-diff-wizard").first
+            if wizard.count():
+                wizard.screenshot(path=str(SHOT_DIR / "archive-diff-wizard.png"))
+                print("  archive-diff-wizard.png")
+            else:
+                print("  skip archive-diff-wizard.png (wizard not visible)", file=sys.stderr)
+            dismiss_explorer()
+
+        shot_archive_diff_wizard()
+
         dismiss_explorer()
         click_tab("investigation")
         page.get_by_role("button", name="Library", exact=False).click()

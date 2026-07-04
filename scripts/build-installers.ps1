@@ -26,6 +26,7 @@ $BundleDir = Join-Path $Root "ui\src-tauri\target\release\bundle"
 
 Write-Host "Building Audiotheca Windows installers (v1.0.0)..." -ForegroundColor Cyan
 
+$env:CARGO_TARGET_DIR = Join-Path $Root "ui\src-tauri\target"
 Push-Location (Join-Path $Root "ui")
 if (-not (Test-Path "node_modules")) {
     npm install

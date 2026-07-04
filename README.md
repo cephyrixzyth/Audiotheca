@@ -66,7 +66,7 @@ Set `AUDIOTHECA_LIBRARY_ROOT` to **your** library path before scanning — never
 
 ## Quick start (Windows)
 
-**Desktop installer (recommended):** download or build with `.\scripts\build-installers.ps1` — see [Install guide](docs/INSTALL.md#pre-built-installers). No Python/Node required for end users.
+**Desktop installer (recommended):** download from [GitHub Releases](https://github.com/chrisjrovira/Audiotheca/releases/tag/v1.0.0) (`.msi`, NSIS setup, portable zip) or build with `.\scripts\build-installers.ps1` — see [Install guide](docs/INSTALL.md#pre-built-installers).
 
 **Portable:** extract `Audiotheca-Portable-1.0.0-win64.zip` and run `Run Audiotheca.bat`.
 
@@ -211,6 +211,8 @@ Place PNG/WebP files under `docs/assets/screenshots/` — see [docs/assets/ASSET
 
 ![Archive peek verdicts](docs/assets/screenshots/archives-verdicts.png)
 
+![Archive diff wizard — side-by-side archive vs folder](docs/assets/screenshots/archive-diff-wizard.png)
+
 ### Security & environment
 
 ![Security / malware panel](docs/assets/screenshots/security-malware.png)
@@ -225,7 +227,7 @@ Place PNG/WebP files under `docs/assets/screenshots/` — see [docs/assets/ASSET
 
 ## Video walkthroughs
 
-All seven walkthroughs are in-repo — click to open or download on GitHub:
+All eight walkthroughs are in-repo — click to open or download on GitHub:
 
 | Topic | Video |
 |-------|-------|
@@ -234,6 +236,7 @@ All seven walkthroughs are in-repo — click to open or download on GitHub:
 | Investigation triage and vendor keywords | [investigation-and-vendors.mp4](docs/assets/videos/investigation-and-vendors.mp4) |
 | Restructure preview and staged live execute | [restructure-live-staging.mp4](docs/assets/videos/restructure-live-staging.mp4) |
 | File explorer and archive peek | [file-explorer-and-archives.mp4](docs/assets/videos/file-explorer-and-archives.mp4) |
+| Archive diff wizard | [archive-diff-wizard.mp4](docs/assets/videos/archive-diff-wizard.mp4) |
 | AI lookup review during scan | [ai-lookup-review.mp4](docs/assets/videos/ai-lookup-review.mp4) |
 | Security scan and space recovery | [security-and-space-recovery.mp4](docs/assets/videos/security-and-space-recovery.mp4) |
 
@@ -278,6 +281,14 @@ Animated previews render inline on GitHub. [Download full video](#download-full-
 *Browse panel, archive listing without extract, redundant archive verdicts.*
 
 [Download full video](docs/assets/videos/file-explorer-and-archives.mp4)
+
+### Archive diff wizard
+
+![Archive diff wizard](docs/assets/gifs/archive-diff-wizard.gif)
+
+*Side-by-side archive vs extracted folder — confirm redundant archives without re-scanning.*
+
+[Download full video](docs/assets/videos/archive-diff-wizard.mp4)
 
 ### AI lookup review during scan
 

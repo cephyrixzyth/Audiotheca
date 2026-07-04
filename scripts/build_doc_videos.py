@@ -23,6 +23,7 @@ VIDEO_CLIPS: dict[str, list[str]] = {
     "investigation-and-vendors.mp4": ["investigation-inbox.png", "duplicates-review.png"],
     "restructure-live-staging.mp4": ["restructure-preview.png", "archives-verdicts.png"],
     "file-explorer-and-archives.mp4": ["file-explorer.png", "archives-verdicts.png"],
+    "archive-diff-wizard.mp4": ["archives-verdicts.png", "archive-diff-wizard.png"],
     "ai-lookup-review.mp4": ["scan-panel.png", "investigation-inbox.png"],
     "security-and-space-recovery.mp4": ["security-malware.png", "environment-themes.png"],
 }

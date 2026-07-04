@@ -27,6 +27,7 @@ HELP_SCREENSHOTS = [
     "restructure-preview.png",
     "file-explorer.png",
     "archives-verdicts.png",
+    "archive-diff-wizard.png",
     "security-malware.png",
     "environment-themes.png",
     "help-panel.png",
