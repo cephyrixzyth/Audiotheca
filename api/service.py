@@ -13,6 +13,9 @@ from audiotheca.config import ENGINE_VERSION, REPORT_DIR
 
 logger = logging.getLogger("audiotheca.api")
 
+API_VERSION = "1.0.0"
+UI_VERSION = "1.0.0"
+
 MAX_RETAINED_JOBS = 32
 STALE_PROGRESS_AGE_S = 6 * 3600  # 6 hours
 
@@ -146,6 +149,8 @@ def health_payload(*, running_job: dict | None = None) -> dict[str, object]:
     return {
         "status": "ok" if not service_state.startup_warnings else "degraded",
         "scan_running": running_job is not None or active_engine is not None,
+        "api_version": API_VERSION,
+        "ui_version": UI_VERSION,
         "engine_version": service_state.engine_version,
         "active_engine": active_engine,
         "orphan_engine_pids": orphan_pids,

@@ -20,3 +20,8 @@ build/sidecars-work/
 build/specs/
 dedupe_reports/decisions/
 dedupe_reports/.progress_*.jsonl
+docs/demo/capture_ws/
+docs/assets/screenshots/page-*.png
+pytest_*.txt
+ui_build_out.txt
+6.0.0

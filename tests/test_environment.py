@@ -60,6 +60,39 @@ def test_scheduled_check_updates_manifest(tmp_path, monkeypatch):
     assert manifest.get("last_scheduled_check")
 
 
+def test_environment_install_dry_run():
+    result = env.install_dependencies(dry_run=True)
+    assert "log" in result
+    assert "manual_hints" in result
+    assert result.get("dry_run") is True
+
+
+def test_missing_installable_dependencies():
+    missing = env.missing_installable_dependencies()
+    assert isinstance(missing, list)
+
+
+def test_environment_install_api(client):
+    response = client.post("/api/environment/install", json={"dry_run": True})
+    assert response.status_code == 200
+    data = response.json()
+    assert "log" in data
+
+
+def test_library_roots_put(client, tmp_path, monkeypatch):
+    from api import security
+
+    roots_path = tmp_path / ".library_roots.json"
+    monkeypatch.setattr(security, "ROOTS_CONFIG_PATH", roots_path)
+    monkeypatch.setattr(security, "AUDIT_LOG_PATH", tmp_path / "audit.jsonl")
+
+    response = client.put("/api/security/library-roots", json={"roots": [r"D:\TestLibrary"]})
+    assert response.status_code == 200
+    data = response.json()
+    assert data.get("configured") is True
+    assert roots_path.is_file()
+
+
 def test_environment_api(client):
     response = client.get("/api/environment")
     assert response.status_code == 200

@@ -3,6 +3,7 @@ import {
   exportEnvironmentManifest,
   fetchEnvironment,
   importEnvironmentManifest,
+  installEnvironmentDependencies,
   repairAllEnvironment,
   repairEnvironment,
 } from "../api/client";
@@ -19,7 +20,8 @@ export function EnvironmentPanel() {
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [confirmLive, setConfirmLive] = useState<"repair-all" | null>(null);
+  const [confirmLive, setConfirmLive] = useState<"repair-all" | "install" | null>(null);
+  const [installLog, setInstallLog] = useState<string[]>([]);
   const [manifestJson, setManifestJson] = useState("");
 
   const reload = useCallback(() => {
@@ -61,6 +63,39 @@ export function EnvironmentPanel() {
       setBusy(null);
     }
   }
+
+  async function handleInstall(live: boolean) {
+    setBusy("install");
+    setError(null);
+    setMsg(null);
+    setInstallLog([]);
+    try {
+      const res = await installEnvironmentDependencies({ dry_run: !live, confirm_live: live });
+      const lines = Array.isArray(res.log) ? res.log.map(String) : [];
+      if (live) {
+        setInstallLog(lines);
+        setMsg(`Install finished: ${res.succeeded ?? 0}/${res.attempted ?? 0} succeeded`);
+        setConfirmLive(null);
+        reload();
+      } else {
+        setInstallLog([`Preview (${res.attempted ?? 0} action(s)):`, ...lines]);
+        setMsg("Install preview ready — confirm live install when ready");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Install failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const hasInstallableGaps =
+    env != null &&
+    env.dependencies.some(
+      (dep) =>
+        dep.status !== "ok" &&
+        dep.repair_action &&
+        (dep.repair_action.startsWith("pip_") || dep.repair_action === "bundle_7zip_win"),
+    );
 
   async function handleRepairAll(live: boolean) {
     setBusy("repair-all");
@@ -152,6 +187,32 @@ export function EnvironmentPanel() {
             </div>
           </div>
           <div className="env-actions" style={{ marginTop: "0.75rem" }}>
+            {hasInstallableGaps && (
+              <>
+                <button type="button" className="text-btn" disabled={!!busy} onClick={() => void handleInstall(false)}>
+                  Preview install
+                </button>
+                {confirmLive === "install" ? (
+                  <>
+                    <button type="button" className="primary-btn" disabled={!!busy} onClick={() => void handleInstall(true)}>
+                      Confirm install
+                    </button>
+                    <button type="button" className="text-btn" onClick={() => setConfirmLive(null)}>
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="primary-btn"
+                    disabled={!!busy}
+                    onClick={() => setConfirmLive("install")}
+                  >
+                    Install missing dependencies
+                  </button>
+                )}
+              </>
+            )}
             <button type="button" className="text-btn" disabled={!!busy} onClick={() => void handleRepairAll(false)}>
               Preview repair-all
             </button>
@@ -173,6 +234,13 @@ export function EnvironmentPanel() {
               Refresh
             </button>
           </div>
+          {installLog.length > 0 && <pre className="env-install-log">{installLog.join("\n")}</pre>}
+          {hasInstallableGaps && (
+            <p className="count-muted" style={{ marginTop: "0.5rem" }}>
+              Or install manually — see hints in the table below (e.g. <code>pip install -r requirements.txt</code>, 7-Zip
+              from 7-zip.org).
+            </p>
+          )}
         </>
       ) : (
         <p className="count-muted">Loading environment…</p>

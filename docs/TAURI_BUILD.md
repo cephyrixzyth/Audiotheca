@@ -88,8 +88,8 @@ Installer:
 
 ```
 ui/src-tauri/target/release/bundle/
-  msi/Audiotheca_0.2.0_x64_en-US.msi
-  nsis/Audiotheca_0.2.0_x64-setup.exe
+  msi/Audiotheca_1.0.0_x64_en-US.msi
+  nsis/Audiotheca_1.0.0_x64-setup.exe
 ```
 
 Sidecars are embedded in the app bundle automatically via `externalBin`.

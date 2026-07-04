@@ -1,6 +1,6 @@
 # Audiotheca — Phased Roadmap (2026-07)
 
-Concrete build order after v10 / Web UI v0.2. Each phase lists **what exists today**, **what we add**, and **how it maps to reports + API**.
+Concrete build order after v10 / Web UI 1.0. Each phase lists **what exists today**, **what we add**, and **how it maps to reports + API**.
 
 ---
 

@@ -47,6 +47,19 @@ async function getJson<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function putJson<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(await apiUrl(path), {
+    method: "PUT",
+    headers: await authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(detail || res.statusText);
+  }
+  return res.json() as Promise<T>;
+}
+
 async function postJson<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(await apiUrl(path), {
     method: "POST",
@@ -981,6 +994,8 @@ export function fetchEnvironment(): Promise<import("../types").EnvironmentPayloa
 
 export function fetchHealth(): Promise<{
   status: string;
+  api_version?: string;
+  ui_version?: string;
   engine_version: string;
   archive_tool: string | null;
   environment?: import("../types").EnvironmentSummary;
@@ -1002,6 +1017,29 @@ export function repairAllEnvironment(params: {
   confirm_live?: boolean;
 }): Promise<Record<string, unknown>> {
   return postJson("/environment/repair-all", params);
+}
+
+export function installEnvironmentDependencies(params: {
+  dry_run?: boolean;
+  confirm_live?: boolean;
+}): Promise<{
+  ok: boolean;
+  dry_run?: boolean;
+  attempted?: number;
+  succeeded?: number;
+  log?: string[];
+  manual_hints?: string[];
+  results?: Record<string, unknown>[];
+}> {
+  return postJson("/environment/install", params);
+}
+
+export function fetchLibraryRoots(): Promise<{ roots: string[]; configured?: boolean }> {
+  return getJson("/security/library-roots");
+}
+
+export function saveLibraryRoots(roots: string[]): Promise<{ ok: boolean; roots: string[]; configured: boolean }> {
+  return putJson("/security/library-roots", { roots });
 }
 
 export function exportEnvironmentManifest(): Promise<Record<string, unknown>> {

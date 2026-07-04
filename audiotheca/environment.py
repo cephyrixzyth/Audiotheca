@@ -414,8 +414,114 @@ def list_repair_actions() -> dict[str, str]:
         "pip_rapidfuzz": "pip install rapidfuzz",
         "pip_watchdog": "pip install watchdog",
         "repair_all": "Run all automated repairs for missing dependencies",
+        "install_dependencies": "Install missing pip packages (and bundled 7-Zip on Windows when available)",
     }
 
+
+def missing_installable_dependencies() -> list[DependencyStatus]:
+    """Dependencies that can be auto-installed (pip packages; 7-Zip bundle on Windows)."""
+    env = probe_environment()
+    installable: list[DependencyStatus] = []
+    for row in env["dependencies"]:
+        dep_id = str(row.get("id", ""))
+        status = row.get("status")
+        repair = row.get("repair_action")
+        if status == "ok" or not repair:
+            continue
+        if repair.startswith("pip_") or repair == "bundle_7zip_win":
+            installable.append(
+                DependencyStatus(
+                    id=dep_id,
+                    name=str(row.get("name", dep_id)),
+                    category=row.get("category", "recommended"),  # type: ignore[arg-type]
+                    status=status,  # type: ignore[arg-type]
+                    detail=str(row.get("detail", "")),
+                    repair_action=repair,
+                    install_hints=list(row.get("install_hints") or []),
+                )
+            )
+    return installable
+
+
+def install_dependencies(*, dry_run: bool = True) -> dict[str, Any]:
+    """Install missing pip packages and optional bundled 7-Zip (Windows only)."""
+    missing = missing_installable_dependencies()
+    if not missing:
+        return {
+            "ok": True,
+            "dry_run": dry_run,
+            "attempted": 0,
+            "succeeded": 0,
+            "log": ["All installable dependencies are already satisfied."],
+            "results": [],
+            "manual_hints": [],
+        }
+
+    log: list[str] = []
+    results: list[dict[str, Any]] = []
+
+    pip_specs: list[str] = []
+    for dep in missing:
+        action = dep.repair_action or ""
+        if action.startswith("pip_"):
+            dep_id = action.removeprefix("pip_")
+            pip_specs.append(PIP_PACKAGES.get(dep_id, dep_id))
+
+    if pip_specs:
+        cmd = [sys.executable, "-m", "pip", "install", *pip_specs]
+        log.append(f"$ {' '.join(cmd)}")
+        if dry_run:
+            results.append({"dependency": "pip", "ok": True, "dry_run": True, "command": cmd})
+        else:
+            ok, detail = _run_command(cmd, timeout_s=600)
+            log.append(detail if detail else ("ok" if ok else "pip install failed"))
+            results.append({"dependency": "pip", "ok": ok, "dry_run": False, "detail": detail, "command": cmd})
+
+    for dep in missing:
+        if dep.repair_action != "bundle_7zip_win":
+            continue
+        cmd = _repair_command("bundle_7zip_win")
+        if not cmd:
+            log.append("7-Zip bundle install is only available on Windows.")
+            results.append({"dependency": dep.id, "ok": False, "skipped": True, "detail": "Windows only"})
+            continue
+        log.append(f"$ {' '.join(cmd)}")
+        if dry_run:
+            results.append({"dependency": dep.id, "ok": True, "dry_run": True, "command": cmd})
+        else:
+            ok, detail = _run_command(cmd)
+            log.append(detail if detail else ("ok" if ok else "7-Zip bundle failed"))
+            results.append({"dependency": dep.id, "ok": ok, "dry_run": False, "detail": detail, "command": cmd})
+
+    ok_count = sum(1 for row in results if row.get("ok"))
+    payload = {
+        "ok": ok_count > 0 or (dry_run and bool(results)),
+        "dry_run": dry_run,
+        "attempted": len(results),
+        "succeeded": ok_count,
+        "log": log,
+        "results": results,
+        "manual_hints": _manual_install_hints(missing),
+    }
+    if not dry_run:
+        _log_operation("install_dependencies", attempted=len(results), succeeded=ok_count)
+    return payload
+
+
+def _manual_install_hints(missing: list[DependencyStatus]) -> list[str]:
+    hints: list[str] = []
+    for dep in missing:
+        if dep.repair_action and dep.repair_action.startswith("pip_"):
+            hints.extend(dep.install_hints)
+        elif dep.id == "seven_zip" and dep.status == "missing":
+            hints.extend(dep.install_hints)
+    seen: set[str] = set()
+    unique: list[str] = []
+    for hint in hints:
+        if hint not in seen:
+            seen.add(hint)
+            unique.append(hint)
+    return unique
 
 def run_repair(action: str, *, dry_run: bool = True) -> dict[str, Any]:
     actions = list_repair_actions()

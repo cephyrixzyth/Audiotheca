@@ -1,0 +1,25 @@
+Engine version: 10.0.0
+Run: 20260704_1600
+DRY_RUN: true
+Scanned: 128 (cache hits: 4, failures: 1)
+Routes planned: 96
+Investigation: 12
+_unknown_vendor: 5
+_ambiguous_product: 3
+_needs_manual: 4
+Quarantined: 0
+Reconciled vendors: 18
+Vendor conflicts: 2
+Nested issues: 1
+Coexistence findings: 3
+Archive peek rows: 6
+Scene archive peeks: 2
+Scene renames planned: 2
+Errors: 0
+Duplicate groups (review): 3
+HIGH confidence: 2
+MEDIUM confidence: 1
+Coverage gaps: 2
+Cache hit paths: 4
+Probe truncations: 0
+Feedback skipped groups: 0

@@ -1,6 +1,6 @@
 # Audiotheca — Feature Guide
 
-Engine version: **10.0.0** · Web UI: **v0.2**
+Engine version: **10.0.0** · Web UI: **1.0.0**
 
 See also the [main README](../README.md) and [User Guide](USER_GUIDE.md) for launch commands and tab workflows.
 
@@ -150,7 +150,7 @@ Scene-hash folders (`_scene_release_id`) are prime candidates for **Phase 1.6 pe
 - `Archive_Delete_Candidates_{stamp}.csv`
 - `move_redundant_archives_{stamp}.ps1` — preview by default; set `$Execute = $true` for Stage 3
 
-### 12. Web UI & API (v0.2 / engine 10.0)
+### 12. Web UI & API (v1.0 / engine 10.0)
 
 FastAPI on `http://127.0.0.1:8787` serves dry-run reports and runs scan jobs. Bearer token auth — see [Security](SECURITY.md).
 

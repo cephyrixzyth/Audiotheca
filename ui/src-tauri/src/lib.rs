@@ -17,6 +17,17 @@ enum ApiProcess {
 struct ApiChild(Mutex<Option<ApiProcess>>);
 struct ApiPort(Mutex<u16>);
 
+fn portable_home_from_config(exe_dir: &Path) -> Option<PathBuf> {
+    let config_path = exe_dir.join("portable.json");
+    let raw = std::fs::read_to_string(&config_path).ok()?;
+    let value: serde_json::Value = serde_json::from_str(&raw).ok()?;
+    if value.get("relative_to_exe").and_then(|v| v.as_bool()) != Some(true) {
+        return None;
+    }
+    let home_rel = value.get("audiotheca_home").and_then(|v| v.as_str()).unwrap_or("data");
+    Some(exe_dir.join(home_rel))
+}
+
 fn workspace_root() -> PathBuf {
     if cfg!(debug_assertions) {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -27,9 +38,13 @@ fn workspace_root() -> PathBuf {
     } else if let Ok(home) = std::env::var("AUDIOTHECA_HOME") {
         PathBuf::from(home)
     } else if let Ok(exe) = std::env::current_exe() {
-        exe.parent()
-            .map(|dir| dir.to_path_buf())
-            .unwrap_or_else(|| PathBuf::from("."))
+        if let Some(exe_dir) = exe.parent() {
+            if let Some(portable) = portable_home_from_config(exe_dir) {
+                return portable;
+            }
+            return exe_dir.to_path_buf();
+        }
+        PathBuf::from(".")
     } else {
         PathBuf::from(".")
     }

@@ -331,3 +331,19 @@ def save_library_roots(roots: list[str]) -> None:
         json.dumps({"roots": roots, "updated": _now_iso()}, indent=2),
         encoding="utf-8",
     )
+
+
+def library_roots_configured() -> bool:
+    """True when roots were explicitly set via env or persisted config (not repo default only)."""
+    if os.environ.get("AUDIOTHECA_LIBRARY_ROOTS", "").strip():
+        return True
+    if os.environ.get("AUDIOTHECA_LIBRARY_ROOT", "").strip():
+        return True
+    if not ROOTS_CONFIG_PATH.is_file():
+        return False
+    try:
+        data = json.loads(ROOTS_CONFIG_PATH.read_text(encoding="utf-8"))
+        roots = [str(item).strip() for item in data.get("roots", []) if str(item).strip()]
+        return bool(roots)
+    except (OSError, json.JSONDecodeError):
+        return False

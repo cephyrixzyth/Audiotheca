@@ -29,6 +29,7 @@ from api.restructure_execute import execute_approved_sections
 from api.scene_execute import execute_approved_renames
 from api.job_runner import SKIPPABLE_PHASES, job_manager
 from api import service as api_service
+from api.service import API_VERSION
 from api.models import RunListItem, RunSummary, ScanAuditItem, SceneRenameItem
 from duplicate_feedback import (
     GLOBAL_FEEDBACK_PATH,
@@ -104,7 +105,7 @@ async def lifespan(app: FastAPI):
         _library_watcher = None
 
 
-app = FastAPI(title="Audiotheca API", version="0.2.0", lifespan=lifespan)
+app = FastAPI(title="Audiotheca API", version=API_VERSION, lifespan=lifespan)
 
 _RUN_STAMP_SEGMENT = re.compile(r"^/api/runs/([^/]+)")
 
@@ -134,6 +135,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
         "http://localhost:4173",
         "http://127.0.0.1:4173",
         "tauri://localhost",
@@ -195,6 +198,16 @@ async def environment_repair_all(body: dict = Body(default_factory=dict)) -> dic
     return await asyncio.to_thread(repair_all, dry_run=dry_run)
 
 
+@app.post("/api/environment/install")
+async def environment_install(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from audiotheca.environment import install_dependencies
+
+    dry_run = security.parse_dry_run(body.get("dry_run"), default=True)
+    security.require_live_confirmation(body, dry_run=dry_run, action="environment install")
+    security.audit("environment_install", dry_run=dry_run)
+    return await asyncio.to_thread(install_dependencies, dry_run=dry_run)
+
+
 @app.get("/api/environment/manifest")
 def get_environment_manifest() -> dict[str, object]:
     from audiotheca.environment import load_manifest
@@ -238,7 +251,23 @@ def import_environment_manifest(body: dict = Body(...)) -> dict[str, object]:
 
 @app.get("/api/security/library-roots")
 def get_library_roots() -> dict[str, object]:
-    return {"roots": [str(path) for path in security.library_roots()]}
+    return {
+        "roots": [str(path) for path in security.library_roots()],
+        "configured": security.library_roots_configured(),
+    }
+
+
+@app.put("/api/security/library-roots")
+def put_library_roots(body: dict = Body(...)) -> dict[str, object]:
+    roots_raw = body.get("roots")
+    if not isinstance(roots_raw, list) or not roots_raw:
+        raise HTTPException(status_code=400, detail="roots must be a non-empty array of paths")
+    roots = [str(item).strip() for item in roots_raw if str(item).strip()]
+    if not roots:
+        raise HTTPException(status_code=400, detail="roots must contain at least one valid path")
+    security.save_library_roots(roots)
+    security.audit("library_roots_update", roots=roots)
+    return {"ok": True, "roots": roots, "configured": True}
 
 
 def _parse_live_execute(body: dict, *, action: str) -> tuple[bool, str | None]:

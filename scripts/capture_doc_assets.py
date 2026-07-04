@@ -15,16 +15,20 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-STAMP = "20260704_1300"
+STAMP = "20260704_1600"
 LIB = ROOT / "docs" / "demo" / "library"
 SEED_REPORTS = ROOT / "docs" / "demo" / "reports"
-REPORTS = ROOT / "dedupe_reports"
+CAPTURE_HOME = ROOT / "docs" / "demo" / "capture_ws"
+REPORTS = CAPTURE_HOME / "dedupe_reports"
 SHOT_DIR = ROOT / "docs" / "assets" / "screenshots"
 VIDEO_DIR = ROOT / "docs" / "assets" / "videos"
-UI_URL = "http://127.0.0.1:5173"
-API_HEALTH = "http://127.0.0.1:8787/api/health"
+UI_PORT = int(os.environ.get("AUDIOTHECA_CAPTURE_UI_PORT", "5175"))
+API_PORT = int(os.environ.get("AUDIOTHECA_CAPTURE_API_PORT", "8788"))
+UI_URL = f"http://127.0.0.1:{UI_PORT}"
+API_HEALTH = f"http://127.0.0.1:{API_PORT}/api/health"
 VIEWPORT = {"width": 1920, "height": 1080}
 TOKEN = "doc-capture-local-only"
+FIRST_RUN_INIT = 'localStorage.setItem("audiotheca.firstRunComplete", "1");'
 
 SCREENSHOT_PLAN: list[tuple[str, str]] = [
     ("ui-overview.png", "dashboard"),
@@ -334,7 +338,7 @@ def seed_reports() -> None:
             _lib_path("archives", "redundant_extracted"),
             "0.95",
             "48.2",
-            "REDUNDANT_EXTRACTED",
+            "MATCHES_EXTRACTED_FOLDER",
             "Demo Pack",
         ],
         [
@@ -378,8 +382,45 @@ def seed_reports() -> None:
     )
 
     REPORTS.mkdir(parents=True, exist_ok=True)
+    for old in REPORTS.glob(f"*_{STAMP}.*"):
+        old.unlink(missing_ok=True)
     for path in SEED_REPORTS.glob(f"*_{STAMP}.*"):
         shutil.copy2(path, REPORTS / path.name)
+    (REPORTS / ".api_token").write_text(TOKEN, encoding="utf-8")
+
+
+def _api_request(method: str, path: str, *, body: dict | None = None) -> None:
+    import json as json_mod
+
+    url = f"http://127.0.0.1:{API_PORT}{path}"
+    data = json_mod.dumps(body or {}).encode("utf-8") if body is not None else None
+    request = urllib.request.Request(
+        url,
+        data=data,
+        method=method,
+        headers={
+            "Authorization": f"Bearer {TOKEN}",
+            "Content-Type": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as resp:
+            resp.read()
+    except urllib.error.HTTPError as exc:
+        if exc.code not in {404, 409}:
+            raise
+
+
+def prepare_capture_session() -> None:
+    """Isolated API with demo reports only — no live NAS scan banner."""
+    try:
+        _api_request(
+            "POST",
+            "/api/system/hard-reset",
+            body={"keep_current_api": True, "kill_orphan_engines": True, "clear_artifacts": False},
+        )
+    except (TimeoutError, urllib.error.URLError, OSError):
+        pass
 
 
 def wait_url(url: str, *, timeout_s: float = 90.0) -> None:
@@ -396,9 +437,17 @@ def wait_url(url: str, *, timeout_s: float = 90.0) -> None:
 
 def start_servers() -> tuple[subprocess.Popen[bytes] | None, subprocess.Popen[bytes] | None]:
     env = os.environ.copy()
+    env["AUDIOTHECA_HOME"] = str(CAPTURE_HOME)
     env["AUDIOTHECA_LIBRARY_ROOTS"] = str(LIB)
     env["AUDIOTHECA_API_TOKEN"] = TOKEN
     env["AUDIOTHECA_ALLOW_REMOTE_TOKEN_BOOTSTRAP"] = "1"
+    env["AUDIOTHECA_API_PORT"] = str(API_PORT)
+    env["VITE_API_PORT"] = str(API_PORT)
+    env["AUDIOTHECA_NO_RELOAD"] = "1"
+
+    CAPTURE_HOME.mkdir(parents=True, exist_ok=True)
+    REPORTS.mkdir(parents=True, exist_ok=True)
+    (REPORTS / ".api_token").write_text(TOKEN, encoding="utf-8")
 
     api_proc: subprocess.Popen[bytes] | None = None
     ui_proc: subprocess.Popen[bytes] | None = None
@@ -418,7 +467,17 @@ def start_servers() -> tuple[subprocess.Popen[bytes] | None, subprocess.Popen[by
         wait_url(UI_URL, timeout_s=3.0)
     except RuntimeError:
         ui_proc = subprocess.Popen(
-            ["npm", "run", "dev", "--", "--host", "127.0.0.1", "--port", "5173"],
+            [
+                "npm",
+                "run",
+                "dev",
+                "--",
+                "--host",
+                "127.0.0.1",
+                f"--port",
+                str(UI_PORT),
+                "--strictPort",
+            ],
             cwd=ROOT / "ui",
             env=env,
             stdout=subprocess.DEVNULL,
@@ -428,6 +487,7 @@ def start_servers() -> tuple[subprocess.Popen[bytes] | None, subprocess.Popen[by
 
     wait_url(API_HEALTH)
     wait_url(UI_URL)
+    prepare_capture_session()
     return api_proc, ui_proc
 
 
@@ -442,16 +502,36 @@ def stop_servers(api_proc: subprocess.Popen[bytes] | None, ui_proc: subprocess.P
 
 
 def _ffmpeg_available() -> bool:
-    return shutil.which("ffmpeg") is not None
+    if shutil.which("ffmpeg"):
+        return True
+    try:
+        import imageio_ffmpeg  # noqa: F401
+
+        return True
+    except ImportError:
+        return False
+
+
+def _resolve_ffmpeg() -> str | None:
+    path = shutil.which("ffmpeg")
+    if path:
+        return path
+    try:
+        import imageio_ffmpeg
+
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except ImportError:
+        return None
 
 
 def _webm_to_mp4(webm: Path, mp4: Path) -> None:
     if not webm.is_file():
         return
-    if _ffmpeg_available():
+    ffmpeg = _resolve_ffmpeg()
+    if ffmpeg:
         subprocess.run(
             [
-                "ffmpeg",
+                ffmpeg,
                 "-y",
                 "-i",
                 str(webm),
@@ -493,11 +573,23 @@ EDGE_PATHS = [
 
 
 def _browser_launch_kwargs() -> dict[str, object]:
-    for channel in ("msedge", "chrome"):
-        return {"headless": True, "channel": channel}
-    for candidate in EDGE_PATHS:
-        if candidate.is_file():
-            return {"headless": True, "executable_path": str(candidate)}
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as playwright:
+        for kwargs in (
+            {"headless": True},
+            {"headless": True, "channel": "msedge"},
+            {"headless": True, "channel": "chrome"},
+        ):
+            try:
+                browser = playwright.chromium.launch(**kwargs)
+                browser.close()
+                return kwargs
+            except Exception:
+                continue
+        for candidate in EDGE_PATHS:
+            if candidate.is_file():
+                return {"headless": True, "executable_path": str(candidate)}
     return {"headless": True}
 
 
@@ -518,34 +610,82 @@ def capture() -> None:
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch(**launch_kwargs)
             context = browser.new_context(viewport=VIEWPORT)
+            context.add_init_script(FIRST_RUN_INIT)
             page = context.new_page()
 
-            page.goto(UI_URL, wait_until="networkidle")
+            page.goto(UI_URL, wait_until="load")
             page.wait_for_timeout(1500)
+
+            def select_demo_run() -> None:
+                run_select = page.locator("select.field-input").first
+                run_select.wait_for(state="visible", timeout=15000)
+                run_select.select_option(value=STAMP)
+                page.wait_for_timeout(1200)
+                if page.locator(".process-banner").count():
+                    prepare_capture_session()
+                    page.reload(wait_until="load")
+                    page.wait_for_timeout(1200)
+                    run_select.select_option(value=STAMP)
+                    page.wait_for_timeout(800)
+
+            select_demo_run()
+
+            def dismiss_explorer() -> None:
+                page.keyboard.press("Escape")
+                page.wait_for_timeout(200)
+                page.keyboard.press("Escape")
+                page.wait_for_timeout(200)
+                close_btn = page.get_by_role("button", name="Close", exact=True)
+                if close_btn.count():
+                    close_btn.first.click()
+                    page.wait_for_timeout(400)
 
             def click_tab(tab_id: str) -> None:
                 page.locator(f'button.top-tab:has-text("{_tab_label(tab_id)}")').click()
-                page.wait_for_timeout(800)
+                page.wait_for_timeout(900)
 
             def shot(name: str, tab_id: str) -> None:
+                if tab_id == "archives":
+                    dismiss_explorer()
                 click_tab(tab_id)
                 if tab_id == "environment":
                     page.locator("text=Themes").first.scroll_into_view_if_needed()
-                    page.wait_for_timeout(400)
-                if tab_id == "dashboard":
+                    page.wait_for_timeout(500)
+                if tab_id == "archives":
+                    page.locator('button.bucket-chip:has-text("All")').click()
                     page.wait_for_timeout(600)
-                page.screenshot(path=str(SHOT_DIR / name), full_page=False)
+                if tab_id == "dashboard":
+                    page.wait_for_timeout(800)
+                out = SHOT_DIR / name
+                if name == "dashboard-gauges.png":
+                    target = page.locator(".dash-grid").first
+                    if not target.count():
+                        target = page.locator(".dash").first
+                    if target.count():
+                        target.screenshot(path=str(out))
+                    else:
+                        page.screenshot(path=str(out), full_page=False)
+                else:
+                    target = page.locator(".app-shell").first
+                    if target.count():
+                        target.screenshot(path=str(out))
+                    else:
+                        page.screenshot(path=str(out), full_page=False)
 
             for filename, tab_id in SCREENSHOT_PLAN:
                 shot(filename, tab_id)
 
-            # File explorer screenshot
+            # File explorer screenshot — after archives; close explorer when done
+            dismiss_explorer()
             click_tab("investigation")
             page.get_by_role("button", name="Library", exact=False).click()
-            page.wait_for_timeout(1200)
-            page.screenshot(path=str(SHOT_DIR / "file-explorer.png"), full_page=False)
-            page.keyboard.press("Escape")
-            page.wait_for_timeout(300)
+            page.wait_for_timeout(1500)
+            explorer = page.locator(".file-explorer-shell").first
+            if explorer.count():
+                explorer.screenshot(path=str(SHOT_DIR / "file-explorer.png"))
+            else:
+                page.screenshot(path=str(SHOT_DIR / "file-explorer.png"), full_page=False)
+            dismiss_explorer()
 
             # Videos — one context per clip
             for video_name, tabs in VIDEO_CLIPS:
@@ -556,9 +696,14 @@ def capture() -> None:
                     record_video_dir=str(video_dir),
                     record_video_size=VIEWPORT,
                 )
+                vctx.add_init_script(FIRST_RUN_INIT)
                 vpage = vctx.new_page()
-                vpage.goto(UI_URL, wait_until="networkidle")
+                vpage.goto(UI_URL, wait_until="load")
                 vpage.wait_for_timeout(1000)
+                run_select = vpage.locator("select.field-input").first
+                run_select.wait_for(state="visible", timeout=15000)
+                run_select.select_option(value=STAMP)
+                vpage.wait_for_timeout(800)
                 for tab_id in tabs:
                     vpage.locator(f'button.top-tab:has-text("{_tab_label(tab_id)}")').click()
                     vpage.wait_for_timeout(2500)

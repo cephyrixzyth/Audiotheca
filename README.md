@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | **Engine** | 10.0.0 |
-| **Web UI** | 0.2.0 |
+| **Web UI / API** | 1.0.0 |
 | **Primary platform** | Windows (CLI, browser UI, Tauri desktop) |
 
 ---
@@ -65,6 +65,12 @@ Set `AUDIOTHECA_LIBRARY_ROOT` to **your** library path before scanning — never
 ---
 
 ## Quick start (Windows)
+
+**Desktop installer (recommended):** download or build with `.\scripts\build-installers.ps1` — see [Install guide](docs/INSTALL.md#pre-built-installers). No Python/Node required for end users.
+
+**Portable:** extract `Audiotheca-Portable-1.0.0-win64.zip` and run `Run Audiotheca.bat`.
+
+**Developer / CLI path:**
 
 ### 1. Prerequisites
 
@@ -166,7 +172,7 @@ Tabs appear left-to-right in the top bar. **Help is last** (after Vendors).
 | **Vendors** | Vendor gaps, web harvest inbox, keyword export |
 | **Help** | Built-in install, workflow, layout, and deploy guides |
 
-**Cross-cutting UI features (v10 / 0.2):**
+**Cross-cutting UI features (engine 10 / UI 1.0):**
 
 - **In-app file explorer** — click **Browse** on path links to list folders or archive contents without extracting.
 - **Reorderable sections** — drag panel headers or ⠿ handles; save named layouts on Dashboard and Scan.
@@ -181,19 +187,37 @@ Built-in help text also lives in the **Help** tab; full prose docs are in [`docs
 
 Place PNG/WebP files under `docs/assets/screenshots/` — see [docs/assets/ASSETS.md](docs/assets/ASSETS.md) for the full checklist.
 
-<!-- Replace placeholders by adding real files; paths are relative to repo root -->
+### Dashboard & overview
 
 ![Audiotheca web UI overview](docs/assets/screenshots/ui-overview.png)
 
 ![Dashboard route-ready gauges](docs/assets/screenshots/dashboard-gauges.png)
 
+### Scan & processing
+
 ![Scan tab with processing flow editor](docs/assets/screenshots/scan-panel.png)
+
+### Triage & review
 
 ![Investigation inbox with bucket filter](docs/assets/screenshots/investigation-inbox.png)
 
+![Duplicate keeper review](docs/assets/screenshots/duplicates-review.png)
+
+![Restructure route preview](docs/assets/screenshots/restructure-preview.png)
+
+### Library tools
+
 ![In-app file explorer browsing a library path](docs/assets/screenshots/file-explorer.png)
 
+![Archive peek verdicts](docs/assets/screenshots/archives-verdicts.png)
+
+### Security & environment
+
+![Security / malware panel](docs/assets/screenshots/security-malware.png)
+
 ![Environment tab theme editor](docs/assets/screenshots/environment-themes.png)
+
+### Help
 
 ![Help tab — last in the tab bar](docs/assets/screenshots/help-panel.png)
 
@@ -201,28 +225,65 @@ Place PNG/WebP files under `docs/assets/screenshots/` — see [docs/assets/ASSET
 
 ## Video walkthroughs
 
-Place MP4/WebM files under `docs/assets/videos/`. Suggested topics:
+Animated previews render inline on GitHub. [Download full video](#download-full-video-links) for higher quality.
 
-| Video | File |
-|-------|------|
-| First scan from install to Dashboard | `docs/assets/videos/first-scan-walkthrough.mp4` |
-| Scan phases and processing flow presets | `docs/assets/videos/scan-phases-and-flow.mp4` |
-| Investigation triage and vendor keywords | `docs/assets/videos/investigation-and-vendors.mp4` |
-| Restructure preview and staged live execute | `docs/assets/videos/restructure-live-staging.mp4` |
-| File explorer and archive peek | `docs/assets/videos/file-explorer-and-archives.mp4` |
-| AI lookup review during scan | `docs/assets/videos/ai-lookup-review.mp4` |
-| Security scan and space recovery | `docs/assets/videos/security-and-space-recovery.mp4` |
+### First scan from install to Dashboard
 
-```html
-<!-- First scan walkthrough (uncomment when file exists) -->
-<!-- <video src="docs/assets/videos/first-scan-walkthrough.mp4" controls width="100%"></video> -->
-```
+![First scan walkthrough](docs/assets/gifs/first-scan-walkthrough.gif)
 
-Markdown-friendly alternative once the file is present:
+*Set library root, run a dry scan, read Dashboard KPIs.*
 
-<!-- [First scan walkthrough](docs/assets/videos/first-scan-walkthrough.mp4) -->
+[Download full video](docs/assets/videos/first-scan-walkthrough.mp4)
 
-Capture instructions: [docs/assets/README.md](docs/assets/README.md).
+### Scan phases and processing flow presets
+
+![Scan phases and flow](docs/assets/gifs/scan-phases-and-flow.gif)
+
+*Processing flow editor, skippable phases, live WebSocket progress.*
+
+[Download full video](docs/assets/videos/scan-phases-and-flow.mp4)
+
+### Investigation triage and vendor keywords
+
+![Investigation and vendors](docs/assets/gifs/investigation-and-vendors.gif)
+
+*Triage unknown items, add vendor keywords, export feedback.*
+
+[Download full video](docs/assets/videos/investigation-and-vendors.mp4)
+
+### Restructure preview and staged live execute
+
+![Restructure live staging](docs/assets/gifs/restructure-live-staging.gif)
+
+*Preview routes, approve sections, confirm live guardrails.*
+
+[Download full video](docs/assets/videos/restructure-live-staging.mp4)
+
+### File explorer and archive peek
+
+![File explorer and archives](docs/assets/gifs/file-explorer-and-archives.gif)
+
+*Browse panel, archive listing without extract, redundant archive verdicts.*
+
+[Download full video](docs/assets/videos/file-explorer-and-archives.mp4)
+
+### AI lookup review during scan
+
+![AI lookup review](docs/assets/gifs/ai-lookup-review.gif)
+
+*AI analyzer queue, confirm/reject lookups, cache behavior.*
+
+[Download full video](docs/assets/videos/ai-lookup-review.mp4)
+
+### Security scan and space recovery
+
+![Security and space recovery](docs/assets/gifs/security-and-space-recovery.gif)
+
+*Malware heuristics, underscore whitelist, coexistence summary.*
+
+[Download full video](docs/assets/videos/security-and-space-recovery.mp4)
+
+Build GIFs from MP4 sources: `python scripts/build_doc_gifs.py`. Capture instructions: [docs/assets/README.md](docs/assets/README.md).
 
 ---
 

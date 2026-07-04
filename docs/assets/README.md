@@ -11,7 +11,8 @@ docs/assets/
 ├── README.md          ← this file
 ├── ASSETS.md          ← checklist of every required file
 ├── screenshots/       ← PNG or WebP stills
-└── videos/            ← MP4 or WebM walkthroughs
+├── videos/            ← MP4 walkthroughs (source)
+└── gifs/              ← optimized GIFs for GitHub README + Help tab
 ```
 
 ## Screenshots to capture
@@ -46,11 +47,31 @@ Record at **1080p**, 30 fps, with brief on-screen captions if helpful. Keep each
 | `videos/ai-lookup-review.mp4` | Scan tab AI analyzer, confirm/reject lookup, cache | After unknown targets queue |
 | `videos/security-and-space-recovery.mp4` | Malware heuristics, underscore whitelist, coexistence summary | Optional advanced day |
 
+## GIFs for GitHub README
+
+GitHub renders GIFs inline but not MP4. After recording or rebuilding MP4s, run:
+
+```powershell
+python scripts/build_doc_gifs.py
+```
+
+This writes optimized GIFs to `gifs/` (~1280px wide, 10 fps) and copies screenshots + GIFs to `ui/public/help/` for the in-app Help tab.
+
+| File | Topic |
+|------|--------|
+| `gifs/first-scan-walkthrough.gif` | Install → first dry-run → Dashboard |
+| `gifs/scan-phases-and-flow.gif` | Processing flow presets, skipping phases |
+| `gifs/investigation-and-vendors.gif` | Investigation corrections → Vendors |
+| `gifs/restructure-live-staging.gif` | Preview routes → staged live execute |
+| `gifs/file-explorer-and-archives.gif` | Browse panel, archive peek |
+| `gifs/ai-lookup-review.gif` | AI analyzer during scan |
+| `gifs/security-and-space-recovery.gif` | Malware heuristics, space recovery |
+
 ## Adding files to the repo
 
-1. Place files under `screenshots/` or `videos/` using the exact names in [ASSETS.md](ASSETS.md).
-2. Re-open [README.md](../../README.md) — image and video tags already point at these paths; they will render once files exist.
-3. Prefer **Git LFS** for videos if the repo grows large; otherwise keep clips short (&lt; 20 MB each).
+1. Place stills under `screenshots/` and MP4s under `videos/` using the exact names in [ASSETS.md](ASSETS.md).
+2. Run `python scripts/build_doc_gifs.py` to regenerate GIFs and sync Help tab assets.
+3. Re-open [README.md](../../README.md) — image and GIF tags already point at these paths.
 
 ## Related documentation
 

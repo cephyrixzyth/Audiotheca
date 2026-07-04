@@ -1,5 +1,22 @@
 # Changelog
 
+## Web UI & API 1.0.0
+
+Engine remains **10.0.0**. This release marks the browser UI, FastAPI layer, and Tauri shell as **1.0.0**.
+
+### Web UI & API
+
+- Version bump to **1.0.0** across `ui/package.json`, Tauri config, and FastAPI
+- Health endpoint exposes `api_version` and `ui_version`
+- Header shows **Web UI 1.0** from package version (with health fallback)
+- Help tab: per-section screenshots and animated walkthrough GIFs
+- README: screenshots grouped by topic; MP4 walkthroughs converted to inline GIFs
+
+### Documentation
+
+- Updated all guides from UI/API **0.2** → **1.0.0**
+- Added `scripts/build_doc_gifs.py` — MP4 → optimized GIF for GitHub README and Help assets
+
 ## 10.0.0
 
 ### Engine
@@ -17,7 +34,7 @@
 - **Tooltips** — navigation tabs, flow editor, and scan controls describe each facet
 - Removed third-party workflow product references from UI copy
 
-## Unreleased / UI 0.2.x (documentation & ops)
+## Unreleased / UI 1.0.x (documentation & ops)
 
 ### Documentation
 

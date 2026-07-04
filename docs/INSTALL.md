@@ -1,6 +1,6 @@
 # Audiotheca — Install Guide
 
-Engine version: **10.0.0** · Web UI: **0.2.0**
+Engine version: **10.0.0** · Web UI: **1.0.0**
 
 For overview and first-run walkthrough, see the [main README](../README.md).
 
@@ -8,7 +8,40 @@ For a step-by-step **first run on another machine**, see **[Testing Guide](TESTI
 
 ---
 
-## Requirements
+## Pre-built installers
+
+End users do **not** need Python, Node, or Rust when using release installers — the Tauri app bundles API + engine sidecars.
+
+| Platform | Build script (maintainers) | Output folder | Artifacts |
+| --- | --- | --- | --- |
+| **Windows** | `.\scripts\build-installers.ps1` | `dist/installers/windows/` | `.msi`, NSIS `-setup.exe` |
+| **Windows portable** | `.\scripts\build-portable.ps1` | `dist/installers/windows/` | `Audiotheca-Portable-1.0.0-win64.zip` |
+| **macOS** | `./scripts/build-installers.sh` | `dist/installers/mac/` | `.dmg` |
+| **Linux** | `./scripts/build-installers.sh` | `dist/installers/linux/` | `.AppImage`, `.deb` |
+
+### Windows installer
+
+1. Download or build `Audiotheca_1.0.0_x64_en-US.msi` or `Audiotheca_1.0.0_x64-setup.exe`.
+2. Run the installer — WebView2 bootstrapper is included when needed.
+3. Launch **Audiotheca** from the Start menu; use the first-run wizard to set your library root.
+
+### Windows portable zip
+
+1. Extract `Audiotheca-Portable-1.0.0-win64.zip` to any writable folder.
+2. Double-click **`Run Audiotheca.bat`** (no terminal window).
+3. Reports and cache go in `data/` (`portable.json` documents `AUDIOTHECA_HOME` relative to the exe).
+
+### macOS / Linux
+
+- **macOS:** open the `.dmg`, drag to Applications; allow in Privacy & Security on first launch.
+- **Linux AppImage:** `chmod +x Audiotheca_*.AppImage && ./Audiotheca_*.AppImage`
+- **Linux deb:** `sudo dpkg -i audiotheca_*.deb`
+
+For portable-style data on macOS/Linux, set `AUDIOTHECA_HOME` to a writable folder before launch.
+
+---
+
+## Requirements (manual / CLI path)
 
 | Requirement | Notes |
 | --- | --- |
@@ -138,6 +171,8 @@ cd ui && npm run dev
 ```
 
 UI: http://localhost:5173 · API health: http://127.0.0.1:8787/api/health
+
+**In-app dependency install:** open the **Environment** tab → **Install missing dependencies** (pip packages; bundled 7-Zip on Windows). Live install requires confirmation (`confirm_live: true`). Manual fallback: `pip install -r requirements.txt` and install 7-Zip from [7-zip.org](https://www.7-zip.org/).
 
 Non-default API port:
 
