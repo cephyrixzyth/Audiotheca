@@ -147,18 +147,20 @@ export function ThemePanel() {
         />
       </div>
 
-      <div className="theme-grid" role="list" aria-label="Theme presets">
-        {themes.map((theme) => (
-          <ThemeCard
-            key={theme.id}
-            theme={theme}
-            active={theme.id === activeId}
-            onSelect={() => {
-              setActiveTheme(theme.id);
-              setEditorId(theme.id);
-            }}
-          />
-        ))}
+      <div className="theme-grid-scroll">
+        <div className="theme-grid" role="list" aria-label="Theme presets">
+          {themes.map((theme) => (
+            <ThemeCard
+              key={theme.id}
+              theme={theme}
+              active={theme.id === activeId}
+              onSelect={() => {
+                setActiveTheme(theme.id);
+                setEditorId(theme.id);
+              }}
+            />
+          ))}
+        </div>
       </div>
 
       {editorTheme && (

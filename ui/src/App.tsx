@@ -1,6 +1,6 @@
 ﻿import { useCallback, useEffect, useState } from "react";
 import "./App.css";
-import { fetchRun, fetchRuns, fetchJobs, fetchHealth } from "./api/client";
+import { fetchRun, fetchRuns, fetchJobs, fetchHealth, fetchLibraryRoots } from "./api/client";
 import { ArchivePeek } from "./components/ArchivePeek";
 import { ContextSidebar, ContextSidebarProvider } from "./components/ContextSidebar";
 import { Dashboard } from "./components/Dashboard";
@@ -14,54 +14,21 @@ import { SceneRenames } from "./components/SceneRenames";
 import { SpaceRecovery } from "./components/SpaceRecovery";
 import { MalwarePanel } from "./components/MalwarePanel";
 import { EnvironmentPanel } from "./components/EnvironmentPanel";
+import { FirstRunWizard, shouldShowFirstRunWizard } from "./components/FirstRunWizard";
 import { HelpPanel } from "./components/HelpPanel";
 import { ProcessBanner } from "./components/ProcessBanner";
+import { NavTabs, REVIEW_TAB_IDS } from "./components/NavTabs";
 import { ThemeSwitcher } from "./components/ThemeSwitcher";
 import { VendorTools } from "./components/VendorTools";
-import { FileExplorerProvider, useFileExplorer } from "./contexts/FileExplorerContext";
+import { FileExplorerProvider } from "./contexts/FileExplorerContext";
 import { useLibraryRoot } from "./hooks/useLibraryRoot";
 import type { RunListItem, RunSummary, TabId } from "./types";
 import { formatEngineLabel, formatEngineVersion } from "./utils/scanDisplay";
-
-const TABS: { id: TabId; label: string; title: string }[] = [
-  { id: "dashboard", label: "Dashboard", title: "Run KPIs, trends, and quick links to other tabs" },
-  { id: "scan", label: "Scan", title: "Start scans, configure pipeline phases, and watch live progress" },
-  { id: "investigation", label: "Investigation", title: "Items the engine could not confidently route — set vendor or bucket" },
-  { id: "duplicates", label: "Duplicates", title: "Review suspected duplicate products and pick keepers" },
-  { id: "restructure", label: "Restructure", title: "Planned vendor folder moves — edit destinations before live run" },
-  { id: "archives", label: "Archives", title: "Archive vs extracted-folder pairs — confirm redundant archives" },
-  { id: "scene-renames", label: "Scene renames", title: "Approve renaming scene-hash folders to product names" },
-  { id: "scan-audit", label: "Scan audit", title: "Per-item scan status, ID method, and quick corrections" },
-  { id: "skipped", label: "Skipped files", title: "Failures, loose archives, cache hits, and rescan targets" },
-  { id: "space-recovery", label: "Space recovery", title: "Hardlink dedup and bloat detection plans" },
-  { id: "security", label: "Security", title: "Malware heuristics, quarantine, hash lookup" },
-  { id: "environment", label: "Environment", title: "Toolchain health, repairs, manifest backup" },
-  { id: "vendors", label: "Vendors", title: "Add vendor keywords, harvest gaps, and export feedback" },
-  { id: "help", label: "Help", title: "Install, deploy, workflow, and layout guides" },
-];
+import { webUiHeaderLabel } from "./utils/uiVersion";
 
 const SUBTREE_TABS: TabId[] = [
-  "investigation",
-  "restructure",
-  "archives",
-  "scan-audit",
-  "duplicates",
-  "scene-renames",
+  ...REVIEW_TAB_IDS.filter((id) => id !== "skipped"),
 ];
-
-function LibraryExplorerButton() {
-  const { openAtRoots } = useFileExplorer();
-  return (
-    <button
-      type="button"
-      className="icon-btn library-explorer-btn"
-      title="Open library explorer at configured roots"
-      onClick={openAtRoots}
-    >
-      Library
-    </button>
-  );
-}
 
 export default function App() {
   const [runs, setRuns] = useState<RunListItem[]>([]);
@@ -71,12 +38,27 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [scanActive, setScanActive] = useState(false);
   const [engineVersion, setEngineVersion] = useState<string | null>(null);
+  const [uiVersion, setUiVersion] = useState<string | null>(null);
+  const [showFirstRun, setShowFirstRun] = useState(false);
   const libraryRoot = useLibraryRoot();
   const explorerSubtree = SUBTREE_TABS.includes(tab) ? libraryRoot : null;
 
   useEffect(() => {
     fetchHealth()
-      .then((h) => setEngineVersion(h.engine_version))
+      .then((h) => {
+        setEngineVersion(h.engine_version);
+        setUiVersion(h.ui_version ?? null);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    fetchLibraryRoots()
+      .then((data) => {
+        if (shouldShowFirstRunWizard(data.configured === true)) {
+          setShowFirstRun(true);
+        }
+      })
       .catch(() => undefined);
   }, []);
 
@@ -140,24 +122,10 @@ export default function App() {
             <div className="topbar-brand">
               <h1>Audiotheca</h1>
               <span className="count-muted">
-                {formatEngineLabel(engineVersion ?? summary?.engine_version)} · Web UI
+                {formatEngineLabel(engineVersion ?? summary?.engine_version)} · {webUiHeaderLabel(uiVersion)}
               </span>
             </div>
-            <nav className="top-tabs" aria-label="Main sections">
-              {TABS.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  className={`top-tab ${tab === t.id ? "active" : ""}`}
-                  title={t.id === "scan" && scanActive ? `${t.title} — scan in progress` : t.title}
-                  onClick={() => setTab(t.id)}
-                >
-                  {t.label}
-                  {t.id === "scan" && scanActive && <span className="scan-live-dot" aria-label="Scan running" />}
-                </button>
-              ))}
-            </nav>
-            <LibraryExplorerButton />
+            <NavTabs tab={tab} onTabChange={setTab} scanActive={scanActive} />
             <ThemeSwitcher />
           </header>
 
@@ -221,6 +189,9 @@ export default function App() {
             </main>
           </div>
         </div>
+        {showFirstRun && (
+          <FirstRunWizard onNavigate={setTab} onComplete={() => setShowFirstRun(false)} />
+        )}
       </ContextSidebarProvider>
     </FileExplorerProvider>
   );
