@@ -86,7 +86,11 @@ def main() -> None:
 
     if TEMP_SRC.is_dir():
         for png in TEMP_SRC.glob("*.png"):
+            if png.name.startswith("page-"):
+                continue
             dest = SHOT_DIR / png.name
+            if dest.is_file():
+                continue
             shutil.copy2(png, dest)
             print(f"Copied {png.name}")
 
