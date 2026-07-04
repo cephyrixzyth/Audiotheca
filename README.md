@@ -225,6 +225,18 @@ Place PNG/WebP files under `docs/assets/screenshots/` — see [docs/assets/ASSET
 
 ## Video walkthroughs
 
+All seven walkthroughs are in-repo — click to open or download on GitHub:
+
+| Topic | Video |
+|-------|-------|
+| First scan from install to Dashboard | [first-scan-walkthrough.mp4](docs/assets/videos/first-scan-walkthrough.mp4) |
+| Scan phases and processing flow presets | [scan-phases-and-flow.mp4](docs/assets/videos/scan-phases-and-flow.mp4) |
+| Investigation triage and vendor keywords | [investigation-and-vendors.mp4](docs/assets/videos/investigation-and-vendors.mp4) |
+| Restructure preview and staged live execute | [restructure-live-staging.mp4](docs/assets/videos/restructure-live-staging.mp4) |
+| File explorer and archive peek | [file-explorer-and-archives.mp4](docs/assets/videos/file-explorer-and-archives.mp4) |
+| AI lookup review during scan | [ai-lookup-review.mp4](docs/assets/videos/ai-lookup-review.mp4) |
+| Security scan and space recovery | [security-and-space-recovery.mp4](docs/assets/videos/security-and-space-recovery.mp4) |
+
 Animated previews render inline on GitHub. [Download full video](#download-full-video-links) for higher quality.
 
 ### First scan from install to Dashboard
