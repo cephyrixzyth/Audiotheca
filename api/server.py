@@ -1308,6 +1308,21 @@ def archive_list_contents(
     return list_archive_contents(path, limit=limit)
 
 
+@app.get("/api/runs/{stamp}/archive-diff")
+def get_archive_diff(
+    stamp: str,
+    archive_path: str = Query(...),
+    folder_path: str = Query(...),
+    limit: int = Query(default=500, le=2000),
+) -> dict[str, object]:
+    from api.archive_diff import build_archive_diff
+
+    security.validate_stamp(stamp)
+    security.assert_library_path(archive_path, must_exist=True, label="archive_path")
+    security.assert_library_path(folder_path, must_exist=True, label="folder_path")
+    return build_archive_diff(stamp, archive_path, folder_path, limit=limit)
+
+
 @app.post("/api/explorer")
 def open_in_explorer(body: dict = Body(...)) -> dict[str, bool]:
     """Legacy: opens OS file manager. Prefer GET /api/browse in the web UI."""

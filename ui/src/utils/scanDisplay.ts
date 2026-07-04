@@ -79,6 +79,9 @@ export function progressEventKey(event: ProgressEvent, index?: number): string {
   const base = event.ts ?? "";
   switch (event.type) {
     case "phase_progress":
+      if ((event as ProgressEvent).heartbeat) {
+        return `pp-hb:${event.phase}:${event.done}:${event.total}:${base}:${event.detail ?? ""}`;
+      }
       return `pp:${event.phase}:${event.done}:${event.total}:${event.pct}:${event.detail ?? ""}`;
     case "engine_log":
     case "step_log":
@@ -99,6 +102,32 @@ export function progressEventKey(event: ProgressEvent, index?: number): string {
     default:
       return `evt:${event.type}:${base}:${index ?? ""}:${JSON.stringify(event).slice(0, 120)}`;
   }
+}
+
+/** ISO timestamp of the most recent phase progress/start event. */
+export function latestProgressTimestamp(events: { type: string; ts?: string }[]): string | null {
+  for (let i = events.length - 1; i >= 0; i -= 1) {
+    const event = events[i];
+    if ((event.type === "phase_progress" || event.type === "phase_start") && event.ts) {
+      return event.ts;
+    }
+  }
+  return null;
+}
+
+/** Seconds since last progress event; null if timestamp missing. */
+export function progressStaleSeconds(ts: string | null | undefined, nowMs = Date.now()): number | null {
+  if (!ts) return null;
+  const parsed = Date.parse(ts);
+  if (!Number.isFinite(parsed)) return null;
+  return Math.max(0, (nowMs - parsed) / 1000);
+}
+
+const STALE_PROGRESS_THRESHOLD_S = 120;
+
+export function isProgressStale(ts: string | null | undefined, nowMs = Date.now()): boolean {
+  const stale = progressStaleSeconds(ts, nowMs);
+  return stale != null && stale >= STALE_PROGRESS_THRESHOLD_S;
 }
 
 export function dedupeProgressEvents(events: ProgressEvent[]): ProgressEvent[] {

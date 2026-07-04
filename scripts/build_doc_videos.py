@@ -30,9 +30,16 @@ VIDEO_CLIPS: dict[str, list[str]] = {
 
 def _ffmpeg() -> str:
     path = shutil.which("ffmpeg")
-    if not path:
-        raise RuntimeError("ffmpeg not found — install ffmpeg to build doc videos")
-    return path
+    if path:
+        return path
+    try:
+        import imageio_ffmpeg
+
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except ImportError as exc:
+        raise RuntimeError(
+            "ffmpeg not found — install ffmpeg or run: pip install imageio-ffmpeg"
+        ) from exc
 
 
 def _build_clip(ffmpeg: str, images: list[Path], output: Path, *, seconds_per: float = 4.0) -> None:

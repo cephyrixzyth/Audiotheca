@@ -22,13 +22,13 @@ Use this table when preparing documentation assets. Each row must exist at the l
 
 | Status | Path | Caption |
 |--------|------|---------|
-| ☐ | `docs/assets/videos/first-scan-walkthrough.mp4` | First scan from install to Dashboard |
-| ☐ | `docs/assets/videos/scan-phases-and-flow.mp4` | Scan phases and processing flow |
-| ☐ | `docs/assets/videos/investigation-and-vendors.mp4` | Investigation and vendor keywords |
-| ☐ | `docs/assets/videos/restructure-live-staging.mp4` | Restructure preview and live staging |
-| ☐ | `docs/assets/videos/file-explorer-and-archives.mp4` | File explorer and archive peek |
-| ☐ | `docs/assets/videos/ai-lookup-review.mp4` | AI lookup review during scan |
-| ☐ | `docs/assets/videos/security-and-space-recovery.mp4` | Security scan and space recovery |
+| ☑ | `docs/assets/videos/first-scan-walkthrough.mp4` | First scan from install to Dashboard |
+| ☑ | `docs/assets/videos/scan-phases-and-flow.mp4` | Scan phases and processing flow |
+| ☑ | `docs/assets/videos/investigation-and-vendors.mp4` | Investigation and vendor keywords |
+| ☑ | `docs/assets/videos/restructure-live-staging.mp4` | Restructure preview and live staging |
+| ☑ | `docs/assets/videos/file-explorer-and-archives.mp4` | File explorer and archive peek |
+| ☑ | `docs/assets/videos/ai-lookup-review.mp4` | AI lookup review during scan |
+| ☑ | `docs/assets/videos/security-and-space-recovery.mp4` | Security scan and space recovery |
 
 ## Capture notes
 

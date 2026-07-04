@@ -1,8 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { SCAN_FLOW_PHASES } from "../flows/scanFlow";
 
-import { formatDuration, formatPhaseLabel, phasesAwaitingProgress } from "../utils/scanDisplay";
+import {
+  formatDuration,
+  formatPhaseLabel,
+  isProgressStale,
+  latestProgressTimestamp,
+  phasesAwaitingProgress,
+  progressStaleSeconds,
+} from "../utils/scanDisplay";
 
 
 
@@ -21,6 +28,10 @@ export interface PhaseProgressState {
   unit?: string;
 
   eta_s?: number | null;
+
+  ts?: string;
+
+  heartbeat?: boolean;
 
 }
 
@@ -52,6 +63,10 @@ export function PhaseLinearProgress({
 
   phaseLabel,
 
+  lastProgressTs,
+
+  nowMs,
+
 }: {
 
   progress?: PhaseProgressState | null;
@@ -59,6 +74,10 @@ export function PhaseLinearProgress({
   initializing?: boolean;
 
   phaseLabel?: string | null;
+
+  lastProgressTs?: string | null;
+
+  nowMs?: number;
 
 }) {
 
@@ -106,6 +125,22 @@ export function PhaseLinearProgress({
 
   const label = progress.detail || `${progress.done?.toLocaleString() ?? 0} / ${progress.total.toLocaleString()}`;
 
+  const stale = isProgressStale(lastProgressTs ?? progress.ts, nowMs);
+
+  const staleSec = progressStaleSeconds(lastProgressTs ?? progress.ts, nowMs);
+
+  const staleLabel =
+
+    stale && staleSec != null
+
+      ? ` · last update ${formatDuration(staleSec)} ago — still working (slow folder listing on NAS is normal)`
+
+      : "";
+
+  const etaLabel =
+
+    progress.eta_s != null && !stale ? ` · ETA ${formatDuration(progress.eta_s)}` : stale ? " · ETA unavailable (waiting for update)" : "";
+
   return (
 
     <div className="phase-linear-progress" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
@@ -124,11 +159,13 @@ export function PhaseLinearProgress({
 
       </div>
 
-      <div className="phase-linear-detail count-muted">
+      <div className={`phase-linear-detail count-muted${stale ? " phase-linear-stale" : ""}`}>
 
         {label}
 
-        {progress.eta_s != null ? ` · ETA ${formatDuration(progress.eta_s)}` : ""}
+        {etaLabel}
+
+        {staleLabel}
 
       </div>
 
@@ -168,6 +205,15 @@ type PhaseVisualState = "active" | "done" | "starting" | "pending";
 
 export function PhaseProgressBar({ activePhase, completedPhases = [], isActive, progress, events = [] }: Props) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!isActive) return undefined;
+    const id = window.setInterval(() => setNowMs(Date.now()), 15000);
+    return () => window.clearInterval(id);
+  }, [isActive]);
+
+  const lastProgressTs = latestProgressTimestamp(events);
   const completed = new Set(completedPhases);
 
   const activeNorm = activePhase?.toLowerCase() ?? "";
@@ -228,7 +274,13 @@ export function PhaseProgressBar({ activePhase, completedPhases = [], isActive, 
     <div
       className={`phase-progress-wrap${hasCollapsedPending ? " is-compact" : ""}`}
     >
-      <PhaseLinearProgress progress={progress} initializing={initializing} phaseLabel={activePhase} />
+      <PhaseLinearProgress
+        progress={progress}
+        initializing={initializing}
+        phaseLabel={activePhase}
+        lastProgressTs={lastProgressTs}
+        nowMs={nowMs}
+      />
       <div className="phase-progress-bar" role="list" aria-label="Scan pipeline progress">
         {nodes.map(({ phase, code, state }) => {
           const isHovered = hoveredId === phase.id;
@@ -339,6 +391,10 @@ export function latestPhaseProgress(
 
     eta_s?: number | null;
 
+    ts?: string;
+
+    heartbeat?: boolean;
+
   }[],
 
 ): PhaseProgressState | null {
@@ -364,6 +420,10 @@ export function latestPhaseProgress(
         unit: event.unit,
 
         eta_s: event.eta_s,
+
+        ts: event.ts,
+
+        heartbeat: event.heartbeat,
 
       };
 

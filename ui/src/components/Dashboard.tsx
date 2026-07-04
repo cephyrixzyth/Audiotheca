@@ -117,7 +117,7 @@ function RunSparkline({ runs }: { runs: RunListItem[] }) {
         );
       })}
       {recent.length === 0 && <p className="count-muted">No run history</p>}
-    </div>
+      </div>
   );
 }
 
@@ -222,8 +222,8 @@ export function Dashboard({ summary, runs, onNavigate }: Props) {
                 detail={
                   oneActionPct != null
                     ? `${oneActionPct}% inv = unverified vendor (add to DB)`
-                    : "—"
-                }
+              : "—"
+          }
                 tone="warning"
               />
             </div>
@@ -615,7 +615,7 @@ export function Dashboard({ summary, runs, onNavigate }: Props) {
               />
               <StatTile label="Suggestions" value={scorecard.findings_suggestions ?? 0} />
               <StatTile label="Dupe groups" value={scorecard.duplicate_groups ?? 0} />
-            </div>
+      </div>
             {findings.length > 0 && (
               <ul className="finding-list">
                 {findings.slice(0, 6).map((finding, idx) => (

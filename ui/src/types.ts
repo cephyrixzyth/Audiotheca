@@ -117,6 +117,35 @@ export interface ArchivePeekResponse {
   delete_candidate_mb: number;
 }
 
+export interface ArchiveDiffMatch {
+  name: string;
+  size_archive: number | null;
+  size_disk: number | null;
+}
+
+export interface ArchiveDiffEntry {
+  name: string;
+  relative_path?: string;
+  path?: string;
+  is_dir: boolean;
+  size: number | null;
+}
+
+export interface ArchiveDiffResponse {
+  stamp: string;
+  archive_path: string;
+  folder_path: string;
+  archive_tool_available?: boolean;
+  archive_list_count?: number;
+  archive_error?: string | null;
+  archive_entries: ArchiveDiffEntry[];
+  folder_entries: ArchiveDiffEntry[];
+  only_in_archive: string[];
+  only_on_disk: string[];
+  matched: ArchiveDiffMatch[];
+  verdict_hint: string;
+}
+
 export interface ScanAuditItem {
   section: string;
   item_name: string;
@@ -239,6 +268,8 @@ export interface ProgressEvent {
   note?: string;
   elapsed_s?: number;
   eta_s?: number | null;
+  /** phase_progress re-emitted without advancing done (long NAS listing, etc.) */
+  heartbeat?: boolean;
   stamp?: string;
   error?: string;
   action?: string;

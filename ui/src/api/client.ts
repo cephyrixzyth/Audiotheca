@@ -1,5 +1,6 @@
 import { getApiBase, getWsBase, isTauri } from "../platform";
 import type {
+  ArchiveDiffResponse,
   ArchivePeekResponse,
   DuplicateGroup,
   InvestigationItem,
@@ -357,6 +358,18 @@ export function fetchArchivePeek(
   if (params.q) qs.set("q", params.q);
   if (params.limit) qs.set("limit", String(params.limit));
   return getJson(`/runs/${stamp}/archive-peek?${qs}`);
+}
+
+export function fetchArchiveDiff(
+  stamp: string,
+  params: { archive_path: string; folder_path: string; limit?: number },
+): Promise<ArchiveDiffResponse> {
+  const qs = new URLSearchParams({
+    archive_path: params.archive_path,
+    folder_path: params.folder_path,
+  });
+  if (params.limit) qs.set("limit", String(params.limit));
+  return getJson(`/runs/${stamp}/archive-diff?${qs}`);
 }
 
 export interface DuplicateRejection {

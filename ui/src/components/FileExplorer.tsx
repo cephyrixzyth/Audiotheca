@@ -7,6 +7,7 @@ import {
 } from "../api/client";
 import { useExplorerPathDrag } from "../contexts/FileExplorerContext";
 import { FileExplorerTree } from "./FileExplorerTree";
+import { ArchiveDiffWizard } from "./ArchiveDiffWizard";
 
 const ARCHIVE_EXT = /\.(zip|rar|7z|iso|tar(\.(gz|bz2|xz))?|gz|001)$/i;
 const LAST_PATH_KEY = "audiotheca.explorer.lastPath";
@@ -73,7 +74,9 @@ interface PaneProps {
   subtreeRoot: string | null;
   treeRoots: BrowseEntry[];
   showTree: boolean;
+  peerPath?: string | null;
   onPathChange?: (path: string) => void;
+  onRequestDiff?: (archivePath: string, folderPath: string) => void;
 }
 
 function ExplorerPane({
@@ -83,7 +86,9 @@ function ExplorerPane({
   subtreeRoot,
   treeRoots,
   showTree,
+  peerPath = null,
   onPathChange,
+  onRequestDiff,
 }: PaneProps) {
   const [currentPath, setCurrentPath] = useState(initialPath);
   const [parent, setParent] = useState<string | null>(null);
@@ -302,6 +307,19 @@ function ExplorerPane({
               Copy path
             </button>
           </li>
+          {isArchiveName(contextMenu.entry.name) && peerPath && onRequestDiff && (
+            <li>
+              <button
+                type="button"
+                onClick={() => {
+                  onRequestDiff(contextMenu.entry.path, peerPath);
+                  setContextMenu(null);
+                }}
+              >
+                Diff vs other pane
+              </button>
+            </li>
+          )}
         </menu>
       )}
     </div>
@@ -373,6 +391,11 @@ export function FileExplorerPanel({
   onClose,
 }: Props) {
   const [treeRoots, setTreeRoots] = useState<BrowseEntry[]>([]);
+  const [primaryPath, setPrimaryPath] = useState(initialPath);
+  const [secondaryCurrentPath, setSecondaryCurrentPath] = useState(secondaryPath ?? "");
+  const [diffPair, setDiffPair] = useState<{ archivePath: string; folderPath: string } | null>(
+    null,
+  );
 
   useEffect(() => {
     void browseDirectoryEnriched("", stamp ?? "").then((data) =>
@@ -402,6 +425,14 @@ export function FileExplorerPanel({
       onClick={pinned ? undefined : onClose}
       role="presentation"
     >
+      {diffPair && stamp && (
+        <ArchiveDiffWizard
+          stamp={stamp}
+          archivePath={diffPair.archivePath}
+          folderPath={diffPair.folderPath}
+          onClose={() => setDiffPair(null)}
+        />
+      )}
       <aside
         className={shellClass}
         onClick={(e) => e.stopPropagation()}
@@ -441,6 +472,11 @@ export function FileExplorerPanel({
               subtreeRoot={subtreeRoot ?? null}
               treeRoots={treeRoots}
               showTree
+              peerPath={secondaryCurrentPath}
+              onPathChange={setPrimaryPath}
+              onRequestDiff={(archivePath, folderPath) =>
+                setDiffPair({ archivePath, folderPath })
+              }
             />
             <ExplorerPane
               paneId="secondary"
@@ -449,6 +485,11 @@ export function FileExplorerPanel({
               subtreeRoot={subtreeRoot ?? null}
               treeRoots={treeRoots}
               showTree={false}
+              peerPath={primaryPath}
+              onPathChange={setSecondaryCurrentPath}
+              onRequestDiff={(archivePath, folderPath) =>
+                setDiffPair({ archivePath, folderPath })
+              }
             />
           </div>
         ) : (

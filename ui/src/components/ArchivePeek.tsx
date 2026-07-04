@@ -9,6 +9,7 @@ import {
 } from "../api/client";
 import type { ArchivePeekItem } from "../types";
 import { useLibraryRoot } from "../hooks/useLibraryRoot";
+import { ArchiveDiffWizard } from "./ArchiveDiffWizard";
 import { PathLink } from "./PathLink";
 import { useContextSidebar } from "./ContextSidebar";
 
@@ -30,6 +31,7 @@ export function ArchivePeek({ stamp }: Props) {
   const [confirmed, setConfirmed] = useState<Record<string, string>>({});
   const [keepers, setKeepers] = useState<Record<string, string>>({});
   const [msg, setMsg] = useState<string | null>(null);
+  const [diffRow, setDiffRow] = useState<ArchivePeekItem | null>(null);
 
   useEffect(() => {
     fetchArchiveFeedback(stamp)
@@ -123,6 +125,15 @@ export function ArchivePeek({ stamp }: Props) {
 
   return (
     <div>
+      {diffRow && diffRow.extracted_folder && (
+        <ArchiveDiffWizard
+          stamp={stamp}
+          row={diffRow}
+          archivePath={diffRow.archive_path}
+          folderPath={diffRow.extracted_folder}
+          onClose={() => setDiffRow(null)}
+        />
+      )}
       <div className="kpi-grid" style={{ marginBottom: "1rem" }}>
         <div className="kpi">
           <div className="label">Delete candidates</div>
@@ -242,6 +253,18 @@ export function ArchivePeek({ stamp }: Props) {
                   <td>{row.archive_size_mb != null ? `${row.archive_size_mb} MB` : "—"}</td>
                   <td>{row.extracted_folder}</td>
                   <td>
+                    {row.extracted_folder ? (
+                      <button
+                        type="button"
+                        className="keeper-btn"
+                        title="Compare archive listing vs extracted folder side by side"
+                        onClick={() => setDiffRow(row)}
+                      >
+                        Diff
+                      </button>
+                    ) : (
+                      <span className="count-muted">—</span>
+                    )}{" "}
                     {row.verdict === "MATCHES_EXTRACTED_FOLDER" && !isRejected && (
                       <>
                         <button

@@ -488,6 +488,7 @@ class DeduplicationEngine(
                     category_bins.append(entry)
 
         bin_progress = PhaseProgress("Phase 1a - Resolve targets per category", len(category_bins), "section")
+        self._bin_progress = bin_progress
         payloads: list[tuple[Path, str]] = []
         bin_targets: dict[str, list[Path]] = {}
 
@@ -508,11 +509,13 @@ class DeduplicationEngine(
         else:
             for category_bin in category_bins:
                 log_step("get_software_targets", f"Resolving bin {category_bin.name}")
+                bin_progress.pulse(detail=f"Starting {category_bin.name}…")
                 targets = self.get_software_targets(category_bin)
                 bin_targets[category_bin.name] = targets
                 payloads.extend((target, category_bin.name) for target in targets)
                 bin_progress.update(1, detail=f"{category_bin.name}: {len(targets)} targets")
             bin_progress.finish(f"{len(payloads):,} total targets")
+            self._bin_progress = None
 
         if not self.scan_options.target_paths:
             gap_progress = PhaseProgress(

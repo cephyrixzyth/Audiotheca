@@ -120,6 +120,28 @@ class PhaseProgress:
             }
         )
 
+    def pulse(self, detail: str = "") -> None:
+        """Re-emit progress without advancing done — for long-running sub-steps."""
+        now = time.monotonic()
+        elapsed = now - self.started
+        rate = self.done / elapsed if elapsed > 0 and self.done > 0 else 0.0
+        remaining = (self.total - self.done) / rate if rate > 0 else float("inf")
+        pct = 100.0 * self.done / self.total
+        _emit_progress_event(
+            {
+                "type": "phase_progress",
+                "phase": self.phase,
+                "done": self.done,
+                "total": self.total,
+                "unit": self.unit,
+                "pct": round(pct, 1),
+                "elapsed_s": round(elapsed, 1),
+                "eta_s": None if remaining == float("inf") else round(remaining, 1),
+                "detail": detail[:120] if detail else "",
+                "heartbeat": True,
+            }
+        )
+
 
 def tqdm_bar(total: int, desc: str, unit: str = "item"):
     """Return a tqdm progress bar with ETA, or None if tqdm missing."""

@@ -10,6 +10,7 @@ import re
 import shutil
 import sys
 import threading
+import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
@@ -471,14 +472,30 @@ class IdentifyMixin:
     def get_software_targets(self, bin_path: Path) -> list[Path]:
         targets: set[Path] = set()
         section = bin_path.name
+        progress = getattr(self, "_bin_progress", None)
+        if progress is not None:
+            progress.pulse(detail=f"{section}: listing folder…")
+
+        entries: list[Path] = []
+        last_pulse = time.monotonic()
         try:
-            entries = list(bin_path.iterdir())
+            with os.scandir(bin_path) as scan:
+                for idx, row in enumerate(scan):
+                    entries.append(Path(row.path))
+                    now = time.monotonic()
+                    if progress is not None and (now - last_pulse >= 30.0 or (idx > 0 and idx % 500 == 0)):
+                        progress.pulse(
+                            detail=f"{section}: listed {idx + 1} entries… ({row.name[:48]})"
+                        )
+                        last_pulse = now
         except (OSError, PermissionError) as exc:
             self.logger.error("Cannot read bin %s: %s", bin_path, exc)
             self._inc("errors")
             return []
 
-        for item in entries:
+        for idx, item in enumerate(entries):
+            if idx > 0 and idx % 200 == 0 and progress is not None:
+                progress.pulse(detail=f"{section}: resolving {idx}/{len(entries)}…")
             if item.name.startswith("_") and not is_underscore_scannable(item.name, item):
                 continue
 
