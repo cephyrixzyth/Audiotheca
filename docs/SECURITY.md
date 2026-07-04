@@ -2,6 +2,8 @@
 
 Audiotheca is a **local-only operator tool** for managing a personal audio software library. It is not designed as a multi-user or internet-facing service.
 
+Overview and troubleshooting: [main README](../README.md) · [User Guide — Security tab](USER_GUIDE.md#web-ui-tabs).
+
 ## Threat model
 
 - **Intended use:** One trusted operator on their own machine, API bound to `127.0.0.1:8787`.
@@ -28,7 +30,7 @@ The API uses a **Bearer token** stored at:
 
 ## Library root allowlist
 
-Paths used for scans, explorer, cache invalidation, rescans, and live moves must fall under configured library roots:
+Paths used for scans, explorer (`/api/browse`), cache invalidation, rescans, and live moves must fall under configured library roots:
 
 1. `AUDIOTHECA_LIBRARY_ROOTS` (comma-separated), or
 2. `dedupe_reports/.library_roots.json`, or

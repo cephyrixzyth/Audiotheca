@@ -21,10 +21,10 @@
 
 ### Documentation
 
-- **[Testing Guide](TESTING.md)** — external tester setup, smoke tests, checklist
-- **[Configuration](CONFIGURATION.md)** — environment variables reference
-- **[.env.example](../.env.example)** — template for library paths and API port
-- Updated README, User Guide, Install, FAQ, Feature Guide for all UI tabs and `AUDIOTHECA_LIBRARY_ROOT`
+- Expanded [main README](../README.md) — TOC, UI tour, screenshot/video placeholders
+- [docs/assets/](assets/) — media capture guide and checklist
+- Updated User Guide, Install, FAQ, Feature Guide for engine **10.0.0**, Security/Environment tabs, AI lookup, file explorer, themes
+- Help tab moved to **end** of UI tab bar
 
 ### Web UI & API
 

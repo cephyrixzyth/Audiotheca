@@ -2,6 +2,8 @@
 
 Private meta-search for Audiotheca vendor / library research. Used by `scripts/searx_search.py`.
 
+Project docs: [main README](../../README.md) · [Feature Guide](../../docs/FEATURE_GUIDE.md)
+
 ## Prerequisites
 
 Install **Docker Desktop for Windows**: https://docs.docker.com/desktop/setup/install/windows-install/

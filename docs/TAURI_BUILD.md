@@ -2,7 +2,7 @@
 
 Native Windows app with **bundled Python sidecars** — end users do not need Python installed.
 
-For day-to-day use without building an installer, prefer the **browser UI**: `.\start-ui.ps1` (Node.js + Python only, no Rust).
+For day-to-day use without building an installer, prefer the **browser UI**: `.\start-ui.ps1` (Node.js + Python only, no Rust). Overview: [main README](../README.md).
 
 | Sidecar | Role |
 | --- | --- |

@@ -1,6 +1,8 @@
 # Audiotheca — Install Guide
 
-Engine version: **9.8.0** · Web UI: **0.2.0**
+Engine version: **10.0.0** · Web UI: **0.2.0**
+
+For overview and first-run walkthrough, see the [main README](../README.md).
 
 For a step-by-step **first run on another machine**, see **[Testing Guide](TESTING.md)**.
 
@@ -179,7 +181,7 @@ python scripts/library_probe.py
 
 ## First live run checklist
 
-1. Successful dry run with 9.8.0 header
+1. Successful dry run with 10.0.0 header
 2. Review `Scene_Rename_Plan_*.csv` and `Archive_Peek_*.csv`
 3. Check `Multipart_Archive_Diagnostic_*.csv` for `MISSING_PART01`
 4. **Backup library**

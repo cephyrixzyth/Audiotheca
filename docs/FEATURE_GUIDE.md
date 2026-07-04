@@ -1,6 +1,8 @@
 # Audiotheca — Feature Guide
 
-Engine version: **9.8.0** · Web UI: **v0.2**
+Engine version: **10.0.0** · Web UI: **v0.2**
+
+See also the [main README](../README.md) and [User Guide](USER_GUIDE.md) for launch commands and tab workflows.
 
 ## Overview
 
@@ -18,6 +20,7 @@ Each phase prints progress as `current / total (%) · elapsed · ETA` in the ter
 | --- | --- | --- |
 | **1a** | Resolve targets | Walk each category bin (`a/`, `b/`, `=`, …); count targets per section |
 | **1b** | Parallel scan | Depth-limited tree scan + vendor ID per target |
+| **1b-fallback** | AI lookup | Contextual lookup for targets still unknown after heuristics (skippable) |
 | **1.5** | Reconciliation | Cross-folder fingerprint vendor inheritance |
 | **1.6** | Scene archive peek | List archives inside scene-hash folders (≥ `SCENE_PEEK_MIN_SIZE_MB`) |
 | **1.6b** | Scene auto-rename | Rename hash folders to inferred product names (if enabled) |
@@ -64,6 +67,17 @@ Tiered ID: `NAME_STRONG` → `NAME_PRODUCT` → `NAME_CONTENT` (9.8+) → `PE_HE
 - **PE normalization** — legal suffixes (GmbH, Inc, LLC…) stripped before vendor DB lookup.
 
 Vendor-stripped fingerprints and cross-folder reconciliation after scan.
+
+### 3b. AI lookup fallback (10.0+)
+
+When local heuristics leave a target unknown, Phase **1b-fallback** can queue **contextual AI lookup**:
+
+- Reads release metadata (NFO/readme) already collected during scan — no extra tree walk.
+- Results cache under `dedupe_reports/ai_lookup_cache/`; confirmed hits feed vendor identification.
+- Skippable via scan options / processing flow (`ai_lookup` phase).
+- **Scan tab → AI analyzer** shows live progress; API endpoints support query and confirm.
+
+Provider plug-in architecture exists; default stub runs offline until you configure a real provider.
 
 ### 4. Archive peek (9.7+)
 
@@ -136,7 +150,7 @@ Scene-hash folders (`_scene_release_id`) are prime candidates for **Phase 1.6 pe
 - `Archive_Delete_Candidates_{stamp}.csv`
 - `move_redundant_archives_{stamp}.ps1` — preview by default; set `$Execute = $true` for Stage 3
 
-### 12. Web UI & API (v0.2)
+### 12. Web UI & API (v0.2 / engine 10.0)
 
 FastAPI on `http://127.0.0.1:8787` serves dry-run reports and runs scan jobs. Bearer token auth — see [Security](SECURITY.md).
 
@@ -145,7 +159,7 @@ FastAPI on `http://127.0.0.1:8787` serves dry-run reports and runs scan jobs. Be
 | Tab | Purpose |
 | --- | --- |
 | Dashboard | Run stats, gauges, run compare, reorderable panels |
-| Scan | Job trigger, processing flow presets, WebSocket progress |
+| Scan | Job trigger, processing flow presets, WebSocket progress, AI analyzer |
 | Investigation | Bucket triage, bulk correct, feedback export |
 | Duplicates | Keeper selection, staging, rejections |
 | Restructure | Route preview, live section execute |
@@ -154,7 +168,10 @@ FastAPI on `http://127.0.0.1:8787` serves dry-run reports and runs scan jobs. Be
 | Scan audit | Per-item identification table |
 | Skipped files | Coverage gaps, cache, coexistence, rescan |
 | Space recovery | Underscore whitelist, coexistence queue |
+| Security | Malware heuristics, quarantine, hash lookup |
+| Environment | Toolchain probe, repairs, theme editor |
 | Vendors | Gaps, harvest, user keywords |
+| Help | Built-in guides *(last tab)* |
 
 #### Key API areas
 
@@ -162,11 +179,13 @@ FastAPI on `http://127.0.0.1:8787` serves dry-run reports and runs scan jobs. Be
 | --- | --- |
 | `/api/runs/{stamp}/*` | Reports: investigation, duplicates, restructure, archives, … |
 | `/api/jobs` + WebSocket | Scan jobs + phase progress |
+| `/api/browse`, `/api/archive/list` | In-app file explorer + archive listing (10.0+) |
+| `/api/ai-lookup/*` | AI lookup cache, query, confirm |
 | `/api/underscore-vendors` | Underscore whitelist CRUD |
 | `/api/runs/{stamp}/underscore/*` | Bulk whitelist + full rescan |
 | `/api/runs/{stamp}/space-recovery/summary` | Coexistence aggregates |
 | `/api/decisions` | Duplicate keeper → `approved_{stamp}.json` |
-| `/api/explorer` | Open path in Explorer (Windows) |
+| `/api/explorer` | Open path in OS file manager (Windows) |
 | `/api/security/library-roots` | Configured library allowlist |
 
 Launch: `.\start-ui.ps1` or `python -m api.server` + `cd ui && npm run dev`.
@@ -202,10 +221,10 @@ All in `dedupe_reports/` with timestamp `YYYYMMDD_HHMM`. Copied to `{ROOT}/_dedu
 
 ---
 
-## Configuration (9.8)
+## Configuration (10.0)
 
 ```python
-ENGINE_VERSION = "9.8.0"
+ENGINE_VERSION = "10.0.0"
 CACHE_SCHEMA = "9.7.1"
 # Prefer env: AUDIOTHECA_LIBRARY_ROOT
 ROOT_DIR = r"Z:\_software\_audio"   # default only — override for your system

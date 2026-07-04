@@ -1,10 +1,12 @@
 # Audiotheca — Architecture & UI Roadmap
 
-How Audiotheca evolved from a CLI script into a desktop product. **v9.8.0** ships the scan engine plus a **Web UI v0.2** (FastAPI + React) and **Tauri 2** desktop shell with PyInstaller sidecars. The UI consumes existing CSV/JSON report contracts — it does not reimplement peek or matching logic.
+How Audiotheca evolved from a CLI script into a desktop product. **v10.0.0** ships the scan engine plus a **Web UI v0.2** (FastAPI + React) and **Tauri 2** desktop shell with PyInstaller sidecars. The UI consumes existing CSV/JSON report contracts — it does not reimplement peek or matching logic.
 
-**Shipped (v0.2):** Report viewer, investigation inbox, duplicate keeper export, restructure preview, archive tab, scan jobs with WebSocket progress, Open in Explorer, launcher scripts.
+**Shipped (v0.2 / engine 10.0):** Report viewer, investigation inbox, duplicate keeper export, restructure preview, archive tab, scan jobs with WebSocket progress, in-app file explorer, AI lookup fallback, Security/Environment tabs, reorderable layouts, themes, Help tab (last), launcher scripts.
 
-**Still roadmap:** SQLite job store, live execute from UI, archive extract/compare wizard, package split (`audiotheca/` module).
+**Still roadmap:** SQLite job store, full live execute from every UI surface, archive extract/compare wizard, package split refinements.
+
+See the [main README](../README.md) for current tab list and [Feature Guide](FEATURE_GUIDE.md) for phase details.
 
 ---
 

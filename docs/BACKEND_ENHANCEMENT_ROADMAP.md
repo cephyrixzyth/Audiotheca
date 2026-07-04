@@ -1,6 +1,8 @@
 # Backend Enhancement Roadmap — Per-Module Feedback & Corrections
 
-Engine **9.8.0** · UI **v0.2**
+Engine **10.0.0** · UI **v0.2**
+
+See [main README](../README.md) and [Feature Guide](FEATURE_GUIDE.md) for shipped capabilities.
 
 This document defines **what to build in each UI module** so your manual review produces structured output the engine can consume on the next run — not just CSV reports to read.
 

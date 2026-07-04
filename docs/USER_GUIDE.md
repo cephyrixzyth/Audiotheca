@@ -1,6 +1,8 @@
 # Audiotheca — Quick User Guide
 
-Engine **9.8.0** · Web UI **0.2.0**
+Engine **10.0.0** · Web UI **0.2.0**
+
+**New here?** Read the [main README](../README.md) for overview, screenshots, and video placeholders.
 
 **Testing on a new machine?** Start with **[Testing Guide](TESTING.md)** — paths, smoke tests, and checklist.
 
@@ -99,7 +101,7 @@ Always review `Run_Summary_*.txt` before any live run.
 | Tab | What you do |
 | --- | --- |
 | **Dashboard** | Pick run, route-ready / identification gauges, compare runs, reorder panels |
-| **Scan** | Start dry-run; **Processing flow** presets (Full audit, Fast identify, …); live WebSocket progress |
+| **Scan** | Start dry-run; **Processing flow** presets; live WebSocket progress; **AI lookup** panel |
 | **Investigation** | Filter buckets, bulk correct, group by prefix, export feedback |
 | **Duplicates** | Pick keeper, reject bad groups, preview/stage deletes, manual dupes |
 | **Restructure** | Preview routes; execute approved sections (live, confirmed) |
@@ -107,10 +109,17 @@ Always review `Run_Summary_*.txt` before any live run.
 | **Scene renames** | Hash folder → product name proposals |
 | **Scan audit** | Full per-item identification audit |
 | **Skipped files** | Scan failures, coverage gaps, cache hits, coexistence, run compare, **rescan** |
-| **Space recovery** | Coexistence summary (deep installers), **underscore vendor whitelist**, disk reclaim links |
+| **Space recovery** | Coexistence summary, **underscore vendor whitelist**, disk reclaim links |
+| **Security** | Malware heuristics, quarantine actions, SHA-256 hash lookup |
+| **Environment** | Dependency health, repairs, **theme editor**, manifest backup |
 | **Vendors** | Vendor gaps, bulk add keywords, web harvest inbox, unified export |
+| **Help** | Built-in install, workflow, layout, and deploy guides *(last tab)* |
 
-Most tabs support **drag-to-reorder sections** (Dashboard, Scan); preferences persist in browser localStorage.
+Most tabs support **drag-to-reorder sections** (Dashboard, Scan, and others); preferences persist in browser localStorage.
+
+**File explorer:** click **Browse** on any path link to open the in-app folder/archive browser (engine 10.0+).
+
+**Themes:** use the ◐ selector in the top bar, or **Environment → Themes** for custom palettes.
 
 Decisions save to `dedupe_reports/decisions/approved_{stamp}.json` and `dedupe_reports/feedback/`.
 
@@ -198,10 +207,12 @@ python -m pytest tests/ -q
 
 | Guide | Contents |
 | --- | --- |
+| [Main README](../README.md) | Overview, UI tour, media placeholders |
 | [Testing Guide](TESTING.md) | External tester checklist |
 | [Configuration](CONFIGURATION.md) | Env vars, paths |
 | [Install Guide](INSTALL.md) | Full setup |
 | [Feature Guide](FEATURE_GUIDE.md) | Phases, reports, API |
+| [Doc assets](assets/README.md) | Screenshot/video capture |
 | [Security](SECURITY.md) | Token, allowlist |
 | [FAQ](FAQ.md) | Q&A |
 | [Changelog](CHANGELOG.md) | Version history |

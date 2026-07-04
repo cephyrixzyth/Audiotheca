@@ -14,7 +14,7 @@ Single installable package (docker-compose + Dockerfiles + Unraid template notes
 
 ## Current project
 Path: c:\Users\Cephyrix Zyth\Desktop\audiotheca
-- Engine 9.8.0, UI 0.2.0, FastAPI api/server.py
+- Engine 10.0.0, UI 0.2.0, FastAPI api/server.py
 - Library root (Windows/SMB today): Z:\_software\_audio
   Unraid equivalent (adjust to my share): likely /mnt/user/<pool>/_software/_audio
   SMB name seen in reports: \\192.168.50.116\infernal-data-streams\_software\_audio

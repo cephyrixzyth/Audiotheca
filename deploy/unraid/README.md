@@ -4,6 +4,8 @@ Production Docker stack: **API** (FastAPI + scan engine) + **UI** (nginx + Vite 
 
 Designed for Unraid 6.x/7.x where the audio library lives on local array paths (`/mnt/user/...`), not over SMB from a PC.
 
+Main project docs: [README](../../README.md) · Engine **10.0.0** · Web UI **0.2.0**
+
 ## Add Container (recommended)
 
 Unraid **Docker → Add Container** needs a single image and a user template.

@@ -4,6 +4,8 @@ This guide is for **another machine or another user** validating Audiotheca with
 
 Engine **10.0.0** · Web UI **0.2.0**
 
+**Overview and UI tour:** [main README](../README.md) · **Doc screenshots:** [assets/ASSETS.md](assets/ASSETS.md)
+
 ---
 
 ## What you need

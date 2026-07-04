@@ -1,6 +1,8 @@
 # Audiotheca — Configuration Reference
 
-Engine **9.8.0** · API **0.2.0**
+Engine **10.0.0** · API **0.2.0**
+
+Overview and env quick-start: [main README](../README.md).
 
 ---
 
@@ -104,7 +106,7 @@ Delete `scan_cache.json` or use UI **Skipped files → rescan** to force fresh t
 Skippable phases (faster dry runs):
 
 - `quarantine`, `duplicates`, `restructure_live`, `purge`
-- `archive_peek`, `scene_peek`
+- `archive_peek`, `scene_peek`, `ai_lookup`
 
 **Processing flow** presets in the Scan tab map to these (default: **Fast identify**).
 

@@ -1,6 +1,8 @@
 # Audiotheca — FAQ
 
-Engine version: **9.8.0** · Web UI: **v0.2**
+Engine version: **10.0.0** · Web UI: **v0.2**
+
+See the [main README](../README.md) for quick start and [User Guide](USER_GUIDE.md) for tab workflows.
 
 ## General
 
@@ -238,11 +240,28 @@ Not for the React dev UI. Use `.\start-api.ps1` and hit JSON endpoints directly,
 
 `dedupe_reports/decisions/approved_{stamp}.json` — export from the Duplicates tab.
 
+### What is the in-app file explorer?
+
+Engine **10.0+** adds **Browse** on path links and API routes `/api/browse` and `/api/archive/list`. You can list folders and archive contents inside the UI without opening Windows Explorer or extracting archives.
+
+### What is AI lookup?
+
+When heuristics cannot identify a product, Phase **1b-fallback** can queue contextual lookup using release metadata (NFO/readme). Results appear in the **Scan tab → AI analyzer** and cache under `dedupe_reports/ai_lookup_cache/`. Skip the phase in processing flow if you want a faster dry-run.
+
+### Where are UI themes configured?
+
+Use the ◐ theme switcher in the top bar, or **Environment → Themes** to duplicate built-in presets, edit colors, and import/export JSON themes (stored in browser localStorage).
+
+### Where is Help in the UI?
+
+The **Help** tab is the **last** tab in the top bar (after Vendors). It mirrors quick install/workflow notes; full docs live in [docs/README.md](README.md) and the [main README](../README.md).
+
 ---
 
 ## Getting help
 
-1. [Quick User Guide](USER_GUIDE.md)
-2. [Debug Runbook](DEBUG_RUNBOOK.md)
-3. Latest `Run_Summary_*.txt` and `dedupe_engine.log`
-4. Note `ENGINE_VERSION` printed at run start when reporting issues
+1. [Main README](../README.md)
+2. [Quick User Guide](USER_GUIDE.md)
+3. [Debug Runbook](DEBUG_RUNBOOK.md)
+4. Latest `Run_Summary_*.txt` and `dedupe_engine.log`
+5. Note `ENGINE_VERSION` printed at run start when reporting issues
