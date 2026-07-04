@@ -27,6 +27,16 @@ import { ProcessDiagnostics, type LogLine as ImportedLogLine } from "./ProcessDi
 import { ReorderableSections } from "./ReorderableSections";
 import { useContextSidebar } from "./ContextSidebar";
 import { FLOW_PRESET_STORAGE, FLOW_PRESETS } from "../flows/scanFlow";
+import { EXPLORER_PATH_MIME } from "../contexts/FileExplorerContext";
+
+function readDroppedPath(e: React.DragEvent): string | null {
+  e.preventDefault();
+  const raw =
+    e.dataTransfer.getData(EXPLORER_PATH_MIME) ||
+    e.dataTransfer.getData("text/plain");
+  const trimmed = raw.trim();
+  return trimmed || null;
+}
 
 interface Props {
   onRunComplete?: (stamp: string) => void;
@@ -498,6 +508,7 @@ export function ScanPanel({ onRunComplete }: Props) {
           ...importedLogLines.map((line, i) => ({
             text: line.text,
             level: line.level,
+            kind: "generic" as const,
             key: `import-${i}-${line.text.slice(0, 40)}`,
           })),
           ...lines,
@@ -566,26 +577,48 @@ export function ScanPanel({ onRunComplete }: Props) {
           <div className="field-stack">
             <label className="context-field">
               <span className="context-label">Library root</span>
-              <input type="text" className="field-input" value={root} onChange={(e) => setRoot(e.target.value)} />
+              <input
+                type="text"
+                className="field-input path-drop-target"
+                value={root}
+                onChange={(e) => setRoot(e.target.value)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  const path = readDroppedPath(e);
+                  if (path) setRoot(path);
+                }}
+              />
             </label>
             <label className="context-field">
               <span className="context-label">Alternate staging root</span>
               <input
                 type="text"
-                className="field-input"
+                className="field-input path-drop-target"
                 placeholder="e.g. D:\audiotheca_staging"
                 value={stagingRoot}
                 onChange={(e) => setStagingRoot(e.target.value)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  const path = readDroppedPath(e);
+                  if (path) setStagingRoot(path);
+                }}
               />
             </label>
             <label className="context-field">
               <span className="context-label">Extra scan roots</span>
               <textarea
-                className="field-input field-textarea"
+                className="field-input field-textarea path-drop-target"
                 rows={2}
                 placeholder="Z:\other_library"
                 value={extraRoots}
                 onChange={(e) => setExtraRoots(e.target.value)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  const path = readDroppedPath(e);
+                  if (path) {
+                    setExtraRoots((prev) => (prev.trim() ? `${prev.trim()}\n${path}` : path));
+                  }
+                }}
               />
             </label>
           </div>

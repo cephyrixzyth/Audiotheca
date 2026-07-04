@@ -1275,6 +1275,29 @@ def browse_directory(
     return list_directory(path, limit=limit)
 
 
+@app.get("/api/browse/enriched")
+def browse_directory_enriched(
+    path: str = Query(default=""),
+    stamp: str = Query(default=""),
+    limit: int = Query(default=500, le=2000),
+) -> dict[str, object]:
+    from api.browse_api import list_directory_enriched
+
+    if stamp.strip():
+        security.validate_stamp(stamp)
+    return list_directory_enriched(path, stamp=stamp.strip(), limit=limit)
+
+
+@app.get("/api/browse/tree")
+def browse_tree(
+    path: str = Query(default=""),
+    limit: int = Query(default=500, le=2000),
+) -> dict[str, object]:
+    from api.browse_api import list_tree_children
+
+    return list_tree_children(path, limit=limit)
+
+
 @app.get("/api/archive/list")
 def archive_list_contents(
     path: str = Query(...),

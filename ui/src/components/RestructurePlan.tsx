@@ -203,7 +203,11 @@ export function RestructurePlan({ stamp }: Props) {
                   </td>
                   <td>
                     <div>{row.item_name}</div>
-                    <PathLink path={row.current_path} />
+                    <PathLink
+                      path={row.current_path}
+                      secondaryPath={override ?? row.planned_destination}
+                      dualPane
+                    />
                   </td>
                   <td>{row.vendor}</td>
                   <td>

@@ -875,6 +875,10 @@ export interface BrowseEntry {
   path: string;
   is_dir: boolean;
   size: number | null;
+  vendor?: string;
+  status?: string;
+  id_method?: string;
+  investigation_bucket?: string;
 }
 
 export async function browseDirectory(path: string = ""): Promise<{
@@ -884,6 +888,30 @@ export async function browseDirectory(path: string = ""): Promise<{
 }> {
   const qs = path ? `?path=${encodeURIComponent(path)}` : "";
   return getJson(`/browse${qs}`);
+}
+
+export async function browseDirectoryEnriched(
+  path: string = "",
+  stamp: string = "",
+): Promise<{
+  path: string;
+  parent: string | null;
+  entries: BrowseEntry[];
+}> {
+  const qs = new URLSearchParams();
+  if (path) qs.set("path", path);
+  if (stamp) qs.set("stamp", stamp);
+  const query = qs.toString();
+  return getJson(`/browse/enriched${query ? `?${query}` : ""}`);
+}
+
+export async function browseTreeChildren(path: string = ""): Promise<{
+  path: string;
+  parent: string | null;
+  children: BrowseEntry[];
+}> {
+  const qs = path ? `?path=${encodeURIComponent(path)}` : "";
+  return getJson(`/browse/tree${qs}`);
 }
 
 export async function listArchiveContents(path: string, limit = 200): Promise<{

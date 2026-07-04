@@ -233,7 +233,7 @@ export function ArchivePeek({ stamp }: Props) {
                   </td>
                   <td>
                     <div>{row.item_name}</div>
-                    <PathLink path={row.item_path} />
+                    <PathLink path={row.item_path} secondaryPath={row.archive_path} dualPane />
                   </td>
                   <td>
                     <div>{row.archive_name}</div>

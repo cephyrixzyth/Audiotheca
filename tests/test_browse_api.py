@@ -81,3 +81,19 @@ def test_archive_list_folder_rejected(browse_client):
     client, _library, vendor = browse_client
     res = client.get("/api/archive/list", params={"path": str(vendor)})
     assert res.status_code == 400
+
+
+def test_browse_tree_children(browse_client):
+    client, library, vendor = browse_client
+    res = client.get("/api/browse/tree", params={"path": str(library)})
+    assert res.status_code == 200
+    body = res.json()
+    assert "children" in body
+    assert any(child["is_dir"] for child in body["children"])
+
+
+def test_browse_enriched_without_stamp(browse_client):
+    client, _library, vendor = browse_client
+    res = client.get("/api/browse/enriched", params={"path": str(vendor)})
+    assert res.status_code == 200
+    assert "readme.txt" in [row["name"] for row in res.json()["entries"]]

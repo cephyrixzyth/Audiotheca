@@ -8,6 +8,8 @@ from pathlib import Path
 from fastapi import HTTPException
 
 from api import security
+from api.path_logic import is_logical_path_under, normalize_logical_path
+from api.report_loader import _load_audit_map
 from archive_peek import ARCHIVE_EXTS, find_7z, peek_archive
 
 IGNORE_DIR_NAMES = {
@@ -42,7 +44,10 @@ def _resolve_browse_target(raw: str) -> Path:
         if candidate.exists() and candidate.is_dir():
             return candidate
         candidate = candidate.parent
-        if not any(security.is_path_under(candidate, root) for root in security.library_roots()):
+        if not any(
+            security.is_path_under(candidate, root) or is_logical_path_under(candidate, root)
+            for root in security.library_roots()
+        ):
             break
     raise HTTPException(status_code=404, detail=f"path not found: {path}")
 
@@ -84,7 +89,10 @@ def list_directory(path: str = "", *, limit: int = 500) -> dict[str, object]:
     parent: str | None
     try:
         parent = str(target.parent) if target.parent != target else None
-        if parent and not any(security.is_path_under(Path(parent), root) for root in security.library_roots()):
+        if parent and not any(
+            security.is_path_under(Path(parent), root) or is_logical_path_under(parent, root)
+            for root in security.library_roots()
+        ):
             parent = None
     except OSError:
         parent = None
@@ -138,4 +146,50 @@ def list_archive_contents(path: str, *, limit: int = 200) -> dict[str, object]:
         "error": error,
         "entries": names,
         "count": len(names),
+    }
+
+
+def enrich_entries(entries: list[dict[str, object]], stamp: str) -> list[dict[str, object]]:
+    """Merge scan-audit metadata (vendor, status) into browse entries."""
+    audit: dict[str, object] = {}
+    for row in _load_audit_map(stamp):
+        audit[normalize_logical_path(row.current_path)] = row
+
+    enriched: list[dict[str, object]] = []
+    for entry in entries:
+        item = dict(entry)
+        row = audit.get(normalize_logical_path(str(entry.get("path", ""))))
+        if row is not None:
+            item["vendor"] = row.vendor
+            item["status"] = row.status
+            item["id_method"] = row.id_method
+            item["investigation_bucket"] = row.investigation_bucket
+        enriched.append(item)
+    return enriched
+
+
+def list_directory_enriched(
+    path: str = "",
+    *,
+    stamp: str = "",
+    limit: int = 500,
+) -> dict[str, object]:
+    data = list_directory(path, limit=limit)
+    entries = data.get("entries")
+    if stamp and isinstance(entries, list):
+        data["entries"] = enrich_entries(entries, stamp)
+    return data
+
+
+def list_tree_children(path: str = "", *, limit: int = 500) -> dict[str, object]:
+    """Return immediate subdirectories for lazy folder-tree loading."""
+    data = list_directory(path, limit=limit)
+    entries = data.get("entries")
+    children: list[dict[str, object]] = []
+    if isinstance(entries, list):
+        children = [entry for entry in entries if entry.get("is_dir")]
+    return {
+        "path": data.get("path", path),
+        "parent": data.get("parent"),
+        "children": children[:limit],
     }

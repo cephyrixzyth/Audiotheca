@@ -1411,8 +1411,18 @@ tr.inv-vendor-set {
 .widget-drag-surface {
   cursor: grab;
   user-select: none;
+  touch-action: none;
 }
 
+.widget-header-grab {
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+  flex: 1;
+  min-width: 0;
+}
+
+.widget-header-grab:active,
 .widget-drag-surface:active {
   cursor: grabbing;
 }
@@ -2017,6 +2027,39 @@ tr.inv-vendor-set {
   justify-content: flex-end;
 }
 
+.file-explorer-dock {
+  position: fixed;
+  top: var(--topbar-height, 3rem);
+  right: 0;
+  bottom: 0;
+  z-index: 900;
+  pointer-events: none;
+}
+
+.file-explorer-dock .file-explorer-shell {
+  pointer-events: auto;
+}
+
+.file-explorer-shell {
+  width: min(720px, 94vw);
+  height: 100%;
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem 1rem;
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.35);
+}
+
+.file-explorer-shell.dual-pane {
+  width: min(960px, 96vw);
+}
+
+.file-explorer-shell.pinned {
+  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.25);
+}
+
 .file-explorer-panel {
   width: min(520px, 92vw);
   height: 100%;
@@ -2036,9 +2079,70 @@ tr.inv-vendor-set {
   gap: 0.75rem;
 }
 
+.file-explorer-header-actions {
+  display: flex;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
 .file-explorer-header h2 {
   margin: 0;
   font-size: 1rem;
+}
+
+.file-explorer-breadcrumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem;
+  font-size: 0.78rem;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.breadcrumb-sep {
+  color: var(--text-muted);
+  margin: 0 0.1rem;
+}
+
+.file-explorer-body {
+  display: flex;
+  gap: 0.5rem;
+  flex: 1;
+  min-height: 0;
+}
+
+.file-explorer-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.file-explorer-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.file-explorer-dual {
+  display: flex;
+  gap: 0.5rem;
+  flex: 1;
+  min-height: 0;
+}
+
+.file-explorer-dual .file-explorer-pane {
+  border-left: 1px solid var(--border);
+  padding-left: 0.5rem;
+}
+
+.file-explorer-dual .file-explorer-pane:first-child {
+  border-left: none;
+  padding-left: 0;
 }
 
 .file-explorer-toolbar {
@@ -2053,6 +2157,105 @@ tr.inv-vendor-set {
 .file-explorer-list {
   overflow: auto;
   flex: 1;
+}
+
+.explorer-audit-cell {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  max-width: 12rem;
+}
+
+.explorer-tree {
+  width: 11rem;
+  flex-shrink: 0;
+  overflow: auto;
+  border-right: 1px solid var(--border);
+  padding-right: 0.35rem;
+  font-size: 0.78rem;
+}
+
+.explorer-tree-roots,
+.explorer-tree-children {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.explorer-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.explorer-tree-row.selected .explorer-tree-label {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.explorer-tree-toggle,
+.explorer-tree-label {
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 0.1rem 0.15rem;
+  text-align: left;
+}
+
+.explorer-tree-toggle {
+  width: 1rem;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.explorer-tree-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.explorer-context-menu {
+  position: fixed;
+  z-index: 1100;
+  margin: 0;
+  padding: 0.25rem 0;
+  list-style: none;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  min-width: 9rem;
+}
+
+.explorer-context-menu button {
+  display: block;
+  width: 100%;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 0.35rem 0.75rem;
+  cursor: pointer;
+}
+
+.explorer-context-menu button:hover {
+  background: var(--bg-hover);
+}
+
+.library-explorer-btn {
+  margin-right: 0.5rem;
+}
+
+.path-drop-target:focus {
+  outline: 1px dashed var(--accent-dim);
+}
+
+.icon-btn.active {
+  color: var(--accent);
+  border-color: var(--accent-dim);
 }
 
 .archive-entry-list {

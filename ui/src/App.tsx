@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+﻿import { useCallback, useEffect, useState } from "react";
 import "./App.css";
 import { fetchRun, fetchRuns, fetchJobs, fetchHealth } from "./api/client";
 import { ArchivePeek } from "./components/ArchivePeek";
@@ -18,7 +18,8 @@ import { HelpPanel } from "./components/HelpPanel";
 import { ProcessBanner } from "./components/ProcessBanner";
 import { ThemeSwitcher } from "./components/ThemeSwitcher";
 import { VendorTools } from "./components/VendorTools";
-import { FileExplorerProvider } from "./contexts/FileExplorerContext";
+import { FileExplorerProvider, useFileExplorer } from "./contexts/FileExplorerContext";
+import { useLibraryRoot } from "./hooks/useLibraryRoot";
 import type { RunListItem, RunSummary, TabId } from "./types";
 import { formatEngineLabel, formatEngineVersion } from "./utils/scanDisplay";
 
@@ -35,9 +36,32 @@ const TABS: { id: TabId; label: string; title: string }[] = [
   { id: "space-recovery", label: "Space recovery", title: "Hardlink dedup and bloat detection plans" },
   { id: "security", label: "Security", title: "Malware heuristics, quarantine, hash lookup" },
   { id: "environment", label: "Environment", title: "Toolchain health, repairs, manifest backup" },
-  { id: "help", label: "Help", title: "Install, deploy, workflow, and layout guides" },
   { id: "vendors", label: "Vendors", title: "Add vendor keywords, harvest gaps, and export feedback" },
+  { id: "help", label: "Help", title: "Install, deploy, workflow, and layout guides" },
 ];
+
+const SUBTREE_TABS: TabId[] = [
+  "investigation",
+  "restructure",
+  "archives",
+  "scan-audit",
+  "duplicates",
+  "scene-renames",
+];
+
+function LibraryExplorerButton() {
+  const { openAtRoots } = useFileExplorer();
+  return (
+    <button
+      type="button"
+      className="icon-btn library-explorer-btn"
+      title="Open library explorer at configured roots"
+      onClick={openAtRoots}
+    >
+      Library
+    </button>
+  );
+}
 
 export default function App() {
   const [runs, setRuns] = useState<RunListItem[]>([]);
@@ -47,6 +71,8 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [scanActive, setScanActive] = useState(false);
   const [engineVersion, setEngineVersion] = useState<string | null>(null);
+  const libraryRoot = useLibraryRoot();
+  const explorerSubtree = SUBTREE_TABS.includes(tab) ? libraryRoot : null;
 
   useEffect(() => {
     fetchHealth()
@@ -107,7 +133,7 @@ export default function App() {
   );
 
   return (
-    <FileExplorerProvider>
+    <FileExplorerProvider stamp={stamp || undefined} subtreeRoot={explorerSubtree}>
       <ContextSidebarProvider tab={tab}>
         <div className="app-shell">
           <header className="topbar">
@@ -131,6 +157,7 @@ export default function App() {
                 </button>
               ))}
             </nav>
+            <LibraryExplorerButton />
             <ThemeSwitcher />
           </header>
 

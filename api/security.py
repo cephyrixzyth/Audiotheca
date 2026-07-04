@@ -195,8 +195,14 @@ def library_roots() -> list[Path]:
 def _validate_library_path(raw: str, *, must_exist: bool = False, label: str = "path") -> Path:
     if not raw or not str(raw).strip():
         raise ValueError(f"{label} is required")
-    path = canonical_path(Path(str(raw)).expanduser())
-    if not any(is_path_under(path, root) for root in library_roots()):
+    raw_path = Path(str(raw)).expanduser()
+    path = canonical_path(raw_path)
+    roots = library_roots()
+    allowed = any(
+        is_path_under(path, root) or is_logical_path_under(raw_path, root)
+        for root in roots
+    )
+    if not allowed:
         audit("library_path_denied", path=str(path), label=label)
         raise ValueError(f"{label} must be under a configured library root")
     if must_exist and not path.exists():
