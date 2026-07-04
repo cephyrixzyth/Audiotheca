@@ -23,6 +23,7 @@
   --scrollbar-track: #0a0e0c;
   --scrollbar-thumb: #2d4036;
   --scrollbar-thumb-hover: #3d5648;
+  --body-glow: rgba(61, 214, 140, 0.06);
   font-family: var(--sans);
   color: var(--text);
   background: var(--bg);
@@ -37,7 +38,7 @@ body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(61, 214, 140, 0.06), transparent),
+    radial-gradient(ellipse 80% 50% at 50% -20%, var(--body-glow), transparent),
     var(--bg);
 }
 

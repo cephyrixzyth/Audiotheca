@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { fetchJobEvents, fetchJobs } from "../api/client";
 import type { JobSnapshot, ProgressEvent } from "../types";
+import { formatPhaseLabel } from "../utils/scanDisplay";
 import { PhaseProgressBar, latestPhaseProgress, phasesFromEvents } from "./PhaseProgressBar";
 
 const ACTIVE = new Set(["running", "paused", "pause_pending", "stop_pending"]);
@@ -46,7 +47,7 @@ export function ProcessBanner() {
       <div className="process-banner-text">
         <strong>Scan {dry}</strong>
         <span className="count-muted">
-          {job.current_phase ? ` · ${job.current_phase}` : ""} · job {job.job_id}
+          {job.current_phase ? ` · ${formatPhaseLabel(job.current_phase)}` : ""} · job {job.job_id}
         </span>
         {progress?.detail && (
           <span className="count-muted process-banner-step"> · {progress.detail}</span>
@@ -57,6 +58,7 @@ export function ProcessBanner() {
         completedPhases={phaseState.completed}
         isActive={ACTIVE.has(job.status)}
         progress={progress}
+        events={events}
       />
     </div>
   );

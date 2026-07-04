@@ -8,6 +8,7 @@ import {
 } from "../api/client";
 import type { EnvironmentDependency, EnvironmentPayload } from "../types";
 import { ReorderableSections } from "./ReorderableSections";
+import { ThemePanel } from "./ThemePanel";
 
 function StatusBadge({ status }: { status: EnvironmentDependency["status"] }) {
   return <span className={`env-badge env-${status}`}>{status}</span>;
@@ -112,6 +113,14 @@ export function EnvironmentPanel() {
   }
 
   const sections = [
+    {
+      id: "appearance",
+      title: "Appearance & themes",
+      subtitle: "8 built-in presets · save custom · import / export JSON",
+      fullWidth: true,
+      minBodyHeight: 200,
+      content: <ThemePanel />,
+    },
     {
       id: "summary",
       title: "Toolchain health",

@@ -170,7 +170,7 @@ export function FlowEditor({
           <h4>{selected.label}</h4>
           <p className="count-muted">{selected.description}</p>
           <dl className="flow-config-meta">
-            <dt>Engine</dt>
+            <dt>Phase</dt>
             <dd>{selected.enginePhase}</dd>
             <dt>Group</dt>
             <dd>{GROUP_LABELS[selected.group]}</dd>

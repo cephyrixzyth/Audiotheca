@@ -18,6 +18,7 @@ import type {
   VerificationFinding,
 } from "../types";
 import { formatCompact, formatDiskFree, formatGb, formatPct } from "../utils/format";
+import { formatEngineVersion } from "../utils/scanDisplay";
 import { ReorderableSections } from "./ReorderableSections";
 import { EnvironmentSummaryWidget } from "./EnvironmentPanel";
 
@@ -354,7 +355,11 @@ export function Dashboard({ summary, runs, onNavigate }: Props) {
             {metrics ? (
               <div className="gauge-stack">
                 {metrics.cpu_percent != null && (
-                  <GaugeBar label="CPU" value={metrics.cpu_percent} detail={formatPct(metrics.cpu_percent, 0)} />
+                  <GaugeBar
+                    label={metrics.cpu_count ? `CPU (${metrics.cpu_count} cores)` : "CPU"}
+                    value={metrics.cpu_percent}
+                    detail={formatPct(metrics.cpu_percent, 0)}
+                  />
                 )}
                 {metrics.ram_used_pct != null && (
                   <GaugeBar
@@ -370,6 +375,38 @@ export function Dashboard({ summary, runs, onNavigate }: Props) {
                   detail={formatDiskFree(metrics)}
                   tone={(metrics.disk_free_pct ?? 100 - (metrics.disk_used_pct ?? 0)) < 10 ? "danger" : "accent"}
                 />
+                {metrics.disk_read_mb != null && (
+                  <GaugeBar
+                    label="Disk read"
+                    value={Math.min(100, metrics.disk_read_mb / 100)}
+                    detail={`${metrics.disk_read_mb.toLocaleString()} MB`}
+                    tone="accent"
+                  />
+                )}
+                {metrics.network_latency_ms != null && (
+                  <GaugeBar
+                    label={`NAS${metrics.network_host ? ` (${metrics.network_host})` : ""}`}
+                    value={Math.min(100, metrics.network_latency_ms)}
+                    detail={`${Math.round(metrics.network_latency_ms)} ms`}
+                    tone={metrics.network_latency_ms >= 80 ? "warning" : "accent"}
+                  />
+                )}
+                {metrics.bottleneck_hints && metrics.bottleneck_hints.length > 0 && (
+                  <ul className="metrics-warnings">
+                    {metrics.bottleneck_hints.map((hint) => (
+                      <li key={hint}>{hint}</li>
+                    ))}
+                  </ul>
+                )}
+                {metrics.volumes && metrics.volumes.length > 0 && (
+                  <div className="metrics-volumes">
+                    {metrics.volumes.slice(0, 5).map((vol) => (
+                      <div key={vol.mount} className="count-muted" style={{ fontSize: "0.75rem" }}>
+                        {vol.mount}: {formatGb(vol.free_gb, 1)} free
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {!metrics.psutil && <p className="count-muted">Install psutil for CPU/RAM metrics</p>}
               </div>
             ) : (
@@ -527,7 +564,7 @@ export function Dashboard({ summary, runs, onNavigate }: Props) {
                     <td>
                       <code>{run.stamp}</code>
                     </td>
-                    <td>{run.engine_version ?? "—"}</td>
+                    <td>{run.engine_version ? formatEngineVersion(run.engine_version) : "—"}</td>
                     <td>{formatCompact(run.scanned)}</td>
                     <td>{formatCompact(run.investigation)}</td>
                     <td>
@@ -629,7 +666,7 @@ export function Dashboard({ summary, runs, onNavigate }: Props) {
           <strong>{summary.dry_run ? "Dry run" : "Live run"}</strong>
           <span className="count-muted">
             {" "}
-            · {summary.stamp} · engine v{summary.engine_version}
+            · {summary.stamp} · {formatEngineVersion(summary.engine_version)}
           </span>
         </div>
         <div className="dash-run-meta">

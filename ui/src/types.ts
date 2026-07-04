@@ -136,7 +136,9 @@ export interface ScanAuditItem {
 export interface SystemMetrics {
   type?: string;
   disk_path?: string;
+  scan_root?: string;
   cpu_percent?: number;
+  cpu_count?: number;
   ram_total_gb?: number;
   ram_used_gb?: number;
   ram_available_gb?: number;
@@ -146,7 +148,66 @@ export interface SystemMetrics {
   disk_free_gb?: number;
   disk_used_pct?: number;
   disk_free_pct?: number;
+  disk_read_mb?: number;
+  disk_write_mb?: number;
+  disk_io_busy_pct?: number;
+  network_path?: boolean;
+  network_host?: string;
+  network_latency_ms?: number;
+  volumes?: Array<{
+    device: string;
+    mount: string;
+    fstype: string;
+    total_gb: number;
+    free_gb: number;
+    free_pct: number;
+  }>;
+  bottleneck_hints?: string[];
   psutil?: boolean;
+}
+
+export interface AiLookupArchetype {
+  category: string;
+  confidence: number;
+  reasoning?: string;
+}
+
+export interface AiLookupDeveloper {
+  vendor?: string | null;
+  product_line?: string | null;
+  aliases?: string[];
+  confidence: number;
+  reasoning?: string;
+}
+
+export interface AiLookupRelease {
+  release_group?: string | null;
+  release_date?: string | null;
+  source_url?: string | null;
+  confidence: number;
+  reasoning?: string;
+}
+
+export interface AiLookupResult {
+  lookup_id: string;
+  content_hash: string;
+  status: string;
+  confidence: number;
+  reasoning: string;
+  vendor?: string | null;
+  product?: string | null;
+  archetype?: AiLookupArchetype | null;
+  developer?: AiLookupDeveloper | null;
+  release?: AiLookupRelease | null;
+  source_url?: string | null;
+  relative_path?: string | null;
+  provider?: string;
+  pending_verification?: boolean;
+}
+
+export interface AiLookupStatus {
+  active: AiLookupResult[];
+  token_usage: { used: number; limit: number };
 }
 
 export interface ScanOptionsInfo {

@@ -109,6 +109,7 @@ class DeduplicationEngine(
         self.skip_phase_impact: dict[str, dict] = {}
         self.feedback_skipped_records: list[dict] = []
         self.deep_identify_rows: list[dict] = []
+        self.ai_lookup_rows: list[dict] = []
         self.verification_findings: list[dict] = []
         self.quality_scorecard: dict = {}
         self.scan_options: ScanOptions = load_scan_options()
@@ -151,6 +152,12 @@ class DeduplicationEngine(
     def _inc(self, key: str, amount: int = 1) -> None:
         with self._lock:
             self.stats[key] = self.stats.get(key, 0) + amount
+
+    @staticmethod
+    def _needs_ai_lookup(item: dict) -> bool:
+        from audiotheca.ai_lookup import needs_ai_lookup
+
+        return needs_ai_lookup(item)
 
     def _confirm(self, prompt: str) -> bool:
         if self.dry_run:
@@ -537,6 +544,37 @@ class DeduplicationEngine(
         scan_progress.finish(f"{len(results):,} items scanned")
         self._checkpoint("parallel_scan", "Phase 1b - Parallel scan")
 
+        if not self.scan_options.skip("malware_scan"):
+            import malware_scanner as ms
+
+            max_malware_files = 25_000
+            malware_progress = PhaseProgress(
+                "Phase 1.4 - Malware scan", max_malware_files, "file"
+            )
+
+            def _malware_progress(scanned: int, detail: str) -> None:
+                malware_progress.update(min(scanned, max_malware_files), detail=detail[:120])
+
+            findings = ms.scan_tree(
+                self.root_dir,
+                max_files=max_malware_files,
+                use_clamav=False,
+                progress_cb=_malware_progress,
+            )
+            if findings:
+                report_path = ms.write_scan_report(self.root_dir, findings)
+                self.logger.warning(
+                    "Malware scan: %d suspicious files — report %s",
+                    len(findings),
+                    report_path.name,
+                )
+            malware_progress.finish(
+                f"{len(findings)} suspicious file(s) from heuristic scan"
+            )
+        else:
+            print("  [SKIP] Malware scan disabled by scan options.")
+        self._checkpoint("malware_scan", "Phase 1.4 - Malware scan")
+
         results.sort(key=lambda r: (r["source_bin"], r["original_name"].lower()))
 
         all_items: list[dict] = []
@@ -603,6 +641,28 @@ class DeduplicationEngine(
             )
             print("  [SKIP] Deep identification disabled by scan options.")
         self._checkpoint("deep_identify", "Phase 1.7 - Deep identification")
+
+        if not self.scan_options.skip("ai_lookup"):
+            ai_candidates = [item for item in all_items if self._needs_ai_lookup(item)]
+            if ai_candidates:
+                from audiotheca.ai_lookup import queue_ai_lookups
+
+                ai_progress = PhaseProgress(
+                    "Phase 1b-fallback - AI lookup", max(len(ai_candidates), 1), "item"
+                )
+                self.ai_lookup_rows = [r.to_dict() for r in queue_ai_lookups(
+                    all_items,
+                    root=self.root_dir,
+                    max_items=50,
+                    progress_cb=lambda _evt: ai_progress.update(1),
+                )]
+                ai_progress.finish(f"{len(self.ai_lookup_rows)} AI lookups queued")
+            else:
+                self.ai_lookup_rows = []
+        else:
+            self.ai_lookup_rows = []
+            print("  [SKIP] AI lookup disabled by scan options.")
+        self._checkpoint("ai_lookup", "Phase 1b-fallback - AI lookup")
 
         if ENABLE_SCENE_ARCHIVE_PEEK and not self.scan_options.skip("scene_peek"):
             self._run_scene_archive_phase(all_items, csv_writer)

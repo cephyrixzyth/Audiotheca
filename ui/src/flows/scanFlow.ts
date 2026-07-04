@@ -45,6 +45,16 @@ export const SCAN_FLOW_PHASES: FlowPhase[] = [
     estimatedWeight: 8,
   },
   {
+    id: "malware_scan",
+    label: "Malware scan",
+    description:
+      "Heuristic pass for crack tools, trojans, and suspicious executables. Review findings in the Security tab.",
+    enginePhase: "Phase 1.4",
+    skipKey: "malware_scan",
+    group: "analyze",
+    estimatedWeight: 8,
+  },
+  {
     id: "deep_identify",
     label: "Deep identification",
     description: "Second pass for unknowns: fuzzy vendor matching and sibling-folder inference.",
@@ -146,7 +156,7 @@ export const FLOW_PRESETS: FlowPreset[] = [
     id: "identify",
     label: "Identify only",
     description: "Scan and identify only — skip routing plan, dupes, OS lanes, and peeks.",
-    skipPhases: ["archive_peek", "scene_peek", "quarantine", "duplicates", "restructure", "verification"],
+    skipPhases: ["archive_peek", "scene_peek", "quarantine", "duplicates", "restructure", "verification", "malware_scan"],
     pauseBetweenPhases: false,
   },
   {

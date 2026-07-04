@@ -1450,6 +1450,8 @@ def scan_options_help() -> dict[str, object]:
             "archive_peek": "Skip archive vs extracted-folder listing (7-Zip)",
             "quarantine": "Skip routing off-native OS items to _mac / _linux / _windows lanes",
             "deep_identify": "Skip fuzzy vendor matching and sibling inference for unknown items",
+            "ai_lookup": "Skip contextual AI lookup fallback for still-unknown targets",
+            "malware_scan": "Skip heuristic malware scan (crack/keygen/trojan patterns)",
             "duplicates": "Skip duplicate group review (restructure still runs)",
             "restructure": "Skip computing the restructure plan (identify-only run)",
             "restructure_live": "Skip live restructure moves (dry-run plan only)",
@@ -1564,6 +1566,61 @@ def system_metrics(root: str | None = Query(default=None)) -> dict[str, object]:
 
     path = security.assert_library_path(root, label="root") if root else None
     return collect_metrics(path=path)
+
+
+@app.get("/api/ai/lookup/cache")
+def ai_lookup_cache(limit: int = Query(default=100, ge=1, le=500)) -> dict[str, object]:
+    from audiotheca.ai_lookup.engine import list_cached
+
+    return {"items": list_cached(limit=limit)}
+
+
+@app.get("/api/ai/lookup/status")
+def ai_lookup_status() -> dict[str, object]:
+    from audiotheca.ai_lookup.engine import get_status
+
+    return get_status()
+
+
+@app.post("/api/ai/lookup/query")
+async def ai_lookup_query(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from audiotheca.ai_lookup.engine import LookupEngine
+
+    path_raw = body.get("path") or body.get("target")
+    if not path_raw:
+        raise HTTPException(status_code=400, detail="path is required")
+    path = Path(str(security.assert_library_path(str(path_raw), label="path")))
+    root_raw = body.get("root")
+    root = Path(str(security.assert_library_path(str(root_raw), label="root"))) if root_raw else path.parent
+    item = {
+        "path": path,
+        "original_name": path.name,
+        "source_bin": body.get("section") or path.parent.name,
+        "id_method": str(body.get("id_method", "NONE")),
+        "id_confidence": str(body.get("id_confidence", "UNKNOWN")),
+        "size": path.stat().st_size if path.exists() else 0,
+        "is_dir": path.is_dir(),
+    }
+    engine = LookupEngine(root=root)
+    result = await asyncio.to_thread(engine.lookup_item, item)
+    return {"result": result.to_dict()}
+
+
+@app.post("/api/ai/lookup/confirm")
+async def ai_lookup_confirm(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from audiotheca.ai_lookup.engine import LookupEngine
+
+    lookup_id = str(body.get("lookup_id", "")).strip()
+    if not lookup_id:
+        raise HTTPException(status_code=400, detail="lookup_id is required")
+    accepted = bool(body.get("accepted", body.get("confirm", False)))
+    reasoning = str(body.get("reasoning", ""))
+    engine = LookupEngine()
+    result = await asyncio.to_thread(engine.confirm, lookup_id, accepted=accepted, reasoning=reasoning)
+    if not result:
+        raise HTTPException(status_code=404, detail="lookup not found")
+    security.audit("ai_lookup_confirm", lookup_id=lookup_id, accepted=accepted)
+    return {"result": result.to_dict()}
 
 
 @app.websocket("/api/jobs/{job_id}/events")

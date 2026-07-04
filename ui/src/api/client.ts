@@ -974,3 +974,27 @@ export function importEnvironmentManifest(params: {
 }): Promise<Record<string, unknown>> {
   return postJson("/environment/manifest/import", params);
 }
+
+export function fetchAiLookupCache(limit = 100): Promise<{ items: import("../types").AiLookupResult[] }> {
+  return getJson(`/ai/lookup/cache?limit=${limit}`);
+}
+
+export function fetchAiLookupStatus(): Promise<import("../types").AiLookupStatus> {
+  return getJson("/ai/lookup/status");
+}
+
+export function queryAiLookup(body: {
+  path: string;
+  root?: string;
+  section?: string;
+}): Promise<{ result: import("../types").AiLookupResult }> {
+  return postJson("/ai/lookup/query", body);
+}
+
+export function confirmAiLookup(body: {
+  lookup_id: string;
+  accepted: boolean;
+  reasoning?: string;
+}): Promise<{ result: import("../types").AiLookupResult }> {
+  return postJson("/ai/lookup/confirm", body);
+}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import "./App.css";
-import { fetchRun, fetchRuns, fetchJobs } from "./api/client";
+import { fetchRun, fetchRuns, fetchJobs, fetchHealth } from "./api/client";
 import { ArchivePeek } from "./components/ArchivePeek";
 import { ContextSidebar, ContextSidebarProvider } from "./components/ContextSidebar";
 import { Dashboard } from "./components/Dashboard";
@@ -16,9 +16,11 @@ import { MalwarePanel } from "./components/MalwarePanel";
 import { EnvironmentPanel } from "./components/EnvironmentPanel";
 import { HelpPanel } from "./components/HelpPanel";
 import { ProcessBanner } from "./components/ProcessBanner";
+import { ThemeSwitcher } from "./components/ThemeSwitcher";
 import { VendorTools } from "./components/VendorTools";
 import { FileExplorerProvider } from "./contexts/FileExplorerContext";
 import type { RunListItem, RunSummary, TabId } from "./types";
+import { formatEngineLabel, formatEngineVersion } from "./utils/scanDisplay";
 
 const TABS: { id: TabId; label: string; title: string }[] = [
   { id: "dashboard", label: "Dashboard", title: "Run KPIs, trends, and quick links to other tabs" },
@@ -44,6 +46,13 @@ export default function App() {
   const [tab, setTab] = useState<TabId>("dashboard");
   const [error, setError] = useState<string | null>(null);
   const [scanActive, setScanActive] = useState(false);
+  const [engineVersion, setEngineVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchHealth()
+      .then((h) => setEngineVersion(h.engine_version))
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     const ACTIVE = ["running", "paused", "pause_pending", "stop_pending"];
@@ -104,7 +113,9 @@ export default function App() {
           <header className="topbar">
             <div className="topbar-brand">
               <h1>Audiotheca</h1>
-              <span className="count-muted">Engine 10 · Web UI</span>
+              <span className="count-muted">
+                {formatEngineLabel(engineVersion ?? summary?.engine_version)} · Web UI
+              </span>
             </div>
             <nav className="top-tabs" aria-label="Main sections">
               {TABS.map((t) => (
@@ -120,6 +131,7 @@ export default function App() {
                 </button>
               ))}
             </nav>
+            <ThemeSwitcher />
           </header>
 
           <div className="app-body">
@@ -135,7 +147,7 @@ export default function App() {
                       {runs.map((run) => (
                         <option key={run.stamp} value={run.stamp}>
                           {run.stamp}
-                          {run.engine_version ? ` · v${run.engine_version}` : ""}
+                          {run.engine_version ? ` · ${formatEngineVersion(run.engine_version)}` : ""}
                           {run.dry_run === false ? " · LIVE" : ""}
                         </option>
                       ))}
@@ -143,7 +155,7 @@ export default function App() {
                   </label>
                   {summary && (
                     <span className="count-muted">
-                      Engine v{summary.engine_version} · {summary.scanned.toLocaleString()} items
+                      {formatEngineVersion(summary.engine_version)} · {summary.scanned.toLocaleString()} items
                     </span>
                   )}
                 </div>
@@ -151,7 +163,11 @@ export default function App() {
 
               {error && <div className="error">{error}</div>}
 
-              {tab === "scan" && <ScanPanel onRunComplete={onScanComplete} />}
+              {(tab === "scan" || scanActive) && (
+                <div className={tab !== "scan" ? "scan-panel-hidden" : undefined} aria-hidden={tab !== "scan"}>
+                  <ScanPanel onRunComplete={onScanComplete} />
+                </div>
+              )}
 
               {runs.length === 0 && tab !== "scan" && !error && (
                 <div className="empty">

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import time
 from pathlib import Path
 
 
@@ -23,6 +24,58 @@ def _disk_usage_path(path: Path | None) -> tuple[Path, str | None]:
     return Path.home(), scan_root
 
 
+def _network_host_hint(scan_root: str | None) -> str | None:
+    if not scan_root:
+        return None
+    raw = scan_root.replace("\\", "/")
+    if raw.startswith("//"):
+        parts = raw.strip("/").split("/")
+        return parts[0] if parts else None
+    return None
+
+
+def _ping_latency_ms(host: str, timeout_s: float = 0.4) -> float | None:
+    """Best-effort latency probe — returns None when ping unavailable."""
+    import subprocess
+    import sys
+
+    if not host:
+        return None
+    flag = "-n" if sys.platform == "win32" else "-c"
+    try:
+        start = time.monotonic()
+        proc = subprocess.run(
+            ["ping", flag, "1", "-w", "300", host] if sys.platform == "win32" else ["ping", "-c", "1", "-W", "1", host],
+            capture_output=True,
+            timeout=timeout_s,
+        )
+        if proc.returncode != 0:
+            return None
+        return round((time.monotonic() - start) * 1000, 1)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+
+def _bottleneck_hints(payload: dict) -> list[str]:
+    hints: list[str] = []
+    cpu = payload.get("cpu_percent")
+    ram = payload.get("ram_used_pct")
+    disk_free = payload.get("disk_free_pct")
+    latency = payload.get("network_latency_ms")
+    if cpu is not None and cpu >= 90:
+        hints.append("CPU saturated — scan workers may contend with host load.")
+    if ram is not None and ram >= 90:
+        hints.append("RAM pressure — consider closing heavy apps during large scans.")
+    if disk_free is not None and disk_free < 10:
+        hints.append("Low disk free space on metrics volume.")
+    if latency is not None and latency >= 80:
+        hints.append("Network path latency elevated — NAS reads may bottleneck scan I/O.")
+    io_busy = payload.get("disk_io_busy_pct")
+    if io_busy is not None and io_busy >= 85:
+        hints.append("Disk I/O busy — parallel scan may queue on storage.")
+    return hints
+
+
 def collect_metrics(*, path: Path | None = None) -> dict:
     """Return system metrics; uses psutil when installed."""
     disk_path, scan_root = _disk_usage_path(path)
@@ -40,19 +93,64 @@ def collect_metrics(*, path: Path | None = None) -> dict:
     }
     if scan_root:
         payload["scan_root"] = scan_root
+        if scan_root.startswith("\\\\") or scan_root.startswith("//"):
+            payload["network_path"] = True
+            host = _network_host_hint(scan_root)
+            if host:
+                payload["network_host"] = host
+                latency = _ping_latency_ms(host)
+                if latency is not None:
+                    payload["network_latency_ms"] = latency
     if disk.total:
         payload["disk_free_pct"] = round(100 * disk.free / disk.total, 1)
     try:
         import psutil  # type: ignore[import-untyped]
     except ImportError:
         payload["psutil"] = False
+        payload["bottleneck_hints"] = _bottleneck_hints(payload)
         return payload
 
     payload["psutil"] = True
     payload["cpu_percent"] = psutil.cpu_percent(interval=0.1)
+    payload["cpu_count"] = psutil.cpu_count(logical=True) or 0
     mem = psutil.virtual_memory()
     payload["ram_total_gb"] = round(mem.total / (1024**3), 2)
     payload["ram_used_gb"] = round(mem.used / (1024**3), 2)
     payload["ram_available_gb"] = round(mem.available / (1024**3), 2)
     payload["ram_used_pct"] = mem.percent
+
+    try:
+        io = psutil.disk_io_counters()
+        if io:
+            payload["disk_read_mb"] = round(io.read_bytes / (1024**2), 1)
+            payload["disk_write_mb"] = round(io.write_bytes / (1024**2), 1)
+            busy = getattr(io, "busy_time", None)
+            if busy is not None:
+                payload["disk_io_busy_pct"] = min(100.0, round(float(busy) / 10.0, 1))
+    except (AttributeError, OSError):
+        pass
+
+    volumes: list[dict] = []
+    for part in psutil.disk_partitions(all=False):
+        mount = part.mountpoint
+        if not mount:
+            continue
+        try:
+            usage = psutil.disk_usage(mount)
+        except (PermissionError, OSError):
+            continue
+        volumes.append(
+            {
+                "device": part.device,
+                "mount": mount,
+                "fstype": part.fstype,
+                "total_gb": round(usage.total / (1024**3), 2),
+                "free_gb": round(usage.free / (1024**3), 2),
+                "free_pct": round(100 * usage.free / usage.total, 1) if usage.total else 0,
+            }
+        )
+    if volumes:
+        payload["volumes"] = volumes[:8]
+
+    payload["bottleneck_hints"] = _bottleneck_hints(payload)
     return payload

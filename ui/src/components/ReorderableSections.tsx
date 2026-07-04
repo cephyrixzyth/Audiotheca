@@ -1,5 +1,6 @@
-import { useMemo, useState, type DragEvent, type ReactNode } from "react";
+import { useCallback, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { isSpacerId, useSectionOrder } from "../hooks/useSectionOrder";
+import { useSectionSpan } from "../hooks/useSectionSpan";
 import { useLayoutPresets } from "../hooks/useLayoutPresets";
 
 function bindHandleDrag(
@@ -13,6 +14,7 @@ function bindHandleDrag(
       e.stopPropagation();
       e.dataTransfer.effectAllowed = "move";
       e.dataTransfer.setData("text/plain", sectionId);
+      e.dataTransfer.setData("application/x-audiotheca-section", sectionId);
       onDragStart(sectionId);
     },
     onDragEnd: (e: DragEvent) => {
@@ -30,14 +32,37 @@ function bindHeaderDrag(
   return {
     draggable: true,
     onDragStart: (e: DragEvent) => {
-      if ((e.target as HTMLElement).closest(".section-drag-handle, button, input, select, textarea, a")) {
+      if ((e.target as HTMLElement).closest(".panel-header-toolbar, .section-drag-handle, button, input, select, textarea, a")) {
         return;
       }
       e.dataTransfer.effectAllowed = "move";
       e.dataTransfer.setData("text/plain", sectionId);
+      e.dataTransfer.setData("application/x-audiotheca-section", sectionId);
       onDragStart(sectionId);
     },
     onDragEnd: onDragEnd,
+  };
+}
+
+function bindDropTarget(
+  targetId: string,
+  dragId: string | null,
+  onDragOver: (id: string) => void,
+  onDrop: (id: string) => void,
+) {
+  return {
+    onDragOver: (e: React.DragEvent) => {
+      if (!dragId || dragId === targetId) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      onDragOver(targetId);
+    },
+    onDrop: (e: React.DragEvent) => {
+      if (!dragId || dragId === targetId) return;
+      e.preventDefault();
+      e.stopPropagation();
+      onDrop(targetId);
+    },
   };
 }
 
@@ -114,32 +139,61 @@ function DragControls({
   title,
   index,
   total,
+  collapsed,
+  onToggleCollapse,
   onMoveUp,
   onMoveDown,
   onDragStart,
   onDragEnd,
+  onPointerDragStart,
+  showWidthControl,
+  onCycleWidth,
 }: {
   sectionId: string;
   title: string;
   index: number;
   total: number;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
   onMoveUp: (id: string) => void;
   onMoveDown: (id: string) => void;
   onDragStart: (id: string) => void;
   onDragEnd: () => void;
+  onPointerDragStart: (id: string) => void;
+  showWidthControl?: boolean;
+  onCycleWidth?: (id: string) => void;
 }) {
   const handleDrag = bindHandleDrag(sectionId, onDragStart, onDragEnd);
   return (
-    <div className="section-drag-controls" onClick={(e) => e.stopPropagation()}>
-      <button
-        type="button"
+    <div className="section-drag-controls panel-header-toolbar" onClick={(e) => e.stopPropagation()}>
+      <span
+        role="button"
+        tabIndex={0}
         className="section-drag-handle"
-        title={`Drag panel to reorder: ${title}`}
-        aria-label={`Drag handle ${title}`}
+        title={`Drag to reorder: ${title}`}
+        aria-label={`Move ${title}`}
+        onPointerDown={(e) => {
+          if (e.button !== 0) return;
+          e.preventDefault();
+          e.stopPropagation();
+          onPointerDragStart(sectionId);
+        }}
         {...handleDrag}
       >
-        ⠿
-      </button>
+        <span className="drag-grip-icon" aria-hidden>
+          ⠿
+        </span>
+      </span>
+      {showWidthControl && onCycleWidth && (
+        <button
+          type="button"
+          className="section-move-btn section-width-btn"
+          title="Cycle panel width"
+          onClick={() => onCycleWidth(sectionId)}
+        >
+          ↔
+        </button>
+      )}
       <button
         type="button"
         className="section-move-btn"
@@ -158,28 +212,105 @@ function DragControls({
       >
         ↓
       </button>
+      {onToggleCollapse && (
+        <button
+          type="button"
+          className="section-move-btn section-collapse-btn"
+          title={collapsed ? "Expand panel" : "Collapse panel"}
+          onClick={onToggleCollapse}
+        >
+          {collapsed ? "▸" : "▾"}
+        </button>
+      )}
     </div>
+  );
+}
+
+function PanelHeader({
+  headerClass,
+  sectionId,
+  title,
+  subtitle,
+  index,
+  total,
+  collapsed,
+  onToggleCollapse,
+  onMoveUp,
+  onMoveDown,
+  onDragStart,
+  onDragEnd,
+  onPointerDragStart,
+  dragProps,
+  showWidthControl,
+  onCycleWidth,
+}: {
+  headerClass: string;
+  sectionId: string;
+  title: string;
+  subtitle?: string;
+  index: number;
+  total: number;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
+  onMoveUp: (id: string) => void;
+  onMoveDown: (id: string) => void;
+  onDragStart: (id: string) => void;
+  onDragEnd: () => void;
+  onPointerDragStart: (id: string) => void;
+  dragProps: ReturnType<typeof bindHeaderDrag>;
+  showWidthControl?: boolean;
+  onCycleWidth?: (id: string) => void;
+}) {
+  return (
+    <header className={`${headerClass} compact-header panel-header widget-drag-surface`} {...dragProps}>
+      <DragControls
+        sectionId={sectionId}
+        title={title}
+        index={index}
+        total={total}
+        collapsed={collapsed}
+        onToggleCollapse={onToggleCollapse}
+        onMoveUp={onMoveUp}
+        onMoveDown={onMoveDown}
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+        onPointerDragStart={onPointerDragStart}
+        showWidthControl={showWidthControl}
+        onCycleWidth={onCycleWidth}
+      />
+      <div className="section-header-text">
+        <h3>{title}</h3>
+        {subtitle && <p className="count-muted">{subtitle}</p>}
+      </div>
+    </header>
   );
 }
 
 function DropSlot({
   active,
+  dragging,
+  isEnd,
   onDragOver,
   onDrop,
 }: {
   active: boolean;
+  dragging: boolean;
+  isEnd?: boolean;
   onDragOver: () => void;
   onDrop: () => void;
 }) {
   return (
     <div
-      className={`reorder-drop-slot ${active ? "active" : ""}`.trim()}
+      className={`reorder-drop-slot ${active ? "active" : ""} ${dragging ? "dragging" : ""}`.trim()}
+      {...(isEnd ? { "data-drop-end": true } : {})}
       onDragOver={(e) => {
         e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
         onDragOver();
       }}
       onDrop={(e) => {
         e.preventDefault();
+        e.stopPropagation();
         onDrop();
       }}
     />
@@ -197,14 +328,19 @@ function WidgetBody({
 }) {
   return (
     <>
-      <header className="reorder-section-header compact-header">
-        <button type="button" className="section-collapse-btn" onClick={onToggle} title="Expand or collapse">
-          {collapsed ? "▸" : "▾"}
-        </button>
+      <header className="widget-pane-header compact-header">
         <div className="section-header-text">
           <h3>{section.title}</h3>
           {section.subtitle && <p className="count-muted">{section.subtitle}</p>}
         </div>
+        <button
+          type="button"
+          className="section-move-btn section-collapse-btn"
+          onClick={onToggle}
+          title={collapsed ? "Expand panel" : "Collapse panel"}
+        >
+          {collapsed ? "▸" : "▾"}
+        </button>
       </header>
       {!collapsed && (
         <div
@@ -233,6 +369,10 @@ function SectionShell({
   onDragEnd,
   onDragOver,
   onDrop,
+  onPointerDragStart,
+  span,
+  showWidthControl,
+  onCycleWidth,
 }: {
   layout: "grid" | "stack";
   section: SectionDescriptor;
@@ -248,48 +388,42 @@ function SectionShell({
   onDragEnd: () => void;
   onDragOver: (id: string) => void;
   onDrop: (id: string) => void;
+  onPointerDragStart: (id: string) => void;
+  span: number;
+  showWidthControl?: boolean;
+  onCycleWidth?: (id: string) => void;
 }) {
   const dragState =
     dragId === section.id ? "is-dragging" : overId === section.id ? "is-drag-over" : "";
   const fullWidth = section.fullWidth ? " widget-full-width" : "";
 
-  const handleProps = {
-    onDragOver: (e: React.DragEvent) => {
-      e.preventDefault();
-      onDragOver(section.id);
-    },
-    onDrop: (e: React.DragEvent) => {
-      e.preventDefault();
-      onDrop(section.id);
-    },
-  };
+  const handleProps = bindDropTarget(section.id, dragId, onDragOver, onDrop);
 
   if (layout === "grid") {
     const dragProps = bindHeaderDrag(section.id, onDragStart, onDragEnd);
     return (
       <section
-        className={`dash-panel span-${section.span ?? 1} reorder-section ${dragState}${fullWidth}`.trim()}
+        className={`dash-panel span-${span} reorder-section ${dragState}${fullWidth}`.trim()}
         {...handleProps}
       >
-        <header className="dash-panel-header compact-header widget-drag-surface" {...dragProps}>
-          <DragControls
-            sectionId={section.id}
-            title={section.title}
-            index={index}
-            total={total}
-            onMoveUp={onMoveUp}
-            onMoveDown={onMoveDown}
-            onDragStart={onDragStart}
-            onDragEnd={onDragEnd}
-          />
-          <button type="button" className="section-collapse-btn no-drag" onClick={onToggleCollapse}>
-            {collapsed ? "▸" : "▾"}
-          </button>
-          <div className="section-header-text">
-            <h3>{section.title}</h3>
-            {section.subtitle && <p>{section.subtitle}</p>}
-          </div>
-        </header>
+        <PanelHeader
+          headerClass="dash-panel-header"
+          sectionId={section.id}
+          title={section.title}
+          subtitle={section.subtitle}
+          index={index}
+          total={total}
+          collapsed={collapsed}
+          onToggleCollapse={onToggleCollapse}
+          onMoveUp={onMoveUp}
+          onMoveDown={onMoveDown}
+          onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
+          onPointerDragStart={onPointerDragStart}
+          showWidthControl={showWidthControl}
+          onCycleWidth={onCycleWidth}
+          dragProps={dragProps}
+        />
         {!collapsed && (
           <div className="dash-panel-body resizable-body" style={{ minHeight: section.minBodyHeight ?? 80 }}>
             {section.content}
@@ -300,27 +434,28 @@ function SectionShell({
   }
 
   const dragProps = bindHeaderDrag(section.id, onDragStart, onDragEnd);
+  const widthClass =
+    span >= 4 ? "stack-width-full" : span >= 3 ? "stack-width-wide" : span >= 2 ? "stack-width-medium" : "stack-width-narrow";
   return (
-    <section className={`reorder-section stack-section ${dragState}${fullWidth}`.trim()} {...handleProps}>
-      <header className="reorder-section-header compact-header widget-drag-surface" {...dragProps}>
-        <DragControls
-          sectionId={section.id}
-          title={section.title}
-          index={index}
-          total={total}
-          onMoveUp={onMoveUp}
-          onMoveDown={onMoveDown}
-          onDragStart={onDragStart}
-          onDragEnd={onDragEnd}
-        />
-        <button type="button" className="section-collapse-btn no-drag" onClick={onToggleCollapse} title="Expand or collapse">
-          {collapsed ? "▸" : "▾"}
-        </button>
-        <div className="section-header-text">
-          <h3>{section.title}</h3>
-          {section.subtitle && <p className="count-muted">{section.subtitle}</p>}
-        </div>
-      </header>
+    <section className={`reorder-section stack-section ${widthClass} ${dragState}${fullWidth}`.trim()} {...handleProps}>
+      <PanelHeader
+        headerClass="reorder-section-header"
+        sectionId={section.id}
+        title={section.title}
+        subtitle={section.subtitle}
+        index={index}
+        total={total}
+        collapsed={collapsed}
+        onToggleCollapse={onToggleCollapse}
+        onMoveUp={onMoveUp}
+        onMoveDown={onMoveDown}
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+        onPointerDragStart={onPointerDragStart}
+        showWidthControl={showWidthControl}
+        onCycleWidth={onCycleWidth}
+        dragProps={dragProps}
+      />
       {!collapsed && (
         <div
           className="reorder-section-body resizable-body"
@@ -350,6 +485,7 @@ export function ReorderableSections({
     resetOrder,
     applyOrder,
   } = useSectionOrder(layoutId, defaultOrder);
+  const { getSpan, cycleSpan } = useSectionSpan(layoutId);
   const { list: listPresets, save: savePreset, load: loadPreset, remove: removePreset } =
     useLayoutPresets(layoutId);
   const [presetName, setPresetName] = useState("");
@@ -358,6 +494,17 @@ export function ReorderableSections({
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const [dropSlot, setDropSlot] = useState<string | null>(null);
+  const pointerDragRef = useRef(false);
+  const handleDropRef = useRef<(targetId: string, fromId?: string) => void>(() => undefined);
+  const handleDropAtEndRef = useRef<(fromId?: string) => void>(() => undefined);
+
+  const clearDragState = useCallback(() => {
+    setDragId(null);
+    setOverId(null);
+    setDropSlot(null);
+    pointerDragRef.current = false;
+  }, []);
+
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
     try {
       const raw = localStorage.getItem(`audiotheca.collapsed.${layoutId}`);
@@ -403,9 +550,27 @@ export function ReorderableSections({
   const containerClass =
     layout === "grid" ? `dash-grid ${className}`.trim() : `reorder-stack ${className}`.trim();
 
-  function handleDrop(targetId: string) {
-    if (dragId) {
-      const fromIdx = blockIndexOf(dragId);
+  function handleDrop(targetId: string, fromId?: string) {
+    const source = fromId ?? dragId;
+    if (!source) {
+      clearDragState();
+      return;
+    }
+    if (isSpacerId(targetId) && source !== targetId) {
+      const next = [...orderedIds];
+      const sourceIdx = next.indexOf(source);
+      const targetIdx = next.indexOf(targetId);
+      if (sourceIdx >= 0 && targetIdx >= 0) {
+        next.splice(sourceIdx, 1);
+        const gapIdx = next.indexOf(targetId);
+        next[gapIdx] = source;
+        applyOrder(next);
+      }
+      clearDragState();
+      return;
+    }
+    if (source) {
+      const fromIdx = blockIndexOf(source);
       const toIdx = blockIndexOf(targetId);
       if (fromIdx >= 0 && toIdx >= 0 && fromIdx !== toIdx) {
         const next = blockIdRuns.filter((_, i) => i !== fromIdx);
@@ -413,29 +578,73 @@ export function ReorderableSections({
         next.splice(insertAt < 0 ? next.length : insertAt, 0, blockIdRuns[fromIdx]);
         applyOrder(next.flat());
       } else if (fromIdx < 0 || toIdx < 0) {
-        reorder(dragId, targetId);
+        reorder(source, targetId);
       }
     }
-    setDragId(null);
-    setOverId(null);
-    setDropSlot(null);
+    clearDragState();
   }
 
-  function handleDropAtEnd() {
-    if (dragId) {
-      const fromIdx = blockIndexOf(dragId);
+  function handleDropAtEnd(fromId?: string) {
+    const source = fromId ?? dragId;
+    if (source) {
+      const fromIdx = blockIndexOf(source);
       if (fromIdx >= 0) {
         const next = blockIdRuns.filter((_, i) => i !== fromIdx);
         next.push(blockIdRuns[fromIdx]);
         applyOrder(next.flat());
       } else if (orderedIds.length) {
-        reorderAfter(dragId, orderedIds[orderedIds.length - 1]);
+        reorderAfter(source, orderedIds[orderedIds.length - 1]);
       }
     }
-    setDragId(null);
-    setOverId(null);
-    setDropSlot(null);
+    clearDragState();
   }
+
+  handleDropRef.current = (targetId: string, fromId?: string) => handleDrop(targetId, fromId);
+  handleDropAtEndRef.current = (fromId?: string) => handleDropAtEnd(fromId);
+
+  const beginPointerDrag = useCallback(
+    (sectionId: string) => {
+      pointerDragRef.current = true;
+      setDragId(sectionId);
+
+      const onMove = (e: PointerEvent) => {
+        const el = document.elementFromPoint(e.clientX, e.clientY);
+        const endSlot = el?.closest("[data-drop-end]");
+        if (endSlot) {
+          setDropSlot("end");
+          setOverId(null);
+          return;
+        }
+        const wrap = el?.closest("[data-drop-anchor]") as HTMLElement | null;
+        const anchor = wrap?.dataset.dropAnchor;
+        if (anchor && anchor !== sectionId) {
+          setOverId(anchor);
+          setDropSlot(`before-${anchor}`);
+        }
+      };
+
+      const onUp = (e: PointerEvent) => {
+        window.removeEventListener("pointermove", onMove);
+        const el = document.elementFromPoint(e.clientX, e.clientY);
+        const endSlot = el?.closest("[data-drop-end]");
+        if (endSlot) {
+          handleDropAtEndRef.current(sectionId);
+          return;
+        }
+        const wrap = el?.closest("[data-drop-anchor]") as HTMLElement | null;
+        const anchor = wrap?.dataset.dropAnchor;
+        if (anchor && anchor !== sectionId) {
+          handleDropRef.current(anchor, sectionId);
+        } else {
+          clearDragState();
+        }
+      };
+
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp, { once: true });
+    },
+    [clearDragState],
+  );
 
   function toggleCollapsed(id: string) {
     setCollapsed((prev) => {
@@ -451,42 +660,28 @@ export function ReorderableSections({
 
   function renderBlock(block: RenderBlock) {
     if (block.kind === "gap") {
-      const gapDrag = bindHandleDrag(block.id, setDragId, () => {
-        setDragId(null);
-        setOverId(null);
-        setDropSlot(null);
-      });
       return (
-        <div key={block.id} className="reorder-gap-space" title="Empty space — drag ⠿ or click × to remove">
-          <button type="button" className="section-drag-handle gap-handle" aria-label="Drag space tile" {...gapDrag}>
-            ⠿
-          </button>
-          <button
-            type="button"
-            className="section-remove-btn"
-            title="Remove space tile"
-            onClick={() => removeSpacer(block.id)}
-          >
-            ×
-          </button>
-        </div>
+        <div
+          key={block.id}
+          className={`reorder-gap-slot ${dragId ? "gap-drop-active" : ""} ${dragId === block.id ? "is-dragging" : ""}`.trim()}
+          aria-hidden
+          title="Drop here — double-click to remove empty slot"
+          onDoubleClick={() => removeSpacer(block.id)}
+        />
       );
     }
 
     if (block.kind === "group") {
       const firstId = block.sections[0]?.id ?? block.id;
       const idx = blockIndexOf(firstId);
-      const dragProps = bindHeaderDrag(firstId, setDragId, () => {
-        setDragId(null);
-        setOverId(null);
-        setDropSlot(null);
-      });
+      const dragProps = bindHeaderDrag(firstId, setDragId, clearDragState);
       return (
         <div
           key={block.id}
-          className={`widget-group stack-section ${dragId === firstId ? "is-dragging" : ""}`.trim()}
+          className={`widget-group stack-section ${dragId === firstId ? "is-dragging" : overId === firstId ? "is-drag-over" : ""}`.trim()}
+          {...bindDropTarget(firstId, dragId, setOverId, handleDrop)}
         >
-          <header className="widget-group-header compact-header widget-drag-surface" {...dragProps}>
+          <header className="widget-group-header compact-header panel-header widget-drag-surface" {...dragProps}>
             <DragControls
               sectionId={firstId}
               title={block.title ?? "Group"}
@@ -495,13 +690,10 @@ export function ReorderableSections({
               onMoveUp={moveBlockUp}
               onMoveDown={moveBlockDown}
               onDragStart={setDragId}
-              onDragEnd={() => {
-                setDragId(null);
-                setOverId(null);
-                setDropSlot(null);
-              }}
+              onDragEnd={clearDragState}
+              onPointerDragStart={beginPointerDrag}
             />
-            <h3 className="widget-group-title">{block.title}</h3>
+            <h3 className="widget-group-title section-header-text">{block.title}</h3>
           </header>
           <div className="widget-group-body">
             {block.sections.map((section) => (
@@ -520,6 +712,7 @@ export function ReorderableSections({
 
     const section = block.section;
     const idx = blockIndexOf(section.id);
+    const span = section.fullWidth ? 4 : getSpan(section.id, section.span ?? 1);
     return (
       <SectionShell
         key={section.id}
@@ -534,22 +727,25 @@ export function ReorderableSections({
         onMoveUp={moveBlockUp}
         onMoveDown={moveBlockDown}
         onDragStart={setDragId}
-        onDragEnd={() => {
-          setDragId(null);
-          setOverId(null);
-          setDropSlot(null);
-        }}
+        onDragEnd={clearDragState}
         onDragOver={setOverId}
         onDrop={handleDrop}
+        onPointerDragStart={beginPointerDrag}
+        span={span}
+        showWidthControl={!section.fullWidth}
+        onCycleWidth={(id) => cycleSpan(id, section.span ?? 1, 4)}
       />
     );
   }
 
   function wrapClass(block: RenderBlock): string {
     if (layout !== "grid") return "reorder-item-wrap";
+    if (block.kind === "gap") return "reorder-item-wrap wrap-gap";
     if (block.kind === "section") {
       if (block.section.fullWidth) return "reorder-item-wrap wrap-full";
-      if ((block.section.span ?? 1) >= 2) return "reorder-item-wrap wrap-span-2";
+      const span = getSpan(block.section.id, block.section.span ?? 1);
+      if (span >= 3) return "reorder-item-wrap wrap-span-3";
+      if (span >= 2) return "reorder-item-wrap wrap-span-2";
     }
     if (block.kind === "group") return "reorder-item-wrap wrap-full";
     return "reorder-item-wrap";
@@ -579,11 +775,15 @@ export function ReorderableSections({
   const presetNames = listPresets();
 
   return (
-    <div className="reorderable-layout">
+    <div className={`reorderable-layout${dragId ? " is-reordering" : ""}`}>
       <div className="reorderable-hint">
-        <span className="count-muted" title="Drag panel header, ⠿ handle, or ↑↓ — resize corners — ▾ collapses">
-          Drag header · ⠿ · ↑ ↓ · resize · collapse
-        </span>
+        <div className="reorderable-hint-main">
+          <strong>Move widgets</strong>
+          <span className="count-muted">
+            Drag the <strong>⠿</strong> grip onto a green drop line, drop into empty slots, or use ↑↓ arrows.
+            Grid panels: <strong>↔</strong> cycles width.
+          </span>
+        </div>
         <div className="reorderable-hint-actions">
           <button type="button" className="text-btn" title="Insert invisible vertical space" onClick={() => insertSpacerAfter(null)}>
             + Space
@@ -646,7 +846,14 @@ export function ReorderableSections({
         )}
       </div>
       {presetMsg && <p className="count-muted layout-preset-msg">{presetMsg}</p>}
-      <div className={containerClass}>
+      <div
+        className={containerClass}
+        onDragOver={(e) => {
+          if (!dragId) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+        }}
+      >
         {blocks.map((block, blockIndex) => {
           const anchorId =
             block.kind === "gap"
@@ -655,10 +862,17 @@ export function ReorderableSections({
                 ? block.sections[0]?.id ?? block.id
                 : block.section.id;
           const slotKey = `before-${anchorId}`;
+          const wrapDrop = bindDropTarget(anchorId, dragId, setOverId, handleDrop);
           return (
-            <div key={`wrap-${anchorId}-${blockIndex}`} className={wrapClass(block)}>
+            <div
+              key={`wrap-${anchorId}-${blockIndex}`}
+              className={`${wrapClass(block)}${overId === anchorId ? " is-drag-over" : ""}`}
+              data-drop-anchor={anchorId}
+              {...wrapDrop}
+            >
               <DropSlot
                 active={dropSlot === slotKey}
+                dragging={!!dragId}
                 onDragOver={() => setDropSlot(slotKey)}
                 onDrop={() => handleDrop(anchorId)}
               />
@@ -668,6 +882,8 @@ export function ReorderableSections({
         })}
         <DropSlot
           active={dropSlot === "end"}
+          dragging={!!dragId}
+          isEnd
           onDragOver={() => setDropSlot("end")}
           onDrop={handleDropAtEnd}
         />

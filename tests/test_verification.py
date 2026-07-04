@@ -189,6 +189,7 @@ class TestRunVerification:
 
 class TestScanOptionsNewPhases:
     def test_new_phases_are_skippable(self):
+        assert "malware_scan" in SKIPPABLE_PHASES
         assert "deep_identify" in SKIPPABLE_PHASES
         assert "verification" in SKIPPABLE_PHASES
 

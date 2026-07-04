@@ -11,7 +11,16 @@ import {
 } from "../api/client";
 import { useLibraryRoot } from "../hooks/useLibraryRoot";
 import { formatDiskFree, formatGb, formatPct } from "../utils/format";
+import {
+  dedupeProgressEvents,
+  formatDuration,
+  formatPhaseLabel,
+  loadCachedJobEvents,
+  progressEventKey,
+  saveCachedJobEvents,
+} from "../utils/scanDisplay";
 import type { JobSnapshot, ProgressEvent, RunSummary, SystemMetrics } from "../types";
+import { AiAnalyzer } from "./AiAnalyzer";
 import { FlowEditor } from "./FlowEditor";
 import { PhaseProgressBar, latestPhaseProgress, phasesFromEvents } from "./PhaseProgressBar";
 import { ProcessDiagnostics, type LogLine as ImportedLogLine } from "./ProcessDiagnostics";
@@ -36,15 +45,45 @@ function loadInitialSkipPhases(): string[] {
 
 type LogLevel = "info" | "warn" | "error" | "detail";
 
+type LogKind =
+  | "phase-start"
+  | "phase-finish"
+  | "phase-progress"
+  | "phase-control"
+  | "job"
+  | "control"
+  | "step"
+  | "engine"
+  | "malware"
+  | "ai"
+  | "generic";
+
 interface LogLine {
   text: string;
   level: LogLevel;
+  kind: LogKind;
+  key?: string;
+  initializing?: boolean;
+}
+
+function inferEngineLog(line: string, level: LogLevel): { kind: LogKind; level: LogLevel } {
+  const lower = line.toLowerCase();
+  if (/malware|suspicious|keygen|crack|trojan|threat|quarantine/.test(lower)) {
+    return { kind: "malware", level: level === "detail" ? "warn" : level };
+  }
+  if (/\[skip\]/i.test(line)) return { kind: "phase-control", level: "warn" };
+  if (/>>> start/i.test(line)) return { kind: "phase-start", level: "info" };
+  if (/\[ok\]/i.test(line)) return { kind: "phase-finish", level: "info" };
+  if (/\[paused\]|\[stopped\]/i.test(line)) return { kind: "phase-control", level: "warn" };
+  if (/error|failed/i.test(lower)) return { kind: "engine", level: "error" };
+  return { kind: "engine", level };
 }
 
 function isLogEvent(e: ProgressEvent): boolean {
   return (
     e.type.startsWith("phase") ||
     e.type.startsWith("job") ||
+    e.type.startsWith("ai_lookup") ||
     e.type === "control_ack" ||
     e.type === "engine_log" ||
     e.type === "step_log"
@@ -54,13 +93,19 @@ function isLogEvent(e: ProgressEvent): boolean {
 function formatLogEvent(e: ProgressEvent): LogLine {
   const ts = e.ts ? new Date(e.ts).toLocaleTimeString() : "";
   const prefix = ts ? `[${ts}] ` : "";
+  const key = progressEventKey(e);
   if (e.type === "engine_log") {
-    return { text: `${prefix}${e.line ?? ""}`, level: e.level ?? "detail" };
+    const level = e.level ?? "detail";
+    const inferred = inferEngineLog(e.line ?? "", level);
+    return { text: `${prefix}${e.line ?? ""}`, ...inferred, key };
   }
   if (e.type === "step_log") {
+    const level = e.level ?? "detail";
     return {
       text: `${prefix}[${e.step ?? "step"}] ${e.line ?? ""}`,
-      level: e.level ?? "detail",
+      level,
+      kind: "step",
+      key,
     };
   }
   if (e.type === "phase_progress") {
@@ -68,26 +113,110 @@ function formatLogEvent(e: ProgressEvent): LogLine {
       e.elapsed_s != null && e.done != null && e.done > 0
         ? ` · ${(e.done / Math.max(e.elapsed_s, 0.1)).toFixed(1)} ${e.unit ?? "items"}/s`
         : "";
-    const eta = e.eta_s != null ? ` · ETA ${Math.round(e.eta_s)}s` : "";
+    const eta = e.eta_s != null ? ` · ETA ${formatDuration(e.eta_s)}` : "";
     return {
-      text: `${prefix}${e.phase}: ${e.done?.toLocaleString() ?? "?"}/${e.total?.toLocaleString() ?? "?"} (${e.pct ?? "?"}%)${rate}${eta}${e.detail ? ` — ${e.detail}` : ""}`,
+      text: `${prefix}${formatPhaseLabel(e.phase)}: ${e.done?.toLocaleString() ?? "?"}/${e.total?.toLocaleString() ?? "?"} (${e.pct ?? "?"}%)${rate}${eta}${e.detail ? ` — ${e.detail}` : ""}`,
       level: "detail",
+      kind: "phase-progress",
+      key,
     };
   }
-  if (e.type === "phase_start") return { text: `${prefix}>>> START ${e.phase}${e.note ? ` — ${e.note}` : ""}`, level: "info" };
-  if (e.type === "phase_finish") return { text: `${prefix}[OK] ${e.phase}${e.note ? ` — ${e.note}` : ""}${e.elapsed_s != null ? ` (${e.elapsed_s}s)` : ""}`, level: "info" };
-  if (e.type === "phase_paused") return { text: `${prefix}[PAUSED] ${e.phase} — waiting for continue`, level: "warn" };
-  if (e.type === "phase_resumed") return { text: `${prefix}[RESUMED] ${e.phase}`, level: "info" };
-  if (e.type === "phase_stopped") return { text: `${prefix}[STOPPED] ${e.phase}${e.note ? ` — ${e.note}` : ""}`, level: "warn" };
+  if (e.type === "phase_start") {
+    return {
+      text: `${prefix}>>> START ${formatPhaseLabel(e.phase)}${e.note ? ` — ${e.note}` : ""}`,
+      level: "info",
+      kind: "phase-start",
+      key: progressEventKey(e),
+      initializing: true,
+    };
+  }
+  if (e.type === "phase_finish") {
+    return {
+      text: `${prefix}[OK] ${formatPhaseLabel(e.phase)}${e.note ? ` — ${e.note}` : ""}${e.elapsed_s != null ? ` (${formatDuration(e.elapsed_s)})` : ""}`,
+      level: "info",
+      kind: "phase-finish",
+      key,
+    };
+  }
+  if (e.type === "phase_paused") {
+    return {
+      text: `${prefix}[PAUSED] ${formatPhaseLabel(e.phase)} — waiting for continue`,
+      level: "warn",
+      kind: "phase-control",
+      key,
+    };
+  }
+  if (e.type === "phase_resumed") {
+    return { text: `${prefix}[RESUMED] ${formatPhaseLabel(e.phase)}`, level: "info", kind: "phase-control", key };
+  }
+  if (e.type === "phase_stopped") {
+    return {
+      text: `${prefix}[STOPPED] ${formatPhaseLabel(e.phase)}${e.note ? ` — ${e.note}` : ""}`,
+      level: "warn",
+      kind: "phase-control",
+      key,
+    };
+  }
   if (e.type === "job_start") {
     const dry = (e as { dry_run?: boolean }).dry_run;
-    return { text: `${prefix}[JOB START] dry_run=${String(dry)} root=${(e as { root?: string }).root ?? "?"}`, level: "info" };
+    return {
+      text: `${prefix}[JOB START] dry_run=${String(dry)} root=${(e as { root?: string }).root ?? "?"}`,
+      level: "info",
+      kind: "job",
+      key,
+    };
   }
-  if (e.type === "job_done") return { text: `${prefix}[JOB DONE] stamp=${e.stamp ?? "?"}${e.elapsed_s != null ? ` elapsed=${e.elapsed_s}s` : ""}`, level: "info" };
-  if (e.type === "job_stopped") return { text: `${prefix}[JOB STOPPED] ${e.error ?? "user stop"}${e.stamp ? ` stamp=${e.stamp}` : ""}`, level: "warn" };
-  if (e.type === "job_failed") return { text: `${prefix}[JOB FAILED] ${e.error ?? "error"}${e.stamp ? ` stamp=${e.stamp}` : ""}`, level: "error" };
-  if (e.type === "control_ack") return { text: `${prefix}[CONTROL] ${e.action ?? ""}${e.note ? ` — ${e.note}` : ""}`, level: "info" };
-  return { text: `${prefix}${e.type}: ${JSON.stringify(e)}`, level: "detail" };
+  if (e.type === "job_done") {
+    return {
+      text: `${prefix}[JOB DONE] stamp=${e.stamp ?? "?"}${e.elapsed_s != null ? ` elapsed=${formatDuration(e.elapsed_s)}` : ""}`,
+      level: "info",
+      kind: "job",
+      key,
+    };
+  }
+  if (e.type === "job_stopped") {
+    return { text: `${prefix}[JOB STOPPED] ${e.error ?? "user stop"}${e.stamp ? ` stamp=${e.stamp}` : ""}`, level: "warn", kind: "job", key };
+  }
+  if (e.type === "job_failed") {
+    return { text: `${prefix}[JOB FAILED] ${e.error ?? "error"}${e.stamp ? ` stamp=${e.stamp}` : ""}`, level: "error", kind: "job", key };
+  }
+  if (e.type === "control_ack") {
+    return { text: `${prefix}[CONTROL] ${e.action ?? ""}${e.note ? ` — ${e.note}` : ""}`, level: "info", kind: "control", key };
+  }
+  if (e.type === "ai_lookup_start") {
+    return {
+      text: `${prefix}[AI] START ${(e as { target?: string }).target ?? e.detail ?? "unknown target"}`,
+      level: "info",
+      kind: "ai",
+      key,
+      initializing: true,
+    };
+  }
+  if (e.type === "ai_lookup_progress") {
+    return {
+      text: `${prefix}[AI] ${e.detail ?? "processing…"}`,
+      level: "detail",
+      kind: "ai",
+      key,
+    };
+  }
+  if (e.type === "ai_lookup_done") {
+    return {
+      text: `${prefix}[AI] DONE ${(e as { vendor?: string }).vendor ?? e.detail ?? ""}`,
+      level: "info",
+      kind: "ai",
+      key,
+    };
+  }
+  if (e.type === "ai_lookup_pending") {
+    return {
+      text: `${prefix}[AI] PENDING ${e.detail ?? "needs verification"}`,
+      level: "warn",
+      kind: "ai",
+      key,
+    };
+  }
+  return { text: `${prefix}${e.type}: ${JSON.stringify(e)}`, level: "detail", kind: "generic", key };
 }
 
 export function ScanPanel({ onRunComplete }: Props) {
@@ -114,6 +243,7 @@ export function ScanPanel({ onRunComplete }: Props) {
   const [importedLogLines, setImportedLogLines] = useState<ImportedLogLine[]>([]);
   const logRef = useRef<HTMLDivElement | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const wsLiveRef = useRef(false);
   const eventsOffsetRef = useRef(0);
 
   useEffect(() => {
@@ -127,8 +257,9 @@ export function ScanPanel({ onRunComplete }: Props) {
         return;
       }
       setEvents((prev) => {
-        if (prev.length && prev[prev.length - 1] === event) return prev;
-        return [...prev.slice(-500), event];
+        const key = progressEventKey(event);
+        if (prev.some((e) => progressEventKey(e) === key)) return prev;
+        return dedupeProgressEvents([...prev, event].slice(-500));
       });
       if (event.type === "phase_start") {
         setJob((j) => (j ? { ...j, status: "running", current_phase: event.phase ?? j.current_phase } : j));
@@ -177,7 +308,12 @@ export function ScanPanel({ onRunComplete }: Props) {
         const res = await fetchJobEvents(jobId, after);
         eventsOffsetRef.current = res.total;
         if (reset) {
-          setEvents(res.events.filter((e) => e.type !== "system_metrics").slice(-500));
+          setEvents((prev) =>
+            dedupeProgressEvents([
+              ...prev,
+              ...res.events.filter((e) => e.type !== "system_metrics"),
+            ]).slice(-500),
+          );
         } else if (res.events.length) {
           for (const event of res.events) {
             applyEvent(event);
@@ -199,14 +335,19 @@ export function ScanPanel({ onRunComplete }: Props) {
         wsRef.current = ws;
         ws.onopen = () => {
           setError(null);
-          void pullEvents(jobId, true);
+          wsLiveRef.current = true;
+          void pullEvents(jobId, eventsOffsetRef.current === 0);
         };
         ws.onmessage = (msg) => {
           const event = JSON.parse(msg.data) as ProgressEvent;
           applyEvent(event);
         };
         ws.onerror = () => {
+          wsLiveRef.current = false;
           setError("WebSocket disconnected — polling progress via API");
+        };
+        ws.onclose = () => {
+          wsLiveRef.current = false;
         };
       })();
     },
@@ -236,8 +377,9 @@ export function ScanPanel({ onRunComplete }: Props) {
         }
       }
       if (resetEvents) {
+        const cached = loadCachedJobEvents(active.job_id);
         eventsOffsetRef.current = 0;
-        setEvents([]);
+        setEvents(cached);
       }
       connectWs(active.job_id);
     },
@@ -261,14 +403,16 @@ export function ScanPanel({ onRunComplete }: Props) {
           const jobs = await fetchJobs().catch(() => []);
           const active = jobs.find((j) => ACTIVE_STATUSES.includes(j.status));
           if (active) {
-            await attachActiveJob(active, true);
-          } else {
+            await attachActiveJob(active, false);
+          } else if (!wsLiveRef.current) {
             setJob(null);
             setEvents([]);
             setError("Scan session ended (API restarted). Start a new scan.");
           }
         });
-      void pullEvents(job.job_id);
+      if (!wsLiveRef.current || wsRef.current?.readyState !== WebSocket.OPEN) {
+        void pullEvents(job.job_id);
+      }
     }, 3000);
     return () => clearInterval(timer);
   }, [job?.job_id, job?.status, attachActiveJob, pullEvents]);
@@ -284,6 +428,10 @@ export function ScanPanel({ onRunComplete }: Props) {
   }, [attachActiveJob]);
 
   useEffect(() => () => wsRef.current?.close(), []);
+
+  useEffect(() => {
+    if (job?.job_id) saveCachedJobEvents(job.job_id, events);
+  }, [job?.job_id, events]);
 
   async function handleStart(live = false) {
     if (live && liveConfirmText.trim().toUpperCase() !== "STAGE LIVE") {
@@ -345,7 +493,16 @@ export function ScanPanel({ onRunComplete }: Props) {
   const phaseState = useMemo(() => phasesFromEvents(events), [events]);
   const logLines = useMemo(() => {
     const lines = events.filter(isLogEvent).map(formatLogEvent);
-    const merged = importedLogLines.length ? [...importedLogLines, ...lines] : lines;
+    const merged: LogLine[] = importedLogLines.length
+      ? [
+          ...importedLogLines.map((line, i) => ({
+            text: line.text,
+            level: line.level,
+            key: `import-${i}-${line.text.slice(0, 40)}`,
+          })),
+          ...lines,
+        ]
+      : lines;
     const q = sidebarQuery.trim().toLowerCase();
     let filtered = q ? merged.filter((line) => line.text.toLowerCase().includes(q)) : merged;
     if (logLevelFilter === "error") {
@@ -505,17 +662,17 @@ export function ScanPanel({ onRunComplete }: Props) {
             {error && <div className="error">{error}</div>}
             {pausePending && !paused && (
               <div className="banner dry">
-                Pause requested — finishing current item/phase (<strong>{activePhase ?? "…"}</strong>).
+                Pause requested — finishing current item/phase (<strong>{formatPhaseLabel(activePhase)}</strong>).
               </div>
             )}
             {stopPending && !paused && (
               <div className="banner live">
-                Stop requested — run will end after the current checkpoint (<strong>{activePhase ?? "…"}</strong>).
+                Stop requested — run will end after the current checkpoint (<strong>{formatPhaseLabel(activePhase)}</strong>).
               </div>
             )}
             {paused && (
               <div className="banner dry">
-                Paused at <strong>{activePhase}</strong>. Review reports, then continue or stop.
+                Paused at <strong>{formatPhaseLabel(activePhase)}</strong>. Review reports, then continue or stop.
               </div>
             )}
             {stagingDay && !isActive && (
@@ -586,6 +743,7 @@ export function ScanPanel({ onRunComplete }: Props) {
             completedPhases={phaseState.completed}
             isActive={isActive}
             progress={latestProgress}
+            events={events}
           />
         ),
       },
@@ -614,7 +772,7 @@ export function ScanPanel({ onRunComplete }: Props) {
                 <div className="kpi kpi-compact">
                   <div className="label">Phase</div>
                   <div className="value" title={activePhase}>
-                    {activePhase}
+                    {formatPhaseLabel(activePhase)}
                   </div>
                 </div>
               )}
@@ -632,7 +790,7 @@ export function ScanPanel({ onRunComplete }: Props) {
               <div className="kpi-grid metrics-grid" style={{ marginTop: "0.75rem" }}>
                 {metrics.cpu_percent != null && (
                   <div className="kpi kpi-compact">
-                    <div className="label">CPU</div>
+                    <div className="label">CPU{metrics.cpu_count ? ` (${metrics.cpu_count}c)` : ""}</div>
                     <div className="value">{formatPct(metrics.cpu_percent, 0)}</div>
                   </div>
                 )}
@@ -650,6 +808,40 @@ export function ScanPanel({ onRunComplete }: Props) {
                     {formatDiskFree(metrics)}
                   </div>
                 </div>
+                {metrics.disk_read_mb != null && (
+                  <div className="kpi kpi-compact">
+                    <div className="label">Disk read</div>
+                    <div className="value">{formatGb(metrics.disk_read_mb / 1024, 1)}</div>
+                  </div>
+                )}
+                {metrics.disk_write_mb != null && (
+                  <div className="kpi kpi-compact">
+                    <div className="label">Disk write</div>
+                    <div className="value">{formatGb(metrics.disk_write_mb / 1024, 1)}</div>
+                  </div>
+                )}
+                {metrics.network_latency_ms != null && (
+                  <div className="kpi kpi-compact">
+                    <div className="label">NAS latency</div>
+                    <div className="value">{Math.round(metrics.network_latency_ms)} ms</div>
+                  </div>
+                )}
+              </div>
+            )}
+            {metrics?.bottleneck_hints && metrics.bottleneck_hints.length > 0 && (
+              <ul className="metrics-warnings">
+                {metrics.bottleneck_hints.map((hint) => (
+                  <li key={hint}>{hint}</li>
+                ))}
+              </ul>
+            )}
+            {metrics?.volumes && metrics.volumes.length > 1 && (
+              <div className="metrics-volumes count-muted" style={{ marginTop: "0.5rem", fontSize: "0.72rem" }}>
+                {metrics.volumes.slice(0, 4).map((vol) => (
+                  <div key={vol.mount}>
+                    {vol.mount}: {formatGb(vol.free_gb, 1)} free ({formatPct(vol.free_pct, 0)})
+                  </div>
+                ))}
               </div>
             )}
             {latestProgress?.detail && <p className="count-muted">Current: {latestProgress.detail}</p>}
@@ -660,6 +852,14 @@ export function ScanPanel({ onRunComplete }: Props) {
             )}
           </div>
         ) : null,
+      },
+      {
+        id: "ai-analyzer",
+        title: "AI analyzer",
+        subtitle: "Contextual lookup for unknown targets",
+        group: "run",
+        minBodyHeight: 220,
+        content: <AiAnalyzer libraryRoot={root} events={events} />,
       },
       {
         id: "log",
@@ -706,8 +906,12 @@ export function ScanPanel({ onRunComplete }: Props) {
             </div>
             <div className="log-lines" ref={logRef}>
               {logLines.length > 0 ? (
-                logLines.map((line, i) => (
-                  <div key={i} className={`log-line log-${line.level}`}>
+                logLines.map((line) => (
+                  <div
+                    key={line.key ?? line.text}
+                    className={`log-line log-${line.level} log-kind-${"kind" in line && line.kind ? line.kind : "generic"}${line.initializing ? " log-initializing" : ""}`}
+                  >
+                    {line.initializing && <span className="phase-init-spinner phase-init-spinner-inline" aria-hidden />}
                     {line.text}
                   </div>
                 ))
@@ -745,6 +949,7 @@ export function ScanPanel({ onRunComplete }: Props) {
       phaseState,
       verboseLog,
       importedLogLines,
+      events,
     ],
   );
 
