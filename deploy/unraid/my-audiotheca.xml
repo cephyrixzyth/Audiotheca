@@ -7,8 +7,8 @@
   <Shell>bash</Shell>
   <Privileged>false</Privileged>
   <Support>https://forums.unraid.net/</Support>
-  <Project>https://github.com/audiotheca/audiotheca</Project>
-  <Overview>Audiotheca scans, deduplicates, and restructures large audio sample libraries on local disk. Includes browser UI and API in one container.[br][br][b]Before adding:[/b] build the image once on Unraid: [code]bash /path/to/audiotheca/deploy/unraid/build-image.sh[/code][br]Or install the template: [code]bash deploy/unraid/install-template.sh[/code]</Overview>
+  <Project>https://github.com/chrisjrovira/Audiotheca</Project>
+  <Overview>Audiotheca v1.0.0 (engine 10.0.0) scans, deduplicates, and restructures large audio sample libraries on local disk. Includes browser UI and API in one container.[br][br][b]Before adding:[/b] build the image once on Unraid: [code]bash /path/to/audiotheca/deploy/unraid/build-image.sh[/code][br]Or install the template: [code]bash deploy/unraid/install-template.sh[/code]</Overview>
   <Category>Tools:Utilities MediaApp:Other</Category>
   <WebUI>http://[IP]:[PORT:4210]/</WebUI>
   <Icon>/boot/config/plugins/dockerMan/templates-user/audiotheca-icon.png</Icon>

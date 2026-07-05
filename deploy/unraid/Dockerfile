@@ -1,7 +1,10 @@
 # Audiotheca all-in-one — API + nginx UI (Unraid Add Container)
+# Web UI / API 1.0.0 · Engine 10.0.0
 # syntax=docker/dockerfile:1
 
 ARG PYTHON_VERSION=3.13
+ARG AUDIOTHECA_VERSION=1.0.0
+ARG ENGINE_VERSION=10.0.0
 FROM node:24-alpine AS ui-build
 
 WORKDIR /app/ui
@@ -14,6 +17,9 @@ ENV VITE_DEFAULT_LIBRARY_ROOT=${VITE_DEFAULT_LIBRARY_ROOT}
 RUN npm run build
 
 FROM python:${PYTHON_VERSION}-slim-bookworm
+
+ARG AUDIOTHECA_VERSION=1.0.0
+ARG ENGINE_VERSION=10.0.0
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends nginx p7zip-full curl tini clamav \
@@ -33,6 +39,11 @@ COPY --from=ui-build /app/ui/dist /usr/share/nginx/html
 COPY deploy/unraid/nginx-local.conf /etc/nginx/conf.d/default.conf
 COPY deploy/unraid/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+
+LABEL org.opencontainers.image.title="Audiotheca" \
+    org.opencontainers.image.version="${AUDIOTHECA_VERSION}" \
+    audiotheca.engine.version="${ENGINE_VERSION}" \
+    audiotheca.ui.version="${AUDIOTHECA_VERSION}"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app \

@@ -367,6 +367,40 @@ python scripts/library_probe.py                      # Lightweight library stats
 
 ---
 
+## Docker (Unraid / Linux / Docker Desktop)
+
+Engine **10.0.0** · Web UI / API **1.0.0**
+
+**All-in-one** — API + nginx UI in a single container (Unraid Add Container template):
+
+```bash
+# From repo root
+bash deploy/unraid/build-image.sh
+# tags: audiotheca/unraid:1.0.0, audiotheca/unraid:latest
+
+docker run -d --name audiotheca \
+  -p 4210:80 -p 4211:8787 \
+  -v /path/to/appdata:/data \
+  -v /path/to/library:/library:ro \
+  audiotheca/unraid:1.0.0
+```
+
+Open `http://localhost:4210`. Appdata holds reports, scan cache, and the API token (`AUDIOTHECA_HOME=/data`).
+
+**Docker Compose** — separate API and UI containers (optional SearXNG / ClamAV profiles):
+
+```bash
+cd deploy/unraid
+cp .env.example .env   # set LIBRARY_HOST_PATH to your library on the host
+docker compose up -d --build
+```
+
+On Windows with Docker Desktop: `.\deploy\unraid\start-local.ps1` (after editing `.env`).
+
+Full NAS volume mappings, profiles, and smoke tests: **[deploy/unraid/README.md](deploy/unraid/README.md)**.
+
+---
+
 ## Staged live rollout
 
 Use a **four-stage rollout** so you never move everything at once:

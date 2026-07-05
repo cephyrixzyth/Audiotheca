@@ -17,7 +17,7 @@ Engine **10.0.0** · Web UI **1.0.0**
 | Node.js | 24+ LTS | Browser UI only |
 | Git | Any | Clone the repo |
 
-**Optional:** Rust (Tauri desktop only), Docker (SearXNG / future Unraid stack).
+**Optional:** Rust (Tauri desktop only), Docker (Unraid stack — see [deploy/unraid/README.md](../deploy/unraid/README.md)).
 
 ---
 
