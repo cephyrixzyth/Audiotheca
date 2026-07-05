@@ -371,18 +371,33 @@ python scripts/library_probe.py                      # Lightweight library stats
 
 Engine **10.0.0** · Web UI / API **1.0.0**
 
+### Pull from GitHub Container Registry
+
+Release tags (`v*`) publish three images to GHCR (replace `1.0.1` with your release version):
+
+| Image | Use |
+| --- | --- |
+| `ghcr.io/chrisjrovira/audiotheca:1.0.1` | All-in-one — API + nginx UI (Unraid Add Container) |
+| `ghcr.io/chrisjrovira/audiotheca-api:1.0.1` | API / engine only (Docker Compose `api` service) |
+| `ghcr.io/chrisjrovira/audiotheca-ui:1.0.1` | Static UI only (Docker Compose `ui` service) |
+
+Each release tag also publishes `:latest` on the all-in-one, API, and UI images.
+
+```bash
+# Log in once (read:packages is enough to pull public images)
+echo "$GITHUB_TOKEN" | docker login ghcr.io -u YOUR_GITHUB_USER --password-stdin
+
+docker pull ghcr.io/chrisjrovira/audiotheca:1.0.1
+```
+
 **All-in-one** — API + nginx UI in a single container (Unraid Add Container template):
 
 ```bash
-# From repo root
-bash deploy/unraid/build-image.sh
-# tags: audiotheca/unraid:1.0.0, audiotheca/unraid:latest
-
 docker run -d --name audiotheca \
   -p 4210:80 -p 4211:8787 \
   -v /path/to/appdata:/data \
   -v /path/to/library:/library:ro \
-  audiotheca/unraid:1.0.0
+  ghcr.io/chrisjrovira/audiotheca:1.0.1
 ```
 
 Open `http://localhost:4210`. Appdata holds reports, scan cache, and the API token (`AUDIOTHECA_HOME=/data`).
@@ -392,8 +407,11 @@ Open `http://localhost:4210`. Appdata holds reports, scan cache, and the API tok
 ```bash
 cd deploy/unraid
 cp .env.example .env   # set LIBRARY_HOST_PATH to your library on the host
+# Optional: set image: ghcr.io/chrisjrovira/audiotheca-api:1.0.1 in compose overrides
 docker compose up -d --build
 ```
+
+Build locally instead: `bash deploy/unraid/build-image.sh` (tags `audiotheca/unraid:1.0.0`, `:latest`).
 
 On Windows with Docker Desktop: `.\deploy\unraid\start-local.ps1` (after editing `.env`).
 

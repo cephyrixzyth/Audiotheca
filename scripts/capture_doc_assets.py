@@ -388,6 +388,44 @@ def seed_reports() -> None:
     ]
     _write_csv(SEED_REPORTS / f"Scene_Rename_Plan_{STAMP}.csv", scene_headers, scene_rows)
 
+    _write_csv(
+        SEED_REPORTS / f"Scan_Failures_{STAMP}.csv",
+        ["Section", "Item Name", "Full Path", "Error"],
+        [
+            [
+                "a",
+                "LockedPack",
+                _lib_path("a", "UnknownVendor", "LockedPack"),
+                "Access is denied",
+            ],
+        ],
+    )
+    _write_csv(
+        SEED_REPORTS / f"Coverage_Gaps_{STAMP}.csv",
+        ["Section", "Path", "Name", "Reason", "Detail"],
+        [
+            [
+                "archives",
+                _lib_path("archives", "loose.zip"),
+                "loose.zip",
+                "LOOSE_ARCHIVE",
+                "Top-level archive outside item folder",
+            ],
+        ],
+    )
+    _write_csv(
+        SEED_REPORTS / f"Cache_Hits_{STAMP}.csv",
+        ["Section", "Path", "Name", "Mtime"],
+        [
+            [
+                "a",
+                _lib_path("a", "AcmeAudio", "SynthOne"),
+                "SynthOne",
+                "1710000000.0",
+            ],
+        ],
+    )
+
     (SEED_REPORTS / f"Skip_Phase_Impact_{STAMP}.json").write_text(
         json.dumps({"archive_peek": {"count": 1, "detail": "demo skip impact"}}),
         encoding="utf-8",
@@ -757,7 +795,7 @@ def _tab_label(tab_id: str) -> str:
         "archives": "Archives",
         "scene-renames": "Scene renames",
         "scan-audit": "Scan audit",
-        "skipped": "Skipped files",
+        "skipped": "Skipped",
         "space-recovery": "Space recovery",
         "security": "Security",
         "environment": "Environment",
