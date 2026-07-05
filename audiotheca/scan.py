@@ -10,6 +10,7 @@ import re
 import shutil
 import sys
 import threading
+import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
@@ -276,9 +277,28 @@ class ScanMixin:
             except (OSError, PermissionError) as exc:
                 self.logger.warning("Scan failed in %s: %s", current, exc)
                 self._inc("errors")
+            throttle_ms = int(getattr(self, "io_throttle_ms", 0) or 0)
+            if throttle_ms > 0:
+                time.sleep(throttle_ms / 1000.0)
 
         largest_heap.sort(key=lambda row: row[0], reverse=True)
         info["largest_files"] = [(size, rel_name) for size, _name, rel_name in largest_heap[:8]]
+        nested_indexes: list[dict] = []
+        for arch in info.get("archive_files", [])[:5]:
+            rel = str(arch.get("rel_path") or arch.get("name") or "")
+            if not rel:
+                continue
+            full = root / rel
+            if not full.is_file():
+                continue
+            try:
+                from archive_nest import index_nested_archives
+
+                nested_indexes.append(index_nested_archives(full, depth=2, limit=80))
+            except OSError:
+                continue
+        if nested_indexes:
+            info["nested_archive_index"] = nested_indexes
         return info
 
     @staticmethod

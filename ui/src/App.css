@@ -3395,6 +3395,18 @@ tr.inv-vendor-set {
   grid-auto-flow: dense;
 }
 
+.dash-grid-canvas {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
+.audit-log-panel .audit-log-lines {
+  max-height: 400px;
+}
+
+.audit-log-panel .log-line {
+  font-size: 0.72rem;
+}
+
 .telemetry-dual {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));

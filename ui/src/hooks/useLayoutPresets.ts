@@ -59,6 +59,20 @@ export function deleteLayoutPreset(layoutId: string, name: string): void {
   writePresets(store);
 }
 
+export function exportLayoutBlueprint(layoutId: string): string {
+  const store = readPresets();
+  return JSON.stringify({ layoutId, presets: store[layoutId] ?? {} }, null, 2);
+}
+
+export function importLayoutBlueprint(layoutId: string, jsonText: string): number {
+  const payload = JSON.parse(jsonText) as { presets?: Record<string, LayoutSnapshot> };
+  const incoming = payload.presets ?? {};
+  const store = readPresets();
+  store[layoutId] = { ...(store[layoutId] ?? {}), ...incoming };
+  writePresets(store);
+  return Object.keys(incoming).length;
+}
+
 export function useLayoutPresets(layoutId: string) {
   const list = useCallback(() => listLayoutPresets(layoutId), [layoutId]);
 
@@ -79,5 +93,12 @@ export function useLayoutPresets(layoutId: string) {
     [layoutId],
   );
 
-  return { list, save, load, remove };
+  const exportBlueprint = useCallback(() => exportLayoutBlueprint(layoutId), [layoutId]);
+
+  const importBlueprint = useCallback(
+    (jsonText: string) => importLayoutBlueprint(layoutId, jsonText),
+    [layoutId],
+  );
+
+  return { list, save, load, remove, exportBlueprint, importBlueprint };
 }

@@ -111,6 +111,8 @@ interface Props {
   className?: string;
   /** Dense grid packing — widgets snap to fill gaps (dashboard auto-flow). */
   autoFlow?: boolean;
+  /** 12-column free canvas grid (CANVAS-DRG MVP). */
+  canvasGrid?: boolean;
 }
 
 type RenderBlock =
@@ -604,6 +606,7 @@ export function ReorderableSections({
   sections,
   className = "",
   autoFlow = false,
+  canvasGrid = false,
 }: Props) {
   const visible = useMemo(() => sections.filter((s) => !s.hidden), [sections]);
   const defaultOrder = useMemo(() => visible.map((s) => s.id), [visible]);
@@ -618,10 +621,11 @@ export function ReorderableSections({
   } = useSectionOrder(layoutId, defaultOrder);
   const { getSpan, cycleSpan } = useSectionSpan(layoutId);
   const { getTitle, setTitle } = useGroupTitles(layoutId);
-  const { list: listPresets, save: savePreset, load: loadPreset, remove: removePreset } =
+  const { list: listPresets, save: savePreset, load: loadPreset, remove: removePreset, exportBlueprint, importBlueprint } =
     useLayoutPresets(layoutId);
   const [presetName, setPresetName] = useState("");
   const [presetMsg, setPresetMsg] = useState<string | null>(null);
+  const [importText, setImportText] = useState("");
 
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
@@ -688,7 +692,7 @@ export function ReorderableSections({
 
   const containerClass =
     layout === "grid"
-      ? `dash-grid${autoFlow ? " dash-grid-auto-flow" : ""} ${className}`.trim()
+      ? `dash-grid${autoFlow ? " dash-grid-auto-flow" : ""}${canvasGrid ? " dash-grid-canvas" : ""} ${className}`.trim()
       : `reorder-stack ${className}`.trim();
 
   function handleDrop(targetId: string, fromId?: string) {
@@ -931,6 +935,41 @@ export function ReorderableSections({
         />
         <button type="button" className="text-btn" onClick={handleSavePreset} disabled={!presetName.trim()}>
           Save layout
+        </button>
+        <button
+          type="button"
+          className="text-btn"
+          title="Export all layout presets as JSON (BPRNT-SAVE)"
+          onClick={() => {
+            const text = exportBlueprint();
+            void navigator.clipboard.writeText(text);
+            setPresetMsg("Layout blueprint copied to clipboard");
+          }}
+        >
+          Export JSON
+        </button>
+        <input
+          type="text"
+          className="field-input layout-preset-name"
+          placeholder="Paste layout JSON to import…"
+          value={importText}
+          onChange={(e) => setImportText(e.target.value)}
+        />
+        <button
+          type="button"
+          className="text-btn"
+          disabled={!importText.trim()}
+          onClick={() => {
+            try {
+              const count = importBlueprint(importText);
+              setPresetMsg(`Imported ${count} layout preset(s)`);
+              setImportText("");
+            } catch {
+              setPresetMsg("Invalid layout JSON");
+            }
+          }}
+        >
+          Import JSON
         </button>
         {presetNames.length > 0 && (
           <select

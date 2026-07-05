@@ -18,6 +18,7 @@ import {
   loadCachedJobEvents,
   progressEventKey,
   saveCachedJobEvents,
+  dedupeLogLines,
 } from "../utils/scanDisplay";
 import type { JobSnapshot, ProgressEvent, RunSummary, SystemMetrics } from "../types";
 import { AiAnalyzer } from "./AiAnalyzer";
@@ -530,7 +531,7 @@ export function ScanPanel({ onRunComplete }: Props) {
           /phase|scan|identify|dedupe|route/i.test(line.text),
       );
     }
-    return filtered.slice(-400);
+    return dedupeLogLines(filtered.slice(-400));
   }, [events, importedLogLines, sidebarQuery, logSearch, logLevelFilter]);
 
   useEffect(() => {

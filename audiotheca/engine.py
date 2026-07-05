@@ -35,7 +35,7 @@ from restructure_feedback import (
     get_section_approvals,
     load_store as load_restructure_store,
 )
-from scan_options import ScanOptions, apply_staging_paths, load_scan_options
+from scan_options import ScanOptions, apply_scan_options, apply_staging_paths, load_scan_options
 from vendor_db import VENDOR_DATABASE
 
 from audiotheca.config import *  # noqa: F403
@@ -113,6 +113,7 @@ class DeduplicationEngine(
         self.verification_findings: list[dict] = []
         self.quality_scorecard: dict = {}
         self.scan_options: ScanOptions = load_scan_options()
+        self.io_throttle_ms = 0
         self._seven_zip = find_7z()
         self.action_mode = "preview"
 
@@ -429,6 +430,7 @@ class DeduplicationEngine(
         self.logger.info("Engine v%s started | DRY_RUN=%s | ROOT=%s", ENGINE_VERSION, self.dry_run, self.root_dir)
 
         apply_staging_paths(self, self.scan_options)
+        apply_scan_options(self, self.scan_options)
         self._invalidate_cache_paths()
 
         paths = self._report_paths()

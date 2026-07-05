@@ -1,6 +1,17 @@
 import { SCAN_FLOW_PHASES } from "../flows/scanFlow";
 import type { ProgressEvent } from "../types";
 
+export function dedupeLogLines<T extends { text: string; key?: string }>(lines: T[]): T[] {
+  const out: T[] = [];
+  let prev = "";
+  for (const line of lines) {
+    if (line.text === prev) continue;
+    prev = line.text;
+    out.push(line);
+  }
+  return out;
+}
+
 /** Human-readable duration — e.g. 45m 12s, 1h 23m 32s */
 export function formatDuration(seconds: number | null | undefined): string {
   if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return "—";

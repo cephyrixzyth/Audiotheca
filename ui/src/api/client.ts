@@ -677,6 +677,18 @@ export function fetchDualSystemMetrics(root?: string): Promise<{
   return getJson(`/system/metrics/dual${qs}`);
 }
 
+export function fetchRuntimePolicy(): Promise<{ air_gap: boolean; outbound_allowed: boolean; path_mask: boolean }> {
+  return getJson("/system/runtime-policy");
+}
+
+export function fetchAuditLog(tail = 200): Promise<{ entries: Array<Record<string, unknown>> }> {
+  return getJson(`/system/audit-log?tail=${tail}`);
+}
+
+export function fetchTransactionLedger(limit = 200): Promise<{ entries: Array<Record<string, unknown>> }> {
+  return getJson(`/system/transaction-ledger?limit=${limit}`);
+}
+
 export function fetchSystemProcesses(): Promise<Record<string, unknown>> {
   return getJson("/system/processes");
 }

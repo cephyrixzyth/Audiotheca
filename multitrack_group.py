@@ -115,3 +115,29 @@ def group_multitracks(folder: Path, *, audio_exts: frozenset[str] | None = None)
         )
     groups.sort(key=lambda row: (-row["count"], row["prefix"]))
     return groups
+
+
+def collapse_session_objects(folder: Path) -> dict[str, Any]:
+    """MTRK-COLLAPSE: merge stem groups with DAW session audio references."""
+    from session_parse import summarize_session_folder
+
+    stem_groups = group_multitracks(folder)
+    sessions = summarize_session_folder(folder)
+    session_refs: set[str] = set()
+    for session in sessions.get("sessions") or []:
+        for ref in session.get("audio_refs") or []:
+            session_refs.add(str(ref).lower())
+
+    linked: list[dict[str, Any]] = []
+    for group in stem_groups:
+        members = group.get("members") or []
+        hits = [m for m in members if str(m.get("name", "")).lower() in session_refs]
+        if hits or group.get("count", 0) >= 2:
+            linked.append({**group, "session_linked": bool(hits), "session_hits": len(hits)})
+
+    return {
+        "path": str(folder),
+        "stem_groups": linked,
+        "session_count": sessions.get("session_count", 0),
+        "group_count": len(linked),
+    }

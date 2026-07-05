@@ -32,6 +32,8 @@ class ScanOptions:
     target_paths: list[str] = field(default_factory=list)
     invalidate_cache_paths: list[str] = field(default_factory=list)
     verbose_log: bool = False
+    io_throttle_ms: int = 0
+    max_workers: int = 0
 
     def skip(self, phase: str) -> bool:
         return phase in self.skip_phases
@@ -45,6 +47,8 @@ class ScanOptions:
             "target_paths": self.target_paths,
             "invalidate_cache_paths": self.invalidate_cache_paths,
             "verbose_log": self.verbose_log,
+            "io_throttle_ms": self.io_throttle_ms,
+            "max_workers": self.max_workers,
         }
 
     @classmethod
@@ -66,6 +70,8 @@ class ScanOptions:
             target_paths=targets,
             invalidate_cache_paths=invalidate,
             verbose_log=bool(data.get("verbose_log")),
+            io_throttle_ms=max(0, int(data.get("io_throttle_ms") or 0)),
+            max_workers=max(0, int(data.get("max_workers") or 0)),
         )
 
 
@@ -91,3 +97,14 @@ def apply_staging_paths(engine, options: ScanOptions) -> None:
         engine.delete_candidates_dir,
         engine.quarantine_dir,
     )
+
+
+def apply_scan_options(engine, options: ScanOptions) -> None:
+    """Apply IO throttle and worker limits from scan options."""
+    engine.scan_options = options
+    engine.io_throttle_ms = max(0, int(options.io_throttle_ms or 0))
+    if options.max_workers > 0:
+        engine.max_workers = options.max_workers
+        engine.logger.info("Scan max_workers overridden to %s", engine.max_workers)
+    if engine.io_throttle_ms > 0:
+        engine.logger.info("IO throttle enabled: %sms between scan batches", engine.io_throttle_ms)

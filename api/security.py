@@ -316,13 +316,32 @@ def redact_path(path: str, *, keep_segments: int = 2) -> str:
 
 
 def audit(action: str, **details: object) -> None:
-    row = {"ts": _now_iso(), "action": action, **details}
+    from path_mask import mask_payload
+
+    row = mask_payload({"ts": _now_iso(), "action": action, **details})
     try:
         AUDIT_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
         with open(AUDIT_LOG_PATH, "a", encoding="utf-8") as handle:
             handle.write(json.dumps(row, default=str) + "\n")
     except OSError:
         pass
+
+
+def read_audit_log(*, tail: int = 200) -> list[dict[str, object]]:
+    from path_mask import mask_payload
+
+    if not AUDIT_LOG_PATH.is_file():
+        return []
+    lines = AUDIT_LOG_PATH.read_text(encoding="utf-8").splitlines()
+    rows: list[dict[str, object]] = []
+    for line in lines[-tail:]:
+        if not line.strip():
+            continue
+        try:
+            rows.append(mask_payload(json.loads(line)))
+        except json.JSONDecodeError:
+            continue
+    return rows
 
 
 def save_library_roots(roots: list[str]) -> None:

@@ -11,6 +11,7 @@ import type { EnvironmentDependency, EnvironmentPayload } from "../types";
 import { ReorderableSections } from "./ReorderableSections";
 import { ThemeStudioPanel } from "./ThemeStudioPanel";
 import { InstallLifecyclePanel } from "./InstallLifecyclePanel";
+import { AuditLogPanel } from "./AuditLogPanel";
 
 function StatusBadge({ status }: { status: EnvironmentDependency["status"] }) {
   return <span className={`env-badge env-${status}`}>{status}</span>;
@@ -156,6 +157,14 @@ export function EnvironmentPanel() {
       fullWidth: true,
       minBodyHeight: 200,
       content: <ThemeStudioPanel />,
+    },
+    {
+      id: "audit-log",
+      title: "Audit & transaction log",
+      subtitle: "Immutable security audit and file move ledger (AUD-LOG)",
+      fullWidth: true,
+      minBodyHeight: 280,
+      content: <AuditLogPanel />,
     },
     {
       id: "install-lifecycle",

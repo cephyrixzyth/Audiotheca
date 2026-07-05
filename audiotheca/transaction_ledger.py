@@ -149,3 +149,10 @@ def guarded_move(
         return False, str(exc)
     commit_move(entry_id, batch_id=batch_id)
     return True, None
+
+
+def list_entries(*, limit: int = 200) -> list[dict[str, Any]]:
+    from path_mask import mask_payload
+
+    rows = _load_entries()
+    return mask_payload(rows[-limit:])

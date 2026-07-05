@@ -1345,6 +1345,8 @@ def reference_dedupe_engine_scan(body: dict = Body(default_factory=dict)) -> dic
 
 @app.post("/api/installations/manifest/sync")
 def sync_installation_manifest(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    import version_verify as vv
+
     url = str(body.get("url") or "").strip()
     if not url:
         raise HTTPException(status_code=400, detail="url is required")
@@ -1728,6 +1730,8 @@ async def control_job(job_id: str, body: dict = Body(...)) -> dict:
 def scan_options_help() -> dict[str, object]:
     return {
         "skippable_phases": sorted(SKIPPABLE_PHASES),
+        "io_throttle_ms": "Milliseconds to sleep between folder scan batches (0 = off)",
+        "max_workers": "Override parallel scan workers (0 = engine default)",
         "phase_descriptions": {
             "scene_peek": "Skip listing archives inside scene-hash folders",
             "archive_peek": "Skip archive vs extracted-folder listing (7-Zip)",
@@ -1849,6 +1853,85 @@ def system_metrics(root: str | None = Query(default=None)) -> dict[str, object]:
 
     path = security.assert_library_path(root, label="root") if root else None
     return collect_metrics(path=path)
+
+
+@app.get("/api/system/runtime-policy")
+def get_runtime_policy() -> dict[str, object]:
+    from runtime_policy import runtime_flags
+
+    return runtime_flags()
+
+
+@app.get("/api/system/audit-log")
+def get_audit_log(tail: int = Query(default=200, ge=1, le=2000)) -> dict[str, object]:
+    return {"entries": security.read_audit_log(tail=tail)}
+
+
+@app.get("/api/system/transaction-ledger")
+def get_transaction_ledger(limit: int = Query(default=200, ge=1, le=2000)) -> dict[str, object]:
+    from audiotheca.transaction_ledger import list_entries
+
+    return {"entries": list_entries(limit=limit)}
+
+
+@app.get("/api/scan-extensions/hash")
+def scan_extension_hash(path: str = Query(..., description="File to hash")) -> dict[str, object]:
+    from hash_ext import hash_file
+
+    target = Path(path)
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    return hash_file(target)
+
+
+@app.get("/api/scan-extensions/archive-crc")
+def scan_extension_archive_crc(path: str = Query(..., description="Archive to diagnose")) -> dict[str, object]:
+    from archive_crc import diagnose_archive
+
+    target = Path(path)
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="Archive not found")
+    return diagnose_archive(target)
+
+
+@app.get("/api/scan-extensions/session-collapse")
+def scan_extension_session_collapse(path: str = Query(..., description="Folder with stems + sessions")) -> dict[str, object]:
+    from multitrack_group import collapse_session_objects
+
+    folder = Path(path)
+    if not folder.is_dir():
+        raise HTTPException(status_code=404, detail="Folder not found")
+    return collapse_session_objects(folder)
+
+
+@app.get("/api/registry-emu/keys")
+def registry_emu_keys(prefix: str = Query(default="")) -> dict[str, object]:
+    import registry_emu as reg
+
+    return {"keys": reg.list_keys(prefix)}
+
+
+@app.post("/api/registry-emu/set")
+def registry_emu_set(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    import registry_emu as reg
+
+    key = str(body.get("key") or "")
+    name = str(body.get("name") or "")
+    value = str(body.get("value") or "")
+    if not key or not name:
+        raise HTTPException(status_code=400, detail="key and name required")
+    return reg.set_value(key, name, value)
+
+
+@app.post("/api/ai/lookup/offline")
+async def ai_lookup_offline(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from audiotheca.ai_lookup.mcp_loop import hybrid_lookup_item
+
+    item = body.get("item")
+    if not isinstance(item, dict):
+        raise HTTPException(status_code=400, detail="item object required")
+    result = await asyncio.to_thread(hybrid_lookup_item, item)
+    return {"result": result.to_dict()}
 
 
 @app.get("/api/system/metrics/dual")

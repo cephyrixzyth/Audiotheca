@@ -170,8 +170,15 @@ def refresh_manifest_entry(
 
 def sync_catalog_from_url(url: str, *, timeout_s: float = 8.0) -> dict[str, Any]:
     """Merge a remote JSON catalog into the local manifest (offline-first, optional sync)."""
+    from runtime_policy import require_outbound
+
     if not url.strip():
         return {"ok": False, "error": "url required", "merged": 0}
+
+    try:
+        require_outbound("manifest catalog sync")
+    except PermissionError as exc:
+        return {"ok": False, "error": str(exc), "merged": 0}
 
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "Audiotheca/1.0"})

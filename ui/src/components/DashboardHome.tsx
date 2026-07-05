@@ -133,7 +133,7 @@ export function DashboardHome({ runs, onNavigate }: Props) {
   return (
     <div className="dash">
       <TabEmptyState tab="dashboard" onStartScan={() => onNavigate?.("scan")} />
-      <ReorderableSections layoutId="dashboard" layout="grid" autoFlow sections={sections} />
+      <ReorderableSections layoutId="dashboard" layout="grid" autoFlow canvasGrid sections={sections} />
     </div>
   );
 }
