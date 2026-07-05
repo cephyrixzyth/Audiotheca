@@ -57,6 +57,13 @@ def ping(*, base_url: str = DEFAULT_BASE, timeout: float = 5.0) -> dict[str, Any
             "error": str(exc.reason),
             "hint": "Start SearXNG: cd docker/searxng && .\\start.ps1",
         }
+    except (OSError, LookupError) as exc:
+        return {
+            "ok": False,
+            "url": base_url,
+            "error": str(exc),
+            "hint": "Start SearXNG: cd docker/searxng && .\\start.ps1",
+        }
 
 
 def search(

@@ -10,6 +10,7 @@ import {
 import type { EnvironmentDependency, EnvironmentPayload } from "../types";
 import { ReorderableSections } from "./ReorderableSections";
 import { ThemePanel } from "./ThemePanel";
+import { InstallLifecyclePanel } from "./InstallLifecyclePanel";
 
 function StatusBadge({ status }: { status: EnvironmentDependency["status"] }) {
   return <span className={`env-badge env-${status}`}>{status}</span>;
@@ -155,6 +156,14 @@ export function EnvironmentPanel() {
       fullWidth: true,
       minBodyHeight: 200,
       content: <ThemePanel />,
+    },
+    {
+      id: "install-lifecycle",
+      title: "Installation lifecycle",
+      subtitle: "Custom tags, notes, dependencies, version status",
+      fullWidth: true,
+      minBodyHeight: 280,
+      content: <InstallLifecyclePanel />,
     },
     {
       id: "summary",

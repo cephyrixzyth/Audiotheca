@@ -1,3 +1,3 @@
 Section,Item Name,Current Path,Planned Destination,Vendor,ID Method,ID Confidence,Clean Display Name,Size MB,Status,Investigation Bucket
-a,SynthOne,C:\Users\Cephyrix Zyth\Desktop\audiotheca\docs\demo\library\a\AcmeAudio\SynthOne,C:\Users\Cephyrix Zyth\Desktop\audiotheca\docs\demo\library\a\Acme Audio\SynthOne,Acme Audio,nfo,HIGH,SynthOne,120.4,READY,
-b,DrumKit,C:\Users\Cephyrix Zyth\Desktop\audiotheca\docs\demo\library\b\BetaSounds\DrumKit,C:\Users\Cephyrix Zyth\Desktop\audiotheca\docs\demo\library\b\Beta Sounds\DrumKit,Beta Sounds,pe_header,HIGH,DrumKit,512.0,NEEDS REVIEW,
+a,SynthOne,D:\Libraries\demo\a\AcmeAudio\SynthOne,D:\Libraries\demo\a\Acme Audio\SynthOne,Acme Audio,nfo,HIGH,SynthOne,120.4,READY,
+b,DrumKit,D:\Libraries\demo\b\BetaSounds\DrumKit,D:\Libraries\demo\b\Beta Sounds\DrumKit,Beta Sounds,pe_header,HIGH,DrumKit,512.0,NEEDS REVIEW,

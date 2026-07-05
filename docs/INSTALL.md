@@ -12,7 +12,7 @@ For a step-by-step **first run on another machine**, see **[Testing Guide](TESTI
 
 End users do **not** need Python, Node, or Rust when using release installers — the Tauri app bundles API + engine sidecars.
 
-**Download:** [GitHub Releases v1.0.0](https://github.com/chrisjrovira/Audiotheca/releases/tag/v1.0.0) (Windows `.msi`, NSIS setup, portable zip).
+**Download:** [GitHub Releases (latest)](https://github.com/chrisjrovira/Audiotheca/releases/latest) — Windows `.msi`, NSIS setup, portable zip; macOS `.dmg` (Intel + Apple Silicon); Linux `.AppImage` and `.deb` (built on each release tag via GitHub Actions).
 
 | Platform | Build script (maintainers) | Output folder | Artifacts |
 | --- | --- | --- | --- |

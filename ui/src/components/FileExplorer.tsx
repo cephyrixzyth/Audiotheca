@@ -376,6 +376,8 @@ interface Props {
   stamp?: string | null;
   subtreeRoot?: string | null;
   pinned?: boolean;
+  popOut?: boolean;
+  onTogglePopOut?: () => void;
   onTogglePin?: () => void;
   onClose: () => void;
 }
@@ -387,7 +389,9 @@ export function FileExplorerPanel({
   stamp = null,
   subtreeRoot = null,
   pinned = false,
+  popOut = false,
   onTogglePin,
+  onTogglePopOut,
   onClose,
 }: Props) {
   const [treeRoots, setTreeRoots] = useState<BrowseEntry[]>([]);
@@ -414,6 +418,7 @@ export function FileExplorerPanel({
   const shellClass = [
     "file-explorer-shell",
     pinned ? "pinned" : "modal",
+    popOut ? "popout" : "",
     dualPane && secondaryPath ? "dual-pane" : "",
   ]
     .filter(Boolean)
@@ -421,7 +426,7 @@ export function FileExplorerPanel({
 
   return (
     <div
-      className={pinned ? "file-explorer-dock" : "file-explorer-backdrop"}
+      className={pinned ? "file-explorer-dock" : `file-explorer-backdrop${popOut ? " popout-mode" : ""}`}
       onClick={pinned ? undefined : onClose}
       role="presentation"
     >
@@ -449,6 +454,14 @@ export function FileExplorerPanel({
             )}
           </div>
           <div className="file-explorer-header-actions">
+            <button
+              type="button"
+              className={`icon-btn ${popOut ? "active" : ""}`}
+              title={popOut ? "Standard width panel" : "Pop out wide explorer"}
+              onClick={onTogglePopOut}
+            >
+              {popOut ? "Standard" : "Pop out"}
+            </button>
             <button
               type="button"
               className={`icon-btn ${pinned ? "active" : ""}`}

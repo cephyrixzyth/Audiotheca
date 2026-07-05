@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useFileExplorer } from "../contexts/FileExplorerContext";
 import type { TabId } from "../types";
 
 export interface SidebarFilterDef {
@@ -120,6 +121,7 @@ const TAB_HINTS: Partial<Record<TabId, string>> = {
 export function ContextSidebar({ stamp }: { stamp?: string }) {
   const { query, setQuery, tab, filters, setFilter } = useContextSidebar();
   const filterDefs = useContext(SidebarDefsCtx);
+  const { openAtRoots, openDualPane, setPopOut } = useFileExplorer();
 
   return (
     <aside className="context-sidebar">
@@ -184,6 +186,33 @@ export function ContextSidebar({ stamp }: { stamp?: string }) {
           </p>
         </div>
       )}
+
+      <div className="context-sidebar-section">
+        <span className="context-label">Library explorer</span>
+        <div className="file-explorer-sidebar-controls">
+          <button type="button" className="text-btn" onClick={openAtRoots}>
+            Browse library roots
+          </button>
+          <button
+            type="button"
+            className="text-btn"
+            onClick={() => {
+              setPopOut(true);
+              openAtRoots();
+            }}
+          >
+            Pop out wide explorer
+          </button>
+          <button
+            type="button"
+            className="text-btn"
+            title="Compare archive vs extracted folder side-by-side"
+            onClick={() => openDualPane("", "")}
+          >
+            Dual-pane compare
+          </button>
+        </div>
+      </div>
     </aside>
   );
 }

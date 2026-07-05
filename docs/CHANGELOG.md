@@ -1,5 +1,34 @@
 # Changelog
 
+## Web UI & API 1.0.1
+
+Engine remains **10.0.0**. Patch release: theme fixes, dashboard without a run, library explorer, installation registry API, and cross-platform CI hardening.
+
+### Web UI
+
+- **Theme-aware controls** — primary buttons, badges, logs, and dashboard panels follow the active theme (no stuck green on Midnight Blue / Solarized / custom themes)
+- **Dashboard without a scan** — host metrics, environment summary, and quick links visible before the first run
+- **Tab empty states** — Review tabs show guidance instead of a blank page when no run is selected
+- **Library explorer** — sidebar shortcuts, **Pop out** wide panel, dual-pane compare; pin dock unchanged
+- Improved muted text contrast across themes
+
+### API & backend
+
+- **Installation registry** (`installation_registry.py`) — custom tags, rich notes, dependency tracking, gold-master presets (`GET/PUT /api/installations`, presets endpoints)
+- Reference dedupe, job store, stalled-progress API, feedback estimate, custom investigation buckets (from 1.0.0 roadmap pass)
+- OpenAI-compatible AI lookup provider (`AUDIOTHECA_AI_LOOKUP_PROVIDER=openai`)
+
+### Documentation & media
+
+- Help tab and README updated for layout, themes, explorer, and empty-state dashboard
+- Screenshots refreshed; GIFs synced to `ui/public/help/`
+- Docker GHCR publish workflow; release CI fixes for macOS Intel sidecars and Linux bundles
+
+### Packaging
+
+- GitHub Actions **Release** workflow builds Windows (`.msi`, NSIS), macOS (`.dmg` Intel + Apple Silicon), Linux (`.AppImage`, `.deb`) on `v*` tags
+- **Docker Publish** pushes `ghcr.io/chrisjrovira/audiotheca*` images on tag push
+
 ## Web UI & API 1.0.0
 
 Engine remains **10.0.0**. This release marks the browser UI, FastAPI layer, and Tauri shell as **1.0.0**.

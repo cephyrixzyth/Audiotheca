@@ -9,6 +9,7 @@ import { InvestigationInbox } from "./components/InvestigationInbox";
 import { RestructurePlan } from "./components/RestructurePlan";
 import { ScanAudit } from "./components/ScanAudit";
 import { ScanPanel } from "./components/ScanPanel";
+import { TabEmptyState } from "./components/TabEmptyState";
 import { SkippedFiles } from "./components/SkippedFiles";
 import { SceneRenames } from "./components/SceneRenames";
 import { SpaceRecovery } from "./components/SpaceRecovery";
@@ -164,24 +165,57 @@ export default function App() {
                 </div>
               )}
 
-              {runs.length === 0 && tab !== "scan" && !error && (
-                <div className="empty">
-                  No scan reports found. Open the <strong>Scan</strong> tab to run a dry-run, or run{" "}
-                  <code>python main.py --dry-run</code> from the terminal.
-                </div>
-              )}
-
-              {stamp && summary && tab === "dashboard" && (
+              {tab === "dashboard" && (
                 <Dashboard summary={summary} runs={runs} onNavigate={setTab} />
               )}
-              {stamp && tab === "investigation" && <InvestigationInbox stamp={stamp} />}
-              {stamp && tab === "duplicates" && <DuplicateReview stamp={stamp} />}
-              {stamp && tab === "restructure" && <RestructurePlan stamp={stamp} />}
-              {stamp && tab === "archives" && <ArchivePeek stamp={stamp} />}
-              {stamp && tab === "scene-renames" && <SceneRenames stamp={stamp} />}
-              {stamp && tab === "scan-audit" && <ScanAudit stamp={stamp} />}
-              {stamp && tab === "skipped" && <SkippedFiles stamp={stamp} runs={runs} />}
-              {stamp && tab === "space-recovery" && <SpaceRecovery stamp={stamp} />}
+              {tab === "investigation" &&
+                (stamp ? (
+                  <InvestigationInbox stamp={stamp} />
+                ) : (
+                  <TabEmptyState tab="investigation" onStartScan={() => setTab("scan")} />
+                ))}
+              {tab === "duplicates" &&
+                (stamp ? (
+                  <DuplicateReview stamp={stamp} />
+                ) : (
+                  <TabEmptyState tab="duplicates" onStartScan={() => setTab("scan")} />
+                ))}
+              {tab === "restructure" &&
+                (stamp ? (
+                  <RestructurePlan stamp={stamp} />
+                ) : (
+                  <TabEmptyState tab="restructure" onStartScan={() => setTab("scan")} />
+                ))}
+              {tab === "archives" &&
+                (stamp ? (
+                  <ArchivePeek stamp={stamp} />
+                ) : (
+                  <TabEmptyState tab="archives" onStartScan={() => setTab("scan")} />
+                ))}
+              {tab === "scene-renames" &&
+                (stamp ? (
+                  <SceneRenames stamp={stamp} />
+                ) : (
+                  <TabEmptyState tab="scene-renames" onStartScan={() => setTab("scan")} />
+                ))}
+              {tab === "scan-audit" &&
+                (stamp ? (
+                  <ScanAudit stamp={stamp} />
+                ) : (
+                  <TabEmptyState tab="scan-audit" onStartScan={() => setTab("scan")} />
+                ))}
+              {tab === "skipped" &&
+                (stamp ? (
+                  <SkippedFiles stamp={stamp} runs={runs} />
+                ) : (
+                  <TabEmptyState tab="skipped" onStartScan={() => setTab("scan")} />
+                ))}
+              {tab === "space-recovery" &&
+                (stamp ? (
+                  <SpaceRecovery stamp={stamp} />
+                ) : (
+                  <TabEmptyState tab="space-recovery" onStartScan={() => setTab("scan")} />
+                ))}
               {tab === "security" && <MalwarePanel stamp={stamp || undefined} />}
               {tab === "environment" && <EnvironmentPanel />}
               {tab === "help" && <HelpPanel />}

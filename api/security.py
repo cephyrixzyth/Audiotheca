@@ -288,7 +288,7 @@ def validate_harvest_url(url: str) -> str:
         raise HTTPException(status_code=400, detail="Localhost URLs are not allowed")
     try:
         infos = socket.getaddrinfo(host, parsed.port or 443, type=socket.SOCK_STREAM)
-    except socket.gaierror as exc:
+    except (socket.gaierror, LookupError) as exc:
         raise HTTPException(status_code=400, detail=f"Cannot resolve host: {host}") from exc
     for info in infos:
         addr = info[4][0]

@@ -70,13 +70,32 @@ Always start with dry-run. Live moves require confirm_live and STAGE LIVE in Sca
       },
       {
         id: "layout",
-        title: "UI layout",
-        body: `Drag panel headers or ⠿ handles to reorder widgets. Use + Space for vertical gaps; click × on a gap tile to remove it.
-Save/load named layouts from the preset bar on Dashboard and Scan.
-Reset layout restores defaults after reload.
+        title: "UI layout & themes",
+        body: `18 built-in themes via the header theme picker — buttons and accents follow the active palette (no stuck green).
 
-Review and System tabs open a second row of sub-tabs for triage and tooling.`,
+Drag panel headers or ⠿ handles to reorder widgets. Group related panels with matching group ids; save/load named layouts from the preset bar on Dashboard and Scan.
+
+Dashboard works before your first scan — host metrics and Environment appear with empty KPI placeholders until a run exists.
+
+Library: top bar opens the explorer; sidebar has Browse roots, Pop out wide panel, and dual-pane compare.`,
         media: { screenshot: "/help/dashboard-gauges.png" },
+      },
+      {
+        id: "file-explorer",
+        title: "File explorer (per tab)",
+        body: `The library explorer is shared across tabs — each tab remembers its own path and pane layout:
+
+• Investigation — browse candidate folders while assigning vendors; Pop out for wide path review.
+• Duplicates — open keeper vs discard paths side by side; dual-pane compare on two folders.
+• Restructure — preview source vs planned destination trees before staging live moves.
+• Archives — list .zip/.rar contents inline; Diff vs extracted folder from the explorer toolbar.
+• Scan audit / Skipped — jump from a row to the on-disk path without leaving the run context.
+
+Pop out opens a full-width overlay; pin dock keeps a narrow tree visible. Close with Escape or the Close button.`,
+        media: {
+          screenshot: "/help/ui-overview.png",
+          gif: "/help/file-explorer-and-archives.gif",
+        },
       },
     ],
   },
@@ -181,9 +200,14 @@ Run security scan after investigation when unknown vendors remain.`,
       },
       {
         id: "environment",
-        title: "Environment",
-        body: `Toolchain health: Python packages, 7-Zip, optional fpcalc/ClamAV.
-Install missing dependencies in-app or follow manual hints. Themes editor lives here — 18 built-in palettes plus custom.`,
+        title: "Environment & installs",
+        body: `Toolchain health: Python packages, 7-Zip, optional fpcalc/ClamAV. Install missing dependencies in-app.
+
+Themes editor — 18 built-in palettes; buttons and accents follow the active theme.
+
+Installation registry API (v1.0.1+): custom tags, notes, dependencies, gold-master presets at /api/installations.
+
+Docker / NAS: deploy/unraid/ stack; GHCR images ghcr.io/chrisjrovira/audiotheca on release tags.`,
         media: { screenshot: "/help/environment-themes.png" },
       },
       {

@@ -1,3 +1,3 @@
 Dedup Key,Confidence,Group Kind,Name Similarity %,Size Ratio,Content Check,Index,Item Name,Section,Full Path,Vendor,Size MB,Recommendation,Planned Action
-acme-synthone,HIGH,same_product,98,1.0,hash_match,1,SynthOne,a,C:\Users\Cephyrix Zyth\Desktop\audiotheca\docs\demo\library\a\AcmeAudio\SynthOne,Acme Audio,120.4,KEEP,keep
-acme-synthone,HIGH,same_product,98,1.0,hash_match,2,SynthOne Copy,a,C:\Users\Cephyrix Zyth\Desktop\audiotheca\docs\demo\library\a\AcmeAudio\SynthOne Copy,Acme Audio,120.4,DELETE,delete_candidate
+acme-synthone,HIGH,same_product,98,1.0,hash_match,1,SynthOne,a,D:\Libraries\demo\a\AcmeAudio\SynthOne,Acme Audio,120.4,KEEP,keep
+acme-synthone,HIGH,same_product,98,1.0,hash_match,2,SynthOne Copy,a,D:\Libraries\demo\a\AcmeAudio\SynthOne Copy,Acme Audio,120.4,DELETE,delete_candidate

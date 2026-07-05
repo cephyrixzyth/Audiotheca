@@ -1111,3 +1111,49 @@ export function confirmAiLookup(body: {
 }): Promise<{ result: import("../types").AiLookupResult }> {
   return postJson("/ai/lookup/confirm", body);
 }
+
+export interface InstallationRecord {
+  install_id: string;
+  product_key: string;
+  display_name: string;
+  install_path: string;
+  tags: string[];
+  notes_html: string;
+  dependencies: Array<{ name: string; kind?: string; required?: boolean; notes?: string }>;
+  local_version: string;
+  manifest_version: string;
+  update_status: string;
+  product_url?: string;
+  docs_url?: string;
+}
+
+export function fetchInstallations(): Promise<{ installs: InstallationRecord[]; default_tags: string[] }> {
+  return getJson("/installations");
+}
+
+export function upsertInstallation(installId: string, body: Partial<InstallationRecord>): Promise<InstallationRecord> {
+  return putJson(`/installations/${encodeURIComponent(installId)}`, body);
+}
+
+export function checkInstallationVersion(installId: string): Promise<{
+  check: {
+    product_key: string;
+    install_path: string;
+    exe_path: string | null;
+    local_version: string;
+    manifest_version: string;
+    update_status: string;
+  };
+  install: InstallationRecord;
+}> {
+  return getJson(`/installations/${encodeURIComponent(installId)}/version-check`);
+}
+
+export function refreshVersionManifest(body: {
+  product_key: string;
+  display_name?: string;
+  expected_version?: string;
+  install_path?: string;
+}): Promise<{ ok: boolean; entry: { expected_version?: string; display_name?: string } }> {
+  return postJson("/installations/manifest/refresh", body);
+}

@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState, type DragEvent, type ReactNode 
 import { isSpacerId, useSectionOrder } from "../hooks/useSectionOrder";
 import { useSectionSpan } from "../hooks/useSectionSpan";
 import { useLayoutPresets } from "../hooks/useLayoutPresets";
+import { useGroupTitles } from "../hooks/useGroupTitles";
 
 function bindHeaderPointerDrag(
   sectionId: string,
@@ -98,6 +99,8 @@ export interface SectionDescriptor {
   /** Progress log and similar panels span full content width */
   fullWidth?: boolean;
   minBodyHeight?: number;
+  /** Dashboard data widgets — accent border tone */
+  tone?: "accent" | "warning" | "danger";
   content: ReactNode;
 }
 
@@ -416,6 +419,7 @@ function SectionShell({
   const dragState =
     dragId === section.id ? "is-dragging" : overId === section.id ? "is-drag-over" : "";
   const fullWidth = section.fullWidth ? " widget-full-width" : "";
+  const toneClass = section.tone ? ` tone-data-${section.tone}` : "";
 
   const handleProps = bindDropTarget(section.id, dragId, onDragOver, onDrop);
 
@@ -423,7 +427,7 @@ function SectionShell({
     const dragProps = bindHeaderDrag(section.id, onDragStart, onDragEnd, onPointerDragStart);
     return (
       <section
-        className={`dash-panel span-${span} reorder-section ${dragState}${fullWidth}`.trim()}
+        className={`dash-panel span-${span} reorder-section ${dragState}${fullWidth}${toneClass}`.trim()}
         {...handleProps}
       >
         <PanelHeader
@@ -488,6 +492,110 @@ function SectionShell({
   );
 }
 
+function WidgetGroupBlock({
+  block,
+  groupId,
+  idx,
+  blocksLength,
+  dragId,
+  overId,
+  collapsed,
+  onToggleCollapsed,
+  moveBlockUp,
+  moveBlockDown,
+  setDragId,
+  clearDragState,
+  beginPointerDrag,
+  handleDrop,
+  setOverId,
+  setTitle,
+}: {
+  block: Extract<RenderBlock, { kind: "group" }>;
+  groupId: string;
+  idx: number;
+  blocksLength: number;
+  dragId: string | null;
+  overId: string | null;
+  collapsed: Record<string, boolean>;
+  onToggleCollapsed: (id: string) => void;
+  moveBlockUp: (id: string) => void;
+  moveBlockDown: (id: string) => void;
+  setDragId: (id: string) => void;
+  clearDragState: () => void;
+  beginPointerDrag: (id: string) => void;
+  handleDrop: (targetId: string, fromId?: string) => void;
+  setOverId: (id: string) => void;
+  setTitle: (groupId: string, title: string) => void;
+}) {
+  const firstId = block.sections[0]?.id ?? block.id;
+  const dragProps = bindHeaderDrag(firstId, setDragId, clearDragState, beginPointerDrag);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(block.title ?? "");
+
+  return (
+    <div
+      className={`widget-group stack-section ${dragId === firstId ? "is-dragging" : overId === firstId ? "is-drag-over" : ""}`.trim()}
+      {...bindDropTarget(firstId, dragId, setOverId, handleDrop)}
+    >
+      <header className="widget-group-header compact-header panel-header widget-drag-surface" {...dragProps}>
+        <DragControls
+          sectionId={firstId}
+          title={block.title ?? "Group"}
+          index={idx}
+          total={blocksLength}
+          onMoveUp={moveBlockUp}
+          onMoveDown={moveBlockDown}
+          onDragStart={setDragId}
+          onDragEnd={clearDragState}
+          onPointerDragStart={beginPointerDrag}
+        />
+        {editingTitle ? (
+          <input
+            className="field-input widget-group-title-input"
+            value={titleDraft}
+            autoFocus
+            onChange={(e) => setTitleDraft(e.target.value)}
+            onBlur={() => {
+              setTitle(groupId, titleDraft);
+              setEditingTitle(false);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                setTitle(groupId, titleDraft);
+                setEditingTitle(false);
+              }
+              if (e.key === "Escape") setEditingTitle(false);
+            }}
+          />
+        ) : (
+          <h3
+            className="widget-group-title section-header-text"
+            title="Double-click to rename group"
+            onDoubleClick={(e) => {
+              e.stopPropagation();
+              setTitleDraft(block.title ?? groupId);
+              setEditingTitle(true);
+            }}
+          >
+            {block.title}
+          </h3>
+        )}
+      </header>
+      <div className="widget-group-body">
+        {block.sections.map((section) => (
+          <div key={section.id} className="widget-group-pane">
+            <WidgetBody
+              section={section}
+              collapsed={!!collapsed[section.id]}
+              onToggle={() => onToggleCollapsed(section.id)}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function ReorderableSections({
   layoutId,
   layout = "stack",
@@ -506,6 +614,7 @@ export function ReorderableSections({
     applyOrder,
   } = useSectionOrder(layoutId, defaultOrder);
   const { getSpan, cycleSpan } = useSectionSpan(layoutId);
+  const { getTitle, setTitle } = useGroupTitles(layoutId);
   const { list: listPresets, save: savePreset, load: loadPreset, remove: removePreset } =
     useLayoutPresets(layoutId);
   const [presetName, setPresetName] = useState("");
@@ -535,7 +644,14 @@ export function ReorderableSections({
   });
 
   const byId = useMemo(() => new Map(visible.map((s) => [s.id, s])), [visible]);
-  const blocks = useMemo(() => buildBlocks(orderedIds, byId), [orderedIds, byId]);
+  const blocks = useMemo(() => {
+    const raw = buildBlocks(orderedIds, byId);
+    return raw.map((block) => {
+      if (block.kind !== "group") return block;
+      const groupId = block.sections[0]?.group ?? block.id;
+      return { ...block, title: getTitle(groupId, block.title ?? groupId) };
+    });
+  }, [orderedIds, byId, getTitle]);
 
   // Each block owns a contiguous run of ids; moves swap whole blocks so
   // grouped widgets travel together instead of splitting apart.
@@ -693,40 +809,27 @@ export function ReorderableSections({
 
     if (block.kind === "group") {
       const firstId = block.sections[0]?.id ?? block.id;
-      const idx = blockIndexOf(firstId);
-      const dragProps = bindHeaderDrag(firstId, setDragId, clearDragState, beginPointerDrag);
+      const groupId = block.sections[0]?.group ?? block.id;
       return (
-        <div
+        <WidgetGroupBlock
           key={block.id}
-          className={`widget-group stack-section ${dragId === firstId ? "is-dragging" : overId === firstId ? "is-drag-over" : ""}`.trim()}
-          {...bindDropTarget(firstId, dragId, setOverId, handleDrop)}
-        >
-          <header className="widget-group-header compact-header panel-header widget-drag-surface" {...dragProps}>
-            <DragControls
-              sectionId={firstId}
-              title={block.title ?? "Group"}
-              index={idx}
-              total={blocks.length}
-              onMoveUp={moveBlockUp}
-              onMoveDown={moveBlockDown}
-              onDragStart={setDragId}
-              onDragEnd={clearDragState}
-              onPointerDragStart={beginPointerDrag}
-            />
-            <h3 className="widget-group-title section-header-text">{block.title}</h3>
-          </header>
-          <div className="widget-group-body">
-            {block.sections.map((section) => (
-              <div key={section.id} className="widget-group-pane">
-                <WidgetBody
-                  section={section}
-                  collapsed={!!collapsed[section.id]}
-                  onToggle={() => toggleCollapsed(section.id)}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
+          block={block}
+          groupId={groupId}
+          idx={blockIndexOf(firstId)}
+          blocksLength={blocks.length}
+          dragId={dragId}
+          overId={overId}
+          collapsed={collapsed}
+          onToggleCollapsed={toggleCollapsed}
+          moveBlockUp={moveBlockUp}
+          moveBlockDown={moveBlockDown}
+          setDragId={setDragId}
+          clearDragState={clearDragState}
+          beginPointerDrag={beginPointerDrag}
+          handleDrop={handleDrop}
+          setOverId={setOverId}
+          setTitle={setTitle}
+        />
       );
     }
 

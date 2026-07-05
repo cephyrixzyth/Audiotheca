@@ -22,7 +22,9 @@ type Ctx = {
   openDualPane: (left: string, right: string) => void;
   close: () => void;
   togglePin: () => void;
+  setPopOut: (enabled: boolean) => void;
   pinned: boolean;
+  popOut: boolean;
   dualPane: boolean;
   stamp: string | null;
   subtreeRoot: string | null;
@@ -66,6 +68,7 @@ export function FileExplorerProvider({ children, stamp = "", subtreeRoot = null 
   const [secondaryPath, setSecondaryPath] = useState<string | null>(null);
   const [dualPane, setDualPane] = useState(false);
   const [pinned, setPinned] = useState(loadPinned);
+  const [popOut, setPopOut] = useState(false);
 
   const openPath = useCallback((next: string, opts?: OpenPathOptions) => {
     const trimmed = next?.trim();
@@ -99,6 +102,7 @@ export function FileExplorerProvider({ children, stamp = "", subtreeRoot = null 
     setPath(null);
     setSecondaryPath(null);
     setDualPane(false);
+    setPopOut(false);
   }, []);
 
   const togglePin = useCallback(() => {
@@ -120,12 +124,14 @@ export function FileExplorerProvider({ children, stamp = "", subtreeRoot = null 
       openDualPane,
       close,
       togglePin,
+      setPopOut,
       pinned,
+      popOut,
       dualPane,
       stamp: stamp || null,
       subtreeRoot,
     }),
-    [openPath, openAtRoots, openDualPane, close, togglePin, pinned, dualPane, stamp, subtreeRoot],
+    [openPath, openAtRoots, openDualPane, close, togglePin, pinned, popOut, dualPane, stamp, subtreeRoot],
   );
 
   return (
@@ -139,6 +145,8 @@ export function FileExplorerProvider({ children, stamp = "", subtreeRoot = null 
           stamp={stamp || null}
           subtreeRoot={subtreeRoot}
           pinned={pinned}
+          popOut={popOut}
+          onTogglePopOut={() => setPopOut((v) => !v)}
           onTogglePin={togglePin}
           onClose={close}
         />

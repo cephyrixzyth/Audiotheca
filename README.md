@@ -66,7 +66,7 @@ Set `AUDIOTHECA_LIBRARY_ROOT` to **your** library path before scanning — never
 
 ## Quick start (Windows)
 
-**Desktop installer (recommended):** download from [GitHub Releases](https://github.com/chrisjrovira/Audiotheca/releases/tag/v1.0.0) (`.msi`, NSIS setup, portable zip) or build with `.\scripts\build-installers.ps1` — see [Install guide](docs/INSTALL.md#pre-built-installers).
+**Desktop installer (recommended):** download from [GitHub Releases](https://github.com/chrisjrovira/Audiotheca/releases/latest) (Windows `.msi`, NSIS setup, portable zip; macOS `.dmg`; Linux `.AppImage` / `.deb`) or build with `.\scripts\build-installers.ps1` — see [Install guide](docs/INSTALL.md#pre-built-installers).
 
 **Portable:** extract `Audiotheca-Portable-1.0.0-win64.zip` and run `Run Audiotheca.bat`.
 

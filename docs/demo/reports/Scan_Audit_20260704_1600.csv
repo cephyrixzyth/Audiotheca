@@ -1,3 +1,3 @@
 Section,Item Name,Current Path,Vendor,ID Method,ID Confidence,Fingerprint,Version Key,Size MB,Status,Investigation Bucket,Planned Destination,Flags
-a,SynthOne,C:\Users\Cephyrix Zyth\Desktop\audiotheca\docs\demo\library\a\AcmeAudio\SynthOne,Acme Audio,nfo,HIGH,fp-synth,v2.1,120.4,ROUTED,,C:\Users\Cephyrix Zyth\Desktop\audiotheca\docs\demo\library\a\Acme Audio\SynthOne,
-a,MysteryPack,C:\Users\Cephyrix Zyth\Desktop\audiotheca\docs\demo\library\a\UnknownVendor\MysteryPack,,filename,LOW,fp-mystery,,240.5,INVESTIGATION,_unknown_vendor,,ai_lookup
+a,SynthOne,D:\Libraries\demo\a\AcmeAudio\SynthOne,Acme Audio,nfo,HIGH,fp-synth,v2.1,120.4,ROUTED,,D:\Libraries\demo\a\Acme Audio\SynthOne,
+a,MysteryPack,D:\Libraries\demo\a\UnknownVendor\MysteryPack,,filename,LOW,fp-mystery,,240.5,INVESTIGATION,_unknown_vendor,,ai_lookup

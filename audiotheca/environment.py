@@ -6,6 +6,7 @@ import json
 import os
 import platform
 import shutil
+import site
 import subprocess
 import sys
 import time
@@ -156,9 +157,31 @@ def _probe_fpcalc() -> DependencyStatus:
     )
 
 
+def _inject_engine_site_paths() -> None:
+    """Ensure packages installed under Audiotheca engine_env / user-site are importable."""
+    if sys.platform == "win32":
+        appdata = os.environ.get("APPDATA", "")
+        if appdata:
+            base = Path(appdata) / "Audiotheca" / "engine_env"
+            if base.is_dir():
+                for site_packages in base.rglob("site-packages"):
+                    if site_packages.is_dir():
+                        entry = str(site_packages)
+                        if entry not in sys.path:
+                            sys.path.insert(0, entry)
+    try:
+        user_site = site.getusersitepackages()
+    except (AttributeError, ValueError):
+        user_site = ""
+    if user_site and user_site not in sys.path:
+        sys.path.insert(0, user_site)
+
+
 def _probe_python_package(dep_id: str, name: str, import_name: str, *, category: DependencyCategory) -> DependencyStatus:
     repair = f"pip_{dep_id}"
     hints = [f"pip install {PIP_PACKAGES.get(dep_id, dep_id)}"]
+    if dep_id == "watchdog":
+        _inject_engine_site_paths()
     try:
         module = __import__(import_name)
     except ImportError:
@@ -567,6 +590,8 @@ def _repair_command(action: str) -> list[str] | None:
         ]
     if action.startswith("pip_"):
         dep_id = action.removeprefix("pip_")
+        if dep_id == "watchdog":
+            _inject_engine_site_paths()
         package = PIP_PACKAGES.get(dep_id, dep_id)
         return [sys.executable, "-m", "pip", "install", package]
     return None

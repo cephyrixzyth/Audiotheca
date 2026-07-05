@@ -23,9 +23,11 @@ import { formatCompact, formatDiskFree, formatGb, formatPct } from "../utils/for
 import { formatEngineVersion } from "../utils/scanDisplay";
 import { ReorderableSections } from "./ReorderableSections";
 import { EnvironmentSummaryWidget } from "./EnvironmentPanel";
+import { InstallationSummaryWidget } from "./InstallLifecyclePanel";
+import { DashboardHome } from "./DashboardHome";
 
 interface Props {
-  summary: RunSummary;
+  summary?: RunSummary | null;
   runs: RunListItem[];
   onNavigate?: (tab: TabId) => void;
 }
@@ -132,7 +134,28 @@ function QuickLink({ label, tab, onNavigate }: { label: string; tab: TabId; onNa
   );
 }
 
-export function Dashboard({ summary, runs, onNavigate }: Props) {
+export function Dashboard(props: Props) {
+  if (!props.summary) {
+    return <DashboardHome runs={props.runs} onNavigate={props.onNavigate} />;
+  }
+  return (
+    <DashboardRun
+      summary={props.summary}
+      runs={props.runs}
+      onNavigate={props.onNavigate}
+    />
+  );
+}
+
+function DashboardRun({
+  summary,
+  runs,
+  onNavigate,
+}: {
+  summary: RunSummary;
+  runs: RunListItem[];
+  onNavigate?: (tab: TabId) => void;
+}) {
   const libraryRoot = useLibraryRoot();
   const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
   const [jobs, setJobs] = useState<JobSnapshot[]>([]);
@@ -181,11 +204,11 @@ export function Dashboard({ summary, runs, onNavigate }: Props) {
     return () => window.clearInterval(timer);
   }, [summary.stamp, libraryRoot]);
 
-  const routeReadyPct = summary.route_ready_pct ?? (
-    summary.routes_planned > 0 && summary.ready_count != null
+  const routeReadyPct =
+    summary.route_ready_pct ??
+    (summary.routes_planned > 0 && summary.ready_count != null
       ? Math.round((summary.ready_count / summary.routes_planned) * 1000) / 10
-      : null
-  );
+      : null);
   const identificationPct = summary.identification_pct ?? null;
   const oneActionPct = summary.one_action_pct ?? null;
   const invPct =
@@ -309,6 +332,7 @@ export function Dashboard({ summary, runs, onNavigate }: Props) {
         title: "Library throughput",
         subtitle: "Current run totals",
         span: 2,
+        tone: "accent" as const,
         content: (
           <div className="stat-grid">
             <StatTile label="Scanned" value={formatCompact(summary.scanned)} />
@@ -418,6 +442,7 @@ export function Dashboard({ summary, runs, onNavigate }: Props) {
             )}
             <div className="stat-grid compact" style={{ marginTop: "0.75rem" }}>
               <EnvironmentSummaryWidget onNavigate={() => onNavigate?.("environment")} />
+              <InstallationSummaryWidget onNavigate={() => onNavigate?.("environment")} />
             </div>
           </>
         ),
@@ -455,6 +480,7 @@ export function Dashboard({ summary, runs, onNavigate }: Props) {
         id: "dupes-archives",
         title: "Duplicates & archives",
         subtitle: "Dedupe and coexistence",
+        tone: "accent" as const,
         content: (
           <div className="stat-grid compact">
             <StatTile label="Dupe groups" value={summary.duplicate_groups} />
@@ -471,6 +497,7 @@ export function Dashboard({ summary, runs, onNavigate }: Props) {
         title: "Investigation buckets",
         subtitle: "Where items landed",
         span: 2,
+        tone: "accent" as const,
         content: <BarChart data={bucketData} maxItems={10} />,
       },
       {

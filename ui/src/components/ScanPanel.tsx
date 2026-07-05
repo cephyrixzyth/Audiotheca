@@ -243,7 +243,8 @@ export function ScanPanel({ onRunComplete }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [completedSummary, setCompletedSummary] = useState<RunSummary | null>(null);
-  const [logLevelFilter, setLogLevelFilter] = useState<"all" | "info" | "warn" | "error">("all");
+  const [logLevelFilter, setLogLevelFilter] = useState<"all" | "error" | "warn" | "scanner">("all");
+  const [logSearch, setLogSearch] = useState("");
   const [autoScroll, setAutoScroll] = useState(true);
   const [copied, setCopied] = useState(false);
   const [stagingDay, setStagingDay] = useState(false);
@@ -514,17 +515,23 @@ export function ScanPanel({ onRunComplete }: Props) {
           ...lines,
         ]
       : lines;
-    const q = sidebarQuery.trim().toLowerCase();
+    const q = (logSearch || sidebarQuery).trim().toLowerCase();
     let filtered = q ? merged.filter((line) => line.text.toLowerCase().includes(q)) : merged;
     if (logLevelFilter === "error") {
       filtered = filtered.filter((line) => line.level === "error");
     } else if (logLevelFilter === "warn") {
       filtered = filtered.filter((line) => line.level === "warn" || line.level === "error");
-    } else if (logLevelFilter === "info") {
-      filtered = filtered.filter((line) => line.level !== "detail");
+    } else if (logLevelFilter === "scanner") {
+      filtered = filtered.filter(
+        (line) =>
+          line.kind === "phase-progress" ||
+          line.kind === "phase-start" ||
+          line.kind === "phase-finish" ||
+          /phase|scan|identify|dedupe|route/i.test(line.text),
+      );
     }
     return filtered.slice(-400);
-  }, [events, importedLogLines, sidebarQuery, logLevelFilter]);
+  }, [events, importedLogLines, sidebarQuery, logSearch, logLevelFilter]);
 
   useEffect(() => {
     if (!autoScroll || !logRef.current) return;
@@ -905,26 +912,40 @@ export function ScanPanel({ onRunComplete }: Props) {
           <div className="log-panel log-panel-full">
             <div className="log-toolbar">
               <div className="log-level-filters">
-                {(["all", "info", "warn", "error"] as const).map((level) => (
+                {(["all", "error", "warn", "scanner"] as const).map((level) => (
                   <button
                     key={level}
                     type="button"
                     className={`log-level-btn ${logLevelFilter === level ? "active" : ""}`}
                     title={
                       level === "all"
-                        ? "Show every log line including per-item detail"
-                        : level === "info"
-                          ? "Hide per-item detail lines"
+                        ? "Show every log line"
+                        : level === "error"
+                          ? "Errors only"
                           : level === "warn"
-                            ? "Warnings and errors only"
-                            : "Errors only"
+                            ? "Warnings and errors"
+                            : "Scanner phase events"
                     }
                     onClick={() => setLogLevelFilter(level)}
                   >
-                    {level === "all" ? "All" : level === "info" ? "Info+" : level === "warn" ? "Warn+" : "Errors"}
+                    {level === "all"
+                      ? "ALL"
+                      : level === "error"
+                        ? "ERROR"
+                        : level === "warn"
+                          ? "WARNING"
+                          : "SCANNER"}
                   </button>
                 ))}
               </div>
+              <input
+                className="field-input log-search-input"
+                type="search"
+                placeholder="Search log…"
+                value={logSearch}
+                onChange={(e) => setLogSearch(e.target.value)}
+                aria-label="Search progress log"
+              />
               <label className="checkbox-label" title="Keep the log pinned to the newest line">
                 <input type="checkbox" checked={autoScroll} onChange={(e) => setAutoScroll(e.target.checked)} />
                 Auto-scroll
@@ -937,7 +958,7 @@ export function ScanPanel({ onRunComplete }: Props) {
               </button>
               <span className="count-muted">{logLines.length} lines</span>
             </div>
-            <div className="log-lines" ref={logRef}>
+            <div className="log-lines log-lines-fixed" ref={logRef}>
               {logLines.length > 0 ? (
                 logLines.map((line) => (
                   <div

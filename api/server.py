@@ -1181,6 +1181,127 @@ def create_custom_bucket(body: dict = Body(...)) -> dict[str, object]:
     return {"ok": True, **bucket}
 
 
+@app.get("/api/installations")
+def list_installations() -> dict[str, object]:
+    import installation_registry as ir
+
+    return {"installs": ir.list_installs(), "default_tags": ir.default_tags()}
+
+
+@app.get("/api/installations/{install_id}")
+def get_installation(install_id: str) -> dict[str, object]:
+    import installation_registry as ir
+
+    record = ir.get_install(install_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Installation not found")
+    return record
+
+
+@app.put("/api/installations/{install_id}")
+def upsert_installation(install_id: str, body: dict = Body(...)) -> dict[str, object]:
+    import installation_registry as ir
+
+    payload = {**body, "install_id": install_id}
+    return ir.upsert_install(payload)
+
+
+@app.get("/api/installations/presets/list")
+def list_installation_presets() -> dict[str, object]:
+    import installation_registry as ir
+
+    return {"presets": ir.list_presets()}
+
+
+@app.post("/api/installations/presets")
+def save_installation_preset(body: dict = Body(...)) -> dict[str, object]:
+    import installation_registry as ir
+
+    name = str(body.get("name", "")).strip()
+    snapshot = body.get("snapshot")
+    if not name or not isinstance(snapshot, dict):
+        raise HTTPException(status_code=400, detail="name and snapshot object required")
+    return ir.save_preset(name, snapshot)
+
+
+@app.get("/api/installations/{install_id}/version-check")
+def installation_version_check(install_id: str) -> dict[str, object]:
+    import installation_registry as ir
+    import version_verify as vv
+
+    record = ir.get_install(install_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Installation not found")
+    product_key = str(record.get("product_key") or install_id)
+    install_path = str(record.get("install_path") or "")
+    if not install_path:
+        raise HTTPException(status_code=400, detail="install_path is required on the record")
+    result = vv.check_installation(
+        product_key=product_key,
+        install_path=install_path,
+        manifest_version=str(record.get("manifest_version") or ""),
+    )
+    updated = ir.upsert_install(
+        {
+            **record,
+            "local_version": result.get("local_version", ""),
+            "manifest_version": result.get("manifest_version", ""),
+            "update_status": result.get("update_status", "unknown"),
+        }
+    )
+    return {"check": result, "install": updated}
+
+
+@app.post("/api/installations/manifest/refresh")
+def refresh_version_manifest(body: dict = Body(...)) -> dict[str, object]:
+    import version_verify as vv
+
+    product_key = str(body.get("product_key", "")).strip()
+    if not product_key:
+        raise HTTPException(status_code=400, detail="product_key is required")
+    entry = vv.refresh_manifest_entry(
+        product_key,
+        display_name=str(body.get("display_name", "")),
+        expected_version=str(body.get("expected_version", "")),
+        install_path=str(body.get("install_path", "")),
+    )
+    return {"ok": True, "entry": entry}
+
+
+@app.get("/api/scan-extensions/bwf")
+def scan_extension_bwf(path: str = Query(..., description="Absolute path to a WAV file")) -> dict[str, object]:
+    from bwf_metadata import parse_wav_metadata
+
+    target = Path(path)
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="WAV file not found")
+    return parse_wav_metadata(target)
+
+
+@app.get("/api/scan-extensions/multitrack")
+def scan_extension_multitrack(path: str = Query(..., description="Folder containing audio stems")) -> dict[str, object]:
+    from multitrack_group import group_multitracks
+
+    folder = Path(path)
+    if not folder.is_dir():
+        raise HTTPException(status_code=404, detail="Folder not found")
+    groups = group_multitracks(folder)
+    return {"path": str(folder), "groups": groups, "group_count": len(groups)}
+
+
+@app.get("/api/scan-extensions/archive-index")
+def scan_extension_archive_index(
+    path: str = Query(..., description="Path to zip/rar/7z archive"),
+    limit: int = Query(default=200, ge=1, le=2000),
+) -> dict[str, object]:
+    from archive_index import index_archive
+
+    target = Path(path)
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="Archive not found")
+    return index_archive(target, limit=limit)
+
+
 @app.get("/api/runs/{stamp}/duplicates/reference-extras")
 def get_reference_extras(
     stamp: str,

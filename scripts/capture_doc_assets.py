@@ -622,24 +622,34 @@ EDGE_PATHS = [
 ]
 
 
-def _browser_launch_kwargs() -> dict[str, object]:
-    from playwright.sync_api import sync_playwright
+def _playwright_chromium_path() -> Path | None:
+    """Resolve Playwright-bundled Chromium (avoids Edge channel headless failures on CI)."""
+    env_path = os.environ.get("PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH", "").strip()
+    if env_path and Path(env_path).is_file():
+        return Path(env_path)
+    if sys.platform == "win32":
+        local = Path(os.environ.get("LOCALAPPDATA", ""))
+        candidates = sorted(local.glob("ms-playwright/chromium-*/chrome-win/chrome.exe"))
+        if candidates:
+            return candidates[-1]
+    elif sys.platform == "darwin":
+        home = Path.home()
+        candidates = sorted(home.glob("Library/Caches/ms-playwright/chromium-*/chrome-mac/Chromium.app/Contents/MacOS/Chromium"))
+        if candidates:
+            return candidates[-1]
+    else:
+        home = Path.home()
+        candidates = sorted(home.glob(".cache/ms-playwright/chromium-*/chrome-linux/chrome"))
+        if candidates:
+            return candidates[-1]
+    return None
 
-    with sync_playwright() as playwright:
-        for kwargs in (
-            {"headless": True},
-            {"headless": True, "channel": "msedge"},
-            {"headless": True, "channel": "chrome"},
-        ):
-            try:
-                browser = playwright.chromium.launch(**kwargs)
-                browser.close()
-                return kwargs
-            except Exception:
-                continue
-        for candidate in EDGE_PATHS:
-            if candidate.is_file():
-                return {"headless": True, "executable_path": str(candidate)}
+
+def _browser_launch_kwargs() -> dict[str, object]:
+    """Prefer Playwright-bundled Chromium (Edge channel fails headless on some CI hosts)."""
+    chromium = _playwright_chromium_path()
+    if chromium:
+        return {"headless": True, "executable_path": str(chromium)}
     return {"headless": True}
 
 

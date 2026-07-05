@@ -24,6 +24,11 @@
   --scrollbar-thumb: #2d4036;
   --scrollbar-thumb-hover: #3d5648;
   --body-glow: rgba(61, 214, 140, 0.06);
+  --accent-faint: color-mix(in srgb, var(--accent) 6%, transparent);
+  --accent-muted: color-mix(in srgb, var(--accent) 10%, transparent);
+  --ready-soft: color-mix(in srgb, var(--ready) 18%, transparent);
+  --warning-soft: color-mix(in srgb, var(--warning) 20%, transparent);
+  --danger-soft: color-mix(in srgb, var(--danger) 20%, transparent);
   font-family: var(--sans);
   color: var(--text);
   background: var(--bg);
@@ -74,7 +79,8 @@ a {
 }
 
 a:hover {
-  color: #6ef0b0;
+  color: var(--accent);
+  filter: brightness(1.15);
 }
 
 /* Themed scrollbars — match dark shell */

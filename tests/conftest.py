@@ -11,6 +11,11 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+try:
+    import encodings.idna  # noqa: F401 — register codec on Python 3.13 Windows store builds
+except ImportError:
+    pass
+
 # Windows-style library roots used in tests and CI (logical validation on Linux).
 os.environ.setdefault(
     "AUDIOTHECA_LIBRARY_ROOTS",
