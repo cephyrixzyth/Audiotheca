@@ -40,12 +40,24 @@ if ($gh) {
     git tag -f $Tag 2>$null
     git push origin $Tag --force
     $assetArgs = @($Assets | ForEach-Object { $_.FullName })
-    gh release view $Tag 2>$null | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        gh release create $Tag --title $Name --notes $Body $assetArgs
+
+    $releaseExists = $false
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = "SilentlyContinue"
+    gh release view $Tag *>$null
+    if ($LASTEXITCODE -eq 0) { $releaseExists = $true }
+    $ErrorActionPreference = $prevEap
+
+    if (-not $releaseExists) {
+        Write-Host "Creating release $Tag..." -ForegroundColor Cyan
+        gh release create $Tag --title $Name --notes $Body @assetArgs
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     } else {
-        gh release upload $Tag $assetArgs --clobber
+        Write-Host "Updating release $Tag..." -ForegroundColor Cyan
+        gh release upload $Tag @assetArgs --clobber
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         gh release edit $Tag --title $Name --notes $Body
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     }
     Write-Host "Release: https://github.com/chrisjrovira/Audiotheca/releases/tag/$Tag" -ForegroundColor Green
     exit 0
