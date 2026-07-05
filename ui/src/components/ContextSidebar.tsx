@@ -89,6 +89,17 @@ export function useSidebarFilters(defs: SidebarFilterDef[]) {
   return { filters, setFilter };
 }
 
+const TAB_EXPLORER_HINTS: Partial<Record<TabId, string>> = {
+  investigation: "Browse library roots while reviewing inbox items.",
+  duplicates: "Open paths from duplicate groups in the explorer.",
+  restructure: "Preview destination folders before staging moves.",
+  archives: "Dual-pane compare archive listing vs extracted folder.",
+  "scan-audit": "Jump to flagged paths on disk.",
+  skipped: "Inspect skipped paths that need manual review.",
+  security: "Locate quarantined or flagged files.",
+  "scene-renames": "Verify scene folders before rename export.",
+};
+
 const SEARCH_TABS = new Set<TabId>([
   "scan",
   "investigation",
@@ -189,6 +200,7 @@ export function ContextSidebar({ stamp }: { stamp?: string }) {
 
       <div className="context-sidebar-section">
         <span className="context-label">Library explorer</span>
+        {TAB_EXPLORER_HINTS[tab] && <p className="count-muted context-explorer-hint">{TAB_EXPLORER_HINTS[tab]}</p>}
         <div className="file-explorer-sidebar-controls">
           <button type="button" className="text-btn" onClick={openAtRoots}>
             Browse library roots

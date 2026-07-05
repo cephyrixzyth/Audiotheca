@@ -1302,6 +1302,58 @@ def scan_extension_archive_index(
     return index_archive(target, limit=limit)
 
 
+@app.get("/api/scan-extensions/session")
+def scan_extension_session(path: str = Query(..., description="DAW session file or folder")) -> dict[str, object]:
+    from session_parse import parse_session, summarize_session_folder
+
+    target = Path(path)
+    if target.is_dir():
+        return summarize_session_folder(target)
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="Session path not found")
+    return parse_session(target)
+
+
+@app.get("/api/scan-extensions/archive-nest")
+def scan_extension_archive_nest(
+    path: str = Query(..., description="Archive file or folder to scan for nested archives"),
+    limit: int = Query(default=50, ge=1, le=200),
+) -> dict[str, object]:
+    from archive_nest import index_nested_archives, scan_folder_for_archives
+
+    target = Path(path)
+    if target.is_dir():
+        return scan_folder_for_archives(target, limit=limit)
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="Path not found")
+    return index_nested_archives(target, depth=2, limit=limit)
+
+
+@app.post("/api/reference-dedupe/engine-scan")
+def reference_dedupe_engine_scan(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from reference_dedupe_engine import find_scan_extras_against_references
+
+    reference_roots = body.get("reference_roots") or []
+    scan_roots = body.get("scan_roots") or []
+    if not isinstance(reference_roots, list) or not isinstance(scan_roots, list):
+        raise HTTPException(status_code=400, detail="reference_roots and scan_roots must be arrays")
+    return find_scan_extras_against_references(
+        [str(r) for r in scan_roots],
+        [str(r) for r in reference_roots],
+    )
+
+
+@app.post("/api/installations/manifest/sync")
+def sync_installation_manifest(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    url = str(body.get("url") or "").strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="url is required")
+    result = vv.sync_catalog_from_url(url)
+    if not result.get("ok"):
+        raise HTTPException(status_code=502, detail=str(result.get("error") or "sync failed"))
+    return result
+
+
 @app.get("/api/runs/{stamp}/duplicates/reference-extras")
 def get_reference_extras(
     stamp: str,
@@ -1797,6 +1849,14 @@ def system_metrics(root: str | None = Query(default=None)) -> dict[str, object]:
 
     path = security.assert_library_path(root, label="root") if root else None
     return collect_metrics(path=path)
+
+
+@app.get("/api/system/metrics/dual")
+def system_metrics_dual(root: str | None = Query(default=None)) -> dict[str, object]:
+    from system_metrics import collect_dual_metrics
+
+    path = security.assert_library_path(root, label="root") if root else None
+    return collect_dual_metrics(scan_root=path)
 
 
 @app.get("/api/ai/lookup/cache")

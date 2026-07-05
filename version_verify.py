@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import re
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -164,3 +166,38 @@ def refresh_manifest_entry(
     products[product_key] = record
     save_manifest(manifest)
     return record
+
+
+def sync_catalog_from_url(url: str, *, timeout_s: float = 8.0) -> dict[str, Any]:
+    """Merge a remote JSON catalog into the local manifest (offline-first, optional sync)."""
+    if not url.strip():
+        return {"ok": False, "error": "url required", "merged": 0}
+
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Audiotheca/1.0"})
+        with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+        payload = json.loads(raw)
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
+        return {"ok": False, "error": str(exc), "merged": 0}
+
+    products_in = payload.get("products") if isinstance(payload, dict) else payload
+    if not isinstance(products_in, dict):
+        return {"ok": False, "error": "catalog must be object with products", "merged": 0}
+
+    manifest = load_manifest()
+    products: dict[str, Any] = manifest.setdefault("products", {})
+    merged = 0
+    for key, entry in products_in.items():
+        if not isinstance(entry, dict):
+            continue
+        existing = products.get(key, {}) if isinstance(products.get(key), dict) else {}
+        products[key] = {
+            **existing,
+            **entry,
+            "product_key": key,
+            "source": str(entry.get("source") or "remote_catalog"),
+        }
+        merged += 1
+    save_manifest(manifest)
+    return {"ok": True, "merged": merged, "url": url}

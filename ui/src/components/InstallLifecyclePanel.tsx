@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   checkInstallationVersion,
+  fetchInstallationPresets,
   fetchInstallations,
   refreshVersionManifest,
+  saveInstallationPreset,
+  syncVersionManifestCatalog,
   upsertInstallation,
 } from "../api/client";
 
@@ -57,6 +60,9 @@ export function InstallLifecyclePanel() {
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [presets, setPresets] = useState<Array<{ name: string; snapshot: Record<string, unknown> }>>([]);
+  const [presetName, setPresetName] = useState("Gold-Master");
+  const [catalogUrl, setCatalogUrl] = useState("");
 
   const reload = useCallback(() => {
     fetchInstallations()
@@ -69,6 +75,9 @@ export function InstallLifecyclePanel() {
         }
       })
       .catch((err: Error) => setError(err.message));
+    fetchInstallationPresets()
+      .then((payload) => setPresets(payload.presets ?? []))
+      .catch(() => undefined);
   }, [selectedId]);
 
   useEffect(() => {
@@ -194,10 +203,97 @@ export function InstallLifecyclePanel() {
     setDepName("");
   }
 
+  async function handleSaveGoldMasterPreset() {
+    const name = presetName.trim() || "Gold-Master";
+    setBusy(true);
+    setError(null);
+    try {
+      await saveInstallationPreset(name, {
+        tags: draft.tags ?? ["Gold-Master"],
+        dependencies: draft.dependencies ?? [],
+        notes_html: draft.notes_html ?? "",
+        product_key: draft.product_key ?? "",
+        display_name: draft.display_name ?? "",
+      });
+      setMsg(`Saved deployment preset “${name}”`);
+      reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Preset save failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function applyPreset(snapshot: Record<string, unknown>) {
+    setDraft((prev) => ({
+      ...prev,
+      tags: Array.isArray(snapshot.tags) ? (snapshot.tags as string[]) : prev.tags,
+      dependencies: Array.isArray(snapshot.dependencies)
+        ? (snapshot.dependencies as InstallRecord["dependencies"])
+        : prev.dependencies,
+      notes_html: typeof snapshot.notes_html === "string" ? snapshot.notes_html : prev.notes_html,
+      display_name: typeof snapshot.display_name === "string" ? snapshot.display_name : prev.display_name,
+      product_key: typeof snapshot.product_key === "string" ? snapshot.product_key : prev.product_key,
+    }));
+    setMsg("Applied deployment preset to draft");
+  }
+
+  async function handleSyncCatalog() {
+    const url = catalogUrl.trim();
+    if (!url) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await syncVersionManifestCatalog(url);
+      setMsg(`Synced ${res.merged} products from catalog`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Catalog sync failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="install-lifecycle">
       {error && <div className="error">{error}</div>}
       {msg && <div className="banner dry">{msg}</div>}
+
+      <div className="install-gold-master">
+        <h4>Deployment presets (gold master)</h4>
+        <div className="install-tags-row">
+          <input
+            className="field-input"
+            value={presetName}
+            onChange={(e) => setPresetName(e.target.value)}
+            placeholder="Preset name"
+          />
+          <button type="button" className="text-btn" disabled={busy} onClick={() => void handleSaveGoldMasterPreset()}>
+            Save current as preset
+          </button>
+          {presets.map((preset) => (
+            <button
+              key={preset.name}
+              type="button"
+              className="text-btn"
+              onClick={() => applyPreset(preset.snapshot)}
+              title="Apply tags, notes, and dependencies to draft"
+            >
+              Apply {preset.name}
+            </button>
+          ))}
+        </div>
+        <div className="install-tags-row">
+          <input
+            className="field-input"
+            value={catalogUrl}
+            onChange={(e) => setCatalogUrl(e.target.value)}
+            placeholder="Remote manifest catalog URL (JSON)"
+          />
+          <button type="button" className="text-btn" disabled={busy || !catalogUrl.trim()} onClick={() => void handleSyncCatalog()}>
+            Sync catalog
+          </button>
+        </div>
+      </div>
 
       <div className="install-lifecycle-toolbar">
         <select

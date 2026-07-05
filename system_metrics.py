@@ -6,6 +6,7 @@ import os
 import shutil
 import time
 from pathlib import Path
+from typing import Any
 
 
 def _disk_usage_path(path: Path | None) -> tuple[Path, str | None]:
@@ -154,3 +155,68 @@ def collect_metrics(*, path: Path | None = None) -> dict:
 
     payload["bottleneck_hints"] = _bottleneck_hints(payload)
     return payload
+
+
+def _sample_path_latency_ms(path: Path, *, sample_bytes: int = 65536) -> float | None:
+    """Measure read latency on a network path by timing a small read."""
+    if not path.exists():
+        return None
+    target: Path | None = None
+    if path.is_file():
+        target = path
+    elif path.is_dir():
+        try:
+            for entry in path.iterdir():
+                if entry.is_file():
+                    target = entry
+                    break
+        except OSError:
+            return None
+    if target is None:
+        return None
+    try:
+        start = time.monotonic()
+        with target.open("rb") as handle:
+            handle.read(sample_bytes)
+        return round((time.monotonic() - start) * 1000, 1)
+    except OSError:
+        return None
+
+
+def _iops_estimate(payload: dict) -> float | None:
+    """Rough IOPS proxy from disk_io counters when psutil exposes busy_time."""
+    busy = payload.get("disk_io_busy_pct")
+    if busy is None:
+        return None
+    return round(max(0.0, min(5000.0, float(busy) * 50.0)), 1)
+
+
+def collect_dual_metrics(*, scan_root: Path | str | None = None) -> dict[str, Any]:
+    """Return host metrics plus optional remote/NAS mount telemetry."""
+    host = collect_metrics(path=None)
+    host["role"] = "host"
+    host["estimated_iops"] = _iops_estimate(host)
+
+    remote: dict[str, Any] | None = None
+    if scan_root:
+        root = Path(str(scan_root))
+        raw = str(scan_root)
+        if raw.startswith("\\\\") or raw.startswith("//"):
+            remote = collect_metrics(path=root)
+            remote["role"] = "remote_mount"
+            remote["estimated_iops"] = _iops_estimate(remote)
+            read_ms = _sample_path_latency_ms(root)
+            if read_ms is not None:
+                remote["read_latency_ms"] = read_ms
+            host_hint = _network_host_hint(raw)
+            if host_hint:
+                ping = _ping_latency_ms(host_hint)
+                if ping is not None:
+                    remote["network_latency_ms"] = ping
+                    remote["network_host"] = host_hint
+
+    return {
+        "host": host,
+        "remote": remote,
+        "dual": remote is not None,
+    }

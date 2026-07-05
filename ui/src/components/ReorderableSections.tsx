@@ -109,6 +109,8 @@ interface Props {
   layout?: "grid" | "stack";
   sections: SectionDescriptor[];
   className?: string;
+  /** Dense grid packing — widgets snap to fill gaps (dashboard auto-flow). */
+  autoFlow?: boolean;
 }
 
 type RenderBlock =
@@ -601,6 +603,7 @@ export function ReorderableSections({
   layout = "stack",
   sections,
   className = "",
+  autoFlow = false,
 }: Props) {
   const visible = useMemo(() => sections.filter((s) => !s.hidden), [sections]);
   const defaultOrder = useMemo(() => visible.map((s) => s.id), [visible]);
@@ -684,7 +687,9 @@ export function ReorderableSections({
   const moveBlockDown = (id: string) => moveBlock(id, 1);
 
   const containerClass =
-    layout === "grid" ? `dash-grid ${className}`.trim() : `reorder-stack ${className}`.trim();
+    layout === "grid"
+      ? `dash-grid${autoFlow ? " dash-grid-auto-flow" : ""} ${className}`.trim()
+      : `reorder-stack ${className}`.trim();
 
   function handleDrop(targetId: string, fromId?: string) {
     const source = fromId ?? dragId;

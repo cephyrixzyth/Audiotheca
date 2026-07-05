@@ -8,6 +8,8 @@ import wave
 from pathlib import Path
 from typing import Any
 
+from audiotheca.audio_fingerprint import AUDIO_EXTS, fingerprint_file
+
 STEM_SUFFIX_RE = re.compile(r"(_\d{1,2}|[-_.](L|R|Mono|Mid|Side|Stem\d+))$", re.I)
 DURATION_TOLERANCE_S = 0.05
 
@@ -53,6 +55,21 @@ def _wav_duration_seconds(path: Path) -> float | None:
     return None
 
 
+def _audio_duration_seconds(path: Path) -> float | None:
+    if path.suffix.lower() in {".wav", ".wave"}:
+        duration = _wav_duration_seconds(path)
+        if duration is not None:
+            return duration
+    if path.suffix.lower() in AUDIO_EXTS:
+        fp = fingerprint_file(path, duration=30)
+        if fp.get("ok") and fp.get("duration") is not None:
+            try:
+                return float(fp["duration"])
+            except (TypeError, ValueError):
+                pass
+    return None
+
+
 def _stem_prefix(name: str) -> str:
     stem = Path(name).stem
     stem = STEM_SUFFIX_RE.sub("", stem)
@@ -61,7 +78,7 @@ def _stem_prefix(name: str) -> str:
 
 
 def group_multitracks(folder: Path, *, audio_exts: frozenset[str] | None = None) -> list[dict[str, Any]]:
-    exts = audio_exts or frozenset({".wav", ".wave", ".aif", ".aiff"})
+    exts = audio_exts or AUDIO_EXTS
     if not folder.is_dir():
         return []
 
@@ -69,7 +86,7 @@ def group_multitracks(folder: Path, *, audio_exts: frozenset[str] | None = None)
     for path in sorted(folder.iterdir()):
         if not path.is_file() or path.suffix.lower() not in exts:
             continue
-        duration = _wav_duration_seconds(path) if path.suffix.lower() in {".wav", ".wave"} else None
+        duration = _audio_duration_seconds(path)
         files.append((path, duration, _stem_prefix(path.name)))
 
     buckets: dict[tuple[str, int], list[dict[str, Any]]] = {}

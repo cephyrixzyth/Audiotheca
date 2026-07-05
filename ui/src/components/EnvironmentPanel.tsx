@@ -9,7 +9,7 @@ import {
 } from "../api/client";
 import type { EnvironmentDependency, EnvironmentPayload } from "../types";
 import { ReorderableSections } from "./ReorderableSections";
-import { ThemePanel } from "./ThemePanel";
+import { ThemeStudioPanel } from "./ThemeStudioPanel";
 import { InstallLifecyclePanel } from "./InstallLifecyclePanel";
 
 function StatusBadge({ status }: { status: EnvironmentDependency["status"] }) {
@@ -151,11 +151,11 @@ export function EnvironmentPanel() {
   const sections = [
     {
       id: "appearance",
-      title: "Appearance & themes",
-      subtitle: "8 built-in presets · save custom · import / export JSON",
+      title: "Theme studio",
+      subtitle: "WYSIWYG token editor with live preview",
       fullWidth: true,
       minBodyHeight: 200,
-      content: <ThemePanel />,
+      content: <ThemeStudioPanel />,
     },
     {
       id: "install-lifecycle",

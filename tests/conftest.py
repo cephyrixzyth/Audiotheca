@@ -17,10 +17,7 @@ except ImportError:
     pass
 
 # Windows-style library roots used in tests and CI (logical validation on Linux).
-os.environ.setdefault(
-    "AUDIOTHECA_LIBRARY_ROOTS",
-    r"Z:\_software\_audio,Z:\test,Z:\lib,Z:\a",
-)
+os.environ["AUDIOTHECA_LIBRARY_ROOTS"] = r"Z:\_software\_audio,Z:\test,Z:\lib,Z:\a"
 
 from api import security
 from api.server import app

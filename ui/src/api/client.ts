@@ -661,10 +661,20 @@ export function fetchSystemMetrics(root?: string): Promise<{
   disk_free_gb?: number;
   disk_used_pct?: number;
   disk_free_pct?: number;
+  network_latency_ms?: number;
   psutil?: boolean;
 }> {
   const qs = root ? `?root=${encodeURIComponent(root)}` : "";
   return getJson(`/system/metrics${qs}`);
+}
+
+export function fetchDualSystemMetrics(root?: string): Promise<{
+  host?: Record<string, unknown>;
+  remote?: Record<string, unknown> | null;
+  dual?: boolean;
+}> {
+  const qs = root ? `?root=${encodeURIComponent(root)}` : "";
+  return getJson(`/system/metrics/dual${qs}`);
 }
 
 export function fetchSystemProcesses(): Promise<Record<string, unknown>> {
@@ -1156,4 +1166,28 @@ export function refreshVersionManifest(body: {
   install_path?: string;
 }): Promise<{ ok: boolean; entry: { expected_version?: string; display_name?: string } }> {
   return postJson("/installations/manifest/refresh", body);
+}
+
+export function syncVersionManifestCatalog(url: string): Promise<{ ok: boolean; merged: number; url: string }> {
+  return postJson("/installations/manifest/sync", { url });
+}
+
+export function fetchInstallationPresets(): Promise<{ presets: Array<{ name: string; snapshot: Record<string, unknown> }> }> {
+  return getJson("/installations/presets/list");
+}
+
+export function saveInstallationPreset(name: string, snapshot: Record<string, unknown>): Promise<{ name: string; snapshot: Record<string, unknown> }> {
+  return postJson("/installations/presets", { name, snapshot });
+}
+
+export function runReferenceDedupeEngine(body: {
+  reference_roots: string[];
+  scan_roots: string[];
+}): Promise<{
+  reference_keys: number;
+  extra_count: number;
+  extra_groups: number;
+  extras: Array<{ dedup_key: string; full_path: string; reference_matches: string[] }>;
+}> {
+  return postJson("/reference-dedupe/engine-scan", body);
 }

@@ -1,39 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { fetchHarvestCandidates, fetchJobs, fetchSystemMetrics } from "../api/client";
+import { fetchHarvestCandidates, fetchJobs } from "../api/client";
 import { useLibraryRoot } from "../hooks/useLibraryRoot";
-import type { JobSnapshot, RunListItem, SystemMetrics, TabId } from "../types";
-import { formatGb } from "../utils/format";
+import type { JobSnapshot, RunListItem, TabId } from "../types";
 import { ReorderableSections } from "./ReorderableSections";
 import { EnvironmentSummaryWidget } from "./EnvironmentPanel";
 import { InstallationSummaryWidget } from "./InstallLifecyclePanel";
 import { TabEmptyState } from "./TabEmptyState";
-
-function GaugeBar({
-  label,
-  value,
-  max = 100,
-  detail,
-  tone = "accent",
-}: {
-  label: string;
-  value: number;
-  max?: number;
-  detail?: string;
-  tone?: "accent" | "warning" | "danger";
-}) {
-  const pct = Math.min(100, Math.max(0, (value / max) * 100));
-  return (
-    <div className="gauge-row">
-      <div className="gauge-row-top">
-        <span className="gauge-label">{label}</span>
-        <span className="gauge-value">{detail ?? `${Math.round(pct)}%`}</span>
-      </div>
-      <div className="gauge-track">
-        <div className={`gauge-fill tone-${tone}`} style={{ width: `${pct}%` }} />
-      </div>
-    </div>
-  );
-}
+import { TelemetryDualPanel } from "./TelemetryDualPanel";
 
 interface Props {
   runs: RunListItem[];
@@ -42,13 +15,11 @@ interface Props {
 
 export function DashboardHome({ runs, onNavigate }: Props) {
   const libraryRoot = useLibraryRoot();
-  const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
   const [jobs, setJobs] = useState<JobSnapshot[]>([]);
   const [harvestPending, setHarvestPending] = useState(0);
 
   useEffect(() => {
     const load = () => {
-      void fetchSystemMetrics(libraryRoot).then(setMetrics).catch(() => undefined);
       void fetchJobs().then(setJobs).catch(() => undefined);
       void fetchHarvestCandidates(false)
         .then((r) => setHarvestPending(r.total_pending))
@@ -66,38 +37,14 @@ export function DashboardHome({ runs, onNavigate }: Props) {
   const sections = useMemo(
     () => [
       {
-        id: "host-metrics",
-        title: "Host telemetry",
-        subtitle: "CPU, RAM, disk on this machine",
+        id: "dual-telemetry",
+        title: "Dual telemetry",
+        subtitle: "Host vs remote mount I/O and latency",
         group: "telemetry",
         groupTitle: "System",
         tone: "accent" as const,
-        content: metrics ? (
-          <div className="gauge-stack">
-            {metrics.cpu_percent != null && (
-              <GaugeBar label="CPU" value={metrics.cpu_percent} detail={`${Math.round(metrics.cpu_percent)}%`} />
-            )}
-            {metrics.ram_used_pct != null && (
-              <GaugeBar
-                label="RAM"
-                value={metrics.ram_used_pct}
-                detail={`${formatGb(metrics.ram_used_gb, 1)} / ${formatGb(metrics.ram_total_gb, 1)} GB`}
-                tone={metrics.ram_used_pct > 85 ? "warning" : "accent"}
-              />
-            )}
-            {metrics.disk_used_pct != null && (
-              <GaugeBar
-                label="Disk"
-                value={metrics.disk_used_pct}
-                detail={`${formatGb(metrics.disk_free_gb, 1)} free`}
-                tone={metrics.disk_free_pct != null && metrics.disk_free_pct < 15 ? "danger" : "accent"}
-              />
-            )}
-            {!metrics.psutil && <p className="count-muted">Install psutil for CPU/RAM metrics</p>}
-          </div>
-        ) : (
-          <p className="count-muted">Loading metrics…</p>
-        ),
+        span: 2 as const,
+        content: <TelemetryDualPanel />,
       },
       {
         id: "environment-home",
@@ -180,13 +127,13 @@ export function DashboardHome({ runs, onNavigate }: Props) {
         ),
       },
     ],
-    [activeJob, harvestPending, metrics, onNavigate, runs],
+    [activeJob, harvestPending, onNavigate, runs],
   );
 
   return (
     <div className="dash">
       <TabEmptyState tab="dashboard" onStartScan={() => onNavigate?.("scan")} />
-      <ReorderableSections layoutId="dashboard" layout="grid" sections={sections} />
+      <ReorderableSections layoutId="dashboard" layout="grid" autoFlow sections={sections} />
     </div>
   );
 }
