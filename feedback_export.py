@@ -219,3 +219,25 @@ def feedback_summary(stamp: str | None = None) -> dict[str, int]:
         "vendor": sum(1 for r in inv.vendor_additions if not stamp or r.stamp == stamp),
         "total": inv_count + dup_count + rst_count + arch_count + scene_count,
     }
+
+
+def feedback_apply_estimate(stamp: str | None = None) -> dict[str, object]:
+    """Heuristic delta if pending feedback is applied on the next scan."""
+    counts = feedback_summary(stamp)
+    inv = counts.get("investigation", 0)
+    dup = counts.get("duplicate", 0)
+    rst = counts.get("restructure", 0)
+    arch = counts.get("archive", 0)
+    scene = counts.get("scene", 0)
+    return {
+        "stamp": stamp,
+        "pending_feedback": counts,
+        "estimated_delta": {
+            "investigation": -min(inv, max(1, inv // 2)) if inv else 0,
+            "duplicate_groups": -min(dup, max(1, dup // 3)) if dup else 0,
+            "restructure_rows": -min(rst, max(1, rst // 2)) if rst else 0,
+            "archive_rows": -min(arch, arch) if arch else 0,
+            "scene_rows": -min(scene, scene) if scene else 0,
+        },
+        "note": "Estimate only — re-run dry scan after exporting/applying feedback to measure real delta.",
+    }

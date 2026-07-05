@@ -1166,6 +1166,41 @@ def feedback_summary(stamp: str | None = Query(default=None)) -> dict[str, int]:
     return feedback_export.feedback_summary(stamp)
 
 
+@app.get("/api/feedback/estimate")
+def feedback_apply_estimate(stamp: str | None = Query(default=None)) -> dict[str, object]:
+    return feedback_export.feedback_apply_estimate(stamp)
+
+
+@app.post("/api/feedback/custom-buckets")
+def create_custom_bucket(body: dict = Body(...)) -> dict[str, object]:
+    name = str(body.get("name", "")).strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="name is required")
+    description = str(body.get("description", "")).strip()
+    bucket = inv_feedback.define_custom_bucket(name, description)
+    return {"ok": True, **bucket}
+
+
+@app.get("/api/runs/{stamp}/duplicates/reference-extras")
+def get_reference_extras(
+    stamp: str,
+    roots: str = Query(default="", description="Comma-separated reference library roots"),
+) -> dict[str, object]:
+    from api.reference_dedupe import summary_for_run
+
+    reference_roots = [r.strip() for r in roots.split(",") if r.strip()]
+    if not reference_roots:
+        raise HTTPException(status_code=400, detail="roots query parameter required")
+    return summary_for_run(stamp, reference_roots)
+
+
+@app.get("/api/jobs/history")
+def list_job_history(limit: int = Query(default=50, ge=1, le=200)) -> dict[str, object]:
+    from audiotheca.job_store import list_jobs
+
+    return {"jobs": list_jobs(limit=limit)}
+
+
 @app.get("/api/vendors")
 def list_vendors() -> dict[str, object]:
     return {
@@ -1444,6 +1479,14 @@ def get_job_events(job_id: str, after: int = Query(default=0, ge=0)) -> dict[str
     job = job_manager.get(job_id)
     total = len(job.events) if job else after + len(events)
     return {"events": events, "total": total, "after": after}
+
+
+@app.get("/api/jobs/{job_id}/progress")
+def get_job_progress(job_id: str) -> dict[str, object]:
+    try:
+        return job_manager.get_progress(job_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Job not found") from exc
 
 
 @app.post("/api/jobs")

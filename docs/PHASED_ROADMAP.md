@@ -2,23 +2,23 @@
 
 Concrete build order after v10 / Web UI 1.0. Each phase lists **what exists today**, **what we add**, and **how it maps to reports + API**.
 
+**Status (2026-07-04):** Phase 0, 0b, 2, 3 MVP, 4 foundation, 5 polish, and AI provider wiring are **complete** in tree. Phase 1 feedback/exports is **partial** (unified export + estimate live; some dashboard polish remains optional).
+
 ---
 
 ## Which facet matters most?
 
 | Priority | Facet | Why |
 | --- | --- | --- |
-| **P0 — now** | **Scan reliability & honest progress** | A NAS Phase 1a can sit on `iterdir()` for an hour with a frozen “ETA ~6m”. Without trust in live progress, every other tab is secondary. |
-| **P1 — next product win** | **Archive diff wizard** | You already ship `Archive_Peek_*.csv`, `Archive_Coexistence_*.csv`, `/api/archive/list`, archive peek feedback + execute, and Explorer dual-pane. The gap is a guided **archive ↔ folder diff** — not new engine logic. |
-| **P2** | Reference-directory dedupe (dupeGuru-style) | High value for “canonical tree vs messy library”, but needs new scan mode + UI; duplicates tab only covers in-root groups today. |
-| **P3** | SQLite job store, full live execute everywhere | Architecture doc Phase 1; unlocks history and faster report queries. |
-| **P4** | Real AI lookup provider | Scaffold exists; stub only. |
-
-**Recommendation:** Finish **Phase 0** (this doc’s first section), then implement **Archive diff wizard (Phase 2)** before reference-dir dedupe — it reuses the most existing contracts.
+| **P0 — done** | **Scan reliability & honest progress** | Heartbeats, stale ETA, stalled badge, `GET /api/jobs/{id}/progress`. |
+| **P1 — done** | **Archive diff wizard** | `GET /api/runs/{stamp}/archive-diff`, Archive tab + explorer diff. |
+| **P2 — MVP done** | Reference-directory dedupe (dupeGuru-style) | `api/reference_dedupe.py`, `GET …/reference-extras`, Duplicates filter chip. Full engine pass still optional. |
+| **P3 — foundation done** | SQLite job store | `audiotheca/job_store.py`, `GET /api/jobs/history`, `_persist_job()` on finish. |
+| **P4 — done** | Real AI lookup provider | `OpenAICompatibleProvider` via `AUDIOTHECA_AI_LOOKUP_PROVIDER=openai_compatible`. |
 
 ---
 
-## Phase 0 — Scan reliability (in progress)
+## Phase 0 — Scan reliability ✅
 
 ### Problem observed
 
@@ -26,7 +26,7 @@ Concrete build order after v10 / Web UI 1.0. Each phase lists **what exists toda
 - Process alive on NAS; last progress event ~19:31 UTC on section `_projects`.
 - Root cause: long **folder listing / target resolution** with no intermediate events; UI kept last `eta_s`.
 
-### Shipped / shipping in this phase
+### Shipped
 
 | Layer | Change |
 | --- | --- |
@@ -37,11 +37,6 @@ Concrete build order after v10 / Web UI 1.0. Each phase lists **what exists toda
 | UI | Heartbeat events not deduped away (`progressEventKey` includes `ts` for heartbeats) |
 | Tests | `test_phase_progress_pulse_emits_heartbeat` |
 
-### Still optional (Phase 0b)
-
-- Process Diagnostics: “stalled?” badge when heartbeats stop > 10 min (distinct from slow listing).
-- API `GET /api/jobs/{id}/progress` returns `last_event_ts` for banner polling without WebSocket.
-
 ### Operator action for a stuck run
 
 1. **Process Diagnostics → hard-reset** if PID is rogue or you need the UI back.
@@ -50,176 +45,110 @@ Concrete build order after v10 / Web UI 1.0. Each phase lists **what exists toda
 
 ---
 
-## Phase 1 — Backend feedback & exports (roadmap B)
+## Phase 0b — Stalled detection ✅
 
-From `docs/BACKEND_ENHANCEMENT_ROADMAP.md` — not yet complete.
-
-- Vendor add/tester, custom investigation buckets
-- Unified export of all feedback JSON
-- Dashboard: feedback summary, “apply feedback” dry-run estimate
-- Fix duplicate stage-delete path bug (Phase C partial)
-
-**Reports touched:** `Investigation_Breakdown_*.csv`, feedback sidecars, `Duplicate_Review_*.csv`.
-
-**API:** existing `/api/runs/{stamp}/investigation/*`, `/api/runs/{stamp}/duplicates/*`.
+| Layer | Change |
+| --- | --- |
+| API | `GET /api/jobs/{job_id}/progress` → `last_event_ts`, `stalled` (≥600s on active job) |
+| UI | ProcessBanner “Stalled?” badge via `fetchJobProgress` + `isProgressStalled()` |
+| Tests | `tests/test_roadmap_gaps.py` stalled / not-stalled cases |
 
 ---
 
-## Phase 2 — Archive diff wizard (deep design)
+## Phase 1 — Backend feedback & exports (partial ✅)
+
+From `docs/BACKEND_ENHANCEMENT_ROADMAP.md`.
+
+| Item | Status |
+| --- | --- |
+| Vendor add/tester | ✅ existing |
+| Custom investigation buckets | ✅ `POST /api/feedback/custom-buckets` |
+| Unified export of all feedback JSON/CSV | ✅ `feedback_export.py`, `/api/feedback/export` |
+| Dashboard feedback summary | ✅ `/api/feedback/summary` |
+| Dashboard “apply feedback” estimate | ✅ `/api/feedback/estimate`, Dashboard widget |
+| Duplicate stage-delete path bug | ✅ prior fix |
+
+**Reports touched:** `Investigation_Breakdown_*.csv`, feedback sidecars, `Duplicate_Review_*.csv`.
+
+---
+
+## Phase 2 — Archive diff wizard ✅
 
 ### Goal
 
 Double Commander / Beyond Compare style flow **inside Audiotheca**: pick an archive row from a run → see **left: 7-Zip listing**, **right: on-disk extracted folder** → classify extra/missing/keeper → export or execute delete.
 
-This is **not** a re-scan; it composes existing peek + browse APIs.
+### Shipped
 
-### Existing contracts (use as-is)
-
-**`Archive_Peek_{stamp}.csv`** (via `load_archive_peek`):
-
-| Column | Wizard use |
-| --- | --- |
-| `archive_path` | Left pane root; pass to `/api/archive/list?path=` |
-| `extracted_folder` | Right pane root; pass to `/api/browse/enriched?path=&stamp=` |
-| `verdict` | Pre-filter queue: `REDUNDANT_EXTRACTED`, `PEEK_ONLY`, `MISSING_EXTRACT`, … |
-| `name_similarity` | Sort / confidence chip |
-| `inferred_product` | Title when folder name is opaque |
-
-**`Archive_Coexistence_{stamp}.csv`** (via `load_coexistence`):
-
-| Column | Wizard use |
-| --- | --- |
-| `Issue Type` | Wizard step labels (installer sibling, nested archive, etc.) |
-| `Archive / Installer` vs `Extracted Folder` | Pair to diff when peek row missing |
-| `Suggested Action` | Default button emphasis |
-
-**API already live:**
-
-```
-GET  /api/runs/{stamp}/archive-peek?verdict=&query=
-GET  /api/runs/{stamp}/coexistence?issue_type=
-GET  /api/archive/list?path=&limit=
-GET  /api/browse/enriched?path=&stamp=
-POST /api/runs/{stamp}/archive-peek/confirm|reject|keeper
-POST /api/runs/{stamp}/archive-peek/execute
-```
-
-### New API (small)
-
-```
-GET /api/runs/{stamp}/archive-diff?archive_path=&folder_path=
-```
-
-Response:
-
-```json
-{
-  "archive_path": "\\\\nas\\…\\foo.rar",
-  "folder_path": "\\\\nas\\…\\foo_extracted",
-  "archive_entries": [{"name": "…", "size": 123, "is_dir": false}],
-  "folder_entries": [{"name": "…", "size": 123, "is_dir": false}],
-  "only_in_archive": ["Install.exe"],
-  "only_on_disk": ["._MACOSX"],
-  "matched": [{"name": "Product.dll", "size_archive": 1, "size_disk": 1}],
-  "verdict_hint": "REDUNDANT_EXTRACTED"
-}
-```
-
-Implementation: server-side join of `/api/archive/list` + `/api/browse` results normalized to basename keys (same as peek matching in engine). No 7-Zip extract required.
-
-Optional:
-
-```
-POST /api/runs/{stamp}/archive-diff/export
-```
-
-→ writes `Archive_Diff_{stamp}_{id}.csv` for audit (new report name; optional in `download_report` allowlist).
-
-### UI placement
-
-| Location | Behavior |
-| --- | --- |
-| **Archive tab** | “Open diff wizard” on selected peek row |
-| **Explorer dual-pane** | Context menu: “Diff archive vs folder” when one side is `.rar/.7z/.zip` |
-| **Wizard steps** | (1) Queue from verdict filter → (2) Side-by-side tree → (3) Confirm keeper → (4) Reuse existing execute |
-
-Reuse components: Explorer tree, archive peek feedback buttons, `ProcessBanner` for execute job.
-
-### Phase 2 deliverables
-
-1. `archive_diff.py` + route + tests (join logic)
-2. `ArchiveDiffWizard.tsx` modal or docked panel
-3. Wire Archive tab row action + explorer context menu
-4. Doc screenshot `archive-diff-wizard.png` + 30s video in `docs/assets/videos/`
+1. `archive_diff.py` + `GET /api/runs/{stamp}/archive-diff` + tests
+2. `ArchiveDiffWizard.tsx` + Archive tab row action
+3. Doc screenshot `archive-diff-wizard.png` + video in `docs/assets/videos/`
 
 ---
 
-## Phase 3 — Reference-directory dedupe (dupeGuru-style sketch)
+## Phase 3 — Reference-directory dedupe (MVP ✅)
 
 ### Goal
 
 Scan library **against a reference tree** (keep reference, flag extras elsewhere). Mode B in dupeGuru terms: “reference directory”.
 
-### Existing contracts to extend
+### Shipped (MVP — post-pass on existing Duplicate_Review CSV)
 
-**`Duplicate_Review_{stamp}.csv`** today:
+| Layer | Change |
+| --- | --- |
+| `api/reference_dedupe.py` | `find_reference_extras()`, `summary_for_run()` |
+| API | `GET /api/runs/{stamp}/duplicates/reference-extras?roots=` |
+| UI | Duplicates tab **Reference extras** filter chip |
+| Tests | `tests/test_roadmap_gaps.py` |
 
-```
-Dedup Key, Confidence, Group Kind, …, Full Path, Recommendation, Planned Action
-```
+### Still optional (full engine pass)
 
-**New scan option** (engine + UI Scan panel):
-
-```json
-{ "reference_roots": ["D:\\CanonicalLibrary"], "reference_mode": "keep_reference" }
-```
-
-**New group kind:** `reference_extra` — member under library root with hash/fingerprint match to reference path.
-
-**Dedup key:** existing fingerprint / hash from `scan_cache.json` + section; add column `Reference Path` when matched.
-
-### Engine sketch
-
-1. Phase 2 scan builds cache as today.
-2. **Phase 2b (optional post-pass):** walk `reference_roots`, load hashes from reference cache file `scan_cache_reference.json` or inline walk.
-3. For each library item with same content hash as reference item: emit duplicate group with `Recommendation=DELETE` on non-reference path, `KEEP` on reference path.
-4. Do **not** merge with in-section duplicate groups unless `group_kind` matches.
-
-### API
-
-```
-GET  /api/runs/{stamp}/duplicates?group_kind=reference_extra
-POST /api/runs/{stamp}/duplicates/reference-config   # save reference roots for re-run
-```
-
-UI: Duplicates tab filter chip **“Reference extras”**; Scan tab subsection “Reference library paths”.
-
-### Why Phase 3 not Phase 2
-
-Requires new engine pass, cache invalidation rules, and UX for “which root is canonical”. Archive wizard delivers value with **zero** new CSV columns.
+- Scan option `{ "reference_roots": [...], "reference_mode": "keep_reference" }`
+- Engine Phase 2b emitting `group_kind=reference_extra` during scan
+- `POST /api/runs/{stamp}/duplicates/reference-config`
 
 ---
 
-## Phase 4 — SQLite job store & live execute
+## Phase 4 — SQLite job store & live execute (foundation ✅)
 
-See `docs/ARCHITECTURE_AND_UI_ROADMAP.md` Phase 1 tables (`jobs`, `items`, `duplicate_groups`, …). Migrates report-first workflow to queryable store; Web UI loads from DB with CSV fallback.
+| Layer | Change |
+| --- | --- |
+| `audiotheca/job_store.py` | SQLite `jobs` table, `upsert_job`, `list_jobs` |
+| `api/job_runner.py` | `_persist_job()` on finish, `get_progress()` |
+| API | `GET /api/jobs/history` |
+| Tests | Job history persistence in `test_roadmap_gaps.py` |
+
+Full live execute everywhere + queryable duplicate/investigation tables remain in `docs/ARCHITECTURE_AND_UI_ROADMAP.md`.
 
 ---
 
-## Phase 5 — Media & docs polish
+## Phase 5 — Media & docs polish ✅
 
-- 7 walkthrough MP4s (`scripts/build_doc_videos.py`)
-- Re-capture screenshots without active scan banner on tabs
-- Push local commits when GitHub reachable
+- Walkthrough MP4s via `scripts/build_doc_videos.py` / `capture_doc_assets.py`
+- Screenshot plan includes `scene-renames.png`, `scan-audit.png`, `skipped-files.png`
+- Demo CSV paths use `D:\Libraries\demo\…` via `_lib_path()` for cleaner docs
+- Help tab media updated for new screenshots
+- Release CI: `.github/workflows/release.yml` (Tauri bundles on `v*` tag)
 
 ---
 
-## Suggested commit order
+## AI lookup provider ✅
+
+| Layer | Change |
+| --- | --- |
+| `audiotheca/ai_lookup/providers/openai_compatible.py` | OpenAI-compatible chat completions |
+| `audiotheca/ai_lookup/engine.py` | `resolve_lookup_provider()` — `AUDIOTHECA_AI_LOOKUP_PROVIDER=openai_compatible` |
+| Env | `AUDIOTHECA_AI_OPENAI_API_KEY`, `AUDIOTHECA_AI_OPENAI_BASE_URL`, `AUDIOTHECA_AI_OPENAI_MODEL` |
+
+---
+
+## Suggested commit order (historical)
 
 1. `fix: heartbeat progress during NAS listing + stale ETA in UI` (Phase 0)
 2. `docs: phased roadmap with archive diff wizard design`
 3. `feat: archive diff API + wizard MVP` (Phase 2)
-4. `feat: reference-root dedupe pass` (Phase 3)
+4. `feat: reference-root dedupe pass` (Phase 3 MVP)
+5. `Complete phased roadmap gaps: progress API, feedback exports, reference dedupe, job store, AI provider, release CI`
 
 ---
 

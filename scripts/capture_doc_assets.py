@@ -41,6 +41,9 @@ SCREENSHOT_PLAN: list[tuple[str, str]] = [
     ("security-malware.png", "security"),
     ("environment-themes.png", "environment"),
     ("help-panel.png", "help"),
+    ("scene-renames.png", "scene-renames"),
+    ("scan-audit.png", "scan-audit"),
+    ("skipped-files.png", "skipped"),
 ]
 
 VIDEO_CLIPS: list[tuple[str, list[str]]] = [
@@ -59,8 +62,12 @@ REVIEW_TAB_IDS = frozenset(
 SYSTEM_TAB_IDS = frozenset({"space-recovery", "security", "environment", "vendors"})
 
 
+DEMO_LIB_ROOT = Path("D:/Libraries/demo")
+
+
 def _lib_path(*parts: str) -> str:
-    return str(LIB.joinpath(*parts))
+    """Display paths for doc screenshots (canonical demo library layout)."""
+    return str(DEMO_LIB_ROOT.joinpath(*parts))
 
 
 def seed_library() -> None:

@@ -124,10 +124,16 @@ export function progressStaleSeconds(ts: string | null | undefined, nowMs = Date
 }
 
 const STALE_PROGRESS_THRESHOLD_S = 120;
+const STALLED_PROGRESS_THRESHOLD_S = 600;
 
 export function isProgressStale(ts: string | null | undefined, nowMs = Date.now()): boolean {
   const stale = progressStaleSeconds(ts, nowMs);
   return stale != null && stale >= STALE_PROGRESS_THRESHOLD_S;
+}
+
+export function isProgressStalled(ts: string | null | undefined, nowMs = Date.now()): boolean {
+  const stale = progressStaleSeconds(ts, nowMs);
+  return stale != null && stale >= STALLED_PROGRESS_THRESHOLD_S;
 }
 
 export function dedupeProgressEvents(events: ProgressEvent[]): ProgressEvent[] {

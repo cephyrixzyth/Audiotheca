@@ -173,6 +173,19 @@ def all_bucket_names(store: InvestigationStore | None = None) -> list[str]:
     return sorted(set(names))
 
 
+def define_custom_bucket(name: str, description: str = "") -> dict[str, str]:
+    store = load_store()
+    bucket = name.strip()
+    if not bucket.startswith("_"):
+        bucket = f"_{bucket.lstrip('_')}"
+    store.custom_buckets[bucket] = description.strip() or "User-defined bucket"
+    save_store(store)
+    from audiotheca.vendor_overrides import sync_bucket_overrides
+
+    sync_bucket_overrides(store.custom_buckets)
+    return {"name": bucket, "description": store.custom_buckets[bucket]}
+
+
 def apply_correction(
     *,
     path: str,

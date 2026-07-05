@@ -4,7 +4,13 @@ import type {
   ArchivePeekResponse,
   DuplicateGroup,
   InvestigationItem,
+  CustomBucketResult,
+  FeedbackApplyEstimate,
+  JobHistoryEntry,
+  JobProgress,
   JobSnapshot,
+  ProgressEvent,
+  ReferenceExtrasSummary,
   RestructureItem,
   RunListItem,
   RunSummary,
@@ -587,6 +593,34 @@ export function fetchJobEvents(
   after = 0,
 ): Promise<{ events: ProgressEvent[]; total: number; after: number }> {
   return getJson(`/jobs/${jobId}/events?after=${after}`);
+}
+
+export function fetchJobProgress(jobId: string): Promise<JobProgress> {
+  return getJson(`/jobs/${jobId}/progress`);
+}
+
+export function fetchJobHistory(limit = 50): Promise<{ jobs: JobHistoryEntry[] }> {
+  return getJson(`/jobs/history?limit=${limit}`);
+}
+
+export function fetchFeedbackEstimate(stamp?: string): Promise<FeedbackApplyEstimate> {
+  const q = stamp ? `?stamp=${encodeURIComponent(stamp)}` : "";
+  return getJson(`/feedback/estimate${q}`);
+}
+
+export function fetchReferenceExtras(
+  stamp: string,
+  roots: string[],
+): Promise<ReferenceExtrasSummary> {
+  const rootsParam = roots.map(encodeURIComponent).join(",");
+  return getJson(`/runs/${stamp}/duplicates/reference-extras?roots=${rootsParam}`);
+}
+
+export function defineCustomBucket(params: {
+  name: string;
+  description?: string;
+}): Promise<CustomBucketResult> {
+  return postJson("/feedback/custom-buckets", params);
 }
 
 export function startScan(params: {

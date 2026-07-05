@@ -140,21 +140,21 @@ Composes existing peek + browse APIs — no re-scan required.`,
         title: "Scene renames",
         body: `Approve renaming scene-hash folders to inferred product names from Scene_Rename_Plan_*.csv.
 Review multipart diagnosis before staging live renames.`,
-        media: { screenshot: "/help/restructure-preview.png" },
+        media: { screenshot: "/help/scene-renames.png" },
       },
       {
         id: "scan-audit",
         title: "Scan audit",
         body: `Per-item scan status, ID method, confidence, and flags. Quick corrections without leaving the run.
 After a scan completes, Audiotheca may open this tab automatically.`,
-        media: { screenshot: "/help/scan-panel.png" },
+        media: { screenshot: "/help/scan-audit.png" },
       },
       {
         id: "skipped",
         title: "Skipped files",
         body: `Failures, loose archives, cache hits, probe truncations, and rescan targets.
 Compare skipped sets between two run stamps when investigating regressions.`,
-        media: { screenshot: "/help/investigation-inbox.png" },
+        media: { screenshot: "/help/skipped-files.png" },
       },
     ],
   },

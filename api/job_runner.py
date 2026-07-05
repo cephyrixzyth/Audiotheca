@@ -83,6 +83,52 @@ class JobManager:
         start = max(0, after)
         return job.events[start:]
 
+    def get_progress(self, job_id: str) -> dict:
+        job = self._jobs.get(job_id)
+        if not job:
+            raise KeyError(job_id)
+        last_ts: str | None = None
+        last_progress: dict | None = None
+        for ev in reversed(job.events):
+            if not last_ts and ev.get("ts"):
+                last_ts = str(ev["ts"])
+            if ev.get("type") == "phase_progress":
+                last_progress = ev
+                if not last_ts and ev.get("ts"):
+                    last_ts = str(ev["ts"])
+                break
+        stalled = False
+        if job.status in {"running", "paused", "pause_pending", "stop_pending"} and last_ts:
+            try:
+                from datetime import datetime
+
+                parsed = datetime.fromisoformat(last_ts.replace("Z", "+00:00"))
+                age_s = time.time() - parsed.timestamp()
+                stalled = age_s >= 600
+            except (ValueError, OSError):
+                stalled = False
+        return {
+            "job_id": job.job_id,
+            "status": job.status,
+            "current_phase": job.current_phase,
+            "last_event_ts": last_ts,
+            "last_progress": last_progress,
+            "event_count": len(job.events),
+            "stalled": stalled,
+        }
+
+    def _persist_job(self, job: JobState, *, finished: bool = False) -> None:
+        try:
+            from audiotheca.job_store import upsert_job
+
+            snap = job.snapshot()
+            snap["started_at"] = job.started_at
+            snap["exit_code"] = job.exit_code
+            snap["error"] = job.error
+            upsert_job(snap, finished=finished)
+        except Exception:
+            pass
+
     def list_jobs(self) -> list[dict]:
         return [job.snapshot() for job in sorted(self._jobs.values(), key=lambda j: -j.started_at)]
 
@@ -409,6 +455,8 @@ class JobManager:
             job.error = str(exc)
             await self._broadcast(job, {"type": "job_failed", "error": str(exc)})
         finally:
+            if job.status not in {"running", "paused", "pause_pending", "stop_pending"}:
+                self._persist_job(job, finished=True)
             try:
                 stderr_handle.close()
             except Exception:

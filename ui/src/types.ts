@@ -256,6 +256,61 @@ export interface JobSnapshot {
   scan_options?: Record<string, unknown>;
 }
 
+export interface JobProgress {
+  job_id: string;
+  status: string;
+  current_phase: string | null;
+  last_event_ts: string | null;
+  last_progress: ProgressEvent | null;
+  event_count: number;
+  stalled: boolean;
+}
+
+export interface JobHistoryEntry {
+  job_id: string;
+  status: string;
+  dry_run: number;
+  root: string | null;
+  stamp: string | null;
+  current_phase: string | null;
+  exit_code: number | null;
+  error: string | null;
+  event_count: number;
+  started_at: number;
+  finished_at: number | null;
+  updated_at: string;
+}
+
+export interface FeedbackApplyEstimate {
+  stamp: string | null;
+  pending_feedback: Record<string, number>;
+  estimated_delta: Record<string, number>;
+  note: string;
+}
+
+export interface ReferenceExtraItem {
+  dedup_key: string;
+  full_path: string;
+  group_kind: string;
+  recommendation: string;
+  confidence: string;
+  item_name: string;
+}
+
+export interface ReferenceExtrasSummary {
+  stamp: string;
+  reference_roots: string[];
+  reference_extra_rows: number;
+  reference_extra_groups: number;
+  items: ReferenceExtraItem[];
+}
+
+export interface CustomBucketResult {
+  ok: boolean;
+  name: string;
+  description: string;
+}
+
 export interface ProgressEvent {
   type: string;
   ts?: string;

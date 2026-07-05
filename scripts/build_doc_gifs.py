@@ -31,6 +31,9 @@ HELP_SCREENSHOTS = [
     "security-malware.png",
     "environment-themes.png",
     "help-panel.png",
+    "scene-renames.png",
+    "scan-audit.png",
+    "skipped-files.png",
 ]
 
 

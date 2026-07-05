@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   compareRuns,
+  fetchFeedbackEstimate,
   fetchFeedbackSummary,
   fetchHarvestCandidates,
   fetchJobs,
@@ -9,6 +10,7 @@ import {
 } from "../api/client";
 import { useLibraryRoot } from "../hooks/useLibraryRoot";
 import type {
+  FeedbackApplyEstimate,
   JobSnapshot,
   QualityScorecard,
   RunListItem,
@@ -135,6 +137,7 @@ export function Dashboard({ summary, runs, onNavigate }: Props) {
   const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
   const [jobs, setJobs] = useState<JobSnapshot[]>([]);
   const [feedback, setFeedback] = useState<Record<string, number> | null>(null);
+  const [feedbackEstimate, setFeedbackEstimate] = useState<FeedbackApplyEstimate | null>(null);
   const [harvestPending, setHarvestPending] = useState(0);
   const [compareStamp, setCompareStamp] = useState("");
   const [compareResult, setCompareResult] = useState<Record<string, unknown> | null>(null);
@@ -168,6 +171,7 @@ export function Dashboard({ summary, runs, onNavigate }: Props) {
       void fetchSystemMetrics(libraryRoot).then(setMetrics).catch(() => undefined);
       void fetchJobs().then(setJobs).catch(() => undefined);
       void fetchFeedbackSummary(summary.stamp).then(setFeedback).catch(() => undefined);
+      void fetchFeedbackEstimate(summary.stamp).then(setFeedbackEstimate).catch(() => undefined);
       void fetchHarvestCandidates(false)
         .then((r) => setHarvestPending(r.total_pending))
         .catch(() => undefined);
@@ -509,18 +513,45 @@ export function Dashboard({ summary, runs, onNavigate }: Props) {
         title: "Feedback & vendors",
         subtitle: "Corrections awaiting next scan",
         content: (
-          <div className="stat-grid compact">
-            <StatTile label="Total feedback" value={feedback?.total ?? "—"} />
-            <StatTile label="Investigation" value={feedback?.investigation ?? "—"} />
-            <StatTile label="Duplicates" value={feedback?.duplicate ?? "—"} />
-            <StatTile label="Restructure" value={feedback?.restructure ?? "—"} />
-            <StatTile label="Archive" value={feedback?.archive ?? "—"} />
-            <StatTile
-              label="Research inbox"
-              value={harvestPending}
-              tone={harvestPending > 0 ? "warning" : undefined}
-            />
-          </div>
+          <>
+            <div className="stat-grid compact">
+              <StatTile label="Total feedback" value={feedback?.total ?? "—"} />
+              <StatTile label="Investigation" value={feedback?.investigation ?? "—"} />
+              <StatTile label="Duplicates" value={feedback?.duplicate ?? "—"} />
+              <StatTile label="Restructure" value={feedback?.restructure ?? "—"} />
+              <StatTile label="Archive" value={feedback?.archive ?? "—"} />
+              <StatTile
+                label="Research inbox"
+                value={harvestPending}
+                tone={harvestPending > 0 ? "warning" : undefined}
+              />
+            </div>
+            {feedbackEstimate?.estimated_delta &&
+            Object.keys(feedbackEstimate.estimated_delta).length > 0 ? (
+              <div className="stat-grid compact" style={{ marginTop: "0.75rem" }}>
+                <StatTile
+                  label="Est. investigation Δ"
+                  value={feedbackEstimate.estimated_delta.investigation ?? 0}
+                  tone={
+                    (feedbackEstimate.estimated_delta.investigation ?? 0) < 0 ? "accent" : undefined
+                  }
+                />
+                <StatTile
+                  label="Est. dupe groups Δ"
+                  value={feedbackEstimate.estimated_delta.duplicate_groups ?? 0}
+                />
+                <StatTile
+                  label="Est. restructure Δ"
+                  value={feedbackEstimate.estimated_delta.restructure_rows ?? 0}
+                />
+              </div>
+            ) : null}
+            {feedbackEstimate?.note && (
+              <p className="count-muted" style={{ marginTop: "0.5rem", fontSize: "0.8rem" }}>
+                {feedbackEstimate.note}
+              </p>
+            )}
+          </>
         ),
       },
       {
@@ -645,6 +676,7 @@ export function Dashboard({ summary, runs, onNavigate }: Props) {
       compareResult,
       compareStamp,
       feedback,
+      feedbackEstimate,
       findings,
       harvestPending,
       identificationPct,

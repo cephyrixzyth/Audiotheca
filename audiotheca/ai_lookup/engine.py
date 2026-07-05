@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import uuid
 from pathlib import Path
 from typing import Any, Callable
@@ -12,6 +13,7 @@ from audiotheca.ai_lookup.cache import LookupCache
 from audiotheca.ai_lookup.disambiguation import DeveloperLineage, LookupResult, ReleaseOrigin, SoftwareArchetype
 from audiotheca.ai_lookup.nfo_reader import read_release_metadata
 from audiotheca.ai_lookup.providers.base import LookupProvider
+from audiotheca.ai_lookup.providers.openai_compatible import OpenAICompatibleProvider
 from audiotheca.ai_lookup.providers.stub import StubLookupProvider
 from audiotheca.ai_lookup.telemetry import build_telemetry
 
@@ -20,6 +22,13 @@ ProgressCallback = Callable[[dict[str, Any]], None]
 # Module-level state for API status endpoints.
 _active_lookups: dict[str, LookupResult] = {}
 _token_usage: dict[str, int] = {"used": 0, "limit": 50_000}
+
+
+def resolve_lookup_provider() -> LookupProvider:
+    kind = os.environ.get("AUDIOTHECA_AI_LOOKUP_PROVIDER", "stub").strip().lower()
+    if kind in {"openai", "openai_compatible", "openai-compatible"}:
+        return OpenAICompatibleProvider()
+    return StubLookupProvider()
 
 
 def needs_ai_lookup(item: dict[str, Any]) -> bool:
@@ -42,7 +51,7 @@ class LookupEngine:
         root: Path | None = None,
     ) -> None:
         self.cache = cache or LookupCache()
-        self.provider = provider or StubLookupProvider()
+        self.provider = provider or resolve_lookup_provider()
         self.root = root
 
     def lookup_item(

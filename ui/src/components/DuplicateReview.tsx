@@ -5,6 +5,8 @@ import {
   executeDuplicateStaging,
   fetchDecisions,
   fetchDuplicates,
+  fetchLibraryRoots,
+  fetchReferenceExtras,
   feedbackExportUrl,
   rejectDuplicateGroup,
   saveDecisions,
@@ -50,8 +52,31 @@ export function DuplicateReview({ stamp }: Props) {
   const [manualB, setManualB] = useState("");
   const [manualNote, setManualNote] = useState("");
   const [hideRejected, setHideRejected] = useState(true);
+  const [showReferenceExtras, setShowReferenceExtras] = useState(false);
+  const [referenceExtraKeys, setReferenceExtraKeys] = useState<Set<string>>(new Set());
+  const [referenceExtraGroups, setReferenceExtraGroups] = useState(0);
 
   const rejectedKeys = new Set(rejections.map((row) => row.dedup_key));
+
+  useEffect(() => {
+    if (!showReferenceExtras) {
+      setReferenceExtraKeys(new Set());
+      setReferenceExtraGroups(0);
+      return;
+    }
+    fetchLibraryRoots()
+      .then((res) => {
+        const roots = res.roots?.length ? res.roots : libraryRoot ? [libraryRoot] : [];
+        if (!roots.length) return null;
+        return fetchReferenceExtras(stamp, roots);
+      })
+      .then((res) => {
+        if (!res) return;
+        setReferenceExtraKeys(new Set(res.items.map((item) => item.dedup_key)));
+        setReferenceExtraGroups(res.reference_extra_groups);
+      })
+      .catch(() => undefined);
+  }, [stamp, showReferenceExtras, libraryRoot]);
 
   useEffect(() => {
     fetchDecisions(stamp).then((res) => {
@@ -178,6 +203,9 @@ export function DuplicateReview({ stamp }: Props) {
   const visibleGroups = hideRejected
     ? groups.filter((group) => !rejectedKeys.has(group.dedup_key))
     : groups;
+  const filteredGroups = showReferenceExtras
+    ? visibleGroups.filter((group) => referenceExtraKeys.has(group.dedup_key))
+    : visibleGroups;
   const decidedCount = Object.keys(keepers).length;
 
   return (
@@ -199,6 +227,15 @@ export function DuplicateReview({ stamp }: Props) {
           />
           Hide bad matches
         </label>
+        <button
+          type="button"
+          className={`bucket-chip ${showReferenceExtras ? "active" : ""}`.trim()}
+          title="Show duplicate groups that also exist under configured reference library roots"
+          onClick={() => setShowReferenceExtras((v) => !v)}
+        >
+          Reference extras
+          {showReferenceExtras && referenceExtraGroups > 0 ? ` (${referenceExtraGroups})` : ""}
+        </button>
         <span className="count-muted">
           {loading
             ? "Loading…"
@@ -278,11 +315,15 @@ export function DuplicateReview({ stamp }: Props) {
         </div>
       )}
 
-      {!loading && visibleGroups.length === 0 && (
-        <div className="empty">No duplicate groups match your filters.</div>
+      {!loading && filteredGroups.length === 0 && (
+        <div className="empty">
+          {showReferenceExtras
+            ? "No reference-extra duplicate groups for configured library roots."
+            : "No duplicate groups match your filters."}
+        </div>
       )}
 
-      {visibleGroups.map((group) => {
+      {filteredGroups.map((group) => {
         const rejected = rejectedKeys.has(group.dedup_key);
         return (
           <article
