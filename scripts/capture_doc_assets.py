@@ -622,31 +622,76 @@ EDGE_PATHS = [
 ]
 
 
+def _playwright_browsers_roots() -> list[Path]:
+    """Directories where `playwright install` may place browser builds."""
+    roots: list[Path] = []
+    env_root = os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "").strip()
+    if env_root:
+        roots.append(Path(env_root))
+    if sys.platform == "win32":
+        local = Path(os.environ.get("LOCALAPPDATA", ""))
+        if local:
+            roots.append(local / "ms-playwright")
+        temp = Path(os.environ.get("TEMP", ""))
+        if temp:
+            roots.extend(sorted(temp.glob("cursor-sandbox-cache/*/playwright")))
+    elif sys.platform == "darwin":
+        roots.append(Path.home() / "Library" / "Caches" / "ms-playwright")
+    else:
+        roots.append(Path.home() / ".cache" / "ms-playwright")
+    return roots
+
+
 def _playwright_chromium_path() -> Path | None:
     """Resolve Playwright-bundled Chromium (avoids Edge channel headless failures on CI)."""
     env_path = os.environ.get("PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH", "").strip()
     if env_path and Path(env_path).is_file():
         return Path(env_path)
     if sys.platform == "win32":
-        local = Path(os.environ.get("LOCALAPPDATA", ""))
-        candidates = sorted(local.glob("ms-playwright/chromium-*/chrome-win/chrome.exe"))
-        if candidates:
-            return candidates[-1]
+        patterns = (
+            "chromium-*/chrome-win64/chrome.exe",
+            "chromium-*/chrome-win/chrome.exe",
+            "chromium_headless_shell-*/chrome-headless-shell-win64/chrome-headless-shell.exe",
+        )
     elif sys.platform == "darwin":
-        home = Path.home()
-        candidates = sorted(home.glob("Library/Caches/ms-playwright/chromium-*/chrome-mac/Chromium.app/Contents/MacOS/Chromium"))
-        if candidates:
-            return candidates[-1]
+        patterns = (
+            "chromium-*/chrome-mac/Chromium.app/Contents/MacOS/Chromium",
+            "chromium_headless_shell-*/chrome-headless-shell-mac/chrome-headless-shell",
+        )
     else:
-        home = Path.home()
-        candidates = sorted(home.glob(".cache/ms-playwright/chromium-*/chrome-linux/chrome"))
-        if candidates:
-            return candidates[-1]
+        patterns = (
+            "chromium-*/chrome-linux/chrome",
+            "chromium_headless_shell-*/chrome-headless-shell-linux/chrome-headless-shell",
+        )
+    for root in _playwright_browsers_roots():
+        if not root.is_dir():
+            continue
+        for pattern in patterns:
+            candidates = sorted(root.glob(pattern))
+            if candidates:
+                return candidates[-1]
     return None
+
+
+def _ensure_playwright_chromium() -> None:
+    """Download bundled Chromium when missing (Playwright default cache path)."""
+    if _playwright_chromium_path() is not None:
+        return
+    print("Installing Playwright Chromium (one-time download)...", flush=True)
+    env = os.environ.copy()
+    if sys.platform == "win32" and not env.get("PLAYWRIGHT_BROWSERS_PATH"):
+        env["PLAYWRIGHT_BROWSERS_PATH"] = str(
+            Path(os.environ.get("LOCALAPPDATA", "")) / "ms-playwright"
+        )
+    subprocess.check_call(
+        [sys.executable, "-m", "playwright", "install", "chromium"],
+        env=env,
+    )
 
 
 def _browser_launch_kwargs() -> dict[str, object]:
     """Prefer Playwright-bundled Chromium (Edge channel fails headless on some CI hosts)."""
+    _ensure_playwright_chromium()
     chromium = _playwright_chromium_path()
     if chromium:
         return {"headless": True, "executable_path": str(chromium)}
@@ -749,7 +794,7 @@ def capture() -> None:
             # File explorer screenshot — after archives; close explorer when done
             dismiss_explorer()
             click_tab("investigation")
-            page.get_by_role("button", name="Library", exact=False).click()
+            page.locator("button.top-tab-library").click()
             page.wait_for_timeout(1500)
             explorer = page.locator(".file-explorer-shell").first
             if explorer.count():
@@ -779,7 +824,7 @@ def capture() -> None:
                     _click_tab(vpage, tab_id)
                     vpage.wait_for_timeout(1600)
                 if "file-explorer" in video_name:
-                    vpage.get_by_role("button", name="Library", exact=False).click()
+                    vpage.locator("button.top-tab-library").click()
                     vpage.wait_for_timeout(2000)
                     vpage.keyboard.press("Escape")
                 vpage.close()

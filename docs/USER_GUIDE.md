@@ -1,6 +1,6 @@
 # Audiotheca — Quick User Guide
 
-Engine **10.0.0** · Web UI **1.0.0**
+Engine **10.0.0** · Web UI **1.0.1**
 
 **New here?** Read the [main README](../README.md) for overview, screenshots, and video placeholders.
 
@@ -100,7 +100,7 @@ Always review `Run_Summary_*.txt` before any live run.
 
 | Tab | What you do |
 | --- | --- |
-| **Dashboard** | Pick run, route-ready / identification gauges, compare runs, reorder panels |
+| **Dashboard** | Works before first scan — host metrics, environment health, quick links; pick run for route-ready gauges and compare runs |
 | **Scan** | Start dry-run; **Processing flow** presets; live WebSocket progress; **AI lookup** panel |
 | **Investigation** | Filter buckets, bulk correct, group by prefix, export feedback |
 | **Duplicates** | Pick keeper, reject bad groups, preview/stage deletes, manual dupes |
@@ -117,9 +117,9 @@ Always review `Run_Summary_*.txt` before any live run.
 
 Most tabs support **drag-to-reorder sections** (Dashboard, Scan, and others); preferences persist in browser localStorage.
 
-**File explorer:** click **Browse** on any path link to open the in-app folder/archive browser (engine 10.0+).
+**File explorer:** open **Library** from the top bar, or click **Browse** on any path link. Use **Pop out wide panel** in the sidebar for full-width review; dual-pane compare on two folders.
 
-**Themes:** use the ◐ selector in the top bar, or **Environment → Themes** for custom palettes.
+**Themes:** use the ◐ selector in the top bar, or **Environment → Themes** for custom palettes. Buttons and accents follow the active theme (no hardcoded green).
 
 Decisions save to `dedupe_reports/decisions/approved_{stamp}.json` and `dedupe_reports/feedback/`.
 

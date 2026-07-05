@@ -114,7 +114,7 @@ def main() -> None:
 
         dismiss_explorer()
         click_tab("investigation")
-        page.get_by_role("button", name="Library", exact=False).click()
+        page.locator("button.top-tab-library").click()
         page.wait_for_timeout(1500)
         explorer = page.locator(".file-explorer-shell").first
         if explorer.count():

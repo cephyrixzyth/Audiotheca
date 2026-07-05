@@ -2,6 +2,17 @@
 
 Use this table when preparing documentation assets. Each row must exist at the listed path before the README media sections show real content.
 
+**Last refreshed:** 2026-07-05 (Web UI 1.0.1 — theme fixes, dashboard without run, library pop-out). Re-capture with demo API/UI running:
+
+```powershell
+$env:AUDIOTHECA_CAPTURE_UI_PORT="5175"
+$env:AUDIOTHECA_CAPTURE_API_PORT="8788"
+python scripts/capture_screenshots_only.py
+python scripts/build_doc_gifs.py
+```
+
+Playwright uses bundled Chromium only (`scripts/capture_doc_assets.py` — no Edge channel).
+
 ## Screenshots
 
 | Status | Path | Alt text (for README) |
