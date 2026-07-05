@@ -78,6 +78,10 @@ jobs:
             file \
             libfuse2
 
+      - name: Install Rosetta (macOS x86_64 cross-build)
+        if: matrix.platform == 'macos-latest' && matrix.sidecar_arch == 'x86_64'
+        run: softwareupdate --install-rosetta --agree-to-license
+
       - name: Build sidecars
         env:
           AUDIOTHECA_TARGET: ${{ matrix.sidecar_target }}

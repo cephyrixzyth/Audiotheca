@@ -113,6 +113,17 @@ def resolve_target(explicit: str | None) -> str:
     return host_target_triple()
 
 
+def host_darwin_arch() -> str | None:
+    if platform.system() != "Darwin":
+        return None
+    machine = platform.machine().lower()
+    if machine in {"arm64", "aarch64"}:
+        return "arm64"
+    if machine in {"x86_64", "amd64"}:
+        return "x86_64"
+    return None
+
+
 def darwin_arch_for_target(triple: str, explicit_arch: str | None) -> str | None:
     if platform.system() != "Darwin":
         return None
@@ -123,6 +134,14 @@ def darwin_arch_for_target(triple: str, explicit_arch: str | None) -> str | None
     if triple.startswith("aarch64-apple-darwin"):
         return "arm64"
     return None
+
+
+def needs_darwin_arch_wrapper(requested: str | None) -> bool:
+    """Use arch(1) only when cross-compiling on macOS (host arch != target arch)."""
+    if not requested:
+        return False
+    host = host_darwin_arch()
+    return host is not None and host != requested
 
 
 def sidecar_suffix(triple: str) -> str:
@@ -165,8 +184,9 @@ def run_pyinstaller(
     for module in hidden:
         cmd.extend(["--hidden-import", module])
 
-    if darwin_arch:
-        cmd = ["arch", darwin_arch, *cmd]
+    if darwin_arch and needs_darwin_arch_wrapper(darwin_arch):
+        # macOS arch(1) requires a leading dash: arch -arm64 / arch -x86_64
+        cmd = ["arch", f"-{darwin_arch}", *cmd]
 
     print(f"\n=== Building {name} ===")
     subprocess.run(cmd, cwd=str(ROOT), check=True)
@@ -210,7 +230,10 @@ def main() -> int:
     triple = resolve_target(args.target)
     darwin_arch = darwin_arch_for_target(triple, args.arch)
     if darwin_arch:
-        print(f"Building sidecars for target {triple} via macOS arch {darwin_arch}")
+        if needs_darwin_arch_wrapper(darwin_arch):
+            print(f"Building sidecars for target {triple} via macOS arch -{darwin_arch}")
+        else:
+            print(f"Building sidecars for target {triple} (native macOS {darwin_arch})")
     else:
         print(f"Building sidecars for target {triple}")
 
