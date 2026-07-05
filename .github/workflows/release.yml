@@ -16,12 +16,22 @@ jobs:
         include:
           - platform: windows-latest
             args: "--target x86_64-pc-windows-msvc"
+            rust_targets: x86_64-pc-windows-msvc
+            sidecar_target: x86_64-pc-windows-msvc
           - platform: macos-latest
             args: "--target x86_64-apple-darwin"
+            rust_targets: x86_64-apple-darwin
+            sidecar_target: x86_64-apple-darwin
+            sidecar_arch: x86_64
           - platform: macos-latest
             args: "--target aarch64-apple-darwin"
+            rust_targets: aarch64-apple-darwin
+            sidecar_target: aarch64-apple-darwin
+            sidecar_arch: arm64
           - platform: ubuntu-22.04
             args: "--target x86_64-unknown-linux-gnu"
+            rust_targets: x86_64-unknown-linux-gnu
+            sidecar_target: x86_64-unknown-linux-gnu
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -47,6 +57,13 @@ jobs:
         run: npm ci
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_targets }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ui/src-tauri -> target
 
       - name: Install Linux system dependencies
         if: matrix.platform == 'ubuntu-22.04'
@@ -56,9 +73,15 @@ jobs:
             libwebkit2gtk-4.1-dev \
             libappindicator3-dev \
             librsvg2-dev \
-            patchelf
+            patchelf \
+            xdg-utils \
+            file \
+            libfuse2
 
       - name: Build sidecars
+        env:
+          AUDIOTHECA_TARGET: ${{ matrix.sidecar_target }}
+          AUDIOTHECA_SIDECAR_ARCH: ${{ matrix.sidecar_arch }}
         run: python scripts/build_sidecars.py
 
       - uses: tauri-apps/tauri-action@v0
