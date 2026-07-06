@@ -37,6 +37,11 @@ const REJECT_LABELS: Record<string, string> = {
   other: "Other",
 };
 
+function dedupKeyFingerprint(dedupKey: string): string {
+  const pipe = dedupKey.indexOf("|");
+  return pipe >= 0 ? dedupKey.slice(pipe + 1) : dedupKey;
+}
+
 export function DuplicateReview({ stamp }: Props) {
   const libraryRoot = useLibraryRoot();
   const { query } = useContextSidebar();
@@ -132,9 +137,11 @@ export function DuplicateReview({ stamp }: Props) {
 
   async function handleReject(group: DuplicateGroup, reason: string) {
     const note = window.prompt("Optional note — why is this a bad match?") ?? "";
+    const fingerprint = dedupKeyFingerprint(group.dedup_key);
     await rejectDuplicateGroup(stamp, {
       dedup_key: group.dedup_key,
       paths: group.members.map((member) => member.full_path),
+      fingerprint,
       reason,
       note,
     });
@@ -143,6 +150,7 @@ export function DuplicateReview({ stamp }: Props) {
       {
         dedup_key: group.dedup_key,
         paths: group.members.map((member) => member.full_path),
+        fingerprint,
         reason,
         note,
       },

@@ -30,9 +30,9 @@ Backend execute paths exist (`duplicate_execute`, `restructure_execute`, `scene_
 | F2 | Wire `POST …/duplicates/stage` response into results UI | Show moved/skipped/failed per discard | ☑ |
 | F3 | Wire restructure + scene live execute responses | Section approve → execute → log | ☑ |
 | F4 | Dashboard **feedback summary** link → execute history for last run | Builds on `/api/feedback/summary` | ☑ |
-| F5 | Fingerprint blocklist from duplicate rejections | `engine_hints.json` merge | ☐ |
+| F5 | Fingerprint blocklist from duplicate rejections | `engine_hints.json` merge | ☑ |
 
-**Exit:** User can stage/execute from UI and see what happened without reading server logs.
+**Exit:** User can stage/execute from UI and see what happened without reading server logs. **Phase F complete** (F1–F5).
 
 ---
 

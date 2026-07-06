@@ -1111,9 +1111,11 @@ def reject_duplicate_group(stamp: str, body: dict = Body(...)) -> dict[str, obje
         raise HTTPException(status_code=400, detail="paths must be a list")
     reason = str(body.get("reason", "bad_match"))
     note = str(body.get("note", ""))
+    fingerprint = str(body.get("fingerprint", "")).strip()
     add_rejection(
         dedup_key,
         [str(p) for p in paths],
+        fingerprint=fingerprint,
         reason=reason,
         note=note,
         stamp=stamp,

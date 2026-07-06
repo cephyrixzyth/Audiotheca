@@ -11,6 +11,7 @@ from pathlib import Path
 FEEDBACK_VERSION = 1
 FEEDBACK_DIR = Path(__file__).resolve().parent / "dedupe_reports" / "feedback"
 GLOBAL_FEEDBACK_PATH = FEEDBACK_DIR / "duplicate_feedback.json"
+ENGINE_HINTS_PATH = FEEDBACK_DIR / "engine_hints.json"
 
 REJECT_REASONS = (
     "bad_match",
@@ -25,6 +26,7 @@ REJECT_REASONS = (
 class Rejection:
     dedup_key: str
     paths: list[str] = field(default_factory=list)
+    fingerprint: str = ""
     reason: str = "bad_match"
     note: str = ""
     stamp: str = ""
@@ -142,21 +144,73 @@ def save_run_feedback(stamp: str, payload: dict) -> Path:
     return path
 
 
+def _dedup_key_parts(dedup_key: str) -> tuple[str, str]:
+    if "|" in dedup_key:
+        left, right = dedup_key.split("|", 1)
+        return left, right
+    return "", dedup_key
+
+
+def rejection_fingerprint(row: Rejection) -> str:
+    if row.fingerprint:
+        return row.fingerprint
+    return _dedup_key_parts(row.dedup_key)[1]
+
+
 def rejected_dedup_keys(store: FeedbackStore | None = None) -> set[str]:
     store = store or load_feedback_store()
     return {row.dedup_key for row in store.rejections if row.dedup_key}
 
 
+def fingerprint_blocklist(store: FeedbackStore | None = None) -> set[str]:
+    """Vendor|fingerprint keys and dedup keys blocked by user rejections."""
+    store = store or load_feedback_store()
+    blocked: set[str] = set()
+    for row in store.rejections:
+        if row.dedup_key:
+            blocked.add(row.dedup_key)
+        fp = rejection_fingerprint(row)
+        if not fp:
+            continue
+        vendor, _ = _dedup_key_parts(row.dedup_key)
+        if vendor:
+            blocked.add(f"{vendor}|{fp}")
+        elif fp:
+            blocked.add(fp)
+    return blocked
+
+
+def load_engine_hints() -> dict:
+    if not ENGINE_HINTS_PATH.is_file():
+        return {}
+    try:
+        return json.loads(ENGINE_HINTS_PATH.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
 def is_group_rejected(dedup_key: str, paths: list[str], store: FeedbackStore | None = None) -> bool:
     store = store or load_feedback_store()
-    if dedup_key in rejected_dedup_keys(store):
+    hints = load_engine_hints()
+    blocked_keys = rejected_dedup_keys(store) | set(hints.get("rejected_dedup_keys", []))
+    blocked_fps = fingerprint_blocklist(store) | set(hints.get("fingerprint_blocklist", []))
+
+    if dedup_key and (dedup_key in blocked_keys or dedup_key in blocked_fps):
         return True
+
     path_set = {str(Path(p).resolve()) for p in paths if p}
     for row in store.rejections:
         if not row.paths:
             continue
         rejected = {str(Path(p).resolve()) for p in row.paths if p}
         if rejected and rejected == path_set:
+            return True
+
+    for path_set_hint in hints.get("rejected_path_sets", []):
+        if not path_set_hint:
+            continue
+        hinted = {str(Path(p).resolve()) for p in path_set_hint if p}
+        if hinted and hinted == path_set:
             return True
     return False
 
@@ -165,12 +219,16 @@ def add_rejection(
     dedup_key: str,
     paths: list[str],
     *,
+    fingerprint: str = "",
     reason: str = "bad_match",
     note: str = "",
     stamp: str = "",
 ) -> FeedbackStore:
     store = load_feedback_store()
     created = _now_iso()
+    fp = fingerprint.strip() or rejection_fingerprint(
+        Rejection(dedup_key=dedup_key, fingerprint="")
+    )
     store.rejections = [
         row for row in store.rejections
         if not (row.dedup_key == dedup_key and row.stamp == stamp)
@@ -179,6 +237,7 @@ def add_rejection(
         Rejection(
             dedup_key=dedup_key,
             paths=paths,
+            fingerprint=fp,
             reason=reason if reason in REJECT_REASONS else "other",
             note=note.strip(),
             stamp=stamp,
@@ -196,12 +255,14 @@ def add_rejection(
         {
             "dedup_key": dedup_key,
             "paths": paths,
+            "fingerprint": fp,
             "reason": reason,
             "note": note.strip(),
             "created": created,
         }
     )
     save_run_feedback(stamp, run_data)
+    export_engine_hints(store)
     return store
 
 
@@ -336,14 +397,15 @@ def export_backend_csv(stamp: str | None = None) -> Path:
     return path
 
 
-def export_engine_hints() -> Path:
+def export_engine_hints(store: FeedbackStore | None = None) -> Path:
     """Compact JSON the engine reads on next scan."""
-    store = load_feedback_store()
-    path = FEEDBACK_DIR / "engine_hints.json"
+    store = store or load_feedback_store()
+    FEEDBACK_DIR.mkdir(parents=True, exist_ok=True)
     hints = {
         "version": FEEDBACK_VERSION,
         "updated": store.updated or _now_iso(),
         "rejected_dedup_keys": sorted(rejected_dedup_keys(store)),
+        "fingerprint_blocklist": sorted(fingerprint_blocklist(store)),
         "rejected_path_sets": [
             sorted(row.paths) for row in store.rejections if row.paths
         ],
@@ -353,5 +415,5 @@ def export_engine_hints() -> Path:
             if row.relationship == "duplicate"
         ],
     }
-    path.write_text(json.dumps(hints, indent=2), encoding="utf-8")
-    return path
+    ENGINE_HINTS_PATH.write_text(json.dumps(hints, indent=2), encoding="utf-8")
+    return ENGINE_HINTS_PATH

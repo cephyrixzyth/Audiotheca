@@ -379,6 +379,7 @@ export function fetchArchiveDiff(
 export interface DuplicateRejection {
   dedup_key: string;
   paths: string[];
+  fingerprint?: string;
   reason: string;
   note?: string;
   created?: string;
@@ -415,6 +416,7 @@ export function rejectDuplicateGroup(
   payload: {
     dedup_key: string;
     paths: string[];
+    fingerprint?: string;
     reason?: string;
     note?: string;
   },
