@@ -1,6 +1,6 @@
 # Changelog
 
-## Web UI & API 1.0.4 (unreleased)
+## Web UI & API 1.0.4
 
 Engine remains **10.0.0**.
 

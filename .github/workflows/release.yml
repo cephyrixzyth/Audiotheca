@@ -115,7 +115,7 @@ jobs:
             - macOS: `.dmg` (Intel and Apple Silicon matrix builds)
             - Linux: `.AppImage` and `.deb`
 
-            Engine version 10.0.0 · UI/API 1.0.3
+            Engine version 10.0.0 · UI/API 1.0.4
 
             - Desktop close: minimize to tray or quit with confirmation dialog
             - 94-code architecture spec catalog (waves A–R)

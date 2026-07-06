@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | **Engine** | 10.0.0 |
-| **Web UI / API** | 1.0.3 |
+| **Web UI / API** | 1.0.4 |
 | **Primary platform** | Windows (CLI, browser UI, Tauri desktop) |
 
 ---
