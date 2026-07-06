@@ -26,7 +26,7 @@ def scan_process(pid: int) -> dict[str, Any]:
     if mem.rss > 2 * 1024**3:
         suspicious.append("high_rss")
     try:
-        for conn in proc.net_connections(kind="inet"):
+        for conn in proc.connections(kind="inet"):
             if conn.raddr:
                 suspicious.append(f"outbound:{conn.raddr.ip}:{conn.raddr.port}")
     except (psutil.AccessDenied, psutil.ZombieProcess):

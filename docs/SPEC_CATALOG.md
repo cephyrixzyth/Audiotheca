@@ -1,8 +1,8 @@
 # Audiotheca — Architecture Spec Catalog
 
-Engine **10.0.0** · Web UI / API **1.0.3**
+Engine **10.0.0** · Web UI / API **1.0.2**
 
-The spec catalog tracks **94 feature codes** across five sections. As of 1.0.3, all codes are **`done`** — each has a module, invoke handler (backend) or UI surface (UI-LOG), and pytest coverage.
+The spec catalog tracks **94 feature codes** across five sections. As of 1.0.2, all codes are **`done`** — each has a module, invoke handler (backend) or UI surface (UI-LOG), and pytest coverage.
 
 ## Sections
 
@@ -59,6 +59,6 @@ python scripts/seed_demo_library.py
 
 ## Related docs
 
-- [CHANGELOG — 1.0.3](CHANGELOG.md#web-ui--api-103)
+- [CHANGELOG — 1.0.2](CHANGELOG.md#web-ui--api-102)
 - [Feature guide](FEATURE_GUIDE.md)
 - [Configuration](CONFIGURATION.md)
