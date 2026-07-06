@@ -25,6 +25,7 @@ import { MountEventsPanel, SpecCatalogPanel } from "./SpecCatalogPanel";
 import { PreviewSessionPanel } from "./PreviewSessionPanel";
 import { OrchestrationToolsPanel } from "./OrchestrationToolsPanel";
 import { VirtualPathsPanel } from "./VirtualPathsPanel";
+import { DawSidecarPanel } from "./DawSidecarPanel";
 import { DesktopCloseBehaviorPanel } from "./DesktopCloseBehaviorPanel";
 import { isTauri } from "../platform";
 
@@ -367,6 +368,14 @@ export function EnvironmentPanel() {
       fullWidth: true,
       minBodyHeight: 220,
       content: <OrchestrationToolsPanel />,
+    },
+    {
+      id: "daw-sidecar",
+      title: "DAW sidecar plugin",
+      subtitle: "JUCE VST3/AU blueprint export + install instructions (DAW-SIDE)",
+      fullWidth: true,
+      minBodyHeight: 200,
+      content: <DawSidecarPanel />,
     },
     {
       id: "spec-catalog",

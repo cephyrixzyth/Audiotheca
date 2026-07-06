@@ -1406,6 +1406,10 @@ export function runReferenceDedupeEngine(body: {
   return postJson("/reference-dedupe/engine-scan", body);
 }
 
+export function exportDawSideBlueprint(home?: string): Promise<Record<string, unknown>> {
+  return postJson("/tools/daw-side/blueprint", home ? { home } : {});
+}
+
 export function fetchSpecCatalog(section?: string): Promise<{
   summary: Record<string, unknown>;
   entries: Array<Record<string, unknown>>;
