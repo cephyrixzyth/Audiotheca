@@ -2,7 +2,7 @@
 
 Start with the [main README](../README.md) for overview, quick start, UI tour, and media placeholders.
 
-Engine **10.0.0** · Web UI **1.0.2**
+Engine **10.0.0** · Web UI **1.0.3**
 
 ---
 
