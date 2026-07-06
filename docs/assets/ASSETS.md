@@ -2,7 +2,7 @@
 
 Use this table when preparing documentation assets. Each row must exist at the listed path before the README media sections show real content.
 
-**Last refreshed:** 2026-07-06 (Web UI **1.0.3** — spec catalog, investigation lookup, orchestration, cloud storage, audio preview, DropZone). Re-capture with demo API/UI running:
+**Last refreshed:** 2026-07-06 (Web UI **1.0.5** — spec catalog, investigation lookup, orchestration, cloud storage, audio preview, DropZone). Re-capture with demo API/UI running:
 
 ```powershell
 $env:AUDIOTHECA_CAPTURE_UI_PORT="5175"
@@ -83,7 +83,7 @@ Help tab assets are copied to `ui/public/help/` by the same script for Vite dev/
 
 ## Capture notes
 
-- **Engine / UI version** shown in the header should match docs (engine **10.0.0**, Web UI **1.0.3**).
+- **Engine / UI version** shown in the header should match docs (engine **10.0.0**, Web UI **1.0.5**).
 - **Primary nav** is grouped: Dashboard · Scan · Review · Library · System · Help (not a flat tab row).
 - **Help tab** appears last in the primary bar.
 - Scroll Environment panels to capture orchestration, spec catalog, and cloud sections — default capture scrolls to Themes only.

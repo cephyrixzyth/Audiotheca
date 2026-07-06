@@ -1,6 +1,6 @@
 # Audiotheca — Install Guide
 
-Engine version: **10.0.0** · Web UI: **1.0.3**
+Engine version: **10.0.0** · Web UI: **1.0.5**
 
 For overview and first-run walkthrough, see the [main README](../README.md).
 
@@ -17,13 +17,13 @@ End users do **not** need Python, Node, or Rust when using release installers �
 | Platform | Build script (maintainers) | Output folder | Artifacts |
 | --- | --- | --- | --- |
 | **Windows** | `.\scripts\build-installers.ps1` | `dist/installers/windows/` | `.msi`, NSIS `-setup.exe` |
-| **Windows portable** | `.\scripts\build-portable.ps1` | `dist/installers/windows/` | `Audiotheca-Portable-1.0.3-win64.zip` |
+| **Windows portable** | `.\scripts\build-portable.ps1` | `dist/installers/windows/` | `Audiotheca-Portable-1.0.5-win64.zip` |
 | **macOS** | `./scripts/build-installers.sh` | `dist/installers/mac/` | `.dmg` |
 | **Linux** | `./scripts/build-installers.sh` | `dist/installers/linux/` | `.AppImage`, `.deb` |
 
 ### Windows installer
 
-1. Download or build `Audiotheca_1.0.3_x64_en-US.msi` or `Audiotheca_1.0.3_x64-setup.exe` from [GitHub Releases](https://github.com/chrisjrovira/Audiotheca/releases/latest).
+1. Download or build `Audiotheca_1.0.5_x64_en-US.msi` or `Audiotheca_1.0.5_x64-setup.exe` from [GitHub Releases](https://github.com/chrisjrovira/Audiotheca/releases/latest).
 2. **Close Audiotheca completely** before upgrading (including any background API sidecar).
 3. Run the installer as Administrator — WebView2 bootstrapper is included when needed.
 4. Launch **Audiotheca** from the Start menu; use the first-run wizard to set your library root.
@@ -37,11 +37,11 @@ The desktop app spawns **api-server** and **audiotheca-engine** sidecars. If the
 3. Or run: `powershell -ExecutionPolicy Bypass -File scripts\kill-audiotheca.ps1`
 4. Re-run the installer **as Administrator**.
 
-Installers built from 1.0.3+ include NSIS hooks that terminate these processes automatically before copying files.
+Installers built from 1.0.5+ include NSIS hooks that terminate these processes automatically before copying files.
 
 ### Windows portable zip
 
-1. Extract `Audiotheca-Portable-1.0.3-win64.zip` to any writable folder.
+1. Extract `Audiotheca-Portable-1.0.5-win64.zip` to any writable folder.
 2. Double-click **`Run Audiotheca.bat`** (no terminal window).
 3. Reports and cache go in `data/` (`portable.json` documents `AUDIOTHECA_HOME` relative to the exe).
 

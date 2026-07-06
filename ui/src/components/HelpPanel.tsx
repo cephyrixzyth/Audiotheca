@@ -39,7 +39,7 @@ Primary nav: Dashboard · Scan · Review · Library · System · Help`,
       {
         id: "install",
         title: "Install & requirements",
-        body: `Desktop installers (latest release, currently v1.0.3) — no CLI for end users:
+        body: `Desktop installers (latest release, currently v1.0.5) — no CLI for end users:
   GitHub Releases → .msi, NSIS setup.exe, or Audiotheca-Portable-*-win64.zip
 
 Build (maintainers):

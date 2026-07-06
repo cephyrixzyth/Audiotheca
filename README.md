@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | **Engine** | 10.0.0 |
-| **Web UI / API** | 1.0.4 |
+| **Web UI / API** | 1.0.5 |
 | **Primary platform** | Windows (CLI, browser UI, Tauri desktop) |
 
 ---
@@ -13,7 +13,7 @@
 ## Table of contents
 
 - [What Audiotheca does](#what-audiotheca-does)
-- [Capabilities overview (UI 1.0.4)](#capabilities-overview-ui-103)
+- [Capabilities overview (UI 1.0.5)](#capabilities-overview-ui-103)
 - [Who should read what](#who-should-read-what)
 - [Quick start (Windows)](#quick-start-windows)
 - [First scan walkthrough](#first-scan-walkthrough)
@@ -49,9 +49,9 @@ When you are ready, live runs support **per-section or per-item approval** with 
 
 ---
 
-## Capabilities overview (UI 1.0.4)
+## Capabilities overview (UI 1.0.5)
 
-Web UI **1.0.4** completes the **94-code architecture spec catalog** (waves A–R). Every SYS-ING, AUD-PIP, AI-SEC, LFC-ORCH, and UI-LOG code has a backend handler or UI surface, API route, and pytest coverage. See [Spec catalog](docs/SPEC_CATALOG.md).
+Web UI **1.0.5** completes the **94-code architecture spec catalog** (waves A–R). Every SYS-ING, AUD-PIP, AI-SEC, LFC-ORCH, and UI-LOG code has a backend handler or UI surface, API route, and pytest coverage. See [Spec catalog](docs/SPEC_CATALOG.md).
 
 | Area | What you get in the UI |
 |------|-------------------------|
@@ -218,7 +218,7 @@ Dashboard · Scan · Review ▾ · Library · System ▾ · Help
 | **Environment** | Dependency health & repairs, **theme studio**, mount watcher (MNT-LSTN), **cloud & S3 telemetry**, **orchestration tools** (NET-SAFE, CLN-SWEEP, XFER-BNDL, …), **94-code spec catalog** panel, virtual paths, preview session, audit log |
 | **Vendors** | Vendor gaps, web harvest inbox, keyword export |
 
-**Cross-cutting UI features (engine 10 / UI 1.0.4):**
+**Cross-cutting UI features (engine 10 / UI 1.0.5):**
 
 - **In-app file explorer** — top-bar **Library**, or **Browse** on path links; list folders or archive contents without extracting.
 - **Audio preview (AUTO-AUD)** — hover/select WAV/MP3/FLAC in the explorer; waveform, LUFS/BPM/key badges; tempo sync and pitch from **Environment → Preview session**.
@@ -487,7 +487,7 @@ python scripts/library_probe.py                      # Lightweight library stats
 
 ## Docker (Unraid / Linux / Docker Desktop)
 
-Engine **10.0.0** · Web UI / API **1.0.4**
+Engine **10.0.0** · Web UI / API **1.0.5**
 
 ### Pull from GitHub Container Registry
 

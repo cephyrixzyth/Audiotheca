@@ -50,8 +50,11 @@ VIDEO_CLIPS: list[tuple[str, list[str]]] = [
     ("first-scan-walkthrough.mp4", ["dashboard", "scan", "dashboard"]),
     ("scan-phases-and-flow.mp4", ["scan"]),
     ("investigation-and-vendors.mp4", ["investigation", "vendors"]),
+    ("investigation-lookup-walkthrough.mp4", ["investigation"]),
     ("restructure-live-staging.mp4", ["restructure"]),
     ("file-explorer-and-archives.mp4", ["archives"]),
+    ("environment-spec-catalog.mp4", ["environment"]),
+    ("audio-preview-walkthrough.mp4", ["dashboard"]),
     ("ai-lookup-review.mp4", ["scan"]),
     ("security-and-space-recovery.mp4", ["security", "space-recovery"]),
 ]

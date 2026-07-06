@@ -1,6 +1,6 @@
 # Audiotheca — Feature Guide
 
-Engine version: **10.0.0** · Web UI: **1.0.3**
+Engine version: **10.0.0** · Web UI: **1.0.5**
 
 See also the [main README](../README.md) and [User Guide](USER_GUIDE.md) for launch commands and tab workflows.
 

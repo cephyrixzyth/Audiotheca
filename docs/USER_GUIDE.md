@@ -1,6 +1,6 @@
 # Audiotheca — Quick User Guide
 
-Engine **10.0.0** · Web UI **1.0.3**
+Engine **10.0.0** · Web UI **1.0.5**
 
 **New here?** Read the [main README](../README.md) for overview, screenshots, and video placeholders.
 

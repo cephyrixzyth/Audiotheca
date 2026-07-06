@@ -13,8 +13,8 @@ from audiotheca.config import ENGINE_VERSION, REPORT_DIR
 
 logger = logging.getLogger("audiotheca.api")
 
-API_VERSION = "1.0.4"
-UI_VERSION = "1.0.4"
+API_VERSION = "1.0.5"
+UI_VERSION = "1.0.5"
 
 MAX_RETAINED_JOBS = 32
 STALE_PROGRESS_AGE_S = 6 * 3600  # 6 hours

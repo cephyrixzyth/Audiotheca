@@ -1,5 +1,39 @@
 # Changelog
 
+### Release note: v1.0.7 (failed)
+
+Git tag **v1.0.7** was published with a broken Windows NSIS pre-install hook (sidecar processes not terminated before file copy). Installers from that tag may report locked files. Use **v1.0.8+** or **v1.0.10**. The remote tag is retained for history; do not delete without maintainer coordination.
+
+## Web UI & API 1.0.5
+
+Engine remains **10.0.0**.
+
+### Phase I — Engine intelligence
+
+- **Size-bucket blocking** (`audiotheca/dedupe_blocking.py`) — dedupe.io-style blocking before pairwise compare
+- **Parent link for `_likely_component`** — auto-links to CONFIRMED parent product path
+- **Incremental scan** — skip unchanged category sections via section mtime cache
+- **Full hash &lt; 200 MB** — `audiotheca/content_hash.py` with rolling-hash sidecar fallback
+- **UCS category hints** — attached to audio scan items; Soundminer fields in sidecar metadata
+
+### Phase J — Native helpers
+
+- **Chromaprint native path** — ctypes libchromaprint + pyacoustid with fpcalc fallback
+- **Gluetun live routing** — `api-vpn` / `searxng-vpn` services via `network_mode: service:gluetun`
+- **Rust sidecars** — `audiotheca-rolling-hash`, `audiotheca-parallel-walk` with Python fallbacks
+
+### Phase K — DAW sidecar
+
+- **JUCE scaffold** from `daw_side.write_blueprint()` — CMake + Source/ templates
+- **Build scripts** — `scripts/build_daw_sidecar.ps1` / `.sh`
+- **Environment tab panel** — export blueprint + install instructions
+
+### Phase E & L
+
+- Capture script updated for 1.0.5 header screenshots and walkthrough MP4 targets
+- Docker Compose / GHCR aligned to **1.0.5**
+- Documented failed **v1.0.7** release (Windows installer hook regression; fixed in 1.0.8)
+
 ## Web UI & API 1.0.4
 
 Engine remains **10.0.0**.

@@ -1,6 +1,6 @@
 # Backend Enhancement Roadmap — Per-Module Feedback & Corrections
 
-Engine **10.0.0** · UI **1.0.3**
+Engine **10.0.0** · UI **1.0.5**
 
 **Status (2026-07-06):** Phases A–D and unified feedback exports are **shipped**. See [PHASED_ROADMAP.md](PHASED_ROADMAP.md) and [SPEC_CATALOG.md](SPEC_CATALOG.md).
 

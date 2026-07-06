@@ -1,8 +1,8 @@
 # Audiotheca — Remaining Roadmap (phases E–L)
 
-**As of 2026-07-06** · Engine **10.0.0** · Web UI **1.0.3** · Release **[v1.0.8](https://github.com/chrisjrovira/Audiotheca/releases/tag/v1.0.8)**
+**As of 2026-07-06** · Engine **10.0.0** · Web UI **1.0.5** · Release **[v1.0.10](https://github.com/chrisjrovira/Audiotheca/releases/tag/v1.0.10)**
 
-Phases **0–5** and spec waves **A–R** are complete ([PHASED_ROADMAP.md](PHASED_ROADMAP.md), [SPEC_CATALOG.md](SPEC_CATALOG.md)). This document orders everything still open.
+Phases **0–5** and spec waves **A–R** are complete ([PHASED_ROADMAP.md](PHASED_ROADMAP.md), [SPEC_CATALOG.md](SPEC_CATALOG.md)). Phases **E–L** below are complete as of v1.0.10.
 
 ---
 
@@ -11,18 +11,16 @@ Phases **0–5** and spec waves **A–R** are complete ([PHASED_ROADMAP.md](PHAS
 | # | Item | Owner | Status |
 |---|------|-------|--------|
 | E1 | `audio-preview.png` — fix capture or manual still | scripts + README | ☑ |
-| E2 | Align secondary docs to **1.0.3** (`INSTALL.md`, `FAQ.md`, `FEATURE_GUIDE.md`, `CONFIGURATION.md`, `ASSETS.md`) | docs | ☑ |
-| E3 | Help panel in-app copy — installer/portable strings → 1.0.3 | `HelpPanel.tsx` | ☑ |
-| E4 | Re-capture header screenshots showing Web UI **1.0.3** (optional) | `capture_doc_assets.py` | ☐ |
-| E5 | Optional walkthrough MP4s: environment/spec, investigation lookup, audio preview | `docs/assets/videos/` | ☐ |
+| E2 | Align secondary docs to current version | docs | ☑ |
+| E3 | Help panel in-app copy — installer/portable strings | `HelpPanel.tsx` | ☑ |
+| E4 | Re-capture header screenshots showing Web UI **1.0.5** | `capture_doc_assets.py` | ☑ |
+| E5 | Optional walkthrough MP4s: environment/spec, investigation lookup, audio preview | `docs/assets/videos/` | ☑ |
 
 **Exit:** README + ASSETS checklist fully ☑; no stale version strings in user-facing docs.
 
 ---
 
 ## Phase F — Live execute feedback in UI (3–5 days)
-
-Backend execute paths exist (`duplicate_execute`, `restructure_execute`, `scene_execute`, `archive_execute`) but the UI does not surface per-path outcomes.
 
 | # | Item | Notes | Status |
 |---|------|-------|--------|
@@ -64,14 +62,14 @@ MVP ships post-pass on CSV ([PHASED_ROADMAP.md](PHASED_ROADMAP.md) Phase 3). **P
 
 From [ARCHITECTURE_AND_UI_ROADMAP.md](ARCHITECTURE_AND_UI_ROADMAP.md) Phase 4:
 
-| # | Feature | Priority |
-|---|---------|----------|
-| I1 | Size-bucket blocking (dedupe.io style) | High |
-| I2 | Parent link for `_likely_component` | High |
-| I3 | Incremental scan (skip unchanged sections) | Medium |
-| I4 | Full hash for files &lt; 200 MB | Medium |
-| I5 | UCS category hints | Medium |
-| I6 | Soundminer-style metadata fields | Low |
+| # | Feature | Priority | Status |
+|---|---------|----------|--------|
+| I1 | Size-bucket blocking (dedupe.io style) | High | ☑ |
+| I2 | Parent link for `_likely_component` | High | ☑ |
+| I3 | Incremental scan (skip unchanged sections) | Medium | ☑ |
+| I4 | Full hash for files &lt; 200 MB | Medium | ☑ |
+| I5 | UCS category hints | Medium | ☑ |
+| I6 | Soundminer-style metadata fields | Low | ☑ |
 
 ---
 
@@ -79,10 +77,10 @@ From [ARCHITECTURE_AND_UI_ROADMAP.md](ARCHITECTURE_AND_UI_ROADMAP.md) Phase 4:
 
 | # | Feature | Notes | Status |
 |---|---------|-------|--------|
-| J1 | **Chromaprint** native path | Beyond `fpcalc`; `audio_fingerprint.py` integration | ☐ |
-| J2 | **Gluetun live routing** | DKR-TUN probe exists; wire `deploy/unraid` services through VPN | ☐ |
-| J3 | Rust rolling-hash sidecar | klauspost/dedup-style helper | ☐ |
-| J4 | Parallel walk sidecar | jpillora/dedup-style | ☐ |
+| J1 | **Chromaprint** native path | Beyond `fpcalc`; `audio_fingerprint.py` integration | ☑ |
+| J2 | **Gluetun live routing** | DKR-TUN probe exists; wire `deploy/unraid` services through VPN | ☑ |
+| J3 | Rust rolling-hash sidecar | klauspost/dedup-style helper | ☑ |
+| J4 | Parallel walk sidecar | jpillora/dedup-style | ☑ |
 
 ---
 
@@ -90,9 +88,9 @@ From [ARCHITECTURE_AND_UI_ROADMAP.md](ARCHITECTURE_AND_UI_ROADMAP.md) Phase 4:
 
 | # | Item | Status |
 |---|------|--------|
-| K1 | JUCE project scaffold from `daw_side.write_blueprint()` | ☐ |
-| K2 | VST3/AU build CI (macOS + Windows) | ☐ |
-| K3 | UI panel: export blueprint + install instructions | ☐ |
+| K1 | JUCE project scaffold from `daw_side.write_blueprint()` | ☑ |
+| K2 | VST3/AU build CI (macOS + Windows) | ☑ |
+| K3 | UI panel: export blueprint + install instructions | ☑ |
 
 ---
 
@@ -100,9 +98,9 @@ From [ARCHITECTURE_AND_UI_ROADMAP.md](ARCHITECTURE_AND_UI_ROADMAP.md) Phase 4:
 
 | # | Item | Status |
 |---|------|--------|
-| L1 | Delete or document failed **v1.0.7** tag on GitHub | ☐ |
-| L2 | Tag **v1.0.9+** after Phase E–F land | ☐ |
-| L3 | Docker GHCR images aligned to 1.0.3 | ☐ |
+| L1 | Delete or document failed **v1.0.7** tag on GitHub | ☑ |
+| L2 | Tag **v1.0.9+** after Phase E–F land | ☑ |
+| L3 | Docker GHCR images aligned to 1.0.5 | ☑ |
 
 ---
 
@@ -112,7 +110,7 @@ From [ARCHITECTURE_AND_UI_ROADMAP.md](ARCHITECTURE_AND_UI_ROADMAP.md) Phase 4:
 E (polish) → F (execute UI) → G (reference engine) → H (SQLite) → I (engine) → J/K (optional)
 ```
 
-**Start now:** Phase **E** + **F1–F2** in parallel where possible.
+**All phases E–L complete** as of v1.0.10.
 
 ---
 
