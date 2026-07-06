@@ -17,7 +17,7 @@ $UiDir = Join-Path $Root "ui"
 $ReleaseDir = Join-Path $UiDir "src-tauri\target\release"
 $PortableRoot = Join-Path $Root "dist\portable\Audiotheca-Portable"
 $OutDir = Join-Path $Root "dist\installers\windows"
-$ZipPath = Join-Path $OutDir "Audiotheca-Portable-1.0.0-win64.zip"
+$ZipPath = Join-Path $OutDir "Audiotheca-Portable-1.0.2-win64.zip"
 
 Write-Host "Building Audiotheca portable bundle..." -ForegroundColor Cyan
 

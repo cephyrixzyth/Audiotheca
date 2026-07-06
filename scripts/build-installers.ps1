@@ -24,7 +24,7 @@ if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
 $OutDir = Join-Path $Root "dist\installers\windows"
 $BundleDir = Join-Path $Root "ui\src-tauri\target\release\bundle"
 
-Write-Host "Building Audiotheca Windows installers (v1.0.0)..." -ForegroundColor Cyan
+Write-Host "Building Audiotheca Windows installers (v1.0.2)..." -ForegroundColor Cyan
 
 $env:CARGO_TARGET_DIR = Join-Path $Root "ui\src-tauri\target"
 Push-Location (Join-Path $Root "ui")
