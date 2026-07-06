@@ -2660,6 +2660,34 @@ def tools_ucs_parse(body: dict = Body(default_factory=dict)) -> dict[str, object
     return parse_ucs_filename(str(name))
 
 
+@app.post("/api/tools/daw-side/blueprint")
+def tools_daw_side_blueprint(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from daw_side import write_blueprint
+
+    home = body.get("home")
+    return write_blueprint(home=home)
+
+
+@app.post("/api/tools/rolling-hash")
+def tools_rolling_hash(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from audiotheca.sidecar_tools import rolling_hash_file
+
+    path = body.get("path")
+    if not path:
+        raise HTTPException(status_code=400, detail="path required")
+    return rolling_hash_file(str(path))
+
+
+@app.post("/api/tools/parallel-walk")
+def tools_parallel_walk(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from audiotheca.sidecar_tools import parallel_walk
+
+    root = body.get("root")
+    if not root:
+        raise HTTPException(status_code=400, detail="root required")
+    return parallel_walk(str(root), max_depth=int(body.get("max_depth") or 8))
+
+
 @app.get("/api/scan-extensions/hash")
 def scan_extension_hash(path: str = Query(..., description="File to hash")) -> dict[str, object]:
     from hash_ext import hash_file
