@@ -186,6 +186,23 @@ def load_investigation(
     limit: int = 500,
     offset: int = 0,
 ) -> tuple[list[InvestigationItem], int]:
+    try:
+        from audiotheca.job_store import query_investigation_items, run_has_sqlite_data
+
+        if run_has_sqlite_data(stamp):
+            rows, total = query_investigation_items(
+                stamp,
+                bucket=bucket,
+                section=section,
+                query=query,
+                limit=limit,
+                offset=offset,
+            )
+            items = [InvestigationItem(**row) for row in rows]
+            return items, total
+    except Exception:
+        pass
+
     rows = _read_csv(stamp, "Investigation_Breakdown")
     items = [
         InvestigationItem(
@@ -403,7 +420,56 @@ def load_scene_renames(stamp: str) -> list[SceneRenameItem]:
     ]
 
 
+def load_items(
+    stamp: str,
+    *,
+    bucket: str | None = None,
+    section: str | None = None,
+    query: str | None = None,
+    limit: int = 500,
+    offset: int = 0,
+) -> tuple[list[ScanAuditItem], int]:
+    try:
+        from audiotheca.job_store import query_items, run_has_sqlite_data
+
+        if run_has_sqlite_data(stamp):
+            rows, total = query_items(
+                stamp,
+                bucket=bucket,
+                section=section,
+                query=query,
+                limit=limit,
+                offset=offset,
+            )
+            items = [ScanAuditItem(**row) for row in rows]
+            return items, total
+    except Exception:
+        pass
+    items, total = load_scan_audit(
+        stamp,
+        query=query,
+        limit=10000,
+        offset=0,
+    )
+    if bucket:
+        items = [item for item in items if item.investigation_bucket == bucket]
+    if section:
+        items = [item for item in items if item.section == section]
+    total = len(items)
+    return items[offset : offset + limit], total
+
+
 def list_investigation_buckets(stamp: str) -> dict[str, int]:
+    try:
+        from audiotheca.job_store import list_investigation_buckets_sqlite, run_has_sqlite_data
+
+        if run_has_sqlite_data(stamp):
+            buckets = list_investigation_buckets_sqlite(stamp)
+            if buckets:
+                return dict(sorted(buckets.items(), key=lambda pair: -pair[1]))
+    except Exception:
+        pass
+
     rows = _read_csv(stamp, "Investigation_Breakdown")
     counts: dict[str, int] = {}
     for row in rows:

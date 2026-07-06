@@ -53,10 +53,10 @@ MVP ships post-pass on CSV ([PHASED_ROADMAP.md](PHASED_ROADMAP.md) Phase 3). **P
 
 | # | Item | Status |
 |---|------|--------|
-| H1 | Import scan results → `items`, `duplicate_groups`, `duplicate_members` tables | ☐ |
-| H2 | Investigation items queryable by bucket (not CSV-only) | ☐ |
-| H3 | Finish `main.py` → thin `cli.py` entry (engine already in `audiotheca/`) | ☐ |
-| H4 | `audiotheca scan \| report \| execute` subcommands | ☐ |
+| H1 | Import scan results → `items`, `duplicate_groups`, `duplicate_members` tables | ☑ |
+| H2 | Investigation items queryable by bucket (not CSV-only) | ☑ |
+| H3 | Finish `main.py` → thin `cli.py` entry (engine already in `audiotheca/`) | ☑ |
+| H4 | `audiotheca scan \| report \| execute` subcommands | ☑ |
 
 ---
 

@@ -346,6 +346,31 @@ def get_sections(
     return report_loader.list_sections(stamp, report)
 
 
+@app.get("/api/runs/{stamp}/items")
+def get_run_items(
+    stamp: str,
+    bucket: str | None = None,
+    section: str | None = None,
+    q: str | None = None,
+    limit: int = Query(default=500, le=2000),
+    offset: int = Query(default=0, ge=0),
+) -> dict[str, object]:
+    items, total = report_loader.load_items(
+        stamp, bucket=bucket, section=section, query=q, limit=limit, offset=offset
+    )
+    source = "sqlite" if _run_items_from_sqlite(stamp) else "csv"
+    return {"items": items, "total": total, "limit": limit, "offset": offset, "source": source}
+
+
+def _run_items_from_sqlite(stamp: str) -> bool:
+    try:
+        from audiotheca.job_store import run_has_sqlite_data
+
+        return run_has_sqlite_data(stamp)
+    except Exception:
+        return False
+
+
 @app.get("/api/runs/{stamp}/investigation")
 def get_investigation(
     stamp: str,
@@ -358,7 +383,8 @@ def get_investigation(
     items, total = report_loader.load_investigation(
         stamp, bucket=bucket, section=section, query=q, limit=limit, offset=offset
     )
-    return {"items": items, "total": total, "limit": limit, "offset": offset}
+    source = "sqlite" if _run_items_from_sqlite(stamp) else "csv"
+    return {"items": items, "total": total, "limit": limit, "offset": offset, "source": source}
 
 
 @app.get("/api/runs/{stamp}/investigation/feedback")

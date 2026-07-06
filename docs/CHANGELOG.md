@@ -1,5 +1,28 @@
 # Changelog
 
+## Web UI & API 1.0.4 (unreleased)
+
+Engine remains **10.0.0**.
+
+### Phase H — SQLite depth & package hygiene
+
+- **`audiotheca/job_store.py`** — `items`, `investigation_items`, `duplicate_groups`, `duplicate_members` tables; `import_run_reports()` on job finish
+- **`GET /api/runs/{stamp}/items`** — bucket/section filters from SQLite when populated, CSV fallback
+- **`GET /api/runs/{stamp}/investigation`** — SQLite-first with `source` field (`sqlite` | `csv`)
+- **`python -m audiotheca scan|report|execute`** — argparse subcommands; legacy `python main.py --dry-run` still works
+
+### Phase G — Reference dedupe (engine)
+
+- Scan option `reference_roots` + `reference_mode: keep_reference`
+- Engine Phase 2b emits `group_kind=reference_extra` during scan
+- `POST /api/runs/{stamp}/duplicates/reference-config` and Scan panel UI
+
+### Phase F — Execute results UI
+
+- Shared execute results panel for duplicates, restructure, scene, and archives
+- Dashboard feedback summary links to execute history
+- Fingerprint blocklist from duplicate rejections (`engine_hints.json`)
+
 ## Web UI & API 1.0.3
 
 Engine remains **10.0.0**.

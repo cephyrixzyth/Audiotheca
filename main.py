@@ -1,7 +1,7 @@
 """
 Audiotheca engine entry point (backward-compatible shim).
 
-Prefer: python cli.py  or  python -m audiotheca (future)
+Prefer: python -m audiotheca scan  or  python cli.py scan
 Engine implementation lives in audiotheca.engine; config in audiotheca.config.
 """
 
@@ -18,6 +18,8 @@ __all__ = [
 ]
 
 if __name__ == "__main__":
-    from cli import main
+    import sys
 
-    main()
+    from audiotheca.cli import main
+
+    main(["scan", *sys.argv[1:]])

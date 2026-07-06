@@ -453,6 +453,7 @@ class JobManager:
             elif proc.returncode == 0 and job.stamp:
                 job.status = "done"
                 self._persist_reference_config(job)
+                self._import_run_reports(job.stamp)
                 await self._broadcast(
                     job,
                     {"type": "job_done", "stamp": job.stamp, "exit_code": proc.returncode},
@@ -506,6 +507,16 @@ class JobManager:
             progress_file.unlink(missing_ok=True)
             control_file.unlink(missing_ok=True)
             engine_lock.clear_lock(job_id=job.job_id)
+
+    def _import_run_reports(self, stamp: str | None) -> None:
+        if not stamp:
+            return
+        try:
+            from audiotheca.job_store import import_run_reports
+
+            import_run_reports(stamp)
+        except Exception:
+            pass
 
     def _persist_reference_config(self, job: JobState) -> None:
         if not job.stamp:
