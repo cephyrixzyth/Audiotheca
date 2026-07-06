@@ -43,8 +43,8 @@ Playwright uses bundled Chromium only (`scripts/capture_doc_assets.py` — no Ed
 
 | Status | Path | What to capture |
 |--------|------|-----------------|
+| ☑ | `docs/assets/screenshots/dropzone-overlay.png` | Library — active DropZone overlay while dragging files |
 | ☐ | `docs/assets/screenshots/audio-preview.png` | Library — WAV row with waveform + LUFS/BPM/key badges |
-| ☐ | `docs/assets/screenshots/dropzone-overlay.png` | Library — active DropZone overlay while dragging files |
 
 Demo WAV for audio preview: `python scripts/seed_demo_library.py` → `docs/demo/library/`.
 

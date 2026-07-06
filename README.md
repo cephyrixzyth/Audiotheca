@@ -327,18 +327,19 @@ python scripts/build_doc_gifs.py           # GIFs + sync to ui/public/help/
 
 *Cloud & storage telemetry — CLD-CACHE + S3-CONN live status and sparklines.*
 
+![DropZone overlay](docs/assets/screenshots/dropzone-overlay.png)
+
+*Library DropZone (DRP-ZONE) — active overlay while dragging files or paths onto the explorer.*
+
 ![Help tab — last in the tab bar](docs/assets/screenshots/help-panel.png)
 
 *Help tab (last in the bar) with topic screenshots and walkthrough GIFs.*
 
 ### Pending captures (1.0.2 — library stills)
 
-Capture with the demo library (`python scripts/seed_demo_library.py`) and running UI, then add rows to [ASSETS.md](docs/assets/ASSETS.md):
-
 | Target file | What to show |
 |-------------|----------------|
-| `audio-preview.png` | **Library** — select a demo `.wav`; waveform strip with LUFS/BPM/key badges |
-| `dropzone-overlay.png` | **Library** — drag files over explorer to show active DropZone overlay |
+| `audio-preview.png` | **Library** — open `docs/demo/library/a/AcmeAudio/SynthOne`, hover a `.wav`; waveform strip with LUFS/BPM/key badges. Run `python scripts/seed_demo_library.py --force` then `python scripts/capture_audio_preview.py`. |
 
 ---
 

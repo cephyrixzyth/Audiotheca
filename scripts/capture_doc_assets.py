@@ -71,6 +71,8 @@ def _lib_path(*parts: str) -> str:
 
 
 def seed_library() -> None:
+    from seed_demo_library import _write_min_wav
+
     folders = [
         LIB / "a" / "AcmeAudio" / "SynthOne",
         LIB / "a" / "UnknownVendor" / "MysteryPack",
@@ -87,6 +89,14 @@ def seed_library() -> None:
     )
     (LIB / "archives" / "redundant.rar").write_bytes(b"PK\x03\x04demo")
     (LIB / "archives" / "redundant_extracted" / "preset.fxp").write_bytes(b"\x00" * 64)
+    for rel, dur, rate in (
+        ("a/AcmeAudio/SynthOne/kick_120bpm_C.wav", 0.3, 44100),
+        ("a/AcmeAudio/SynthOne/snare_120bpm.wav", 0.2, 48000),
+        ("a/UnknownVendor/MysteryPack/ambience_loop.wav", 1.0, 44100),
+    ):
+        wav_path = LIB / rel
+        if not wav_path.is_file():
+            _write_min_wav(wav_path, duration_s=dur, rate=rate)
 
 
 def _write_csv(path: Path, headers: list[str], rows: list[list[str]]) -> None:
@@ -893,27 +903,52 @@ def _capture_extended_screenshots(
 
     dismiss_explorer()  # type: ignore[operator]
     click_tab("investigation")  # type: ignore[operator]
+    wav_dir = str((LIB / "a" / "AcmeAudio" / "SynthOne").resolve())
+    page.evaluate(  # type: ignore[union-attr]
+        "(path) => sessionStorage.setItem('audiotheca.explorer.lastPath', path)",
+        wav_dir,
+    )
     page.locator("button.top-tab-library").click()  # type: ignore[union-attr]
-    page.wait_for_timeout(1200)  # type: ignore[union-attr]
-    wav_row = page.locator(".file-explorer-row").filter(has_text=".wav").first  # type: ignore[union-attr]
-    if not wav_row.count():
-        wav_row = page.locator(".file-explorer-row").filter(has_text="wav").first  # type: ignore[union-attr]
-    if wav_row.count():
-        wav_row.click()
-        page.wait_for_timeout(1000)  # type: ignore[union-attr]
-        preview = page.locator(".audio-preview-strip").first  # type: ignore[union-attr]
-        if preview.count():
-            explorer = page.locator(".file-explorer-shell").first  # type: ignore[union-attr]
-            if explorer.count():
-                explorer.screenshot(path=str(shot_dir / "audio-preview.png"))
-                print("  audio-preview.png")
-            else:
-                preview.screenshot(path=str(shot_dir / "audio-preview.png"))
-                print("  audio-preview.png (strip only)")
-        else:
-            print("  skip audio-preview.png (no preview strip)", file=sys.stderr)
+    page.wait_for_timeout(1500)  # type: ignore[union-attr]
+    preview = page.locator(".file-explorer-shell .audio-preview-strip").first  # type: ignore[union-attr]
+    if not preview.count():
+        wav_btn = page.locator(".file-explorer-shell .linkish-btn").filter(  # type: ignore[union-attr]
+            has_text="kick_120bpm"
+        ).first
+        if wav_btn.count():
+            wav_btn.hover()
+            page.wait_for_timeout(1200)  # type: ignore[union-attr]
+            preview = page.locator(".file-explorer-shell .audio-preview-strip").first  # type: ignore[union-attr]
+    if preview.count():
+        explorer = page.locator(".file-explorer-shell").first  # type: ignore[union-attr]
+        explorer.screenshot(path=str(shot_dir / "audio-preview.png"))
+        print("  audio-preview.png")
     else:
-        print("  skip audio-preview.png (no WAV row)", file=sys.stderr)
+        print("  skip audio-preview.png (no preview strip)", file=sys.stderr)
+
+    overlay = page.locator(".drop-zone-overlay").first  # type: ignore[union-attr]
+    if overlay.count():
+        page.evaluate(  # type: ignore[union-attr]
+            """() => {
+              const el = document.querySelector('.drop-zone-overlay');
+              if (!el) return;
+              const dt = new DataTransfer();
+              el.dispatchEvent(
+                new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt }),
+              );
+            }"""
+        )
+        page.wait_for_timeout(400)  # type: ignore[union-attr]
+        shell = page.locator(".file-explorer-shell").first  # type: ignore[union-attr]
+        if shell.count():
+            shell.screenshot(path=str(shot_dir / "dropzone-overlay.png"))
+            print("  dropzone-overlay.png")
+        else:
+            overlay.screenshot(path=str(shot_dir / "dropzone-overlay.png"))
+            print("  dropzone-overlay.png (overlay only)")
+    else:
+        print("  skip dropzone-overlay.png (no overlay)", file=sys.stderr)
+
     dismiss_explorer()  # type: ignore[operator]
 
 
