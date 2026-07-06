@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 from typing import Any
 
@@ -31,8 +30,7 @@ def _save_db(data: dict[str, Any]) -> None:
 
 
 def get_value(key: str, name: str, default: str = "") -> str:
-    if sys.platform != "win32":
-        return default
+    """Read from the emulated registry store (works on all platforms)."""
     db = _load_db()
     keys: dict[str, Any] = db.get("keys", {})
     entry = keys.get(key.lower(), {})

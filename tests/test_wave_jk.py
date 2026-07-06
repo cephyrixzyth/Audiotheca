@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -37,9 +38,14 @@ def test_sym_agg_persist(tmp_path, monkeypatch):
 
 
 def test_path_normalize_long():
-    info = path_info("C:\\" + "a" * 250)
-    assert info["needs_extended"] is True
-    assert normalize_long_path(info["original"]).startswith("\\\\?\\")
+    long_path = "C:\\" + "a" * 250
+    info = path_info(long_path)
+    if sys.platform == "win32":
+        assert info["needs_extended"] is True
+        assert normalize_long_path(info["original"]).startswith("\\\\?\\")
+    else:
+        assert info["needs_extended"] is False
+        assert normalize_long_path(long_path) == long_path
 
 
 def test_mmap_tree_preview(tmp_path):
