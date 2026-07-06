@@ -14,13 +14,13 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from capture_doc_assets import (  # noqa: E402
     API_PORT,
     FIRST_RUN_INIT,
-    LIB,
     SHOT_DIR,
     STAMP,
     UI_PORT,
     UI_URL,
     VIEWPORT,
     _browser_launch_kwargs,
+    _capture_audio_preview_shot,
     _click_tab,
     seed_library,
     seed_reports,
@@ -70,22 +70,11 @@ def main() -> None:
             run_select.select_option(value=STAMP)
             page.wait_for_timeout(1200)
 
-            wav_dir = str((LIB / "a" / "AcmeAudio" / "SynthOne").resolve())
-            page.evaluate(
-                "(path) => sessionStorage.setItem('audiotheca.explorer.lastPath', path)",
-                wav_dir,
+            _capture_audio_preview_shot(
+                page,
+                SHOT_DIR,
+                click_tab=lambda tab_id: _click_tab(page, tab_id),
             )
-            _click_tab(page, "investigation")
-            page.locator("button.top-tab-library").click()
-            page.wait_for_timeout(2000)
-            page.wait_for_selector(".file-explorer-shell .linkish-btn", timeout=15000)
-            kick = page.locator(".file-explorer-shell .linkish-btn").filter(has_text="kick_120bpm").first
-            if kick.count():
-                kick.hover()
-            page.wait_for_timeout(2500)
-            page.wait_for_selector(".file-explorer-shell .audio-preview-strip", timeout=15000)
-            page.locator(".file-explorer-shell").first.screenshot(path=str(SHOT_DIR / "audio-preview.png"))
-            print("  audio-preview.png")
             browser.close()
     finally:
         stop_servers(api_proc, ui_proc)

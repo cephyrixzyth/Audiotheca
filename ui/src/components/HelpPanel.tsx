@@ -39,8 +39,8 @@ Primary nav: Dashboard · Scan · Review · Library · System · Help`,
       {
         id: "install",
         title: "Install & requirements",
-        body: `Desktop installers (v1.0.0) — no CLI for end users:
-  GitHub Releases → .msi, NSIS setup.exe, or Audiotheca-Portable-1.0.0-win64.zip
+        body: `Desktop installers (latest release, currently v1.0.3) — no CLI for end users:
+  GitHub Releases → .msi, NSIS setup.exe, or Audiotheca-Portable-*-win64.zip
 
 Build (maintainers):
   .\\scripts\\build-installers.ps1 · ./scripts/build-installers.sh · .\\scripts\\build-portable.ps1

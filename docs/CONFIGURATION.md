@@ -1,6 +1,6 @@
 # Audiotheca — Configuration Reference
 
-Engine **10.0.0** · API **1.0.2**
+Engine **10.0.0** · API **1.0.3**
 
 Overview and env quick-start: [main README](../README.md).
 

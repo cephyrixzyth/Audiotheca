@@ -331,15 +331,13 @@ python scripts/build_doc_gifs.py           # GIFs + sync to ui/public/help/
 
 *Library DropZone (DRP-ZONE) — active overlay while dragging files or paths onto the explorer.*
 
+![Audio preview strip](docs/assets/screenshots/audio-preview.png)
+
+*Library — hover a `.wav` in the explorer for waveform, LUFS, BPM, and key badges.*
+
 ![Help tab — last in the tab bar](docs/assets/screenshots/help-panel.png)
 
 *Help tab (last in the bar) with topic screenshots and walkthrough GIFs.*
-
-### Pending captures (1.0.2 — library stills)
-
-| Target file | What to show |
-|-------------|----------------|
-| `audio-preview.png` | **Library** — open `docs/demo/library/a/AcmeAudio/SynthOne`, hover a `.wav`; waveform strip with LUFS/BPM/key badges. Run `python scripts/seed_demo_library.py --force` then `python scripts/capture_audio_preview.py`. |
 
 ---
 

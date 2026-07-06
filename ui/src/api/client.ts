@@ -449,24 +449,31 @@ export function addManualDuplicate(
   return postJson(`/runs/${stamp}/duplicates/manual`, payload);
 }
 
-export function executeDuplicateStaging(
-  stamp: string,
-  payload: { dry_run?: boolean; root?: string; confirm_live?: boolean },
-): Promise<{
+export type ExecuteResultItem = {
+  dedup_key?: string;
+  path: string;
+  ok: boolean;
+  dry_run?: boolean;
+  staged_to?: string;
+  error?: string;
+};
+
+export type DuplicateExecuteResponse = {
   ok: boolean;
   dry_run: boolean;
   staged: number;
   failed: number;
-  results: Array<{
-    dedup_key: string;
-    path: string;
-    ok: boolean;
-    dry_run?: boolean;
-    staged_to?: string;
-    error?: string;
-  }>;
+  results: ExecuteResultItem[];
   error?: string;
-}> {
+  library_root?: string;
+  delete_dir?: string;
+  batch_id?: string;
+};
+
+export function executeDuplicateStaging(
+  stamp: string,
+  payload: { dry_run?: boolean; root?: string; confirm_live?: boolean },
+): Promise<DuplicateExecuteResponse> {
   return postJson(`/runs/${stamp}/duplicates/execute`, payload);
 }
 

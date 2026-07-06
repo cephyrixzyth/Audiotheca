@@ -11,6 +11,7 @@ import {
   rejectDuplicateGroup,
   saveDecisions,
   type DuplicateRejection,
+  type DuplicateExecuteResponse,
   type ManualDuplicateFinding,
 } from "../api/client";
 import type { DuplicateGroup } from "../types";
@@ -18,6 +19,11 @@ import { useLibraryRoot } from "../hooks/useLibraryRoot";
 import { PathLink } from "./PathLink";
 import { useContextSidebar } from "./ContextSidebar";
 import { HoverMenu } from "./HoverMenu";
+import {
+  ExecuteResultsPanel,
+  duplicateExecuteRows,
+  type ExecuteResultRow,
+} from "./ExecuteResultsPanel";
 
 interface Props {
   stamp: string;
@@ -55,6 +61,11 @@ export function DuplicateReview({ stamp }: Props) {
   const [showReferenceExtras, setShowReferenceExtras] = useState(false);
   const [referenceExtraKeys, setReferenceExtraKeys] = useState<Set<string>>(new Set());
   const [referenceExtraGroups, setReferenceExtraGroups] = useState(0);
+  const [executeResults, setExecuteResults] = useState<ExecuteResultRow[]>([]);
+  const [executeDryRun, setExecuteDryRun] = useState(true);
+  const [executeSummary, setExecuteSummary] = useState<{ staged: number; failed: number } | null>(
+    null,
+  );
 
   const rejectedKeys = new Set(rejections.map((row) => row.dedup_key));
 
@@ -146,14 +157,19 @@ export function DuplicateReview({ stamp }: Props) {
   }
 
   async function handlePreviewDeletes() {
-    const res = await executeDuplicateStaging(stamp, {
+    const res: DuplicateExecuteResponse = await executeDuplicateStaging(stamp, {
       dry_run: true,
       root: libraryRoot,
     });
-    if (!res.ok) {
+    if (!res.ok && !res.results?.length) {
+      setExecuteResults([]);
+      setExecuteSummary(null);
       setActionMsg(res.error ?? "Save keeper decisions first, then preview staging");
       return;
     }
+    setExecuteDryRun(true);
+    setExecuteResults(duplicateExecuteRows(res.results ?? [], true));
+    setExecuteSummary({ staged: res.staged, failed: res.failed });
     setActionMsg(
       `Preview: ${res.staged} discard(s) would move to _delete-canidates` +
         (res.failed ? ` (${res.failed} failed)` : ""),
@@ -168,15 +184,20 @@ export function DuplicateReview({ stamp }: Props) {
     ) {
       return;
     }
-    const res = await executeDuplicateStaging(stamp, {
+    const res: DuplicateExecuteResponse = await executeDuplicateStaging(stamp, {
       dry_run: false,
       confirm_live: true,
       root: libraryRoot,
     });
-    if (!res.ok) {
+    if (!res.ok && !res.results?.length) {
+      setExecuteResults([]);
+      setExecuteSummary(null);
       setActionMsg(res.error ?? `Staging failed (${res.failed} errors)`);
       return;
     }
+    setExecuteDryRun(false);
+    setExecuteResults(duplicateExecuteRows(res.results ?? [], false));
+    setExecuteSummary({ staged: res.staged, failed: res.failed });
     setActionMsg(`Staged ${res.staged} discard(s) to _delete-canidates`);
     setFeedbackUrl(await feedbackExportUrl(stamp));
   }
@@ -290,6 +311,16 @@ export function DuplicateReview({ stamp }: Props) {
 
       {saveMsg && <div className="banner dry">{saveMsg}</div>}
       {actionMsg && <div className="banner review">{actionMsg}</div>}
+
+      {executeResults.length > 0 && (
+        <ExecuteResultsPanel
+          title="Duplicate staging results"
+          dryRun={executeDryRun}
+          results={executeResults}
+          staged={executeSummary?.staged}
+          failed={executeSummary?.failed}
+        />
+      )}
 
       {showManual && (
         <div className="manual-panel">

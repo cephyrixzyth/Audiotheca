@@ -902,29 +902,7 @@ def _capture_extended_screenshots(
             print(f"  skip {name} (heading not found)", file=sys.stderr)
 
     dismiss_explorer()  # type: ignore[operator]
-    click_tab("investigation")  # type: ignore[operator]
-    wav_dir = str((LIB / "a" / "AcmeAudio" / "SynthOne").resolve())
-    page.evaluate(  # type: ignore[union-attr]
-        "(path) => sessionStorage.setItem('audiotheca.explorer.lastPath', path)",
-        wav_dir,
-    )
-    page.locator("button.top-tab-library").click()  # type: ignore[union-attr]
-    page.wait_for_timeout(1500)  # type: ignore[union-attr]
-    preview = page.locator(".file-explorer-shell .audio-preview-strip").first  # type: ignore[union-attr]
-    if not preview.count():
-        wav_btn = page.locator(".file-explorer-shell .linkish-btn").filter(  # type: ignore[union-attr]
-            has_text="kick_120bpm"
-        ).first
-        if wav_btn.count():
-            wav_btn.hover()
-            page.wait_for_timeout(1200)  # type: ignore[union-attr]
-            preview = page.locator(".file-explorer-shell .audio-preview-strip").first  # type: ignore[union-attr]
-    if preview.count():
-        explorer = page.locator(".file-explorer-shell").first  # type: ignore[union-attr]
-        explorer.screenshot(path=str(shot_dir / "audio-preview.png"))
-        print("  audio-preview.png")
-    else:
-        print("  skip audio-preview.png (no preview strip)", file=sys.stderr)
+    _capture_audio_preview_shot(page, shot_dir, click_tab=click_tab)
 
     overlay = page.locator(".drop-zone-overlay").first  # type: ignore[union-attr]
     if overlay.count():
@@ -970,6 +948,43 @@ def _tab_label(tab_id: str) -> str:
         "help": "Help",
     }
     return labels.get(tab_id, tab_id)
+
+
+def _open_explorer_at_path(page: object, path: str, *, click_tab: object) -> None:
+    """Open library explorer at path — dashboard tab avoids review subtree filters."""
+    page.evaluate(  # type: ignore[union-attr]
+        "(path) => sessionStorage.setItem('audiotheca.explorer.lastPath', path)",
+        path,
+    )
+    click_tab("dashboard")  # type: ignore[operator]
+    page.locator("button.top-tab-library").click()  # type: ignore[union-attr]
+    page.wait_for_selector(".file-explorer-shell", timeout=15000)  # type: ignore[union-attr]
+    page.wait_for_selector(  # type: ignore[union-attr]
+        ".file-explorer-shell .file-explorer-table tbody tr",
+        timeout=20000,
+    )
+    page.wait_for_timeout(600)  # type: ignore[union-attr]
+
+
+def _capture_audio_preview_shot(page: object, shot_dir: Path, *, click_tab: object) -> None:
+    """Hover a demo WAV and capture the audio preview strip."""
+    wav_dir = str((LIB / "a" / "AcmeAudio" / "SynthOne").resolve())
+    _open_explorer_at_path(page, wav_dir, click_tab=click_tab)
+    preview = page.locator(".file-explorer-shell .audio-preview-strip").first  # type: ignore[union-attr]
+    if not preview.count():
+        wav_btn = page.locator(".file-explorer-shell .linkish-btn").filter(  # type: ignore[union-attr]
+            has_text="kick_120bpm"
+        ).first
+        if wav_btn.count():
+            wav_btn.hover()
+            page.wait_for_timeout(2500)  # type: ignore[union-attr]
+            preview = page.locator(".file-explorer-shell .audio-preview-strip").first  # type: ignore[union-attr]
+    if preview.count():
+        explorer = page.locator(".file-explorer-shell").first  # type: ignore[union-attr]
+        explorer.screenshot(path=str(shot_dir / "audio-preview.png"))
+        print("  audio-preview.png")
+    else:
+        print("  skip audio-preview.png (no preview strip)", file=sys.stderr)
 
 
 def _click_tab(page: object, tab_id: str) -> None:

@@ -2,7 +2,7 @@
 
 This guide is for **another machine or another user** validating Audiotheca without the original author's library paths or network share.
 
-Engine **10.0.0** · Web UI **1.0.2**
+Engine **10.0.0** · Web UI **1.0.3**
 
 **Overview and UI tour:** [main README](../README.md) · **Doc screenshots:** [assets/ASSETS.md](assets/ASSETS.md)
 
