@@ -371,6 +371,13 @@ class ScanMixin:
                 "installer_count": len(info.get("installer_files") or []),
                 "from_cache": from_cache,
             }
+            ext = path.suffix.lower()
+            if ext in {".wav", ".flac", ".aiff", ".aif", ".mp3", ".ogg"}:
+                from ucs_map import parse_ucs_filename
+
+                ucs = parse_ucs_filename(path.name)
+                if ucs.get("ucs_aligned"):
+                    result["ucs_hints"] = ucs
             status = "CACHE_HIT" if from_cache else "SCANNED"
             self._upsert_audit_row(result, status=status, inv_bucket="", destination="")
             return result

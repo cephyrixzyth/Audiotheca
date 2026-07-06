@@ -33,6 +33,8 @@ from investigation_feedback import (
     merged_bucket_map,
 )
 from progress import PhaseProgress, tqdm_bar
+from sm_metadata import build_sm_fields
+from ucs_map import parse_ucs_filename
 from vendor_db import VENDOR_DATABASE
 
 from audiotheca.config import *  # noqa: F403
@@ -82,6 +84,37 @@ class RoutingMixin:
                 if len(base) >= MIN_BASE_NAME_LEN and base not in GENERIC_BASE_NAMES:
                     mapping[base] = item["company"]
         return mapping
+
+    def _confirmed_base_paths(self, all_items: list[dict]) -> dict[str, str]:
+        """Map base_name → best CONFIRMED product path (for parent linking)."""
+        best: dict[str, tuple[int, str]] = {}
+        for item in all_items:
+            if item.get("company") and item.get("id_confidence") == "CONFIRMED":
+                base = item.get("base_name", "")
+                if len(base) < MIN_BASE_NAME_LEN or base in GENERIC_BASE_NAMES:
+                    continue
+                path = str(item.get("path", ""))
+                if not path:
+                    continue
+                size = int(item.get("size") or 0)
+                prev = best.get(base)
+                if not prev or size > prev[0]:
+                    best[base] = (size, path)
+        return {base: path for base, (_size, path) in best.items()}
+
+    def _apply_likely_component_parent(
+        self,
+        item: dict,
+        confirmed_paths: dict[str, str],
+    ) -> None:
+        """Auto-link _likely_component items to their parent product path."""
+        if item.get("parent_link"):
+            return
+        base = item.get("base_name", "")
+        parent = confirmed_paths.get(base)
+        if parent and str(item.get("path", "")) != parent:
+            item["parent_link"] = parent
+            item["inferred_parent"] = True
 
     def classify_investigation(
         self,
@@ -297,6 +330,8 @@ class RoutingMixin:
     def write_sidecar_metadata(self, folder_path: Path, original_data: dict) -> None:
         if self.dry_run or folder_path.is_file():
             return
+        ucs_hints = original_data.get("ucs_hints") or parse_ucs_filename(original_data["original_name"])
+        sm_fields = build_sm_fields(original_data, ucs=ucs_hints)
         metadata = {
             "original_name": original_data["original_name"],
             "original_path": str(original_data["path"]),
@@ -305,6 +340,9 @@ class RoutingMixin:
             "base_name": original_data["base_name"],
             "is_tonex": original_data["is_tonex"],
             "investigation_bucket": original_data.get("investigation_bucket", ""),
+            "parent_link": original_data.get("parent_link", ""),
+            "ucs_hints": ucs_hints if ucs_hints.get("ucs_aligned") else {},
+            "soundminer": sm_fields,
             "engine_version": ENGINE_VERSION,
             "processed_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }

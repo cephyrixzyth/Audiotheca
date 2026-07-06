@@ -40,6 +40,7 @@ class ScanOptions:
     io_throttle_ms: int = 0
     max_workers: int = 0
     cooldown_s: float = 0.0
+    incremental_scan: bool = True
 
     def skip(self, phase: str) -> bool:
         return phase in self.skip_phases
@@ -59,6 +60,7 @@ class ScanOptions:
             "io_throttle_ms": self.io_throttle_ms,
             "max_workers": self.max_workers,
             "cooldown_s": self.cooldown_s,
+            "incremental_scan": self.incremental_scan,
         }
         if self.reference_roots:
             payload["reference_roots"] = self.reference_roots
@@ -96,6 +98,7 @@ class ScanOptions:
             io_throttle_ms=max(0, int(data.get("io_throttle_ms") or 0)),
             max_workers=max(0, int(data.get("max_workers") or 0)),
             cooldown_s=max(0.0, float(data.get("cooldown_s") or 0)),
+            incremental_scan=bool(data.get("incremental_scan", True)),
         )
 
 

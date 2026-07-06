@@ -36,6 +36,8 @@ from progress import PhaseProgress, tqdm_bar
 from vendor_db import VENDOR_DATABASE
 
 from audiotheca.config import *  # noqa: F403
+from audiotheca.content_hash import content_hash, full_hash, sparse_hash as _sparse_hash_impl
+from audiotheca.dedupe_blocking import find_size_blocked_pairs
 from audiotheca.helpers import _archive_stem, _limit_walk, _squash, _walk_depth
 
 
@@ -197,19 +199,16 @@ class DedupeMixin:
     @staticmethod
     def sparse_hash(filepath: str | Path, chunk_size: int = 4096) -> str | None:
         """MD5 of head, middle, and tail chunks — cheap content fingerprint over SMB."""
-        hasher = hashlib.md5()
-        try:
-            file_size = os.path.getsize(filepath)
-            with open(filepath, "rb") as handle:
-                hasher.update(handle.read(chunk_size))
-                if file_size > chunk_size * 3:
-                    handle.seek(file_size // 2)
-                    hasher.update(handle.read(chunk_size))
-                    handle.seek(file_size - chunk_size)
-                    hasher.update(handle.read(chunk_size))
-            return hasher.hexdigest()
-        except OSError:
-            return None
+        return _sparse_hash_impl(filepath, chunk_size=chunk_size)
+
+    @staticmethod
+    def full_hash(filepath: str | Path) -> str | None:
+        """Full-file MD5 for files under 200 MB."""
+        return full_hash(filepath)
+
+    def find_size_bucket_groups(self, all_items: list[dict]) -> list[dict]:
+        """Size-bucket blocking pass (dedupe.io style) before name-based grouping."""
+        return find_size_blocked_pairs(all_items, hash_fn=content_hash)
 
     def _largest_top_file(self, item: dict) -> tuple[int, Path] | None:
         if not item["is_dir"]:
@@ -221,13 +220,13 @@ class DedupeMixin:
         return (size, Path(item["path"]) / rel_path)
 
     def _content_check(self, items: list[dict]) -> str:
-        """Compares the largest top-level file of each copy via sparse hash."""
+        """Compare largest top-level file per copy — full hash when under 200 MB."""
         refs = [self._largest_top_file(item) for item in items]
         if any(ref is None for ref in refs):
             return "SKIPPED"
         if len({ref[0] for ref in refs}) > 1:
             return "DIFFERS"
-        hashes = {self.sparse_hash(ref[1]) for ref in refs}
+        hashes = {content_hash(ref[1], prefer_full=True) for ref in refs}
         if None in hashes:
             return "SKIPPED"
         return "MATCH" if len(hashes) == 1 else "DIFFERS"

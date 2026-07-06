@@ -43,6 +43,11 @@ from audiotheca.coverage import discover_coverage_gaps
 from audiotheca.session_log import log_step
 from audiotheca.deep_identify import find_renamed_archive_dupes, needs_deep_identify, run_deep_identify
 from audiotheca.helpers import _archive_stem, _limit_walk, _squash, _walk_depth
+from audiotheca.incremental_scan import (
+    cached_section_items,
+    section_unchanged,
+    update_section_cache,
+)
 from audiotheca.verification import run_verification
 from audiotheca.archive import ArchiveMixin
 from audiotheca.dedupe import DedupeMixin
@@ -496,6 +501,7 @@ class DeduplicationEngine(
         self._bin_progress = bin_progress
         payloads: list[tuple[Path, str]] = []
         bin_targets: dict[str, list[Path]] = {}
+        incremental_results: list[dict] = []
 
         if self.scan_options.target_paths:
             for raw in self.scan_options.target_paths:
@@ -512,14 +518,30 @@ class DeduplicationEngine(
                     bin_targets.setdefault(section, []).append(item)
             bin_progress.finish(f"{len(payloads):,} ad-hoc targets")
         else:
+            section_cache = self.scan_cache.get("sections") or {}
+            incremental_hits = 0
             for category_bin in category_bins:
                 log_step("get_software_targets", f"Resolving bin {category_bin.name}")
                 bin_progress.pulse(detail=f"Starting {category_bin.name}…")
+                if self.scan_options.incremental_scan and section_unchanged(category_bin, section_cache):
+                    cached = cached_section_items(category_bin, section_cache)
+                    if cached:
+                        for item in cached:
+                            item["path"] = Path(item["path"])
+                            item["from_cache"] = True
+                            item["section_incremental"] = True
+                            incremental_results.append(item)
+                        incremental_hits += len(cached)
+                        bin_targets[category_bin.name] = []
+                        bin_progress.update(1, detail=f"{category_bin.name}: {len(cached)} cached (unchanged)")
+                        continue
                 targets = self.get_software_targets(category_bin)
                 bin_targets[category_bin.name] = targets
                 payloads.extend((target, category_bin.name) for target in targets)
                 bin_progress.update(1, detail=f"{category_bin.name}: {len(targets)} targets")
-            bin_progress.finish(f"{len(payloads):,} total targets")
+            if incremental_hits:
+                print(f"  Incremental scan: {incremental_hits} items from unchanged sections")
+            bin_progress.finish(f"{len(payloads):,} total targets (+ {incremental_hits} incremental)")
             self._bin_progress = None
 
         if not self.scan_options.target_paths:
@@ -533,22 +555,27 @@ class DeduplicationEngine(
             gap_progress.finish(f"{len(self.coverage_gaps):,} coverage gaps")
         self._checkpoint("resolve_targets", "Phase 1a - Resolve targets per category")
 
-        if not payloads:
+        if not payloads and not incremental_results:
             print("\n[!] WARNING: Found 0 targets.")
             return
 
-        scan_progress = PhaseProgress("Phase 1b - Parallel scan", len(payloads), "item")
-        results: list[dict] = []
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            futures = {
-                executor.submit(self._scan_worker, path, bin_name): path
-                for path, bin_name in payloads
-            }
-            for future in as_completed(futures):
-                result = future.result()
-                if result:
-                    results.append(result)
-                scan_progress.update(1)
+        scan_progress = PhaseProgress(
+            "Phase 1b - Parallel scan",
+            max(len(payloads), 1),
+            "item",
+        )
+        results: list[dict] = list(incremental_results)
+        if payloads:
+            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                futures = {
+                    executor.submit(self._scan_worker, path, bin_name): path
+                    for path, bin_name in payloads
+                }
+                for future in as_completed(futures):
+                    result = future.result()
+                    if result:
+                        results.append(result)
+                    scan_progress.update(1)
         scan_progress.finish(f"{len(results):,} items scanned")
         self._checkpoint("parallel_scan", "Phase 1b - Parallel scan")
 
@@ -584,6 +611,18 @@ class DeduplicationEngine(
         self._checkpoint("malware_scan", "Phase 1.4 - Malware scan")
 
         results.sort(key=lambda r: (r["source_bin"], r["original_name"].lower()))
+
+        # Persist section snapshots for incremental scan on next run.
+        if self.scan_options.incremental_scan and not self.scan_options.target_paths:
+            section_items: dict[str, list[dict]] = defaultdict(list)
+            for item in results:
+                section_items[item["source_bin"]].append(item)
+            if "sections" not in self.scan_cache:
+                self.scan_cache["sections"] = {}
+            for category_bin in category_bins:
+                items = section_items.get(category_bin.name, [])
+                if items:
+                    update_section_cache(self.scan_cache, category_bin, items)
 
         all_items: list[dict] = []
 
@@ -755,7 +794,8 @@ class DeduplicationEngine(
 
         if not self.scan_options.skip("duplicates"):
             renamed_groups = find_renamed_archive_dupes(all_items, self.sparse_hash)
-            for group in renamed_groups:
+            size_blocked_groups = self.find_size_bucket_groups(all_items)
+            for group in renamed_groups + size_blocked_groups:
                 pair_paths = [str(item["path"]) for item in group["items"]]
                 if frozenset(item["path"] for item in group["items"]) in archive_pair_path_sets:
                     continue
@@ -772,9 +812,10 @@ class DeduplicationEngine(
                     continue
                 self.duplicate_groups.append(group)
                 self._inc("duplicates_suspected")
+                kind_label = group.get("group_kind", "RENAMED_COPY").replace("_", " ")
                 print(
-                    f"\n[RENAMED COPY {group['confidence']}] {group['dedup_key']} "
-                    f"— byte-identical archives with different names"
+                    f"\n[{kind_label} {group['confidence']}] {group['dedup_key']} "
+                    f"— {group.get('action', 'byte-identical match')}"
                 )
                 for idx, item in enumerate(group["items"], 1):
                     size_mb = item["size"] / (1024 * 1024)
@@ -964,6 +1005,9 @@ class DeduplicationEngine(
         delete_paths = {entry["path"] for entry in items_to_delete}
         conflict_bases = {c["base_name"] for c in self.vendor_conflicts}
         confirmed_bases = self._confirmed_base_vendors(all_items)
+        confirmed_paths = self._confirmed_base_paths(all_items)
+        for item in all_items:
+            self._apply_likely_component_parent(item, confirmed_paths)
 
         if self.scan_options.skip("restructure"):
             print("[!] Phase 3 restructure plan skipped (scan options).")
