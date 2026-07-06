@@ -210,10 +210,13 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| {
-            if let RunEvent::Exit = event {
-                if let Some(state) = app_handle.try_state::<ApiChild>() {
-                    stop_api_server(&state);
+            match event {
+                RunEvent::Exit | RunEvent::ExitRequested { .. } => {
+                    if let Some(state) = app_handle.try_state::<ApiChild>() {
+                        stop_api_server(&state);
+                    }
                 }
+                _ => {}
             }
         });
 }

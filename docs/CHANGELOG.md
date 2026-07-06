@@ -1,5 +1,14 @@
 # Changelog
 
+## Web UI & API 1.0.2 (installer fix)
+
+### Windows installers
+
+- **NSIS pre-install hooks** terminate `Audiotheca.exe` and PyInstaller sidecars before upgrade (`ui/src-tauri/windows/hooks.nsh`)
+- Desktop shell stops API sidecar on `ExitRequested` as well as `Exit`
+- **`scripts/kill-audiotheca.ps1`** — manual process cleanup before reinstall
+- Install/FAQ docs: upgrade steps when installer reports locked files
+
 ## Web UI & API 1.0.2
 
 Engine remains **10.0.0**. Completes the **94-code architecture spec catalog** (waves A–R): every SYS-ING, AUD-PIP, AI-SEC, LFC-ORCH, and UI-LOG code has a handler, API surface, and tests.

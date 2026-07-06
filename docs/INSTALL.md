@@ -1,6 +1,6 @@
 # Audiotheca — Install Guide
 
-Engine version: **10.0.0** · Web UI: **1.0.0**
+Engine version: **10.0.0** · Web UI: **1.0.2**
 
 For overview and first-run walkthrough, see the [main README](../README.md).
 
@@ -23,9 +23,21 @@ End users do **not** need Python, Node, or Rust when using release installers �
 
 ### Windows installer
 
-1. Download or build `Audiotheca_1.0.0_x64_en-US.msi` or `Audiotheca_1.0.0_x64-setup.exe`.
-2. Run the installer — WebView2 bootstrapper is included when needed.
-3. Launch **Audiotheca** from the Start menu; use the first-run wizard to set your library root.
+1. Download or build `Audiotheca_1.0.2_x64_en-US.msi` or `Audiotheca_1.0.2_x64-setup.exe` from [GitHub Releases](https://github.com/chrisjrovira/Audiotheca/releases/latest).
+2. **Close Audiotheca completely** before upgrading (including any background API sidecar).
+3. Run the installer as Administrator — WebView2 bootstrapper is included when needed.
+4. Launch **Audiotheca** from the Start menu; use the first-run wizard to set your library root.
+
+### Upgrading on Windows (fix “error opening file for writing”)
+
+The desktop app spawns **api-server** and **audiotheca-engine** sidecars. If they stay running, the NSIS/MSI installer cannot overwrite files under `Program Files`.
+
+1. Quit **Audiotheca** from the taskbar (not only the window — exit the app).
+2. Open Task Manager → end any **`Audiotheca`**, **`api-server`**, or **`audiotheca-engine`** processes.
+3. Or run: `powershell -ExecutionPolicy Bypass -File scripts\kill-audiotheca.ps1`
+4. Re-run the installer **as Administrator**.
+
+Installers built from 1.0.2+ include NSIS hooks that terminate these processes automatically before copying files.
 
 ### Windows portable zip
 

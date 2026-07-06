@@ -1,6 +1,6 @@
 # Audiotheca — FAQ
 
-Engine version: **10.0.0** · Web UI: **1.0.0**
+Engine version: **10.0.0** · Web UI: **1.0.2**
 
 See the [main README](../README.md) for quick start and [User Guide](USER_GUIDE.md) for tab workflows.
 
@@ -227,6 +227,17 @@ Some libraries use `_8Dio`, `_Kontakt Libraries`, etc. The engine skips `_`-pref
 ### What is Space recovery?
 
 UI + `space_recovery.py` for coexistence issues (deep installers, archive+extract siblings) and optional hardlink/bloat reports. Does not delete files automatically — generates CSV + PowerShell preview scripts.
+
+### Windows upgrade fails with “error opening file for writing”
+
+The installer cannot overwrite **Audiotheca.exe** or the bundled **api-server** / **audiotheca-engine** sidecars while they are running.
+
+1. Fully quit Audiotheca (taskbar → Exit).
+2. Task Manager → end `Audiotheca`, `api-server`, and `audiotheca-engine`.
+3. Or: `powershell -ExecutionPolicy Bypass -File scripts\kill-audiotheca.ps1`
+4. Re-run the installer **as Administrator**.
+
+See [Install guide — Upgrading on Windows](INSTALL.md#upgrading-on-windows-fix-error-opening-file-for-writing).
 
 ### `npm: not recognized`
 
