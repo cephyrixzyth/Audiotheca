@@ -38,14 +38,14 @@ Backend execute paths exist (`duplicate_execute`, `restructure_execute`, `scene_
 
 ## Phase G — Reference dedupe (full engine pass) (1 week)
 
-MVP ships post-pass on CSV ([PHASED_ROADMAP.md](PHASED_ROADMAP.md) Phase 3). Full pass:
+MVP ships post-pass on CSV ([PHASED_ROADMAP.md](PHASED_ROADMAP.md) Phase 3). **Phase G complete** (G1–G4): scan options, engine Phase 2b, reference-config API, Scan panel UI.
 
 | # | Item | Status |
 |---|------|--------|
-| G1 | Scan option `reference_roots` + `reference_mode: keep_reference` | ☐ |
-| G2 | Engine Phase 2b emits `group_kind=reference_extra` during scan | ☐ |
-| G3 | `POST /api/runs/{stamp}/duplicates/reference-config` | ☐ |
-| G4 | UI: configure reference roots before scan | ☐ |
+| G1 | Scan option `reference_roots` + `reference_mode: keep_reference` | ☑ |
+| G2 | Engine Phase 2b emits `group_kind=reference_extra` during scan | ☑ |
+| G3 | `POST /api/runs/{stamp}/duplicates/reference-config` | ☑ |
+| G4 | UI: configure reference roots before scan | ☑ |
 
 ---
 

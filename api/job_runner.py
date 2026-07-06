@@ -452,6 +452,7 @@ class JobManager:
                 )
             elif proc.returncode == 0 and job.stamp:
                 job.status = "done"
+                self._persist_reference_config(job)
                 await self._broadcast(
                     job,
                     {"type": "job_done", "stamp": job.stamp, "exit_code": proc.returncode},
@@ -505,6 +506,25 @@ class JobManager:
             progress_file.unlink(missing_ok=True)
             control_file.unlink(missing_ok=True)
             engine_lock.clear_lock(job_id=job.job_id)
+
+    def _persist_reference_config(self, job: JobState) -> None:
+        if not job.stamp:
+            return
+        opts = job.scan_options or {}
+        roots = opts.get("reference_roots") or []
+        mode = str(opts.get("reference_mode") or "").strip()
+        if not roots or mode != "keep_reference":
+            return
+        try:
+            from api.reference_config import save_reference_config
+
+            save_reference_config(
+                job.stamp,
+                reference_roots=[str(root) for root in roots],
+                reference_mode=mode,
+            )
+        except Exception:
+            pass
 
     def _detect_stamp(self, started_at: float) -> str | None:
         candidates = sorted(

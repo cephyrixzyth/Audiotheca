@@ -6,6 +6,7 @@ import {
   fetchDecisions,
   fetchDuplicates,
   fetchLibraryRoots,
+  fetchReferenceConfig,
   fetchReferenceExtras,
   feedbackExportUrl,
   rejectDuplicateGroup,
@@ -80,11 +81,24 @@ export function DuplicateReview({ stamp }: Props) {
       setReferenceExtraGroups(0);
       return;
     }
-    fetchLibraryRoots()
-      .then((res) => {
-        const roots = res.roots?.length ? res.roots : libraryRoot ? [libraryRoot] : [];
-        if (!roots.length) return null;
-        return fetchReferenceExtras(stamp, roots);
+    const engineExtras = groups.filter(
+      (group) => group.group_kind.toLowerCase() === "reference_extra",
+    );
+    if (engineExtras.length > 0) {
+      setReferenceExtraKeys(new Set(engineExtras.map((group) => group.dedup_key)));
+      setReferenceExtraGroups(engineExtras.length);
+      return;
+    }
+    fetchReferenceConfig(stamp)
+      .then((config) => {
+        if (config.configured && config.reference_roots.length) {
+          return fetchReferenceExtras(stamp, config.reference_roots);
+        }
+        return fetchLibraryRoots().then((res) => {
+          const roots = res.roots?.length ? res.roots : libraryRoot ? [libraryRoot] : [];
+          if (!roots.length) return null;
+          return fetchReferenceExtras(stamp, roots);
+        });
       })
       .then((res) => {
         if (!res) return;
@@ -92,7 +106,7 @@ export function DuplicateReview({ stamp }: Props) {
         setReferenceExtraGroups(res.reference_extra_groups);
       })
       .catch(() => undefined);
-  }, [stamp, showReferenceExtras, libraryRoot]);
+  }, [stamp, showReferenceExtras, libraryRoot, groups]);
 
   useEffect(() => {
     fetchDecisions(stamp).then((res) => {
@@ -233,7 +247,11 @@ export function DuplicateReview({ stamp }: Props) {
     ? groups.filter((group) => !rejectedKeys.has(group.dedup_key))
     : groups;
   const filteredGroups = showReferenceExtras
-    ? visibleGroups.filter((group) => referenceExtraKeys.has(group.dedup_key))
+    ? visibleGroups.filter(
+        (group) =>
+          group.group_kind.toLowerCase() === "reference_extra" ||
+          referenceExtraKeys.has(group.dedup_key),
+      )
     : visibleGroups;
   const decidedCount = Object.keys(keepers).length;
 

@@ -681,10 +681,34 @@ export function fetchFeedbackEstimate(stamp?: string): Promise<FeedbackApplyEsti
 
 export function fetchReferenceExtras(
   stamp: string,
-  roots: string[],
+  roots?: string[],
 ): Promise<ReferenceExtrasSummary> {
-  const rootsParam = roots.map(encodeURIComponent).join(",");
-  return getJson(`/runs/${stamp}/duplicates/reference-extras?roots=${rootsParam}`);
+  const rootsParam = roots?.length ? roots.map(encodeURIComponent).join(",") : "";
+  const q = rootsParam ? `?roots=${rootsParam}` : "";
+  return getJson(`/runs/${stamp}/duplicates/reference-extras${q}`);
+}
+
+export function fetchReferenceConfig(
+  stamp: string,
+): Promise<{
+  stamp: string;
+  configured: boolean;
+  reference_roots: string[];
+  reference_mode: string;
+}> {
+  return getJson(`/runs/${stamp}/duplicates/reference-config`);
+}
+
+export function saveReferenceConfig(
+  stamp: string,
+  body: { reference_roots: string[]; reference_mode?: string },
+): Promise<{
+  stamp: string;
+  reference_roots: string[];
+  reference_mode: string;
+  updated: string;
+}> {
+  return postJson(`/runs/${stamp}/duplicates/reference-config`, body);
 }
 
 export function defineCustomBucket(params: {
@@ -704,6 +728,8 @@ export function startScan(params: {
     extra_scan_roots?: string[];
     target_paths?: string[];
     invalidate_cache_paths?: string[];
+    reference_roots?: string[];
+    reference_mode?: "keep_reference";
     verbose_log?: boolean;
   };
 }): Promise<JobSnapshot> {

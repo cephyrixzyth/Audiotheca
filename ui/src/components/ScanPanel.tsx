@@ -45,6 +45,24 @@ interface Props {
 
 const ACTIVE_STATUSES = ["running", "paused", "pause_pending", "stop_pending"];
 
+const REFERENCE_ROOTS_STORAGE = "audiotheca.reference_roots";
+const REFERENCE_MODE_STORAGE = "audiotheca.reference_mode";
+
+function loadInitialReferenceRoots(): string {
+  try {
+    return localStorage.getItem(REFERENCE_ROOTS_STORAGE) || "";
+  } catch {
+    return "";
+  }
+}
+
+function loadInitialReferenceMode(): boolean {
+  try {
+    return localStorage.getItem(REFERENCE_MODE_STORAGE) === "keep_reference";
+  } catch {
+    return false;
+  }
+}
 function loadInitialSkipPhases(): string[] {
   try {
     const presetId = localStorage.getItem(FLOW_PRESET_STORAGE) || "fast";
@@ -236,6 +254,8 @@ export function ScanPanel({ onRunComplete }: Props) {
   const [root, setRoot] = useState(libraryRoot);
   const [stagingRoot, setStagingRoot] = useState("");
   const [extraRoots, setExtraRoots] = useState("");
+  const [referenceRoots, setReferenceRoots] = useState(loadInitialReferenceRoots);
+  const [referenceDedupe, setReferenceDedupe] = useState(loadInitialReferenceMode);
   const [pauseBetweenPhases, setPauseBetweenPhases] = useState(false);
   const [skipPhases, setSkipPhases] = useState<string[]>(loadInitialSkipPhases);
   const [job, setJob] = useState<JobSnapshot | null>(null);
@@ -261,6 +281,18 @@ export function ScanPanel({ onRunComplete }: Props) {
   useEffect(() => {
     setRoot(libraryRoot);
   }, [libraryRoot]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(REFERENCE_ROOTS_STORAGE, referenceRoots);
+      localStorage.setItem(
+        REFERENCE_MODE_STORAGE,
+        referenceDedupe ? "keep_reference" : "",
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [referenceRoots, referenceDedupe]);
 
   const applyEvent = useCallback(
     (event: ProgressEvent) => {
@@ -376,6 +408,8 @@ export function ScanPanel({ onRunComplete }: Props) {
             skip_phases?: string[];
             staging_root?: string;
             extra_scan_roots?: string[];
+            reference_roots?: string[];
+            reference_mode?: string;
           }
         | undefined;
       if (opts) {
@@ -386,6 +420,12 @@ export function ScanPanel({ onRunComplete }: Props) {
         if (typeof opts.staging_root === "string") setStagingRoot(opts.staging_root);
         if (Array.isArray(opts.extra_scan_roots)) {
           setExtraRoots(opts.extra_scan_roots.join("\n"));
+        }
+        if (Array.isArray(opts.reference_roots)) {
+          setReferenceRoots(opts.reference_roots.join("\n"));
+        }
+        if (opts.reference_mode === "keep_reference") {
+          setReferenceDedupe(true);
         }
       }
       if (resetEvents) {
@@ -455,6 +495,10 @@ export function ScanPanel({ onRunComplete }: Props) {
     setEvents([]);
     setMetrics(null);
     try {
+      const refRoots = referenceRoots
+        .split(/[\n,;]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
       const snapshot = await startScan({
         dry_run: !live,
         root,
@@ -467,6 +511,9 @@ export function ScanPanel({ onRunComplete }: Props) {
             .map((s) => s.trim())
             .filter(Boolean),
           verbose_log: verboseLog,
+          ...(referenceDedupe && refRoots.length
+            ? { reference_roots: refRoots, reference_mode: "keep_reference" as const }
+            : {}),
         },
       });
       setJob(snapshot);
@@ -629,6 +676,33 @@ export function ScanPanel({ onRunComplete }: Props) {
                 }}
               />
             </label>
+            <label className="checkbox-inline" title="Compare scan library against canonical reference trees (Phase 2b)">
+              <input
+                type="checkbox"
+                checked={referenceDedupe}
+                onChange={(e) => setReferenceDedupe(e.target.checked)}
+              />
+              Reference dedupe (keep reference copies)
+            </label>
+            {referenceDedupe && (
+              <label className="context-field">
+                <span className="context-label">Reference library roots</span>
+                <textarea
+                  className="field-input field-textarea path-drop-target"
+                  rows={2}
+                  placeholder="Z:\canonical_library"
+                  value={referenceRoots}
+                  onChange={(e) => setReferenceRoots(e.target.value)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    const path = readDroppedPath(e);
+                    if (path) {
+                      setReferenceRoots((prev) => (prev.trim() ? `${prev.trim()}\n${path}` : path));
+                    }
+                  }}
+                />
+              </label>
+            )}
           </div>
         ),
       },
@@ -984,6 +1058,8 @@ export function ScanPanel({ onRunComplete }: Props) {
       copied,
       error,
       extraRoots,
+      referenceRoots,
+      referenceDedupe,
       handleControl,
       handleStart,
       isActive,

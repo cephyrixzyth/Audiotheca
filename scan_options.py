@@ -23,6 +23,9 @@ SKIPPABLE_PHASES = frozenset({
 })
 
 
+REFERENCE_MODES = frozenset({"keep_reference"})
+
+
 @dataclass
 class ScanOptions:
     pause_between_phases: bool = False
@@ -31,6 +34,8 @@ class ScanOptions:
     extra_scan_roots: list[str] = field(default_factory=list)
     target_paths: list[str] = field(default_factory=list)
     invalidate_cache_paths: list[str] = field(default_factory=list)
+    reference_roots: list[str] = field(default_factory=list)
+    reference_mode: str = ""
     verbose_log: bool = False
     io_throttle_ms: int = 0
     max_workers: int = 0
@@ -39,8 +44,11 @@ class ScanOptions:
     def skip(self, phase: str) -> bool:
         return phase in self.skip_phases
 
+    def reference_dedupe_enabled(self) -> bool:
+        return self.reference_mode == "keep_reference" and bool(self.reference_roots)
+
     def to_dict(self) -> dict:
-        return {
+        payload = {
             "pause_between_phases": self.pause_between_phases,
             "skip_phases": sorted(self.skip_phases),
             "staging_root": self.staging_root,
@@ -52,6 +60,11 @@ class ScanOptions:
             "max_workers": self.max_workers,
             "cooldown_s": self.cooldown_s,
         }
+        if self.reference_roots:
+            payload["reference_roots"] = self.reference_roots
+        if self.reference_mode:
+            payload["reference_mode"] = self.reference_mode
+        return payload
 
     @classmethod
     def from_dict(cls, data: dict | None) -> ScanOptions:
@@ -64,6 +77,12 @@ class ScanOptions:
         invalidate = [
             str(path).strip() for path in (data.get("invalidate_cache_paths") or []) if str(path).strip()
         ]
+        reference_roots = [
+            str(path).strip() for path in (data.get("reference_roots") or []) if str(path).strip()
+        ]
+        reference_mode = str(data.get("reference_mode") or "").strip()
+        if reference_mode not in REFERENCE_MODES:
+            reference_mode = ""
         return cls(
             pause_between_phases=bool(data.get("pause_between_phases")),
             skip_phases=skip,
@@ -71,6 +90,8 @@ class ScanOptions:
             extra_scan_roots=extra,
             target_paths=targets,
             invalidate_cache_paths=invalidate,
+            reference_roots=reference_roots,
+            reference_mode=reference_mode,
             verbose_log=bool(data.get("verbose_log")),
             io_throttle_ms=max(0, int(data.get("io_throttle_ms") or 0)),
             max_workers=max(0, int(data.get("max_workers") or 0)),

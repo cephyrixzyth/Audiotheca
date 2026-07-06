@@ -1405,12 +1405,56 @@ def get_reference_extras(
     stamp: str,
     roots: str = Query(default="", description="Comma-separated reference library roots"),
 ) -> dict[str, object]:
+    from api.reference_config import load_reference_config, reference_roots_for_run
     from api.reference_dedupe import summary_for_run
 
     reference_roots = [r.strip() for r in roots.split(",") if r.strip()]
     if not reference_roots:
-        raise HTTPException(status_code=400, detail="roots query parameter required")
-    return summary_for_run(stamp, reference_roots)
+        reference_roots = reference_roots_for_run(stamp)
+    if not reference_roots:
+        raise HTTPException(
+            status_code=400,
+            detail="roots query parameter required (or save reference-config for this run)",
+        )
+    summary = summary_for_run(stamp, reference_roots)
+    config = load_reference_config(stamp)
+    if config:
+        summary["reference_mode"] = config.get("reference_mode", "")
+        summary["config_saved"] = True
+    return summary
+
+
+@app.post("/api/runs/{stamp}/duplicates/reference-config")
+def save_reference_config_endpoint(stamp: str, body: dict = Body(...)) -> dict[str, object]:
+    from api.reference_config import save_reference_config
+
+    reference_roots = body.get("reference_roots") or []
+    if not isinstance(reference_roots, list):
+        raise HTTPException(status_code=400, detail="reference_roots must be an array")
+    reference_mode = str(body.get("reference_mode") or "keep_reference").strip()
+    try:
+        validated_roots = [
+            str(security.assert_library_path(str(root), label="reference_root")) for root in reference_roots
+        ]
+        payload = save_reference_config(
+            stamp,
+            reference_roots=validated_roots,
+            reference_mode=reference_mode,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    security.audit("reference_config_save", stamp=stamp, roots=len(validated_roots))
+    return payload
+
+
+@app.get("/api/runs/{stamp}/duplicates/reference-config")
+def get_reference_config_endpoint(stamp: str) -> dict[str, object]:
+    from api.reference_config import load_reference_config
+
+    config = load_reference_config(stamp)
+    if not config:
+        return {"stamp": stamp, "configured": False, "reference_roots": [], "reference_mode": ""}
+    return {"configured": True, **config}
 
 
 @app.get("/api/jobs/history")
@@ -1743,6 +1787,11 @@ async def start_job(request: Request, body: dict = Body(default_factory=dict)) -
                 label="invalidate_cache_path",
             )
         ]
+    if scan_options.get("reference_roots"):
+        scan_options["reference_roots"] = [
+            str(security.assert_library_path(str(item), label="reference_root"))
+            for item in scan_options["reference_roots"]
+        ]
     token = security.extract_bearer_token(request) or ""
     try:
         job = await job_manager.start(
@@ -1790,6 +1839,8 @@ def scan_options_help() -> dict[str, object]:
             "verification": "Skip the post-plan quality scorecard and QA findings",
             "purge": "Skip empty wrapper directory purge",
         },
+        "reference_roots": "Canonical library trees — extras elsewhere get group_kind=reference_extra",
+        "reference_mode": "keep_reference — prefer copies under reference_roots during Phase 2b",
     }
 
 

@@ -412,6 +412,9 @@ class DeduplicationEngine(
             print(f" SKIP PHASES: {', '.join(sorted(self.scan_options.skip_phases))}")
         if self.scan_options.staging_root:
             print(f" STAGING ROOT: {self.scan_options.staging_root}")
+        if self.scan_options.reference_dedupe_enabled():
+            print(f" REFERENCE ROOTS: {', '.join(self.scan_options.reference_roots)}")
+            print(f" REFERENCE MODE: {self.scan_options.reference_mode}")
         if self.scan_options.pause_between_phases:
             print(" PAUSE BETWEEN PHASES: enabled (UI can continue/stop at each step)")
         print(f" 7-ZIP: {self._seven_zip or 'NOT FOUND - install 7-Zip for .rar/.7z listing'}")
@@ -895,6 +898,47 @@ class DeduplicationEngine(
                     print("Invalid index.")
 
             dupe_progress.finish(f"{len(self.duplicate_groups)} groups flagged")
+
+            if self.scan_options.reference_dedupe_enabled():
+                ref_progress = PhaseProgress("Phase 2b - Reference dedupe", 1, "group")
+                existing_keys = {group["dedup_key"] for group in self.duplicate_groups}
+                ref_groups = self.find_reference_extra_groups(
+                    all_items,
+                    self.scan_options.reference_roots,
+                )
+                added = 0
+                for group in ref_groups:
+                    if group["dedup_key"] in existing_keys:
+                        continue
+                    item_paths = [str(item["path"]) for item in group["items"]]
+                    if is_group_rejected(group["dedup_key"], item_paths, feedback_store):
+                        self._inc("feedback_skipped")
+                        self.feedback_skipped_records.append(
+                            {
+                                "dedup_key": group["dedup_key"],
+                                "kind": "reference_extra",
+                                "paths": item_paths,
+                                "confidence": group["confidence"],
+                            }
+                        )
+                        continue
+                    self.duplicate_groups.append(group)
+                    existing_keys.add(group["dedup_key"])
+                    self._inc("duplicates_suspected")
+                    added += 1
+                    print(
+                        f"\n[REFERENCE EXTRA {group['confidence']}] {group['dedup_key']} "
+                        f"({len(group['items'])} copies — keep reference tree)"
+                    )
+                    for idx, item in enumerate(group["items"], 1):
+                        size_mb = item["size"] / (1024 * 1024)
+                        rec = (
+                            " <-- reference keep"
+                            if item["path"] == group["recommended_keep"]["path"]
+                            else ""
+                        )
+                        print(f"  [{idx}] {item['original_name']} ({size_mb:.1f} MB) in {item['source_bin']}{rec}")
+                ref_progress.finish(f"{added} reference-extra groups")
         self._checkpoint("duplicates", "Phase 2 - Duplicate review")
 
         if items_to_delete:

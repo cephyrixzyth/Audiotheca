@@ -44,6 +44,67 @@ class DedupeMixin:
     # Duplicate analysis
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _normalize_path(path: str | Path) -> str:
+        return str(Path(path)).replace("\\", "/").lower().rstrip("/")
+
+    def find_reference_extra_groups(
+        self,
+        all_items: list[dict],
+        reference_roots: list[str],
+    ) -> list[dict]:
+        """Flag items outside reference_roots that share a dedup key with a reference copy."""
+        if not reference_roots:
+            return []
+
+        ref_prefixes = [self._normalize_path(root) for root in reference_roots if str(root).strip()]
+        if not ref_prefixes:
+            return []
+
+        by_key: dict[str, list[dict]] = defaultdict(list)
+        for item in all_items:
+            dedup_key = self.build_dedup_key(item)
+            if not dedup_key:
+                continue
+            by_key[dedup_key].append(item)
+
+        groups: list[dict] = []
+        for dedup_key, items in by_key.items():
+            ref_items = [
+                item
+                for item in items
+                if any(self._normalize_path(item["path"]).startswith(prefix) for prefix in ref_prefixes)
+            ]
+            if not ref_items:
+                continue
+            extra_items = [
+                item
+                for item in items
+                if not any(self._normalize_path(item["path"]).startswith(prefix) for prefix in ref_prefixes)
+            ]
+            if not extra_items:
+                continue
+
+            ref_sorted = sorted(ref_items, key=lambda entry: (entry["version_key"], entry["size"]), reverse=True)
+            keep = ref_sorted[0]
+            group_items = ref_sorted + sorted(extra_items, key=lambda entry: entry["size"], reverse=True)
+            assessment = self.assess_duplicate_group(group_items)
+            groups.append(
+                {
+                    "dedup_key": dedup_key,
+                    "confidence": assessment["confidence"],
+                    "name_similarity": assessment["name_similarity"],
+                    "same_version": assessment["same_version"],
+                    "size_ratio": assessment["size_ratio"],
+                    "group_kind": "reference_extra",
+                    "recommended_keep": keep,
+                    "items": group_items,
+                    "content_check": "SKIPPED",
+                    "action": "REVIEW — extra copy outside reference library",
+                }
+            )
+        return groups
+
     def reconcile_vendors(self, all_items: list[dict]) -> int:
         """
         Cross-folder reconciliation: after all buckets have run, unknown and
