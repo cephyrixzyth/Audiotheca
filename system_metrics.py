@@ -4,9 +4,16 @@ from __future__ import annotations
 
 import os
 import shutil
+import threading
 import time
+from collections import deque
 from pathlib import Path
 from typing import Any
+
+_HISTORY_SIZE = int(os.environ.get("AUDIOTHECA_METRICS_HISTORY", "60"))
+_HISTORY_LOCK = threading.Lock()
+_PERF_HISTORY: deque[dict[str, Any]] = deque(maxlen=_HISTORY_SIZE)
+_STRG_HISTORY: deque[dict[str, Any]] = deque(maxlen=_HISTORY_SIZE)
 
 
 def _disk_usage_path(path: Path | None) -> tuple[Path, str | None]:
@@ -114,6 +121,10 @@ def collect_metrics(*, path: Path | None = None) -> dict:
     payload["psutil"] = True
     payload["cpu_percent"] = psutil.cpu_percent(interval=0.1)
     payload["cpu_count"] = psutil.cpu_count(logical=True) or 0
+    try:
+        payload["thread_count"] = psutil.Process().num_threads()
+    except (AttributeError, OSError):
+        payload["thread_count"] = None
     mem = psutil.virtual_memory()
     payload["ram_total_gb"] = round(mem.total / (1024**3), 2)
     payload["ram_used_gb"] = round(mem.used / (1024**3), 2)
@@ -155,6 +166,48 @@ def collect_metrics(*, path: Path | None = None) -> dict:
 
     payload["bottleneck_hints"] = _bottleneck_hints(payload)
     return payload
+
+
+def _sparkline_fields(payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "ts": time.time(),
+        "cpu_percent": payload.get("cpu_percent"),
+        "ram_used_pct": payload.get("ram_used_pct"),
+        "disk_free_pct": payload.get("disk_free_pct"),
+        "disk_io_busy_pct": payload.get("disk_io_busy_pct"),
+        "network_latency_ms": payload.get("network_latency_ms"),
+        "read_latency_ms": payload.get("read_latency_ms"),
+        "estimated_iops": payload.get("estimated_iops"),
+    }
+
+
+def record_metrics_sample(payload: dict[str, Any], *, kind: str = "perf") -> None:
+    """Append a rolling telemetry sample for sparkline endpoints."""
+    row = _sparkline_fields(payload)
+    target = _STRG_HISTORY if kind == "strg" else _PERF_HISTORY
+    with _HISTORY_LOCK:
+        target.append(row)
+
+
+def get_metrics_history(*, limit: int = 60) -> dict[str, Any]:
+    cap = max(1, min(limit, _HISTORY_SIZE))
+    with _HISTORY_LOCK:
+        perf = list(_PERF_HISTORY)[-cap:]
+        strg = list(_STRG_HISTORY)[-cap:]
+    return {
+        "limit": cap,
+        "perf": perf,
+        "strg": strg,
+        "sparklines": {
+            "cpu_percent": [row.get("cpu_percent") for row in perf if row.get("cpu_percent") is not None],
+            "ram_used_pct": [row.get("ram_used_pct") for row in perf if row.get("ram_used_pct") is not None],
+            "disk_free_pct": [row.get("disk_free_pct") for row in perf if row.get("disk_free_pct") is not None],
+            "network_latency_ms": [
+                row.get("network_latency_ms") for row in strg if row.get("network_latency_ms") is not None
+            ],
+            "read_latency_ms": [row.get("read_latency_ms") for row in strg if row.get("read_latency_ms") is not None],
+        },
+    }
 
 
 def _sample_path_latency_ms(path: Path, *, sample_bytes: int = 65536) -> float | None:
@@ -214,6 +267,10 @@ def collect_dual_metrics(*, scan_root: Path | str | None = None) -> dict[str, An
                 if ping is not None:
                     remote["network_latency_ms"] = ping
                     remote["network_host"] = host_hint
+
+    record_metrics_sample(host, kind="perf")
+    if remote is not None:
+        record_metrics_sample(remote, kind="strg")
 
     return {
         "host": host,

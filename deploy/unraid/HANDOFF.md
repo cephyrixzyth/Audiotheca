@@ -61,22 +61,36 @@ Start from deploy/unraid/ skeleton in the repo and flesh out Dockerfiles + compo
 
 ---
 
+## Local Windows Docker (dev)
+
+From `deploy/unraid/`:
+
+```powershell
+copy .env.example .env   # edit LIBRARY_HOST_PATH
+.\start-local.ps1
+# UI http://localhost:4210 · API http://localhost:4211/api/health
+```
+
 ## What already exists in repo
 
 | Path | Status |
 |------|--------|
 | `docker/searxng/` | SearXNG compose + JSON API settings (Windows dev) |
 | `deploy/unraid/` | Compose stack + **Add Container** template (`my-audiotheca.xml`, `Dockerfile`) |
+| `deploy/unraid/start-local.ps1` | Windows Docker Desktop local stack |
 | `scripts/searx_search.py` | SearXNG CLI helper |
+| `scripts/seed_demo_library.py` | Demo library under `docs/demo/library` |
+| `audiotheca/spec/` | 94-code architecture spec catalog + invoke API |
+| `docs/SPEC_CATALOG.md` | Spec catalog reference |
 | `docs/TAURI_BUILD.md` | Sidecar pattern (reference for AUDIOTHECA_HOME) |
 
-## Known gaps for Unraid (new chat should fix)
+## Resolved (was gaps in early handoff)
 
-1. `audiotheca/config.py` — `ROOT_DIR` hardcoded; needs `AUDIOTHECA_LIBRARY_ROOT` env
-2. `ui/src/platform.ts` — `DEFAULT_LIBRARY_ROOT` hardcoded for Windows
-3. No Dockerfile yet — greenfield
-4. Engine may need `7z` in container for archive peek
-5. Live restructure on Linux needs different “open in explorer” / path semantics (API already has security path allowlist via `AUDIOTHECA_LIBRARY_ROOTS`)
+1. `AUDIOTHECA_LIBRARY_ROOT` env — supported in config and API security
+2. UI library root — from `/api/security/library-roots` at runtime
+3. Dockerfiles — `deploy/unraid/Dockerfile`, `Dockerfile.api`, `Dockerfile.ui`
+4. 7-Zip — bundled via `tools/7zip/` or system path in container
+5. Spec waves A–R — 94/94 codes implemented with tests
 
 ## Suggested Unraid paths (user to confirm)
 

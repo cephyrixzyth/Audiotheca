@@ -1044,6 +1044,111 @@ export function deleteSecurityThreats(params: {
   return postJson("/security/delete", params);
 }
 
+export function shredSecurityThreats(params: {
+  paths: string[];
+  confirm_live: boolean;
+  passes?: number;
+}): Promise<{ ok: boolean; results: Array<{ path: string; deleted?: boolean; passes?: number }> }> {
+  return postJson("/security/shred", params);
+}
+
+export function analyzeQuarantine(params: {
+  path: string;
+  root?: string;
+}): Promise<{
+  path: string;
+  repairable: boolean;
+  recommendation: string;
+  injection_blocks: string[];
+  mode: string;
+}> {
+  return postJson("/security/quarantine/analyze", params);
+}
+
+export function evaluateExecutionPolicy(params: {
+  path: string;
+  action?: string;
+}): Promise<{ path: string; allowed: boolean; reasons: string[] }> {
+  return postJson("/security/execution/evaluate", params);
+}
+
+export function fetchAntiPhoneBlock(params?: {
+  domains?: string[];
+  vendors?: string[];
+}): Promise<{ domains: string[]; hosts_text: string; count: number }> {
+  return postJson("/security/anti-phone", params ?? {});
+}
+
+export function fetchNodeSyncStatus(nodeId = "local"): Promise<Record<string, unknown>> {
+  return getJson(`/orchestration/node-sync?node_id=${encodeURIComponent(nodeId)}`);
+}
+
+export function registerNodeSyncPeer(params: {
+  peer_id: string;
+  host?: string;
+  library_root?: string;
+}): Promise<Record<string, unknown>> {
+  return postJson("/orchestration/node-sync/peers", params);
+}
+
+export function compareNodeSyncManifest(manifest: Record<string, unknown>): Promise<Record<string, unknown>> {
+  return postJson("/orchestration/node-sync/compare", { manifest });
+}
+
+export function fetchEnvironmentBlueprintYaml(): Promise<{ yaml: string; format: string }> {
+  return getJson("/environment/blueprint/yaml");
+}
+
+export function validateStagingRoot(path: string): Promise<{
+  path: string;
+  valid: boolean;
+  writable: boolean;
+  delete_candidates: string;
+  quarantine: string;
+}> {
+  return postJson("/scan/staging/validate", { path });
+}
+
+export function postExplorerDrop(paths: string[]): Promise<{ ok: boolean; count: number; routed: Array<Record<string, unknown>> }> {
+  return postJson("/explorer/drop", { paths });
+}
+
+export function fetchMetricsHistory(limit = 60): Promise<Record<string, unknown>> {
+  return getJson(`/system/metrics/history?limit=${limit}`);
+}
+
+export function fetchVendorHints(path: string): Promise<Record<string, unknown>> {
+  return getJson(`/tools/vendor-hints?path=${encodeURIComponent(path)}`);
+}
+
+export function runAcousticDedupe(paths: string[]): Promise<Record<string, unknown>> {
+  return postJson("/audio/acoustic-dedupe", { paths });
+}
+
+export function planWebSpiderLookup(query: string, preset?: string): Promise<Record<string, unknown>> {
+  return postJson("/ai/web-spider/plan", { query, preset });
+}
+
+export function runWebSpiderLookup(query: string, preset?: string): Promise<Record<string, unknown>> {
+  return postJson("/ai/web-spider/run", { query, preset });
+}
+
+export function generateTagsFromText(body: { text?: string; path?: string; max_tags?: number }): Promise<{ tags: string[] }> {
+  return postJson("/ai/tag-generate", body);
+}
+
+export function parseNfoFile(path?: string, text?: string): Promise<{ parsed: Record<string, unknown>; path?: string | null }> {
+  return postJson("/ai/nfo-parse", path ? { path } : { text });
+}
+
+export function fetchCloudCacheStatus(): Promise<Record<string, unknown>> {
+  return getJson("/storage/cloud-cache/status");
+}
+
+export function fetchS3StorageStatus(): Promise<{ status: Record<string, unknown>; probe: Record<string, unknown> }> {
+  return getJson("/storage/s3");
+}
+
 export function fetchEnvironment(): Promise<import("../types").EnvironmentPayload> {
   return getJson("/environment");
 }
@@ -1202,4 +1307,146 @@ export function runReferenceDedupeEngine(body: {
   extras: Array<{ dedup_key: string; full_path: string; reference_matches: string[] }>;
 }> {
   return postJson("/reference-dedupe/engine-scan", body);
+}
+
+export function fetchSpecCatalog(section?: string): Promise<{
+  summary: Record<string, unknown>;
+  entries: Array<Record<string, unknown>>;
+}> {
+  const query = section ? `?section=${encodeURIComponent(section)}` : "";
+  return getJson(`/spec/catalog${query}`);
+}
+
+export function fetchMountEvents(limit = 100): Promise<{
+  enabled: boolean;
+  active?: boolean;
+  watchdog_available: boolean;
+  roots?: string[];
+  events: Array<Record<string, unknown>>;
+}> {
+  return getJson(`/system/mount-events?limit=${limit}`);
+}
+
+export function fetchNetSafe(root?: string): Promise<Record<string, unknown>> {
+  const query = root ? `?root=${encodeURIComponent(root)}` : "";
+  return getJson(`/system/net-safe${query}`);
+}
+
+export function setNetSafePaused(paused: boolean): Promise<{ paused: boolean }> {
+  return postJson("/system/net-safe", { paused });
+}
+
+export function exportWorkspaceBundle(body: {
+  output?: string;
+  include_ledger?: boolean;
+  include_audit?: boolean;
+}): Promise<{ output: string; entries: number; included: string[]; ok: boolean }> {
+  return postJson("/tools/bundle/export", body);
+}
+
+export async function mediaStreamUrl(path: string): Promise<string> {
+  const token = await ensureApiToken();
+  return apiUrl(`/media/stream?path=${encodeURIComponent(path)}&token=${encodeURIComponent(token)}`);
+}
+
+export function fetchAudioWaveform(
+  path: string,
+  bins = 64,
+): Promise<{ peaks: number[]; duration_s?: number; cached?: boolean }> {
+  return getJson(`/audio/waveform?path=${encodeURIComponent(path)}&bins=${bins}`);
+}
+
+export function fetchAudioAnalyze(path: string): Promise<Record<string, unknown>> {
+  return getJson(`/audio/analyze?path=${encodeURIComponent(path)}`);
+}
+
+export function fetchAudioBwf(path: string): Promise<Record<string, unknown>> {
+  return getJson(`/audio/bwf?path=${encodeURIComponent(path)}`);
+}
+
+export function fetchAnonymizeStatus(item: Record<string, unknown>): Promise<Record<string, unknown>> {
+  return postJson("/ai/anonymize-status", { item });
+}
+
+export function fetchConfidenceTier(body: {
+  id_confidence?: string;
+  id_method?: string;
+}): Promise<Record<string, unknown>> {
+  return postJson("/ai/confidence-tier", body);
+}
+
+export function scanProcessMemory(pid: number): Promise<Record<string, unknown>> {
+  return postJson("/security/memory-scan", { pid });
+}
+
+export function exportCueLog(body: {
+  markers: Array<Record<string, unknown>>;
+  format?: string;
+  fps?: number;
+  title?: string;
+}): Promise<Record<string, unknown>> {
+  return postJson("/tools/cue/export", body);
+}
+
+export function relocatePaths(body: {
+  path?: string;
+  paths?: string[];
+  target_os?: string;
+}): Promise<Record<string, unknown>> {
+  return postJson("/tools/path-relocate", body);
+}
+
+export function propagateTags(body: {
+  paths: string[];
+  tags: Record<string, string>;
+  dry_run?: boolean;
+}): Promise<Record<string, unknown>> {
+  return postJson("/tools/tag-propagate", body);
+}
+
+export function runDistScan(body: {
+  workers?: string[];
+  root?: string;
+  paths?: string[];
+  shard?: number;
+  limit?: number;
+}): Promise<Record<string, unknown>> {
+  return postJson("/orchestration/dist-scan", body);
+}
+
+export function runCleanSweep(body: {
+  root: string;
+  patterns?: string[];
+  limit?: number;
+}): Promise<{ orphans: Array<Record<string, unknown>>; count: number }> {
+  return postJson("/tools/clean-sweep", body);
+}
+
+export function recommendStorageTier(body: {
+  path?: string;
+  age_days?: number;
+  access_count?: number;
+  size_gb?: number;
+}): Promise<Record<string, unknown>> {
+  return postJson("/storage/tier", body);
+}
+
+export function fetchVirtualPaths(): Promise<{ entries: Array<Record<string, unknown>>; count: number }> {
+  return getJson("/system/virtual-paths");
+}
+
+export function saveVirtualPaths(mappings: Record<string, string>): Promise<Record<string, unknown>> {
+  return postJson("/system/virtual-paths", { mappings, persist: true });
+}
+
+export function fetchCtxProfile(action = "scan"): Promise<Record<string, unknown>> {
+  return getJson(`/system/ctx-profile?action=${encodeURIComponent(action)}`);
+}
+
+export function fetchSignalCapture(): Promise<Record<string, unknown>> {
+  return getJson("/system/signal-capture");
+}
+
+export function fetchDriveCooldown(): Promise<Record<string, unknown>> {
+  return getJson("/system/drive-cooldown");
 }

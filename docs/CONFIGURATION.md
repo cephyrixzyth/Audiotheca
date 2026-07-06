@@ -1,6 +1,6 @@
 # Audiotheca — Configuration Reference
 
-Engine **10.0.0** · API **1.0.0**
+Engine **10.0.0** · API **1.0.2**
 
 Overview and env quick-start: [main README](../README.md).
 
@@ -59,6 +59,11 @@ Alternative allowlist file: `dedupe_reports/.library_roots.json` (see API securi
 |----------|-------------|
 | `PYTHONUNBUFFERED` | Set `1` for live terminal progress during CLI scans |
 | `SEARXNG_URL` | Base URL for `scripts/searx_search.py` (default `http://127.0.0.1:8080`) |
+| `AUDIOTHECA_REQUIRE_ADMIN` | Set `1` to require elevation for live delete/quarantine/shred/repair |
+| `AUDIOTHECA_NET_PAUSE` | Set `1` to pause scans when NAS is unreachable (NET-SAFE) |
+| `AUDIOTHECA_METRICS_HISTORY` | Rolling telemetry samples for sparklines (default `60`) |
+| `AUDIOTHECA_AI_LOOKUP_PROVIDER` | `openai_compatible` for live AI lookup |
+| `AUDIOTHECA_AI_OPENAI_API_KEY` | API key when using OpenAI-compatible provider |
 
 ---
 

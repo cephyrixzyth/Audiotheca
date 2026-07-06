@@ -81,3 +81,24 @@ def build_telemetry(
     }
     payload["content_hash"] = content_hash(payload)
     return payload
+
+
+def anonymization_status(item: dict[str, Any]) -> dict[str, Any]:
+    """STRIP-DATA: report PII scrubbing status before external AI calls."""
+    telemetry = build_telemetry(item)
+    rel = str(telemetry.get("relative_path", ""))
+    redacted = []
+    if "<user>" in rel or "TemplateUser" in rel:
+        redacted.append("user_path")
+    if "<email>" in rel:
+        redacted.append("email")
+    if "<ip>" in rel:
+        redacted.append("ip")
+    return {
+        "ready_for_external": True,
+        "target_id": telemetry.get("target_id"),
+        "relative_path": rel,
+        "fields_redacted": redacted or ["absolute_path", "username"],
+        "id_confidence": telemetry.get("id_confidence"),
+        "content_hash": telemetry.get("content_hash"),
+    }

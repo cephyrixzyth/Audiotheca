@@ -34,6 +34,7 @@ class ScanOptions:
     verbose_log: bool = False
     io_throttle_ms: int = 0
     max_workers: int = 0
+    cooldown_s: float = 0.0
 
     def skip(self, phase: str) -> bool:
         return phase in self.skip_phases
@@ -49,6 +50,7 @@ class ScanOptions:
             "verbose_log": self.verbose_log,
             "io_throttle_ms": self.io_throttle_ms,
             "max_workers": self.max_workers,
+            "cooldown_s": self.cooldown_s,
         }
 
     @classmethod
@@ -72,6 +74,7 @@ class ScanOptions:
             verbose_log=bool(data.get("verbose_log")),
             io_throttle_ms=max(0, int(data.get("io_throttle_ms") or 0)),
             max_workers=max(0, int(data.get("max_workers") or 0)),
+            cooldown_s=max(0.0, float(data.get("cooldown_s") or 0)),
         )
 
 
@@ -97,6 +100,32 @@ def apply_staging_paths(engine, options: ScanOptions) -> None:
         engine.delete_candidates_dir,
         engine.quarantine_dir,
     )
+
+
+def validate_staging_root(path: str) -> dict:
+    """STG-ISOL: verify alternate staging root exists and is writable."""
+    staging = Path(path)
+    result = {
+        "path": str(path),
+        "valid": False,
+        "exists": staging.exists(),
+        "is_dir": staging.is_dir(),
+        "writable": False,
+        "delete_candidates": str(staging / "_delete-canidates"),
+        "quarantine": str(staging / "_non_pc_quarantine"),
+    }
+    if not staging.is_dir():
+        result["error"] = "not_a_directory" if staging.exists() else "missing"
+        return result
+    probe = staging / ".audiotheca_staging_probe"
+    try:
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink(missing_ok=True)
+        result["writable"] = True
+        result["valid"] = True
+    except OSError as exc:
+        result["error"] = str(exc)
+    return result
 
 
 def apply_scan_options(engine, options: ScanOptions) -> None:

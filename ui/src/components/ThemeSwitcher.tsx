@@ -5,6 +5,7 @@ export function ThemeSwitcher() {
   const { activeId, activeTheme, themes, setActiveTheme } = useTheme();
   const [open, setOpen] = useState(false);
   const [focusIndex, setFocusIndex] = useState(0);
+  const [contrastPreview, setContrastPreview] = useState(100);
   const rootRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const listboxId = useId();
@@ -109,32 +110,59 @@ export function ThemeSwitcher() {
         </span>
       </button>
       {open && (
-        <ul
-          ref={listRef}
-          id={listboxId}
-          className="theme-switcher-menu"
-          role="listbox"
-          aria-label="Theme presets"
-          tabIndex={-1}
-          onKeyDown={onListKeyDown}
-        >
-          {themes.map((theme, index) => (
-            <li
-              key={theme.id}
-              role="option"
-              data-index={index}
-              aria-selected={theme.id === activeId}
-              className={`theme-switcher-option${theme.id === activeId ? " active" : ""}${index === focusIndex ? " focused" : ""}`}
-              onMouseEnter={() => setFocusIndex(index)}
-              onClick={() => selectTheme(theme.id)}
+        <div className="theme-switcher-popover">
+          <ul
+            ref={listRef}
+            id={listboxId}
+            className="theme-switcher-menu"
+            role="listbox"
+            aria-label="Theme presets"
+            tabIndex={-1}
+            onKeyDown={onListKeyDown}
+          >
+            {themes.map((theme, index) => (
+              <li
+                key={theme.id}
+                role="option"
+                data-index={index}
+                aria-selected={theme.id === activeId}
+                className={`theme-switcher-option${theme.id === activeId ? " active" : ""}${index === focusIndex ? " focused" : ""}`}
+                onMouseEnter={() => setFocusIndex(index)}
+                onClick={() => selectTheme(theme.id)}
+              >
+                <span className="theme-switcher-option-name">
+                  {theme.name}
+                  {!theme.builtIn && <span className="theme-switcher-custom"> ★</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <div className="theme-contrast-preview" aria-label="Contrast preview">
+            <div
+              className="theme-contrast-swatch"
+              style={{
+                background: activeTheme.tokens.bg,
+                color: activeTheme.tokens.text,
+                borderColor: activeTheme.tokens.border,
+                filter: `contrast(${contrastPreview / 100})`,
+              }}
             >
-              <span className="theme-switcher-option-name">
-                {theme.name}
-                {!theme.builtIn && <span className="theme-switcher-custom"> ★</span>}
-              </span>
-            </li>
-          ))}
-        </ul>
+              <span style={{ color: activeTheme.tokens.accent }}>Accent</span>
+              <span style={{ color: activeTheme.tokens.textMuted }}>Muted</span>
+            </div>
+            <label className="theme-contrast-slider">
+              <span className="context-label">Contrast</span>
+              <input
+                type="range"
+                min={70}
+                max={140}
+                value={contrastPreview}
+                onChange={(e) => setContrastPreview(Number(e.target.value))}
+              />
+              <span className="count-muted">{contrastPreview}%</span>
+            </label>
+          </div>
+        </div>
       )}
     </div>
   );

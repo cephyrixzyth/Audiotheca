@@ -184,6 +184,8 @@ async def environment_repair(body: dict = Body(default_factory=dict)) -> dict[st
         raise HTTPException(status_code=400, detail="action is required")
     dry_run = security.parse_dry_run(body.get("dry_run"), default=True)
     security.require_live_confirmation(body, dry_run=dry_run, action=f"environment repair ({action})")
+    if not dry_run:
+        _require_ctx_permission("repair_live")
     security.audit("environment_repair", action=action, dry_run=dry_run)
     return await asyncio.to_thread(run_repair, action, dry_run=dry_run)
 
@@ -194,6 +196,8 @@ async def environment_repair_all(body: dict = Body(default_factory=dict)) -> dic
 
     dry_run = security.parse_dry_run(body.get("dry_run"), default=True)
     security.require_live_confirmation(body, dry_run=dry_run, action="environment repair-all")
+    if not dry_run:
+        _require_ctx_permission("repair_live")
     security.audit("environment_repair_all", dry_run=dry_run)
     return await asyncio.to_thread(repair_all, dry_run=dry_run)
 
@@ -204,6 +208,8 @@ async def environment_install(body: dict = Body(default_factory=dict)) -> dict[s
 
     dry_run = security.parse_dry_run(body.get("dry_run"), default=True)
     security.require_live_confirmation(body, dry_run=dry_run, action="environment install")
+    if not dry_run:
+        _require_ctx_permission("install_live")
     security.audit("environment_install", dry_run=dry_run)
     return await asyncio.to_thread(install_dependencies, dry_run=dry_run)
 
@@ -232,6 +238,13 @@ def export_environment_manifest() -> dict[str, object]:
     return export_manifest()
 
 
+@app.get("/api/environment/blueprint/yaml")
+def export_environment_blueprint_yaml() -> dict[str, object]:
+    from audiotheca.environment import export_blueprint_yaml
+
+    return export_blueprint_yaml()
+
+
 @app.post("/api/environment/manifest/import")
 def import_environment_manifest(body: dict = Body(...)) -> dict[str, object]:
     from audiotheca.environment import import_manifest
@@ -242,6 +255,7 @@ def import_environment_manifest(body: dict = Body(...)) -> dict[str, object]:
     dry_run = security.parse_dry_run(body.get("dry_run"), default=False)
     if not dry_run:
         security.require_live_confirmation(body, dry_run=False, action="environment manifest import")
+        _require_ctx_permission("live_execute")
     if dry_run:
         return {"ok": True, "dry_run": True, "would_import": manifest}
     security.audit("environment_manifest_import")
@@ -270,9 +284,20 @@ def put_library_roots(body: dict = Body(...)) -> dict[str, object]:
     return {"ok": True, "roots": roots, "configured": True}
 
 
+def _require_ctx_permission(action: str) -> None:
+    from ctx_prof import require_permission
+
+    try:
+        require_permission(action)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+
 def _parse_live_execute(body: dict, *, action: str) -> tuple[bool, str | None]:
     dry_run = security.parse_dry_run(body.get("dry_run"), default=True)
     security.require_live_confirmation(body, dry_run=dry_run, action=action)
+    if not dry_run:
+        _require_ctx_permission("live_execute")
     root_raw = body.get("root")
     root = str(security.assert_library_path(root_raw, label="root")) if root_raw else None
     return dry_run, root
@@ -945,6 +970,8 @@ def scene_flag_missing_part01(stamp: str, body: dict = Body(...)) -> dict[str, o
 async def execute_scene_renames(stamp: str, body: dict = Body(default_factory=dict)) -> dict[str, object]:
     dry_run = security.parse_dry_run(body.get("dry_run"), default=True)
     security.require_live_confirmation(body, dry_run=dry_run, action="scene renames")
+    if not dry_run:
+        _require_ctx_permission("live_execute")
     security.audit("execute_scene_renames", stamp=stamp, dry_run=dry_run)
     return await asyncio.to_thread(execute_approved_renames, stamp, dry_run=dry_run)
 
@@ -1186,6 +1213,13 @@ def list_installations() -> dict[str, object]:
     import installation_registry as ir
 
     return {"installs": ir.list_installs(), "default_tags": ir.default_tags()}
+
+
+@app.get("/api/installations/vendor-links")
+def installations_vendor_links(product_key: str = Query(default="")) -> dict[str, object]:
+    from installation_registry import vendor_links
+
+    return vendor_links(product_key)
 
 
 @app.get("/api/installations/{install_id}")
@@ -1730,6 +1764,7 @@ async def control_job(job_id: str, body: dict = Body(...)) -> dict:
 def scan_options_help() -> dict[str, object]:
     return {
         "skippable_phases": sorted(SKIPPABLE_PHASES),
+        "staging_root": "Alternate root for delete/quarantine staging (STG-ISOL)",
         "io_throttle_ms": "Milliseconds to sleep between folder scan batches (0 = off)",
         "max_workers": "Override parallel scan workers (0 = engine default)",
         "phase_descriptions": {
@@ -1804,6 +1839,7 @@ def security_lookup(hash: str = Query(..., min_length=64, max_length=64)) -> dic
 async def security_quarantine(body: dict = Body(...)) -> dict[str, object]:
     import malware_scanner as ms
 
+    _require_ctx_permission("quarantine")
     if not body.get("confirm_live"):
         raise HTTPException(status_code=400, detail="confirm_live required")
     paths_raw = body.get("paths") or []
@@ -1823,6 +1859,7 @@ async def security_quarantine(body: dict = Body(...)) -> dict[str, object]:
 async def security_delete(body: dict = Body(...)) -> dict[str, object]:
     import malware_scanner as ms
 
+    _require_ctx_permission("delete")
     if not body.get("confirm_live"):
         raise HTTPException(status_code=400, detail="confirm_live required")
     paths_raw = body.get("paths") or []
@@ -1843,16 +1880,27 @@ async def rollback_transaction_batch(body: dict = Body(...)) -> dict[str, object
         raise HTTPException(status_code=400, detail="batch_id is required")
     dry_run = security.parse_dry_run(body.get("dry_run"), default=True)
     security.require_live_confirmation(body, dry_run=dry_run, action="transaction rollback")
+    if not dry_run:
+        _require_ctx_permission("live_execute")
     security.audit("transaction_rollback", batch_id=batch_id, dry_run=dry_run)
     return await asyncio.to_thread(rollback_batch, batch_id, dry_run=dry_run)
 
 
 @app.get("/api/system/metrics")
 def system_metrics(root: str | None = Query(default=None)) -> dict[str, object]:
-    from system_metrics import collect_metrics
+    from system_metrics import collect_metrics, record_metrics_sample
 
     path = security.assert_library_path(root, label="root") if root else None
-    return collect_metrics(path=path)
+    payload = collect_metrics(path=path)
+    record_metrics_sample(payload, kind="strg" if root else "perf")
+    return payload
+
+
+@app.get("/api/system/metrics/history")
+def system_metrics_history(limit: int = Query(default=60, ge=1, le=120)) -> dict[str, object]:
+    from system_metrics import get_metrics_history
+
+    return get_metrics_history(limit=limit)
 
 
 @app.get("/api/system/runtime-policy")
@@ -1864,14 +1912,665 @@ def get_runtime_policy() -> dict[str, object]:
 
 @app.get("/api/system/audit-log")
 def get_audit_log(tail: int = Query(default=200, ge=1, le=2000)) -> dict[str, object]:
-    return {"entries": security.read_audit_log(tail=tail)}
+    from path_mask import mask_payload
+
+    return mask_payload({"entries": security.read_audit_log(tail=tail)})
 
 
 @app.get("/api/system/transaction-ledger")
 def get_transaction_ledger(limit: int = Query(default=200, ge=1, le=2000)) -> dict[str, object]:
     from audiotheca.transaction_ledger import list_entries
+    from path_mask import mask_payload
 
-    return {"entries": list_entries(limit=limit)}
+    return mask_payload({"entries": list_entries(limit=limit)})
+
+
+@app.get("/api/system/mount-events")
+def get_mount_events(limit: int = Query(default=100, ge=1, le=500)) -> dict[str, object]:
+    from audiotheca.watcher import HAS_WATCHDOG, list_mount_events, watcher_enabled
+    from path_mask import mask_payload
+
+    global _library_watcher
+    roots: list[str] = []
+    active = False
+    if _library_watcher is not None:
+        active = True
+        roots = [str(root) for root in _library_watcher.roots]
+
+    return mask_payload(
+        {
+            "enabled": watcher_enabled(),
+            "active": active,
+            "watchdog_available": HAS_WATCHDOG,
+            "roots": roots,
+            "events": list_mount_events(limit=limit),
+        }
+    )
+
+
+@app.get("/api/system/net-safe")
+def get_net_safe(root: str | None = Query(default=None)) -> dict[str, object]:
+    from net_safe import evaluate_job_network, status
+
+    if root:
+        return evaluate_job_network(root)
+    return status()
+
+
+@app.post("/api/system/net-safe")
+def set_net_safe(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from net_safe import set_paused
+
+    if "paused" not in body:
+        raise HTTPException(status_code=400, detail="Missing paused boolean")
+    return set_paused(bool(body["paused"]))
+
+
+@app.get("/api/system/ctx-profile")
+def get_ctx_profile(action: str = Query(default="scan")) -> dict[str, object]:
+    from ctx_prof import check_admin_permissions
+
+    return check_admin_permissions(action=action)
+
+
+@app.get("/api/system/virtual-paths")
+def get_virtual_paths() -> dict[str, object]:
+    from sym_agg import list_unified_entries
+
+    return list_unified_entries()
+
+
+@app.post("/api/system/virtual-paths")
+def post_virtual_paths(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from sym_agg import build_virtual_tree, resolve_virtual_path, save_mappings
+
+    mappings = body.get("mappings")
+    if isinstance(mappings, dict):
+        cleaned = {str(k): str(v) for k, v in mappings.items()}
+        if body.get("persist"):
+            save_mappings(cleaned)
+        return build_virtual_tree(cleaned)
+    virtual = body.get("virtual")
+    if virtual:
+        resolved = resolve_virtual_path(str(virtual))
+        return {"virtual": virtual, "resolved": resolved}
+    raise HTTPException(status_code=400, detail="mappings or virtual required")
+
+
+@app.get("/api/system/path-normalize")
+def get_path_normalize(path: str = Query(...)) -> dict[str, object]:
+    from path_mask import mask_payload
+    from pth_nrm import path_info
+
+    return mask_payload(path_info(path))
+
+
+@app.get("/api/system/tree-preview")
+def get_tree_preview(
+    root: str = Query(...),
+    limit: int = Query(default=200, ge=1, le=2000),
+    max_depth: int = Query(default=3, ge=1, le=8),
+) -> dict[str, object]:
+    from mmap_eng import list_tree_preview
+    from path_mask import mask_payload
+
+    target = security.assert_library_path(root, must_exist=True, label="root")
+    return mask_payload(list_tree_preview(target, limit=limit, max_depth=max_depth))
+
+
+@app.get("/api/system/drive-cooldown")
+def get_drive_cooldown() -> dict[str, object]:
+    from drv_cooldwn import queue_status
+
+    return queue_status()
+
+
+@app.get("/api/system/signal-capture")
+def get_signal_capture() -> dict[str, object]:
+    from sig_cap import capture_status
+
+    return capture_status()
+
+
+@app.get("/api/system/vpn-sidecar")
+def get_vpn_sidecar() -> dict[str, object]:
+    from dkr_tun import gluetun_config, parse_compose_services
+
+    return {"config": gluetun_config(), "compose": parse_compose_services()}
+
+
+@app.get("/api/audio/waveform")
+def audio_waveform(
+    path: str = Query(..., description="WAV file path"),
+    bins: int = Query(default=64, ge=8, le=512),
+    refresh: bool = Query(default=False),
+) -> dict[str, object]:
+    from path_mask import mask_payload
+    from wav_cch import waveform_cache_key
+
+    target = security.assert_library_path(path, label="path")
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    return mask_payload(waveform_cache_key(target, bins=bins, refresh=refresh))
+
+
+@app.get("/api/audio/analyze")
+def audio_analyze(path: str = Query(..., description="WAV file to analyze")) -> dict[str, object]:
+    from audio_analyze import analyze_audio_file
+    from path_mask import mask_payload
+
+    target = security.assert_library_path(path, must_exist=True, label="path")
+    return mask_payload(analyze_audio_file(target))
+
+
+@app.get("/api/audio/bwf")
+def audio_bwf(path: str = Query(..., description="WAV file for BWF axml/bext extract")) -> dict[str, object]:
+    from bwf_metadata import parse_wav_metadata
+    from path_mask import mask_payload
+
+    target = security.assert_library_path(path, must_exist=True, label="path")
+    return mask_payload(parse_wav_metadata(target))
+
+
+@app.post("/api/audio/acoustic-dedupe")
+def audio_acoustic_dedupe(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from path_mask import mask_payload
+    from reference_dedupe_engine import find_acoustic_duplicates
+
+    paths_raw = body.get("paths") or []
+    if not isinstance(paths_raw, list) or not paths_raw:
+        raise HTTPException(status_code=400, detail="paths list required")
+    paths = [str(security.assert_library_path(str(p), label="path")) for p in paths_raw]
+    return mask_payload(find_acoustic_duplicates(paths))
+
+
+@app.post("/api/tools/phonetic-search")
+def tools_phonetic_search(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from phn_speech import search_file, search_transcript
+
+    query = str(body.get("query", "")).strip()
+    if not query:
+        raise HTTPException(status_code=400, detail="query required")
+    path = body.get("path")
+    if path:
+        security.assert_library_path(str(path), label="path")
+        return search_file(str(path), query, phonetic=bool(body.get("phonetic", True)))
+    text = str(body.get("text", ""))
+    if not text:
+        raise HTTPException(status_code=400, detail="path or text required")
+    return search_transcript(text, query, phonetic=bool(body.get("phonetic", True)))
+
+
+@app.post("/api/security/shred")
+async def security_shred(body: dict = Body(...)) -> dict[str, object]:
+    from shred_erase import secure_delete
+
+    _require_ctx_permission("shred")
+    if not body.get("confirm_live"):
+        raise HTTPException(status_code=400, detail="confirm_live required")
+    paths_raw = body.get("paths") or []
+    if not isinstance(paths_raw, list) or not paths_raw:
+        raise HTTPException(status_code=400, detail="paths list required")
+    passes = int(body.get("passes") or 3)
+    results: list[dict[str, object]] = []
+    for raw in paths_raw:
+        target = security.assert_library_path(str(raw), must_exist=True, label="path")
+        result = await asyncio.to_thread(secure_delete, target, passes=passes)
+        results.append(result)
+    security.audit("secure_shred", count=len(paths_raw))
+    return {"ok": True, "results": results}
+
+
+@app.post("/api/explorer/drop")
+def explorer_drop(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    """DRP-ZONE: route dropped paths to inspect, carve, or browse handlers."""
+    from carve_str import carve_strings
+    from pkg_hrvst import inspect_installer
+
+    paths_raw = body.get("paths") or []
+    if not isinstance(paths_raw, list) or not paths_raw:
+        raise HTTPException(status_code=400, detail="paths list required")
+
+    routed: list[dict[str, object]] = []
+    for raw in paths_raw:
+        target = security.assert_library_path(str(raw), label="path")
+        suffix = target.suffix.lower()
+        if target.is_dir():
+            routed.append({"path": str(target), "action": "browse", "kind": "directory"})
+        elif suffix in {".msi", ".exe", ".pkg", ".dmg", ".zip"}:
+            routed.append({"path": str(target), "action": "installer_inspect", "result": inspect_installer(target)})
+        elif suffix in {".dll", ".bin", ".dat", ".fxp", ".vst3"} or target.stat().st_size > 4096:
+            routed.append({"path": str(target), "action": "carve_strings", "result": carve_strings(target, limit=80)})
+        else:
+            routed.append({"path": str(target), "action": "path_accepted", "kind": suffix or "file"})
+    security.audit("explorer_drop", count=len(routed))
+    return {"ok": True, "routed": routed, "count": len(routed)}
+
+
+@app.post("/api/tools/carve/strings")
+def tools_carve_strings(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from carve_str import carve_strings
+
+    path = body.get("path")
+    if not path:
+        raise HTTPException(status_code=400, detail="path required")
+    security.assert_library_path(str(path), label="path")
+    result = carve_strings(str(path), limit=int(body.get("limit", 200)))
+    return {
+        "ok": True,
+        "path": result.get("path"),
+        "urls": result.get("urls", []),
+        "version_tokens": result.get("version_tokens", []),
+        "strings": result.get("strings", []),
+        "total": result.get("total", 0),
+        "truncated": result.get("truncated", False),
+        "error": result.get("error"),
+    }
+
+
+@app.get("/api/tools/vendor-hints")
+def tools_vendor_hints(path: str = Query(..., description="Library file path")) -> dict[str, object]:
+    from btq_fpt import match_boutique
+    from bwf_metadata import parse_wav_metadata
+
+    target = security.assert_library_path(path, label="path")
+    name = target.name
+    boutique = match_boutique(name)
+    sfx: dict[str, object] = {"vendor_hints": [], "chunks": []}
+    if target.suffix.lower() in {".wav", ".wave"}:
+        sfx = parse_wav_metadata(target)
+    return {
+        "path": str(target),
+        "name": name,
+        "boutique": boutique,
+        "sfx_map": {
+            "vendor_hints": sfx.get("vendor_hints", []),
+            "chunks": sfx.get("chunks", []),
+        },
+    }
+
+
+@app.post("/api/ai/tag-generate")
+def ai_tag_generate(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from tag_gen import generate_tags
+
+    text = str(body.get("text", "")).strip()
+    path = body.get("path")
+    if path and not text:
+        from audiotheca.ai_lookup.nfo_reader import _read_text
+
+        target = security.assert_library_path(str(path), label="path")
+        text = _read_text(target)
+    if not text:
+        raise HTTPException(status_code=400, detail="text or path required")
+    return generate_tags(text, max_tags=int(body.get("max_tags", 12)))
+
+
+@app.post("/api/ai/nfo-parse")
+def ai_nfo_parse(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from audiotheca.ai_lookup.nfo_reader import parse_nfo_file, parse_release_text
+
+    path = body.get("path")
+    if path:
+        target = security.assert_library_path(str(path), label="path")
+        return parse_nfo_file(target)
+    text = str(body.get("text", "")).strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="path or text required")
+    return {"parsed": parse_release_text(text), "path": None}
+
+
+@app.post("/api/ai/anonymize-status")
+def ai_anonymize_status(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from audiotheca.ai_lookup.telemetry import anonymization_status
+
+    item = body.get("item")
+    if not isinstance(item, dict):
+        raise HTTPException(status_code=400, detail="item object required")
+    return anonymization_status(item)
+
+
+@app.post("/api/ai/confidence-tier")
+def ai_confidence_tier(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from audiotheca.verification import confidence_category
+
+    return confidence_category(
+        str(body.get("id_confidence", body.get("confidence", "UNKNOWN"))),
+        str(body.get("id_method", "")),
+    )
+
+
+_MIME_BY_EXT = {
+    ".wav": "audio/wav",
+    ".wave": "audio/wav",
+    ".mp3": "audio/mpeg",
+    ".flac": "audio/flac",
+    ".ogg": "audio/ogg",
+    ".aif": "audio/aiff",
+    ".aiff": "audio/aiff",
+}
+
+
+@app.get("/api/media/stream")
+def media_stream(path: str = Query(..., description="Library audio file to stream")) -> FileResponse:
+    target = security.assert_library_path(path, must_exist=True, label="path")
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    ext = target.suffix.lower()
+    if ext not in _MIME_BY_EXT:
+        raise HTTPException(status_code=415, detail="Unsupported media type for streaming")
+    security.audit("media_stream", path=str(target))
+    return FileResponse(target, media_type=_MIME_BY_EXT[ext], filename=target.name)
+
+
+@app.post("/api/tools/clean-sweep")
+def tools_clean_sweep(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from cln_sweep import scan_orphans
+
+    root = body.get("root")
+    if not root:
+        raise HTTPException(status_code=400, detail="root required")
+    security.assert_library_path(str(root), must_exist=True, label="root")
+    patterns = tuple(body.get("patterns") or ())
+    return scan_orphans(str(root), patterns=patterns or None, limit=int(body.get("limit", 200)))
+
+
+@app.post("/api/storage/tier")
+def storage_tier(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from strg_tier import recommend_tier
+
+    path = body.get("path")
+    if path:
+        security.assert_library_path(str(path), label="path")
+    return recommend_tier(
+        path=str(path) if path else None,
+        age_days=body.get("age_days"),
+        access_count=int(body.get("access_count", 0)),
+        size_gb=body.get("size_gb"),
+    )
+
+
+@app.post("/api/storage/cloud-cache")
+def storage_cloud_cache(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from cld_cache import cache_entry, read_cache
+
+    cloud_path = str(body.get("cloud_path", ""))
+    provider = str(body.get("provider", "dropbox"))
+    if not cloud_path:
+        raise HTTPException(status_code=400, detail="cloud_path required")
+    if body.get("read"):
+        return read_cache(cloud_path, provider=provider)
+    headers = body.get("headers")
+    return cache_entry(cloud_path, provider=provider, headers=headers if isinstance(headers, dict) else None)
+
+
+@app.get("/api/storage/s3")
+def storage_s3_list(
+    endpoint: str | None = Query(default=None),
+    bucket: str | None = Query(default=None),
+) -> dict[str, object]:
+    from s3_conn import connect_bucket, s3_status
+
+    status = s3_status()
+    probe = connect_bucket(endpoint=endpoint, bucket=bucket)
+    return {"status": status, "probe": probe}
+
+
+@app.get("/api/storage/cloud-cache/status")
+def storage_cloud_cache_status() -> dict[str, object]:
+    from cld_cache import cache_status
+
+    return cache_status()
+
+
+@app.post("/api/tools/prop-inject")
+def tools_prop_inject(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from prop_inj import inject_properties, read_properties
+
+    path = body.get("path")
+    if not path:
+        raise HTTPException(status_code=400, detail="path required")
+    security.assert_library_path(str(path), must_exist=True, label="path")
+    if body.get("read"):
+        return read_properties(str(path))
+    tags = body.get("tags")
+    if not isinstance(tags, dict):
+        raise HTTPException(status_code=400, detail="tags dict required for write")
+    return inject_properties(str(path), tags={str(k): str(v) for k, v in tags.items()})
+
+
+@app.post("/api/tools/tag-propagate")
+def tools_tag_propagate(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from tag_prop import propagate_tags
+
+    paths = body.get("paths") or []
+    tags = body.get("tags") or {}
+    if not isinstance(paths, list) or not paths:
+        raise HTTPException(status_code=400, detail="paths list required")
+    if not isinstance(tags, dict):
+        raise HTTPException(status_code=400, detail="tags dict required")
+    for raw in paths:
+        security.assert_library_path(str(raw), must_exist=True, label="path")
+    return propagate_tags(
+        [str(p) for p in paths],
+        {str(k): str(v) for k, v in tags.items()},
+        dry_run=bool(body.get("dry_run", False)),
+    )
+
+
+@app.post("/api/tools/installer/inspect")
+def tools_installer_inspect(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from pkg_hrvst import inspect_installer
+
+    path = body.get("path")
+    if not path:
+        raise HTTPException(status_code=400, detail="path required")
+    security.assert_library_path(str(path), label="path")
+    result = inspect_installer(str(path))
+    return {
+        "ok": result.get("exists", False) and result.get("error") is None,
+        "path": result.get("path"),
+        "kind": result.get("kind"),
+        "supported": result.get("supported"),
+        "mode": result.get("mode"),
+        "extracted": result.get("extracted"),
+        "size_bytes": result.get("size_bytes"),
+        "pe_machine": result.get("pe_machine"),
+        "urls": result.get("urls", []),
+        "version_tokens": result.get("version_tokens", []),
+        "archive_entries": result.get("archive_entries", []),
+        "entry_count": result.get("entry_count"),
+        "error": result.get("error"),
+        "raw": result,
+    }
+
+
+@app.post("/api/tools/plugin/validate")
+def tools_plugin_validate(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from daw_val import validate_plugin
+
+    path = body.get("path")
+    if not path:
+        raise HTTPException(status_code=400, detail="path required")
+    return validate_plugin(str(path))
+
+
+@app.post("/api/ai/web-spider/plan")
+def ai_web_spider_plan(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from web_spdr import plan_lookup
+
+    query = str(body.get("query", "")).strip()
+    if not query:
+        raise HTTPException(status_code=400, detail="query required")
+    return plan_lookup(query, preset=body.get("preset"))
+
+
+@app.post("/api/ai/web-spider/run")
+async def ai_web_spider_run(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from web_spdr import run_lookup
+
+    query = str(body.get("query", "")).strip()
+    if not query:
+        raise HTTPException(status_code=400, detail="query required")
+    try:
+        return await asyncio.to_thread(run_lookup, query, preset=body.get("preset"), limit=int(body.get("limit", 8)))
+    except PermissionError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@app.post("/api/security/quarantine/analyze")
+def security_quarantine_analyze(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from qrnt_rpr import analyze_quarantine
+
+    path = body.get("path")
+    if not path:
+        raise HTTPException(status_code=400, detail="path required")
+    return analyze_quarantine(str(path), root=body.get("root"))
+
+
+@app.post("/api/security/execution/evaluate")
+def security_execution_evaluate(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from exe_intrcpt import evaluate_execution
+
+    path = body.get("path")
+    if not path:
+        raise HTTPException(status_code=400, detail="path required")
+    return evaluate_execution(str(path), action=str(body.get("action", "launch")))
+
+
+@app.post("/api/security/anti-phone")
+def security_anti_phone(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from anti_phone import generate_hosts_block
+
+    domains = body.get("domains")
+    vendors = body.get("vendors")
+    return generate_hosts_block(
+        list(domains) if isinstance(domains, list) else None,
+        vendors=list(vendors) if isinstance(vendors, list) else None,
+    )
+
+
+@app.post("/api/security/memory-scan")
+def security_memory_scan(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from mem_scan import scan_process
+
+    pid = body.get("pid")
+    if pid is None:
+        raise HTTPException(status_code=400, detail="pid required")
+    return scan_process(int(pid))
+
+
+@app.get("/api/orchestration/node-sync")
+def orchestration_node_sync(node_id: str = Query(default="local")) -> dict[str, object]:
+    from node_sync import sync_status
+
+    return sync_status(node_id=node_id)
+
+
+@app.post("/api/orchestration/node-sync/peers")
+def orchestration_node_sync_peer(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from node_sync import register_peer
+
+    peer_id = str(body.get("peer_id", "")).strip()
+    if not peer_id:
+        raise HTTPException(status_code=400, detail="peer_id required")
+    return register_peer(peer_id, host=str(body.get("host", "")), library_root=str(body.get("library_root", "")))
+
+
+@app.post("/api/orchestration/node-sync/compare")
+def orchestration_node_sync_compare(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from node_sync import compare_peer_manifest
+
+    manifest = body.get("manifest")
+    if not isinstance(manifest, dict):
+        raise HTTPException(status_code=400, detail="manifest object required")
+    return compare_peer_manifest(manifest)
+
+
+@app.post("/api/scan/staging/validate")
+def scan_staging_validate(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from scan_options import validate_staging_root
+
+    path = str(body.get("path") or body.get("staging_root") or "").strip()
+    if not path:
+        raise HTTPException(status_code=400, detail="path or staging_root required")
+    resolved = str(security.assert_library_path(path, label="staging_root"))
+    return validate_staging_root(resolved)
+
+
+@app.post("/api/orchestration/dist-scan")
+def orchestration_dist_scan(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from dist_scan import assign_worker, shard_paths, shard_tree
+
+    workers = [str(w) for w in (body.get("workers") or []) if w]
+    if body.get("root"):
+        root = str(body["root"])
+        security.assert_library_path(root, must_exist=True, label="root")
+        return shard_tree(root, workers, limit=int(body.get("limit", 500)))
+    paths = body.get("paths")
+    if isinstance(paths, list) and paths:
+        return shard_paths([str(p) for p in paths], workers)
+    shard = int(body.get("shard", 0))
+    return assign_worker(workers, shard=shard)
+
+
+@app.post("/api/tools/bundle/export")
+async def tools_bundle_export(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from xfer_bndl import export_workspace_bundle
+
+    output = str(body.get("output", "audiotheca_bundle.zip"))
+    return await asyncio.to_thread(
+        export_workspace_bundle,
+        output,
+        home=body.get("home"),
+        include_ledger=bool(body.get("include_ledger", True)),
+        include_audit=bool(body.get("include_audit", True)),
+    )
+
+
+@app.post("/api/tools/cue/export")
+def tools_cue_export(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from cue_log import export_cue
+
+    markers = body.get("markers") or []
+    if not isinstance(markers, list):
+        raise HTTPException(status_code=400, detail="markers must be a list")
+    return export_cue(
+        markers,
+        format=str(body.get("format", "csv")),
+        fps=float(body.get("fps", 24.0)),
+        title=str(body.get("title", "Audiotheca Cue Log")),
+    )
+
+
+@app.post("/api/tools/path-relocate")
+def tools_path_relocate(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from path_rloc import build_map, translate_batch, translate_path
+
+    target_os = str(body.get("target_os", "mac"))
+    custom_map = build_map(body.get("pairs") or []) if body.get("pairs") else body.get("custom_map")
+    paths = body.get("paths")
+    if paths:
+        return translate_batch([str(p) for p in paths], target_os=target_os, custom_map=custom_map)
+    path = body.get("path")
+    if not path:
+        raise HTTPException(status_code=400, detail="path or paths required")
+    return translate_path(str(path), target_os=target_os, custom_map=custom_map)
+
+
+@app.post("/api/tools/ucs-parse")
+def tools_ucs_parse(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from ucs_map import batch_parse, parse_ucs_filename
+
+    names = body.get("filenames")
+    if names:
+        return batch_parse([str(n) for n in names])
+    name = body.get("filename")
+    if not name:
+        raise HTTPException(status_code=400, detail="filename or filenames required")
+    return parse_ucs_filename(str(name))
 
 
 @app.get("/api/scan-extensions/hash")
@@ -1995,6 +2694,43 @@ async def ai_lookup_confirm(body: dict = Body(default_factory=dict)) -> dict[str
         raise HTTPException(status_code=404, detail="lookup not found")
     security.audit("ai_lookup_confirm", lookup_id=lookup_id, accepted=accepted)
     return {"result": result.to_dict()}
+
+
+@app.get("/api/spec/catalog")
+def spec_catalog(section: str | None = Query(default=None)) -> dict[str, object]:
+    from audiotheca.spec import catalog_summary, list_entries
+
+    return {"summary": catalog_summary(), "entries": list_entries(section=section)}
+
+
+@app.get("/api/spec/{code}")
+def spec_code_info(code: str, invoke: bool = Query(default=False)) -> dict[str, object]:
+    from audiotheca.spec import get_handler_info, invoke_handler
+
+    info = get_handler_info(code)
+    if info is None:
+        raise HTTPException(status_code=404, detail=f"Unknown spec code: {code}")
+    if invoke and info.get("invokable"):
+        try:
+            info["invoke_result"] = invoke_handler(code, {})
+        except Exception as exc:
+            info["invoke_error"] = str(exc)
+    return info
+
+
+@app.post("/api/spec/{code}/invoke")
+async def spec_code_invoke(code: str, body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from audiotheca.spec import get_handler_info, invoke_handler
+
+    info = get_handler_info(code)
+    if info is None:
+        raise HTTPException(status_code=404, detail=f"Unknown spec code: {code}")
+    try:
+        return await asyncio.to_thread(invoke_handler, code, body)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Unknown spec code: {code}")
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @app.websocket("/api/jobs/{job_id}/events")

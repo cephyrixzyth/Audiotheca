@@ -1,8 +1,8 @@
 # Backend Enhancement Roadmap — Per-Module Feedback & Corrections
 
-Engine **10.0.0** · UI **1.0.0**
+Engine **10.0.0** · UI **1.0.2**
 
-See [main README](../README.md) and [Feature Guide](FEATURE_GUIDE.md) for shipped capabilities.
+**Status (2026-07-06):** Phases A–D and unified feedback exports are **shipped**. See [PHASED_ROADMAP.md](PHASED_ROADMAP.md) and [SPEC_CATALOG.md](SPEC_CATALOG.md).
 
 This document defines **what to build in each UI module** so your manual review produces structured output the engine can consume on the next run — not just CSV reports to read.
 

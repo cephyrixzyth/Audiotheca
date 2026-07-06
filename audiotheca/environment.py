@@ -334,6 +334,26 @@ def _probe_python_runtime() -> DependencyStatus:
     )
 
 
+def _probe_venv_isolation() -> dict[str, Any]:
+    """Report whether the engine runs inside an isolated virtual environment."""
+    in_venv = sys.prefix != sys.base_prefix or hasattr(sys, "real_prefix")
+    venv_path = os.environ.get("VIRTUAL_ENV") or (sys.prefix if in_venv else None)
+    user_site = site.getusersitepackages() if hasattr(site, "getusersitepackages") else None
+    site_paths = [str(p) for p in getattr(site, "getsitepackages", lambda: [])() or []]
+    return {
+        "isolated": in_venv,
+        "venv_active": in_venv,
+        "venv_path": venv_path,
+        "python_prefix": sys.prefix,
+        "base_prefix": sys.base_prefix,
+        "user_site": user_site,
+        "site_packages": site_paths[:6],
+        "detail": "Virtual environment active — imports prefer local site-packages"
+        if in_venv
+        else "System Python — consider activating project venv for reproducible imports",
+    }
+
+
 def probe_environment() -> dict[str, Any]:
     deps = [
         _probe_python_runtime(),
@@ -355,6 +375,7 @@ def probe_environment() -> dict[str, Any]:
         "checked_at": _now_iso(),
         "workspace": str(workspace_root()),
         "manifest_path": str(MANIFEST_PATH),
+        "isolation": _probe_venv_isolation(),
         "dependencies": rows,
         "summary": {
             "total": len(rows),
@@ -411,6 +432,30 @@ def export_manifest() -> dict[str, Any]:
     manifest["exported_at"] = _now_iso()
     manifest["environment_snapshot"] = probe_environment()["summary"]
     return manifest
+
+
+def export_blueprint_yaml() -> dict[str, Any]:
+    """ENV-YAML: multi-machine config blueprint as YAML text."""
+    manifest = export_manifest()
+    snap = manifest.get("environment_snapshot") or {}
+    lines = [
+        "# Audiotheca environment blueprint (ENV-YAML)",
+        f"version: {manifest.get('version', MANIFEST_VERSION)}",
+        f"exported_at: {manifest.get('exported_at', _now_iso())}",
+        "library_roots:",
+    ]
+    for root in manifest.get("library_roots") or []:
+        lines.append(f"  - {root}")
+    prefs = manifest.get("tool_preferences") or {}
+    lines.append("tool_preferences:")
+    for key, value in prefs.items():
+        lines.append(f"  {key}: {value!r}")
+    lines.append("environment:")
+    lines.append(f"  healthy: {snap.get('healthy', False)}")
+    lines.append(f"  ok: {snap.get('ok', 0)}")
+    lines.append(f"  total: {snap.get('total', 0)}")
+    yaml_text = "\n".join(lines) + "\n"
+    return {"yaml": yaml_text, "manifest": manifest, "format": "audiotheca-blueprint-v1"}
 
 
 def import_manifest(data: dict[str, Any]) -> dict[str, Any]:

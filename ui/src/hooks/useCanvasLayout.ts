@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 
 const CANVAS_KEY = "audiotheca.canvasLayout.v1";
 
@@ -26,14 +26,22 @@ function readStore(): CanvasLayoutStore {
 function writeStore(store: CanvasLayoutStore) {
   try {
     localStorage.setItem(CANVAS_KEY, JSON.stringify(store));
+    window.dispatchEvent(new Event("audiotheca-canvas-layout"));
   } catch {
     /* quota */
   }
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
 export function useCanvasLayout(layoutId: string) {
+  const [revision, setRevision] = useState(0);
+
   const getSlot = useCallback(
     (sectionId: string, fallbackSpan: number): CanvasSlot => {
+      void revision;
       const store = readStore();
       return (
         store[layoutId]?.[sectionId] ?? {
@@ -44,7 +52,7 @@ export function useCanvasLayout(layoutId: string) {
         }
       );
     },
-    [layoutId],
+    [layoutId, revision],
   );
 
   const setSlot = useCallback(
@@ -53,11 +61,24 @@ export function useCanvasLayout(layoutId: string) {
       if (!store[layoutId]) store[layoutId] = {};
       store[layoutId][sectionId] = slot;
       writeStore(store);
+      setRevision((v) => v + 1);
     },
     [layoutId],
   );
 
-  return { getSlot, setSlot };
+  const resizeSlot = useCallback(
+    (sectionId: string, fallbackSpan: number, delta: { colSpan?: number; rowSpan?: number }) => {
+      const current = getSlot(sectionId, fallbackSpan);
+      setSlot(sectionId, {
+        ...current,
+        colSpan: clamp(current.colSpan + (delta.colSpan ?? 0), 1, 12),
+        rowSpan: clamp(current.rowSpan + (delta.rowSpan ?? 0), 1, 6),
+      });
+    },
+    [getSlot, setSlot],
+  );
+
+  return { getSlot, setSlot, resizeSlot };
 }
 
 export function canvasStyle(slot: CanvasSlot): CSSProperties {

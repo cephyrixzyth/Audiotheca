@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchJobEvents, fetchJobProgress, fetchJobs } from "../api/client";
+import { fetchJobEvents, fetchJobProgress, fetchJobs, fetchNetSafe } from "../api/client";
 import type { JobSnapshot, ProgressEvent } from "../types";
 import { formatPhaseLabel, isProgressStalled, latestProgressTimestamp } from "../utils/scanDisplay";
 import { PhaseProgressBar, latestPhaseProgress, phasesFromEvents } from "./PhaseProgressBar";
@@ -10,6 +10,18 @@ export function ProcessBanner() {
   const [job, setJob] = useState<JobSnapshot | null>(null);
   const [events, setEvents] = useState<ProgressEvent[]>([]);
   const [stalled, setStalled] = useState(false);
+  const [netPaused, setNetPaused] = useState(false);
+
+  useEffect(() => {
+    const pollNet = () => {
+      void fetchNetSafe()
+        .then((s) => setNetPaused(Boolean(s.paused)))
+        .catch(() => undefined);
+    };
+    pollNet();
+    const timer = window.setInterval(pollNet, 8000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const poll = () => {
@@ -73,6 +85,11 @@ export function ProcessBanner() {
         {showStalled && (
           <span className="badge review process-banner-stalled" title="No progress events for 10+ minutes">
             Stalled?
+          </span>
+        )}
+        {netPaused && (
+          <span className="badge bucket process-banner-stalled" title="NET-SAFE: scan paused — NAS unreachable">
+            NET-SAFE pause
           </span>
         )}
       </div>

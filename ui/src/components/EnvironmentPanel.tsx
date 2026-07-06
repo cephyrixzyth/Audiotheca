@@ -1,17 +1,30 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  compareNodeSyncManifest,
+  evaluateExecutionPolicy,
   exportEnvironmentManifest,
+  fetchAntiPhoneBlock,
   fetchEnvironment,
+  fetchEnvironmentBlueprintYaml,
+  fetchMountEvents,
+  fetchNodeSyncStatus,
   importEnvironmentManifest,
   installEnvironmentDependencies,
+  registerNodeSyncPeer,
   repairAllEnvironment,
   repairEnvironment,
+  validateStagingRoot,
 } from "../api/client";
 import type { EnvironmentDependency, EnvironmentPayload } from "../types";
 import { ReorderableSections } from "./ReorderableSections";
 import { ThemeStudioPanel } from "./ThemeStudioPanel";
 import { InstallLifecyclePanel } from "./InstallLifecyclePanel";
 import { AuditLogPanel } from "./AuditLogPanel";
+import { CloudStoragePanel } from "./CloudStoragePanel";
+import { MountEventsPanel, SpecCatalogPanel } from "./SpecCatalogPanel";
+import { PreviewSessionPanel } from "./PreviewSessionPanel";
+import { OrchestrationToolsPanel } from "./OrchestrationToolsPanel";
+import { VirtualPathsPanel } from "./VirtualPathsPanel";
 
 function StatusBadge({ status }: { status: EnvironmentDependency["status"] }) {
   return <span className={`env-badge env-${status}`}>{status}</span>;
@@ -25,6 +38,15 @@ export function EnvironmentPanel() {
   const [confirmLive, setConfirmLive] = useState<"repair-all" | "install" | null>(null);
   const [installLog, setInstallLog] = useState<string[]>([]);
   const [manifestJson, setManifestJson] = useState("");
+  const [execPath, setExecPath] = useState("C:\\Program Files\\Demo\\run.exe");
+  const [execPolicy, setExecPolicy] = useState<{ allowed: boolean; reasons: string[] } | null>(null);
+  const [hostsPreview, setHostsPreview] = useState("");
+  const [nodeSync, setNodeSync] = useState<Record<string, unknown> | null>(null);
+  const [peerCompareJson, setPeerCompareJson] = useState('{"node_id":"studio-b","library_roots":["Z:\\\\lib"]}');
+  const [peerCompareResult, setPeerCompareResult] = useState<Record<string, unknown> | null>(null);
+  const [stagingPath, setStagingPath] = useState("");
+  const [stagingStatus, setStagingStatus] = useState<Record<string, unknown> | null>(null);
+  const [watcherMeta, setWatcherMeta] = useState<{ active?: boolean; enabled?: boolean }>({});
 
   const reload = useCallback(() => {
     fetchEnvironment()
@@ -38,8 +60,20 @@ export function EnvironmentPanel() {
 
   useEffect(() => {
     reload();
+    void fetchNodeSyncStatus().then(setNodeSync).catch(() => undefined);
+    void fetchMountEvents(1)
+      .then((payload) => setWatcherMeta({ active: payload.active, enabled: payload.enabled }))
+      .catch(() => setWatcherMeta({}));
     const timer = window.setInterval(reload, 30_000);
-    return () => window.clearInterval(timer);
+    const watcherTimer = window.setInterval(() => {
+      void fetchMountEvents(1)
+        .then((payload) => setWatcherMeta({ active: payload.active, enabled: payload.enabled }))
+        .catch(() => undefined);
+    }, 15_000);
+    return () => {
+      window.clearInterval(timer);
+      window.clearInterval(watcherTimer);
+    };
   }, [reload]);
 
   async function handleRepair(dep: EnvironmentDependency, dryRun: boolean) {
@@ -149,7 +183,147 @@ export function EnvironmentPanel() {
     }
   }
 
+  async function handleExecPolicyCheck() {
+    try {
+      const res = await evaluateExecutionPolicy({ path: execPath });
+      setExecPolicy(res);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Policy check failed");
+    }
+  }
+
+  async function handleAntiPhonePreview() {
+    try {
+      const res = await fetchAntiPhoneBlock({ vendors: ["ilok", "waves"] });
+      setHostsPreview(res.hosts_text);
+      setMsg(`ANTI-PHONE preview — ${res.count} domain(s)`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Hosts preview failed");
+    }
+  }
+
+  async function handleCopyHosts() {
+    if (!hostsPreview) return;
+    await navigator.clipboard.writeText(hostsPreview);
+    setMsg("Hosts block copied to clipboard");
+  }
+
+  async function handleExportYaml() {
+    try {
+      const res = await fetchEnvironmentBlueprintYaml();
+      const blob = new Blob([res.yaml], { type: "text/yaml" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `audiotheca-blueprint-${new Date().toISOString().slice(0, 10)}.yaml`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setMsg("ENV-YAML blueprint exported");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "YAML export failed");
+    }
+  }
+
+  async function handlePeerCompare() {
+    try {
+      const manifest = JSON.parse(peerCompareJson) as Record<string, unknown>;
+      const res = await compareNodeSyncManifest(manifest);
+      setPeerCompareResult(res);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Peer compare failed — check JSON");
+    }
+  }
+
+  async function handleStagingValidate() {
+    if (!stagingPath.trim()) return;
+    try {
+      const res = await validateStagingRoot(stagingPath.trim());
+      setStagingStatus(res as unknown as Record<string, unknown>);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Staging validation failed");
+    }
+  }
+
   const sections = [
+    {
+      id: "security-orchestration",
+      title: "Security & orchestration",
+      subtitle: "EXE-INTRCPT, ANTI-PHONE, NODE-SYNC, ENV-YAML, STG-ISOL",
+      fullWidth: true,
+      minBodyHeight: 220,
+      content: (
+        <div className="field-stack">
+          <div className="stat-grid compact">
+            <div className={`stat-tile ${execPolicy?.allowed === false ? "tone-danger" : execPolicy?.allowed ? "tone-accent" : ""}`}>
+              <div className="stat-label">EXE-INTRCPT</div>
+              <div className="stat-value">{execPolicy ? (execPolicy.allowed ? "Allowed" : "Blocked") : "—"}</div>
+              <div className="stat-sub">{execPolicy?.reasons?.[0] ?? "Policy not checked"}</div>
+            </div>
+            <div className="stat-tile">
+              <div className="stat-label">NODE-SYNC peers</div>
+              <div className="stat-value">{Array.isArray(nodeSync?.peers) ? nodeSync.peers.length : 0}</div>
+            </div>
+            <div className={`stat-tile ${stagingStatus?.valid ? "tone-accent" : stagingStatus ? "tone-warning" : ""}`}>
+              <div className="stat-label">STG-ISOL</div>
+              <div className="stat-value">{stagingStatus ? (stagingStatus.valid ? "Valid" : "Invalid") : "—"}</div>
+            </div>
+          </div>
+          <label className="context-field">
+            <span className="context-label">Execution path (EXE-INTRCPT)</span>
+            <input type="text" className="field-input" value={execPath} onChange={(e) => setExecPath(e.target.value)} />
+          </label>
+          <div className="env-actions">
+            <button type="button" className="text-btn" onClick={() => void handleExecPolicyCheck()}>
+              Check launch policy
+            </button>
+            <button type="button" className="text-btn" onClick={() => void handleAntiPhonePreview()}>
+              ANTI-PHONE preview
+            </button>
+            <button type="button" className="text-btn" disabled={!hostsPreview} onClick={() => void handleCopyHosts()}>
+              Copy hosts block
+            </button>
+            <button type="button" className="text-btn" onClick={() => void handleExportYaml()}>
+              Export ENV-YAML
+            </button>
+            <button
+              type="button"
+              className="text-btn"
+              onClick={() =>
+                void registerNodeSyncPeer({ peer_id: `peer-${Date.now()}`, host: "127.0.0.1" }).then(setNodeSync)
+              }
+            >
+              Register local peer
+            </button>
+          </div>
+          {hostsPreview && (
+            <textarea className="field-input env-manifest-editor" rows={6} readOnly value={hostsPreview} spellCheck={false} />
+          )}
+          <label className="context-field">
+            <span className="context-label">Staging root (STG-ISOL)</span>
+            <input type="text" className="field-input" value={stagingPath} onChange={(e) => setStagingPath(e.target.value)} />
+          </label>
+          <button type="button" className="keeper-btn" disabled={!stagingPath.trim()} onClick={() => void handleStagingValidate()}>
+            Validate staging root
+          </button>
+          <label className="context-field">
+            <span className="context-label">Peer manifest JSON (NODE-SYNC compare)</span>
+            <textarea
+              className="field-input env-manifest-editor"
+              rows={4}
+              value={peerCompareJson}
+              onChange={(e) => setPeerCompareJson(e.target.value)}
+              spellCheck={false}
+            />
+          </label>
+          <button type="button" className="text-btn" onClick={() => void handlePeerCompare()}>
+            Compare peer manifest
+          </button>
+          {peerCompareResult && (
+            <pre className="env-install-log">{JSON.stringify(peerCompareResult, null, 2)}</pre>
+          )}
+        </div>
+      ),
+    },
     {
       id: "appearance",
       title: "Theme studio",
@@ -157,6 +331,54 @@ export function EnvironmentPanel() {
       fullWidth: true,
       minBodyHeight: 200,
       content: <ThemeStudioPanel />,
+    },
+    {
+      id: "virtual-paths",
+      title: "Virtual path aggregation",
+      subtitle: "SYM-AGG unified browse roots without relocation",
+      fullWidth: true,
+      minBodyHeight: 180,
+      content: <VirtualPathsPanel />,
+    },
+    {
+      id: "preview-session",
+      title: "Preview session",
+      subtitle: "Tempo sync, pitch, and mix matrix for AUTO-AUD",
+      fullWidth: true,
+      minBodyHeight: 160,
+      content: <PreviewSessionPanel />,
+    },
+    {
+      id: "orchestration-tools",
+      title: "Orchestration tools",
+      subtitle: "CLN-SWEEP, XFER-BNDL, PATH-RLOC, CUE-LOG, NET-SAFE, DIST-SCAN",
+      fullWidth: true,
+      minBodyHeight: 220,
+      content: <OrchestrationToolsPanel />,
+    },
+    {
+      id: "spec-catalog",
+      title: "Architecture spec catalog",
+      subtitle: "94-code registry with done / partial / mvp status",
+      fullWidth: true,
+      minBodyHeight: 320,
+      content: <SpecCatalogPanel />,
+    },
+    {
+      id: "cloud-storage",
+      title: "Cloud & storage telemetry",
+      subtitle: "CLD-CACHE + S3-CONN live status and TLM sparklines",
+      fullWidth: true,
+      minBodyHeight: 180,
+      content: <CloudStoragePanel />,
+    },
+    {
+      id: "mount-events",
+      title: "Mount & library events",
+      subtitle: "Hot-swap and filesystem change listener (MNT-LSTN)",
+      fullWidth: true,
+      minBodyHeight: 220,
+      content: <MountEventsPanel />,
     },
     {
       id: "audit-log",
@@ -203,6 +425,15 @@ export function EnvironmentPanel() {
                 …{env.workspace.slice(-28)}
               </div>
             </div>
+            {"isolation" in env && env.isolation && (
+              <div className={`stat-tile ${(env.isolation as { isolated?: boolean }).isolated ? "tone-accent" : "tone-warning"}`}>
+                <div className="stat-label">ISO-ENV</div>
+                <div className="stat-value">{(env.isolation as { isolated?: boolean }).isolated ? "venv" : "system"}</div>
+                <div className="stat-sub" title={String((env.isolation as { detail?: string }).detail ?? "")}>
+                  {(env.isolation as { detail?: string }).detail?.slice(0, 48)}
+                </div>
+              </div>
+            )}
           </div>
           <div className="env-actions" style={{ marginTop: "0.75rem" }}>
             {hasInstallableGaps && (
@@ -394,7 +625,15 @@ export function EnvironmentPanel() {
     <div className="panel environment-panel">
       <header className="panel-header">
         <div>
-          <h2>Environment</h2>
+          <h2>
+            Environment{" "}
+            <span
+              className={`env-badge ${watcherMeta.active ? "env-ok" : watcherMeta.enabled ? "env-degraded" : "env-missing"}`}
+              title="MNT-LSTN library mount watcher"
+            >
+              watcher {watcherMeta.active ? "active" : watcherMeta.enabled ? "idle" : "off"}
+            </span>
+          </h2>
           <p className="count-muted">
             Toolchain status, automated repairs, and manifest backup — inspired by UniGet-style dependency dashboards.
           </p>

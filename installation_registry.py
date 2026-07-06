@@ -119,3 +119,23 @@ def save_preset(name: str, snapshot: dict[str, Any]) -> dict[str, Any]:
 
 def default_tags() -> list[str]:
     return list(DEFAULT_TAGS)
+
+
+def vendor_links(product_key: str = "") -> dict[str, Any]:
+    """VNDR-LNK: product page and docs URLs from installation registry."""
+    key = str(product_key or "").strip().lower()
+    links: list[dict[str, str]] = []
+    for row in list_installs():
+        pk = str(row.get("product_key", "")).lower()
+        if key and key not in pk:
+            continue
+        if row.get("product_url") or row.get("docs_url"):
+            links.append(
+                {
+                    "product_key": str(row.get("product_key", "")),
+                    "display_name": str(row.get("display_name", "")),
+                    "product_url": str(row.get("product_url", "")),
+                    "docs_url": str(row.get("docs_url", "")),
+                }
+            )
+    return {"product_key": product_key, "count": len(links), "links": links}

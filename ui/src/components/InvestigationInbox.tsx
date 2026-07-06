@@ -14,7 +14,9 @@ import {
 import type { InvestigationItem } from "../types";
 import { useContextSidebar, useSidebarFilters } from "./ContextSidebar";
 import { HoverMenu } from "./HoverMenu";
+import { InvestigationLookupPanel } from "./InvestigationLookupPanel";
 import { PathLink } from "./PathLink";
+import { VendorHintBadges } from "./VendorHintBadges";
 
 interface Props {
   stamp: string;
@@ -38,6 +40,13 @@ function methodClass(method: string, confidence: string) {
   if (method === "NONE") return "badge review";
   if (confidence === "TENTATIVE") return "badge bucket";
   return "badge ready";
+}
+
+function confidenceTierClass(confidence: string): string {
+  const conf = (confidence || "UNKNOWN").toUpperCase();
+  if (conf === "CONFIRMED") return "badge ready";
+  if (conf === "TENTATIVE") return "badge bucket";
+  return "badge review";
 }
 
 export function InvestigationInbox({ stamp }: Props) {
@@ -294,6 +303,8 @@ export function InvestigationInbox({ stamp }: Props) {
       {msg && <div className="banner dry">{msg}</div>}
       {error && <div className="error">{error}</div>}
 
+      <InvestigationLookupPanel />
+
       {!loading && view === "groups" && groups.length === 0 && !error && (
         <div className="empty">No investigation groups match your filters.</div>
       )}
@@ -404,6 +415,7 @@ export function InvestigationInbox({ stamp }: Props) {
                   <td>
                     <div>{row.item_name}</div>
                     <PathLink path={row.current_path} />
+                    <VendorHintBadges path={row.current_path} name={row.item_name} />
                     {vendorOverride && (
                       <div className="count-muted">vendor → {vendorOverride}</div>
                     )}
@@ -421,7 +433,9 @@ export function InvestigationInbox({ stamp }: Props) {
                     <span className={methodClass(row.id_method, row.id_confidence)}>
                       {row.id_method}
                     </span>
-                    <div className="path">{row.id_confidence}</div>
+                    <span className={`${confidenceTierClass(row.id_confidence)} conf-cat-badge`} title="CONF-CAT tier">
+                      {row.id_confidence || "UNKNOWN"}
+                    </span>
                     <div className="count-muted">{row.size_mb != null ? `${row.size_mb} MB` : ""}</div>
                   </td>
                   <td className="inv-actions row-actions-cell">

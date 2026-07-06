@@ -7,7 +7,11 @@ import threading
 import time
 from collections import deque
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
+
+MAX_MOUNT_EVENTS = int(os.environ.get("AUDIOTHECA_MOUNT_EVENT_LIMIT", "500"))
+_MOUNT_EVENTS: deque[dict[str, Any]] = deque(maxlen=MAX_MOUNT_EVENTS)
+_EVENTS_LOCK = threading.Lock()
 
 HAS_WATCHDOG = False
 Observer: type | None = None
@@ -61,12 +65,35 @@ else:
             return []
 
 
+def record_mount_event(path: str, *, event_type: str = "change") -> None:
+    with _EVENTS_LOCK:
+        _MOUNT_EVENTS.append(
+            {
+                "ts": time.time(),
+                "path": path,
+                "type": event_type,
+            }
+        )
+
+
+def list_mount_events(*, limit: int = 100) -> list[dict[str, Any]]:
+    cap = max(1, min(limit, MAX_MOUNT_EVENTS))
+    with _EVENTS_LOCK:
+        return list(_MOUNT_EVENTS)[-cap:]
+
+
 class LibraryWatcher:
     """Background directory watcher for auto-triage hooks."""
 
     def __init__(self, roots: list[Path], *, on_change: Callable[[str], None] | None = None) -> None:
         self.roots = roots
-        self._on_change = on_change or (lambda _path: None)
+
+        def _wrapped(path: str) -> None:
+            record_mount_event(path, event_type="library_change")
+            if on_change:
+                on_change(path)
+
+        self._on_change = _wrapped
         self._handler = _DebouncedHandler(self._on_change)
         self._observer: Observer | None = None
         self._poll_thread: threading.Thread | None = None

@@ -10,7 +10,7 @@ services:
       dockerfile: deploy/unraid/Dockerfile.api
       args:
         PYTHON_VERSION: ${PYTHON_VERSION:-3.13}
-        AUDIOTHECA_VERSION: "1.0.0"
+        AUDIOTHECA_VERSION: "1.0.2"
         ENGINE_VERSION: "10.0.0"
     container_name: audiotheca-api
     restart: unless-stopped
@@ -46,7 +46,7 @@ services:
       context: ../..
       dockerfile: deploy/unraid/Dockerfile.ui
       args:
-        AUDIOTHECA_VERSION: "1.0.0"
+        AUDIOTHECA_VERSION: "1.0.2"
         VITE_DEFAULT_LIBRARY_ROOT: ${LIBRARY_CONTAINER_PATH:-/library}
     container_name: audiotheca-ui
     restart: unless-stopped
@@ -109,7 +109,7 @@ services:
       dockerfile: deploy/unraid/Dockerfile.api
       args:
         PYTHON_VERSION: ${PYTHON_VERSION:-3.13}
-        AUDIOTHECA_VERSION: "1.0.0"
+        AUDIOTHECA_VERSION: "1.0.2"
         ENGINE_VERSION: "10.0.0"
     container_name: audiotheca-space-recovery
     env_file: .env
@@ -126,6 +126,34 @@ services:
       - ${LIBRARY_CONTAINER_PATH:-/library}
     restart: "no"
 
+  # Optional Gluetun VPN sidecar (DKR-TUN). Route api/searxng through VPN:
+  #   docker compose --profile vpn up -d
+  # Set api/searxng network_mode: "service:gluetun" when enabled.
+  gluetun:
+    profiles: ["vpn"]
+    image: qmcgaw/gluetun:latest
+    container_name: audiotheca-gluetun
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      VPN_SERVICE_PROVIDER: ${VPN_SERVICE_PROVIDER:-}
+      VPN_TYPE: ${VPN_TYPE:-openvpn}
+      OPENVPN_USER: ${OPENVPN_USER:-}
+      OPENVPN_PASSWORD: ${OPENVPN_PASSWORD:-}
+      SERVER_COUNTRIES: ${SERVER_COUNTRIES:-}
+      FIREWALL_OUTBOUND_SUBNETS: ${FIREWALL_OUTBOUND_SUBNETS:-172.16.0.0/12,192.168.0.0/16}
+    ports:
+      - "${API_PORT:-4211}:8787"
+      - "127.0.0.1:${SEARXNG_PORT:-8081}:8080"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   # Single-container stack (same image as Unraid Add Container template)
   audiotheca:
     profiles: ["single"]
@@ -134,7 +162,7 @@ services:
       dockerfile: deploy/unraid/Dockerfile
       args:
         PYTHON_VERSION: ${PYTHON_VERSION:-3.13}
-        AUDIOTHECA_VERSION: "1.0.0"
+        AUDIOTHECA_VERSION: "1.0.2"
         ENGINE_VERSION: "10.0.0"
         VITE_DEFAULT_LIBRARY_ROOT: ${LIBRARY_CONTAINER_PATH:-/library}
     container_name: audiotheca

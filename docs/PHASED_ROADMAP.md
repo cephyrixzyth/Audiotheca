@@ -2,7 +2,7 @@
 
 Concrete build order after v10 / Web UI 1.0. Each phase lists **what exists today**, **what we add**, and **how it maps to reports + API**.
 
-**Status (2026-07-04):** Phase 0, 0b, 2, 3 MVP, 4 foundation, 5 polish, and AI provider wiring are **complete** in tree. Phase 1 feedback/exports is **partial** (unified export + estimate live; some dashboard polish remains optional).
+**Status (2026-07-06):** All phases below are **complete** in tree, including the **94-code spec catalog** (waves A–R). See [Spec catalog](docs/SPEC_CATALOG.md) and [CHANGELOG](docs/CHANGELOG.md#web-ui--api-102).
 
 ---
 

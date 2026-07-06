@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | **Engine** | 10.0.0 |
-| **Web UI / API** | 1.0.0 |
+| **Web UI / API** | 1.0.2 |
 | **Primary platform** | Windows (CLI, browser UI, Tauri desktop) |
 
 ---
@@ -326,6 +326,7 @@ Build GIFs from MP4 sources: `python scripts/build_doc_gifs.py`. Capture instruc
 | **[Changelog](docs/CHANGELOG.md)** | Version history |
 | **[Tauri build](docs/TAURI_BUILD.md)** | Desktop app packaging |
 | **[Architecture roadmap](docs/ARCHITECTURE_AND_UI_ROADMAP.md)** | How the stack fits together |
+| **[Spec catalog (94 codes)](docs/SPEC_CATALOG.md)** | Architecture spec registry + invoke API |
 | **[Doc media assets](docs/assets/README.md)** | Screenshot/video capture guide |
 | **[Unraid deploy](deploy/unraid/README.md)** | Docker compose for NAS |
 | **[SearXNG (optional)](docker/searxng/README.md)** | Private web search for vendor research |
@@ -346,7 +347,8 @@ audiotheca/
 ├── space_recovery.py            # Hardlink dedup + bloat finder
 ├── scripts/                     # Helpers (searx_search, library_probe, …)
 ├── docker/searxng/              # Optional private web search
-├── deploy/unraid/               # NAS Docker skeleton
+├── audiotheca/spec/             # 94-code architecture spec catalog
+├── deploy/unraid/               # NAS Docker + start-local.ps1
 ├── docs/                        # Documentation + assets/
 ├── tests/                       # pytest suite
 ├── dedupe_reports/              # Generated reports (gitignored)
@@ -369,17 +371,17 @@ python scripts/library_probe.py                      # Lightweight library stats
 
 ## Docker (Unraid / Linux / Docker Desktop)
 
-Engine **10.0.0** · Web UI / API **1.0.0**
+Engine **10.0.0** · Web UI / API **1.0.2**
 
 ### Pull from GitHub Container Registry
 
-Release tags (`v*`) publish three images to GHCR (replace `1.0.1` with your release version):
+Release tags (`v*`) publish three images to GHCR (replace `1.0.2` with your release version):
 
 | Image | Use |
 | --- | --- |
-| `ghcr.io/chrisjrovira/audiotheca:1.0.1` | All-in-one — API + nginx UI (Unraid Add Container) |
-| `ghcr.io/chrisjrovira/audiotheca-api:1.0.1` | API / engine only (Docker Compose `api` service) |
-| `ghcr.io/chrisjrovira/audiotheca-ui:1.0.1` | Static UI only (Docker Compose `ui` service) |
+| `ghcr.io/chrisjrovira/audiotheca:1.0.2` | All-in-one — API + nginx UI (Unraid Add Container) |
+| `ghcr.io/chrisjrovira/audiotheca-api:1.0.2` | API / engine only (Docker Compose `api` service) |
+| `ghcr.io/chrisjrovira/audiotheca-ui:1.0.2` | Static UI only (Docker Compose `ui` service) |
 
 Each release tag also publishes `:latest` on the all-in-one, API, and UI images.
 
@@ -387,7 +389,7 @@ Each release tag also publishes `:latest` on the all-in-one, API, and UI images.
 # Log in once (read:packages is enough to pull public images)
 echo "$GITHUB_TOKEN" | docker login ghcr.io -u YOUR_GITHUB_USER --password-stdin
 
-docker pull ghcr.io/chrisjrovira/audiotheca:1.0.1
+docker pull ghcr.io/chrisjrovira/audiotheca:1.0.2
 ```
 
 **All-in-one** — API + nginx UI in a single container (Unraid Add Container template):
@@ -397,7 +399,7 @@ docker run -d --name audiotheca \
   -p 4210:80 -p 4211:8787 \
   -v /path/to/appdata:/data \
   -v /path/to/library:/library:ro \
-  ghcr.io/chrisjrovira/audiotheca:1.0.1
+  ghcr.io/chrisjrovira/audiotheca:1.0.2
 ```
 
 Open `http://localhost:4210`. Appdata holds reports, scan cache, and the API token (`AUDIOTHECA_HOME=/data`).
@@ -407,11 +409,13 @@ Open `http://localhost:4210`. Appdata holds reports, scan cache, and the API tok
 ```bash
 cd deploy/unraid
 cp .env.example .env   # set LIBRARY_HOST_PATH to your library on the host
-# Optional: set image: ghcr.io/chrisjrovira/audiotheca-api:1.0.1 in compose overrides
+# Optional: set image: ghcr.io/chrisjrovira/audiotheca-api:1.0.2 in compose overrides
 docker compose up -d --build
 ```
 
-Build locally instead: `bash deploy/unraid/build-image.sh` (tags `audiotheca/unraid:1.0.0`, `:latest`).
+Build locally instead: `bash deploy/unraid/build-image.sh` (tags `audiotheca/unraid:1.0.2`, `:latest`).
+
+**Windows Docker Desktop:** `deploy/unraid/start-local.ps1` after copying `.env.example` → `.env`.
 
 On Windows with Docker Desktop: `.\deploy\unraid\start-local.ps1` (after editing `.env`).
 

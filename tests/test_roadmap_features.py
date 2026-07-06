@@ -172,10 +172,16 @@ def test_scan_extensions_api(client, tmp_path):
 
 
 def test_inject_engine_site_paths(monkeypatch, tmp_path):
+    import sys
+
     from audiotheca import environment as env
 
     user_site = str(tmp_path / "user-site")
+    original_path = list(sys.path)
     monkeypatch.setattr(env.site, "getusersitepackages", lambda: user_site)
-    env.sys.path.clear()
-    env._inject_engine_site_paths()
-    assert user_site in env.sys.path
+    try:
+        sys.path.clear()
+        env._inject_engine_site_paths()
+        assert user_site in sys.path
+    finally:
+        sys.path[:] = original_path

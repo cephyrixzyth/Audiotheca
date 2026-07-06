@@ -238,6 +238,16 @@ class JobManager:
             raise RuntimeError(str(exc)) from exc
         root_dir = str(root_path)
         options = ScanOptions.from_dict(scan_options or {})
+
+        from drv_cooldwn import apply_cooldown_before_scan
+
+        cooldown_s = options.cooldown_s if options.cooldown_s > 0 else None
+        if cooldown_s is None:
+            raw = os.environ.get("AUDIOTHECA_SCAN_COOLDOWN_S", "").strip()
+            cooldown_s = float(raw) if raw else None
+        if cooldown_s and cooldown_s > 0:
+            await asyncio.to_thread(apply_cooldown_before_scan, root=root_dir, cooldown_s=cooldown_s)
+
         progress_file = report_loader.REPORT_DIR / f".progress_{job_id}.jsonl"
         control_file = report_loader.REPORT_DIR / f".control_{job_id}.json"
         progress_file.unlink(missing_ok=True)
@@ -322,6 +332,8 @@ class JobManager:
         offset = 0
         stdout_offset = 0
         last_metrics = 0.0
+        last_net_check = 0.0
+        net_pause_sent = False
 
         async def drain_stdout() -> None:
             nonlocal stdout_offset
@@ -383,6 +395,28 @@ class JobManager:
                         offset += 1
 
                 now = time.monotonic()
+                if now - last_net_check >= 5.0:
+                    from net_safe import evaluate_job_network
+
+                    net_status = await asyncio.to_thread(evaluate_job_network, root_dir)
+                    last_net_check = now
+                    if net_status.get("should_pause") and job.status == "running" and not net_pause_sent:
+                        if control_file.is_file():
+                            payload = {"command": "pause", "updated": time.time(), "reason": net_status.get("reason")}
+                            await asyncio.to_thread(
+                                control_file.write_text,
+                                json.dumps(payload, indent=2),
+                                "utf-8",
+                            )
+                            net_pause_sent = True
+                            job.status = "pause_pending"
+                            await self._broadcast(
+                                job,
+                                {"type": "net_safe_pause", "reason": net_status.get("reason"), **net_status},
+                            )
+                    elif not net_status.get("should_pause"):
+                        net_pause_sent = False
+
                 if now - last_metrics >= 2.0:
                     metrics = await asyncio.to_thread(collect_metrics, path=Path(root_dir))
                     await self._broadcast(job, {"type": "system_metrics", **metrics})

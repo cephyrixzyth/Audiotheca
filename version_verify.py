@@ -100,6 +100,60 @@ def find_primary_exe(install_path: Path) -> Path | None:
     return preferred[0] if preferred else candidates[0]
 
 
+def architecture_warning(install_path: str | Path) -> dict[str, Any]:
+    """ARCH-ALRT: warn when legacy Intel builds may run under translation."""
+    import platform
+    import sys
+
+    path = Path(install_path)
+    exe = find_primary_exe(path)
+    warnings: list[str] = []
+    host_arch = platform.machine().lower()
+    is_apple_silicon = sys.platform == "darwin" and host_arch in {"arm64", "aarch64"}
+    is_arm_windows = sys.platform == "win32" and host_arch in {"arm64", "aarch64"}
+
+    if exe and sys.platform == "win32":
+        try:
+            import pefile
+
+            pe = pefile.PE(str(exe), fast_load=True)
+            machine = pe.FILE_HEADER.Machine
+            machine_map = {0x014C: "x86", 0x8664: "x64", 0xAA64: "ARM64", 0x01C4: "ARM"}
+            pe_arch = machine_map.get(machine, f"0x{machine:04x}")
+            is_x86 = machine in {0x014C, 0x8664}
+            if is_arm_windows and is_x86:
+                warnings.append(f"{pe_arch} binary on ARM64 Windows — may use emulation layer")
+            elif host_arch in {"arm64", "aarch64"} and machine == 0x014C:
+                warnings.append(f"32-bit {pe_arch} binary on {host_arch} host — legacy risk")
+        except (ImportError, OSError, AttributeError):
+            if is_arm_windows:
+                warnings.append("Could not read PE headers — verify ARM compatibility manually")
+
+    if is_apple_silicon:
+        if exe and exe.suffix.lower() in {".app", ""}:
+            warnings.append("macOS bundle on Apple Silicon — verify universal binary or Rosetta")
+        try:
+            proc = __import__("subprocess").run(
+                ["sysctl", "-n", "sysctl.proc_translated"],
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+            if proc.stdout.strip() == "1":
+                warnings.append("Process running under Rosetta translation")
+        except (OSError, __import__("subprocess").SubprocessError):
+            pass
+
+    return {
+        "install_path": str(path),
+        "exe_path": str(exe) if exe else None,
+        "host_arch": host_arch,
+        "platform": sys.platform,
+        "warnings": warnings,
+        "legacy_risk": bool(warnings),
+    }
+
+
 def compare_versions(local: str | None, expected: str | None) -> str:
     local_t = _normalize_version(local)
     expected_t = _normalize_version(expected)

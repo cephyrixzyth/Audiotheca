@@ -3,6 +3,7 @@ import { isSpacerId, useSectionOrder } from "../hooks/useSectionOrder";
 import { useSectionSpan } from "../hooks/useSectionSpan";
 import { useLayoutPresets } from "../hooks/useLayoutPresets";
 import { useGroupTitles } from "../hooks/useGroupTitles";
+import { canvasStyle, useCanvasLayout } from "../hooks/useCanvasLayout";
 
 function bindHeaderPointerDrag(
   sectionId: string,
@@ -400,6 +401,8 @@ function SectionShell({
   span,
   showWidthControl,
   onCycleWidth,
+  canvasGrid = false,
+  onResizeCanvas,
 }: {
   layout: "grid" | "stack";
   section: SectionDescriptor;
@@ -419,6 +422,8 @@ function SectionShell({
   span: number;
   showWidthControl?: boolean;
   onCycleWidth?: (id: string) => void;
+  canvasGrid?: boolean;
+  onResizeCanvas?: (id: string, delta: { colSpan?: number; rowSpan?: number }) => void;
 }) {
   const dragState =
     dragId === section.id ? "is-dragging" : overId === section.id ? "is-drag-over" : "";
@@ -431,7 +436,7 @@ function SectionShell({
     const dragProps = bindHeaderDrag(section.id, onDragStart, onDragEnd, onPointerDragStart);
     return (
       <section
-        className={`dash-panel span-${span} reorder-section ${dragState}${fullWidth}${toneClass}`.trim()}
+        className={`dash-panel span-${span} reorder-section ${dragState}${fullWidth}${toneClass}${collapsed ? " is-collapsed" : ""}`.trim()}
         {...handleProps}
       >
         <PanelHeader
@@ -455,6 +460,18 @@ function SectionShell({
         {!collapsed && (
           <div className="dash-panel-body resizable-body" style={{ minHeight: section.minBodyHeight ?? 80 }}>
             {section.content}
+            {canvasGrid && onResizeCanvas && (
+              <button
+                type="button"
+                className="axis-resize-handle hvr-hl"
+                title="Resize widget (AXIS-RESIZE): click widen, Shift+click taller"
+                aria-label="Resize widget"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onResizeCanvas(section.id, e.shiftKey ? { rowSpan: 1 } : { colSpan: 1 });
+                }}
+              />
+            )}
           </div>
         )}
       </section>
@@ -623,6 +640,7 @@ export function ReorderableSections({
   const { getTitle, setTitle } = useGroupTitles(layoutId);
   const { list: listPresets, save: savePreset, load: loadPreset, remove: removePreset, exportBlueprint, importBlueprint } =
     useLayoutPresets(layoutId);
+  const { getSlot, resizeSlot } = useCanvasLayout(layoutId);
   const [presetName, setPresetName] = useState("");
   const [presetMsg, setPresetMsg] = useState<string | null>(null);
   const [importText, setImportText] = useState("");
@@ -692,7 +710,9 @@ export function ReorderableSections({
 
   const containerClass =
     layout === "grid"
-      ? `dash-grid${autoFlow ? " dash-grid-auto-flow" : ""}${canvasGrid ? " dash-grid-canvas" : ""} ${className}`.trim()
+      ? `dash-grid${autoFlow ? " dash-grid-auto-flow" : ""}${canvasGrid ? " dash-grid-canvas" : ""}${
+          autoFlow && Object.values(collapsed).filter(Boolean).length >= 2 ? " dash-grid-dense-reflow" : ""
+        } ${className}`.trim()
       : `reorder-stack ${className}`.trim();
 
   function handleDrop(targetId: string, fromId?: string) {
@@ -805,10 +825,11 @@ export function ReorderableSections({
 
   function renderBlock(block: RenderBlock) {
     if (block.kind === "gap") {
+      const hidden = canvasGrid && !dragId;
       return (
         <div
           key={block.id}
-          className={`reorder-gap-slot ${dragId ? "gap-drop-active" : ""} ${dragId === block.id ? "is-dragging" : ""}`.trim()}
+          className={`reorder-gap-slot ${dragId ? "gap-drop-active" : ""} ${dragId === block.id ? "is-dragging" : ""} ${hidden ? "clr-clus-empty" : ""}`.trim()}
           aria-hidden
           title="Drop here — double-click to remove empty slot"
           onDoubleClick={() => removeSpacer(block.id)}
@@ -866,6 +887,8 @@ export function ReorderableSections({
         span={span}
         showWidthControl={!section.fullWidth}
         onCycleWidth={(id) => cycleSpan(id, section.span ?? 1, 4)}
+        canvasGrid={canvasGrid}
+        onResizeCanvas={(id, delta) => resizeSlot(id, section.span ?? 1, delta)}
       />
     );
   }
@@ -1030,11 +1053,16 @@ export function ReorderableSections({
                 : block.section.id;
           const slotKey = `before-${anchorId}`;
           const wrapDrop = bindDropTarget(anchorId, dragId, setOverId, handleDrop);
+          const canvasSlot =
+            canvasGrid && block.kind === "section"
+              ? getSlot(block.section.id, block.section.span ?? 1)
+              : null;
           return (
             <div
               key={`wrap-${anchorId}-${blockIndex}`}
               className={`${wrapClass(block)}${overId === anchorId ? " is-drag-over" : ""}`}
               data-drop-anchor={anchorId}
+              style={canvasSlot ? canvasStyle(canvasSlot) : undefined}
               {...wrapDrop}
             >
               <DropSlot

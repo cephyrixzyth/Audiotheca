@@ -33,6 +33,26 @@ def _pct(part: int, whole: int) -> float:
     return round(100.0 * part / whole, 1) if whole else 100.0
 
 
+def confidence_category(id_confidence: str = "UNKNOWN", id_method: str = "") -> dict[str, object]:
+    """CONF-CAT: map identification confidence to review tier badges."""
+    conf = str(id_confidence or "UNKNOWN").upper()
+    method = str(id_method or "").upper()
+    if conf == "CONFIRMED":
+        tier, tone, needs_review = "verified", "accent", False
+    elif conf == "TENTATIVE":
+        tier, tone, needs_review = "pending", "warning", True
+    else:
+        tier, tone, needs_review = "unknown", "danger", True
+    return {
+        "tier": tier,
+        "tone": tone,
+        "badge": conf,
+        "id_confidence": conf,
+        "id_method": method,
+        "needs_review": needs_review,
+    }
+
+
 def build_scorecard(
     all_items: list[dict],
     *,

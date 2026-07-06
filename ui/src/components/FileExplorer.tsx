@@ -6,8 +6,10 @@ import {
   type BrowseEntry,
 } from "../api/client";
 import { useExplorerPathDrag } from "../contexts/FileExplorerContext";
+import { AudioPreviewStrip, isAuditionableFile } from "./AudioPreviewStrip";
 import { FileExplorerTree } from "./FileExplorerTree";
 import { ArchiveDiffWizard } from "./ArchiveDiffWizard";
+import { DropZoneOverlay } from "./DropZoneOverlay";
 
 const ARCHIVE_EXT = /\.(zip|rar|7z|iso|tar(\.(gz|bz2|xz))?|gz|001)$/i;
 const LAST_PATH_KEY = "audiotheca.explorer.lastPath";
@@ -98,7 +100,22 @@ function ExplorerPane({
   const [archiveEntries, setArchiveEntries] = useState<string[] | null>(null);
   const [archiveError, setArchiveError] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
+  const [hoverAuditionPath, setHoverAuditionPath] = useState<string | null>(null);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadSeq = useRef(0);
+
+  const setHoverAuditionDebounced = useCallback((path: string | null) => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    if (!path) {
+      setHoverAuditionPath(null);
+      return;
+    }
+    hoverTimer.current = setTimeout(() => setHoverAuditionPath(path), 280);
+  }, []);
+
+  useEffect(() => () => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+  }, []);
 
   const loadDir = useCallback(
     async (path: string) => {
@@ -267,6 +284,8 @@ function ExplorerPane({
                   <ExplorerRow
                     key={entry.path}
                     entry={entry}
+                    autoAudition={hoverAuditionPath === entry.path && isAuditionableFile(entry.name)}
+                    onHover={(active) => setHoverAuditionDebounced(active ? entry.path : null)}
                     onOpen={() => void openEntry(entry)}
                     onContextMenu={(e) => {
                       e.preventDefault();
@@ -330,10 +349,14 @@ function ExplorerRow({
   entry,
   onOpen,
   onContextMenu,
+  onHover,
+  autoAudition = false,
 }: {
   entry: BrowseEntry;
   onOpen: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
+  onHover?: (active: boolean) => void;
+  autoAudition?: boolean;
 }) {
   const drag = useExplorerPathDrag(entry.path);
   const auditLabel = [entry.vendor, entry.status, entry.investigation_bucket].filter(Boolean).join(" · ");
@@ -343,24 +366,31 @@ function ExplorerRow({
       className={entry.is_dir ? "dir-row" : ""}
       onDoubleClick={onOpen}
       onContextMenu={onContextMenu}
+      onMouseEnter={() => onHover?.(true)}
+      onMouseLeave={() => onHover?.(false)}
       draggable={drag.draggable}
       onDragStart={drag.onDragStart}
     >
       <td>
-        <button
-          type="button"
-          className="linkish-btn"
-          title={
-            entry.is_dir
-              ? "Open this folder"
-              : isArchiveName(entry.name)
-                ? "List archive contents without extracting"
-                : "Drag to Scan path fields"
-          }
-          onClick={onOpen}
-        >
-          {entry.name}
-        </button>
+        <div className="explorer-name-cell">
+          <button
+            type="button"
+            className="linkish-btn"
+            title={
+              entry.is_dir
+                ? "Open this folder"
+                : isArchiveName(entry.name)
+                  ? "List archive contents without extracting"
+                  : "Drag to Scan path fields"
+            }
+            onClick={onOpen}
+          >
+            {entry.name}
+          </button>
+          {!entry.is_dir && isAuditionableFile(entry.name) && (
+            <AudioPreviewStrip path={entry.path} name={entry.name} autoPlay={autoAudition} compact />
+          )}
+        </div>
       </td>
       <td>{entry.is_dir ? "Folder" : isArchiveName(entry.name) ? "Archive" : "File"}</td>
       <td>{formatSize(entry.size)}</td>
@@ -453,6 +483,7 @@ export function FileExplorerPanel({
               </p>
             )}
           </div>
+          <DropZoneOverlay />
           <div className="file-explorer-header-actions">
             <button
               type="button"

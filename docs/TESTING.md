@@ -2,7 +2,7 @@
 
 This guide is for **another machine or another user** validating Audiotheca without the original author's library paths or network share.
 
-Engine **10.0.0** · Web UI **1.0.0**
+Engine **10.0.0** · Web UI **1.0.2**
 
 **Overview and UI tour:** [main README](../README.md) · **Doc screenshots:** [assets/ASSETS.md](assets/ASSETS.md)
 
@@ -47,7 +47,7 @@ python -c "import pefile, rapidfuzz, tqdm, fastapi; print('deps OK')"
 python -m pytest tests/ -q
 ```
 
-Expect **150+ tests passing**. Failures often mean missing packages or wrong Python version.
+Expect **516+ tests passing** (3 skipped). Failures often mean missing packages or wrong Python version.
 
 ---
 

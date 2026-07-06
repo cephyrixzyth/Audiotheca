@@ -84,3 +84,15 @@ def read_release_metadata(target: Path) -> dict[str, str | None]:
             if value and not merged.get(key):
                 merged[key] = value
     return merged
+
+
+def parse_nfo_file(path: Path) -> dict[str, object]:
+    """Parse a single NFO/readme file path."""
+    text = _read_text(path)
+    parsed = parse_release_text(text)
+    return {
+        "path": str(path),
+        "parsed": parsed,
+        "text_chars": len(text),
+        "metadata_files": [str(path)],
+    }

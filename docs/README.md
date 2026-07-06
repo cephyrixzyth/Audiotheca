@@ -2,7 +2,7 @@
 
 Start with the [main README](../README.md) for overview, quick start, UI tour, and media placeholders.
 
-Engine **10.0.0** · Web UI **1.0.0**
+Engine **10.0.0** · Web UI **1.0.2**
 
 ---
 
@@ -20,6 +20,7 @@ Engine **10.0.0** · Web UI **1.0.0**
 | API security & tokens | [SECURITY.md](SECURITY.md) |
 | Build desktop installer | [TAURI_BUILD.md](TAURI_BUILD.md) |
 | Architecture & roadmap | [ARCHITECTURE_AND_UI_ROADMAP.md](ARCHITECTURE_AND_UI_ROADMAP.md) |
+| **94-code spec catalog** | [SPEC_CATALOG.md](SPEC_CATALOG.md) |
 | Add doc screenshots/videos | [assets/README.md](assets/README.md) · [assets/ASSETS.md](assets/ASSETS.md) |
 | Deploy on Unraid Docker | [../deploy/unraid/README.md](../deploy/unraid/README.md) |
 | Optional web search helper | [../docker/searxng/README.md](../docker/searxng/README.md) |

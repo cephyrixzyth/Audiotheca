@@ -524,6 +524,11 @@ export interface EnvironmentPayload {
   checked_at: string;
   workspace: string;
   manifest_path: string;
+  isolation?: {
+    isolated?: boolean;
+    venv_active?: boolean;
+    detail?: string;
+  };
   dependencies: EnvironmentDependency[];
   summary: EnvironmentSummary;
   manifest: Record<string, unknown>;

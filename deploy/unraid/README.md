@@ -4,7 +4,7 @@ Production Docker stack: **API** (FastAPI + scan engine) + **UI** (nginx + Vite 
 
 Designed for Unraid 6.x/7.x where the audio library lives on local array paths (`/mnt/user/...`), not over SMB from a PC.
 
-Main project docs: [README](../../README.md) · Engine **10.0.0** · Web UI **1.0.0**
+Main project docs: [README](../../README.md) · Engine **10.0.0** · Web UI **1.0.2**
 
 ## Add Container (recommended)
 
@@ -80,6 +80,8 @@ The API reads `AUDIOTHECA_LIBRARY_ROOTS=/library` inside the container. The UI p
 | `ui` | 4210 (default) | Browser entry point; proxies `/api` to the API container |
 | `api` | 4211 | Direct API access (optional; UI proxy is usually enough) |
 | `searxng` | 8081 (localhost) | Optional — `docker compose --profile search up -d` |
+| `clamav` | 3310 (localhost) | Optional — `docker compose --profile clamav up -d` |
+| `gluetun` | shares API/SearXNG ports | Optional VPN sidecar — `docker compose --profile vpn up -d` |
 
 ## Optional profiles
 
@@ -87,6 +89,18 @@ The API reads `AUDIOTHECA_LIBRARY_ROOTS=/library` inside the container. The UI p
 
 ```bash
 docker compose --profile search up -d --build
+```
+
+**ClamAV** (Security tab deep scans):
+
+```bash
+docker compose --profile clamav up -d --build
+```
+
+**Gluetun VPN** (DKR-TUN — route outbound traffic through VPN; configure `.env` VPN vars):
+
+```bash
+docker compose --profile vpn up -d
 ```
 
 **Space recovery** (one-shot hardlink/bloat report):

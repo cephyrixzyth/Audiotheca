@@ -1,5 +1,28 @@
 # Changelog
 
+## Web UI & API 1.0.2
+
+Engine remains **10.0.0**. Completes the **94-code architecture spec catalog** (waves A–R): every SYS-ING, AUD-PIP, AI-SEC, LFC-ORCH, and UI-LOG code has a handler, API surface, and tests.
+
+### Spec catalog (94/94 done)
+
+- **`audiotheca/spec/`** — schema registry, invoke handlers, `GET /api/spec/catalog`, `POST /api/spec/{code}`
+- **Environment tab** — mount watcher, telemetry sparklines, cloud cache/S3 status, virtual paths, orchestration tools, VPN sidecar probe
+- **Security** — CTX-PROF elevation gate, malware quarantine/delete/shred, QRNT-RPR analyze, EXE-INTRCPT, ANTI-PHONE, MEM-SCAN
+- **Investigation** — WEB-SPDR / TAG-GEN / NFO-PARSE lookup panel, CONF-CAT tier badges, STRIP-DATA anonymization preview, vendor hint badges
+- **Audio preview** — AUTO-AUD hover audition, LUFS/BPM/key badges, BWF extract, acoustic dedupe, phonetic search
+- **Orchestration** — NET-SAFE pause, CLN-SWEEP, XFER-BNDL, PATH-RLOC, CUE-LOG, DIST-SCAN, NODE-SYNC, ENV-YAML export
+
+### Tests
+
+- **516+ pytest** across `test_spec_catalog.py` and `test_wave_{e,fg,hi,jk,lm,n,o,p,q,r}.py`
+
+### Deploy
+
+- **Unraid Docker Compose** — optional profiles: `search` (SearXNG), `clamav`, `vpn` (Gluetun DKR-TUN), `space-recovery`, `single`
+- **`deploy/unraid/start-local.ps1`** — Windows Docker Desktop local stack
+- **`scripts/seed_demo_library.py`** — demo tree under `docs/demo/library`
+
 ## Web UI & API 1.0.1
 
 Engine remains **10.0.0**. Patch release: theme fixes, dashboard without a run, library explorer, installation registry API, and cross-platform CI hardening.
