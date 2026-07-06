@@ -16,6 +16,7 @@ import { SpaceRecovery } from "./components/SpaceRecovery";
 import { MalwarePanel } from "./components/MalwarePanel";
 import { EnvironmentPanel } from "./components/EnvironmentPanel";
 import { FirstRunWizard, shouldShowFirstRunWizard } from "./components/FirstRunWizard";
+import { CloseConfirmDialog } from "./components/CloseConfirmDialog";
 import { HelpPanel } from "./components/HelpPanel";
 import { ProcessBanner } from "./components/ProcessBanner";
 import { NavTabs, REVIEW_TAB_IDS } from "./components/NavTabs";
@@ -23,9 +24,11 @@ import { ThemeSwitcher } from "./components/ThemeSwitcher";
 import { VendorTools } from "./components/VendorTools";
 import { FileExplorerProvider } from "./contexts/FileExplorerContext";
 import { useLibraryRoot } from "./hooks/useLibraryRoot";
+import { useDesktopCloseHandler } from "./hooks/useDesktopCloseHandler";
 import type { RunListItem, RunSummary, TabId } from "./types";
 import { formatEngineLabel, formatEngineVersion } from "./utils/scanDisplay";
 import { webUiHeaderLabel } from "./utils/uiVersion";
+import { isTauri } from "./platform";
 
 const SUBTREE_TABS: TabId[] = [
   ...REVIEW_TAB_IDS.filter((id) => id !== "skipped"),
@@ -43,6 +46,7 @@ export default function App() {
   const [showFirstRun, setShowFirstRun] = useState(false);
   const libraryRoot = useLibraryRoot();
   const explorerSubtree = SUBTREE_TABS.includes(tab) ? libraryRoot : null;
+  const desktopClose = useDesktopCloseHandler();
 
   useEffect(() => {
     fetchHealth()
@@ -225,6 +229,14 @@ export default function App() {
         </div>
         {showFirstRun && (
           <FirstRunWizard onNavigate={setTab} onComplete={() => setShowFirstRun(false)} />
+        )}
+        {isTauri() && (
+          <CloseConfirmDialog
+            open={desktopClose.dialogOpen}
+            initialAction={desktopClose.dialogAction}
+            onConfirm={desktopClose.onDialogConfirm}
+            onCancel={desktopClose.onDialogCancel}
+          />
         )}
       </ContextSidebarProvider>
     </FileExplorerProvider>

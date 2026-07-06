@@ -25,6 +25,8 @@ import { MountEventsPanel, SpecCatalogPanel } from "./SpecCatalogPanel";
 import { PreviewSessionPanel } from "./PreviewSessionPanel";
 import { OrchestrationToolsPanel } from "./OrchestrationToolsPanel";
 import { VirtualPathsPanel } from "./VirtualPathsPanel";
+import { DesktopCloseBehaviorPanel } from "./DesktopCloseBehaviorPanel";
+import { isTauri } from "../platform";
 
 function StatusBadge({ status }: { status: EnvironmentDependency["status"] }) {
   return <span className={`env-badge env-${status}`}>{status}</span>;
@@ -332,6 +334,16 @@ export function EnvironmentPanel() {
       minBodyHeight: 200,
       content: <ThemeStudioPanel />,
     },
+    ...(isTauri()
+      ? [
+          {
+            id: "desktop-close",
+            title: "Desktop close behavior",
+            subtitle: "Minimize to tray or quit when clicking the window close button",
+            content: <DesktopCloseBehaviorPanel />,
+          },
+        ]
+      : []),
     {
       id: "virtual-paths",
       title: "Virtual path aggregation",

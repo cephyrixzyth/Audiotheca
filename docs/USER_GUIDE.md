@@ -1,6 +1,6 @@
 # Audiotheca — Quick User Guide
 
-Engine **10.0.0** · Web UI **1.0.2**
+Engine **10.0.0** · Web UI **1.0.3**
 
 **New here?** Read the [main README](../README.md) for overview, screenshots, and video placeholders.
 
@@ -74,6 +74,8 @@ cd ui && npm run dev
 ```powershell
 .\start-tauri.ps1
 ```
+
+On Windows, the close button (X) can **minimize to the system tray** or **quit completely**. Choose the default in **System → Environment → Desktop close behavior**, or pick each time in the close dialog. Right-click or double-click the tray icon to show the window again.
 
 See [Tauri Build](TAURI_BUILD.md).
 

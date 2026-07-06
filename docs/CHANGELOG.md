@@ -1,5 +1,20 @@
 # Changelog
 
+## Web UI & API 1.0.3
+
+Engine remains **10.0.0**.
+
+### Desktop shell
+
+- **Close button** — minimize to system tray or quit completely, with optional confirmation dialog
+- **Environment → Desktop close behavior** — default action and “ask every time” preference (Windows desktop defaults to tray)
+- System tray icon restores the window; tray menu includes Show and Quit
+
+### Documentation
+
+- Refreshed README screenshots and walkthrough videos for Environment, Investigation, and spec catalog panels
+- `scripts/capture_doc_assets.py` — expanded capture targets for doc media
+
 ## Web UI & API 1.0.2 (installer fix)
 
 ### Windows installers

@@ -2,7 +2,11 @@ use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
-use tauri::{Manager, RunEvent, State};
+use tauri::{
+    menu::{Menu, MenuItem},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    Emitter, Manager, RunEvent, State, WindowEvent,
+};
 use tauri_plugin_shell::process::CommandChild;
 use tauri_plugin_shell::ShellExt;
 
@@ -193,18 +197,106 @@ fn workspace_path() -> String {
     workspace_root().display().to_string()
 }
 
+#[tauri::command]
+fn hide_main_window(app: tauri::AppHandle) -> Result<(), String> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "main window not found".to_string())?;
+    window.hide().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn quit_app(app: tauri::AppHandle, api_child: State<'_, ApiChild>) -> Result<(), String> {
+    stop_api_server(&api_child);
+    app.exit(0);
+    Ok(())
+}
+
+fn show_main_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
+fn quit_from_tray(app: &tauri::AppHandle) {
+    if let Some(state) = app.try_state::<ApiChild>() {
+        stop_api_server(&state);
+    }
+    app.exit(0);
+}
+
+#[cfg(desktop)]
+fn setup_system_tray(app: &tauri::App) -> tauri::Result<()> {
+    let show_item = MenuItem::with_id(app, "tray-show", "Show Audiotheca", true, None::<&str>)?;
+    let quit_item = MenuItem::with_id(app, "tray-quit", "Quit", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
+    let icon = app
+        .default_window_icon()
+        .expect("missing default window icon")
+        .clone();
+
+    let _tray = TrayIconBuilder::new()
+        .icon(icon)
+        .menu(&menu)
+        .tooltip("Audiotheca")
+        .on_menu_event(|app, event| match event.id.as_ref() {
+            "tray-show" => show_main_window(app),
+            "tray-quit" => quit_from_tray(app),
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+            {
+                show_main_window(tray.app_handle());
+            }
+        })
+        .build(app)?;
+
+    Ok(())
+}
+
+#[cfg(desktop)]
+fn wire_close_requested(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let handle = app.clone();
+        window.on_window_event(move |event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                let _ = handle.emit("close-requested", ());
+            }
+        });
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![api_base_url, workspace_path])
+        .invoke_handler(tauri::generate_handler![
+            api_base_url,
+            workspace_path,
+            hide_main_window,
+            quit_app
+        ])
         .setup(|app| {
             let root = workspace_root();
             let api_port = pick_api_port();
             app.manage(ApiPort(Mutex::new(api_port)));
             let child = spawn_api_server(app, &root, api_port);
             app.manage(ApiChild(Mutex::new(child)));
+
+            #[cfg(desktop)]
+            {
+                setup_system_tray(app)?;
+                wire_close_requested(&app.handle());
+            }
+
             Ok(())
         })
         .build(tauri::generate_context!())
