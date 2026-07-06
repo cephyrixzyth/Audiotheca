@@ -41,6 +41,10 @@ Engine **10.0.0** · Web UI **1.0.2**
 
 ## Web UI tabs (reference)
 
-Help appears **last** in the tab bar. Full descriptions: [User guide — Web UI tabs](USER_GUIDE.md#web-ui-tabs).
+Primary nav: **Dashboard** · **Scan** · **Review** ▾ · **Library** · **System** ▾ · **Help** (last).
 
-Dashboard · Scan · Investigation · Duplicates · Restructure · Archives · Scene renames · Scan audit · Skipped files · Space recovery · Security · Environment · Vendors · **Help**
+**Review:** Investigation · Duplicates · Restructure · Archives · Scene renames · Scan audit · Skipped files
+
+**System:** Space recovery · Security · Environment · Vendors
+
+Full descriptions: [User guide — Web UI tabs](USER_GUIDE.md#web-ui-tabs) · [Main README — Web UI tour](../README.md#web-ui-tour)

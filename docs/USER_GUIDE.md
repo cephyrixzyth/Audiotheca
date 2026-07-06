@@ -98,28 +98,43 @@ Always review `Run_Summary_*.txt` before any live run.
 
 ## Web UI tabs
 
-| Tab | What you do |
+Primary nav: **Dashboard** · **Scan** · **Review** ▾ · **Library** · **System** ▾ · **Help** (last).
+
+| Section | What you do |
 | --- | --- |
 | **Dashboard** | Works before first scan — host metrics, environment health, quick links; pick run for route-ready gauges and compare runs |
 | **Scan** | Start dry-run; **Processing flow** presets; live WebSocket progress; **AI lookup** panel |
-| **Investigation** | Filter buckets, bulk correct, group by prefix, export feedback |
+| **Library** | Shared explorer — browse roots, **Pop out**, dual-pane compare, **audio preview**, **DropZone** |
+| **Help** | Built-in guides with screenshots and GIFs |
+
+### Review sub-tabs
+
+| Tab | What you do |
+| --- | --- |
+| **Investigation** | Filter buckets, bulk correct, group by prefix, export feedback; **Investigation lookup** (WEB-SPDR, TAG-GEN, NFO-PARSE) |
 | **Duplicates** | Pick keeper, reject bad groups, preview/stage deletes, manual dupes |
 | **Restructure** | Preview routes; execute approved sections (live, confirmed) |
-| **Archives** | Archive peek verdicts; redundant archive size summary |
+| **Archives** | Archive peek verdicts; redundant archive size summary; **Diff** wizard |
 | **Scene renames** | Hash folder → product name proposals |
 | **Scan audit** | Full per-item identification audit |
 | **Skipped files** | Scan failures, coverage gaps, cache hits, coexistence, run compare, **rescan** |
+
+### System sub-tabs
+
+| Tab | What you do |
+| --- | --- |
 | **Space recovery** | Coexistence summary, **underscore vendor whitelist**, disk reclaim links |
-| **Security** | Malware heuristics, quarantine actions, SHA-256 hash lookup |
-| **Environment** | Dependency health, repairs, **theme editor**, manifest backup |
+| **Security** | Malware heuristics, quarantine/shred, SHA-256 hash lookup, MEM-SCAN |
+| **Environment** | Dependency health, repairs, **theme studio**, mount watcher, **cloud/S3 telemetry**, **orchestration tools**, **94-code spec catalog**, virtual paths, preview session |
 | **Vendors** | Vendor gaps, bulk add keywords, web harvest inbox, unified export |
-| **Help** | Built-in install, workflow, layout, and deploy guides *(last tab)* |
 
 Most tabs support **drag-to-reorder sections** (Dashboard, Scan, and others); preferences persist in browser localStorage.
 
-**File explorer:** open **Library** from the top bar, or click **Browse** on any path link. Use **Pop out wide panel** in the sidebar for full-width review; dual-pane compare on two folders.
+**File explorer:** open **Library** from the top bar, or click **Browse** on any path link. **Audio preview** on WAV/MP3/FLAC rows; **DropZone** when dragging files onto the explorer. Use **Pop out wide panel** for full-width review; dual-pane compare on two folders.
 
-**Themes:** use the ◐ selector in the top bar, or **Environment → Themes** for custom palettes. Buttons and accents follow the active theme (no hardcoded green).
+**Themes:** use the ◐ selector in the top bar, or **Environment → Theme studio** for custom palettes. Buttons and accents follow the active theme (no hardcoded green).
+
+**Spec catalog:** browse 94-code status under **Environment → Architecture spec catalog**; API at `GET /api/spec/catalog` — see [Spec catalog](SPEC_CATALOG.md).
 
 Decisions save to `dedupe_reports/decisions/approved_{stamp}.json` and `dedupe_reports/feedback/`.
 

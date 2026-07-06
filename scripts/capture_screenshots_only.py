@@ -17,6 +17,7 @@ from capture_doc_assets import (  # noqa: E402
     VIEWPORT,
     SCREENSHOT_PLAN,
     _browser_launch_kwargs,
+    _capture_extended_screenshots,
     _click_tab,
 )
 
@@ -123,6 +124,13 @@ def main() -> None:
             page.screenshot(path=str(SHOT_DIR / "file-explorer.png"), full_page=False)
         print("  file-explorer.png")
         dismiss_explorer()
+
+        _capture_extended_screenshots(
+            page,
+            SHOT_DIR,
+            click_tab=click_tab,
+            dismiss_explorer=dismiss_explorer,
+        )
 
         browser.close()
 

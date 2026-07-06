@@ -13,6 +13,7 @@
 ## Table of contents
 
 - [What Audiotheca does](#what-audiotheca-does)
+- [Capabilities overview (UI 1.0.2)](#capabilities-overview-ui-102)
 - [Who should read what](#who-should-read-what)
 - [Quick start (Windows)](#quick-start-windows)
 - [First scan walkthrough](#first-scan-walkthrough)
@@ -48,6 +49,25 @@ When you are ready, live runs support **per-section or per-item approval** with 
 
 ---
 
+## Capabilities overview (UI 1.0.2)
+
+Web UI **1.0.2** completes the **94-code architecture spec catalog** (waves A–R). Every SYS-ING, AUD-PIP, AI-SEC, LFC-ORCH, and UI-LOG code has a backend handler or UI surface, API route, and pytest coverage. See [Spec catalog](docs/SPEC_CATALOG.md).
+
+| Area | What you get in the UI |
+|------|-------------------------|
+| **Scan & identify** | Processing flow presets, skippable phases, live WebSocket progress, **AI lookup** confirm/reject queue |
+| **Review** | Investigation inbox, duplicates, restructure, archives, scene renames, scan audit, skipped-files hub |
+| **Library** | In-app explorer with **Pop out**, dual-pane compare, **audio preview** (waveform, LUFS/BPM/key badges), **DropZone** drag-drop routing |
+| **Investigation lookup** | WEB-SPDR / TAG-GEN / NFO-PARSE panel with STRIP-DATA anonymization gate and CONF-CAT tier badges |
+| **Security** | Malware heuristics, ClamAV deep scan, quarantine/shred, SHA-256 hash lookup, MEM-SCAN, CTX-PROF elevation gate |
+| **Environment** | Toolchain health & repairs, **theme studio**, mount watcher, **cloud cache / S3** telemetry, **orchestration tools**, **spec catalog** registry, virtual paths, preview session (tempo/pitch/mix) |
+| **System ops** | Space recovery (underscore whitelist, hardlink/bloat plans), Vendors (gaps, harvest, keywords) |
+| **Layout** | Reorderable panels, named layout presets, 18 built-in themes, dashboard before first scan |
+
+Primary navigation is grouped: **Dashboard** · **Scan** · **Review** · **Library** · **System** · **Help** (not a flat 14-tab row).
+
+---
+
 ## Who should read what
 
 | You are… | Start here |
@@ -57,6 +77,7 @@ When you are ready, live runs support **per-section or per-item approval** with 
 | **Installing Python, 7-Zip, Node, or Tauri** | [Install guide](docs/INSTALL.md) |
 | **Configuring paths and env vars** | [Configuration](docs/CONFIGURATION.md) · copy [.env.example](.env.example) |
 | **Understanding scan phases and reports** | [Feature guide](docs/FEATURE_GUIDE.md) |
+| **94-code spec catalog (waves A–R)** | [Spec catalog](docs/SPEC_CATALOG.md) |
 | **Fixing a failed or hung scan** | [Debug runbook](docs/DEBUG_RUNBOOK.md) · [FAQ](docs/FAQ.md) |
 | **Adding screenshots/videos to docs** | [docs/assets/README.md](docs/assets/README.md) |
 
@@ -153,31 +174,59 @@ Decisions you make in the UI save under `dedupe_reports/decisions/` and `dedupe_
 
 ## Web UI tour
 
-Tabs appear left-to-right in the top bar. **Help is last** (after Vendors).
+The top bar uses **grouped navigation**. **Help** is always last.
+
+```
+Dashboard · Scan · Review ▾ · Library · System ▾ · Help
+              │                      │
+              ├ Investigation        ├ Space recovery
+              ├ Duplicates           ├ Security
+              ├ Restructure          ├ Environment
+              ├ Archives             └ Vendors
+              ├ Scene renames
+              ├ Scan audit
+              └ Skipped files
+```
+
+### Primary sections
+
+| Section | What you do there |
+|---------|-------------------|
+| **Dashboard** | Pick a run, route-ready gauges, run compare, reorderable panels; host metrics and environment summary **before your first scan** |
+| **Scan** | Start jobs, processing flow editor, skippable phases, live WebSocket log, **AI lookup** analyzer |
+| **Library** | Shared file explorer — browse roots, **Pop out** wide panel, dual-pane compare, inline archive listing, **audio preview** strip, **DropZone** overlay |
+| **Help** | Built-in install, workflow, layout, and deploy guides with screenshots and GIFs |
+
+### Review (sub-tabs)
 
 | Tab | What you do there |
 |-----|-------------------|
-| **Dashboard** | Pick a run, route-ready gauges, run compare, reorderable panels |
-| **Scan** | Start jobs, processing flow editor, skippable phases, AI lookup progress |
-| **Investigation** | Triage unknown items — set vendor or bucket, bulk correct, export feedback |
+| **Investigation** | Triage unknown items — bucket filter, bulk correct, export feedback; **Investigation lookup** panel (WEB-SPDR, TAG-GEN, NFO-PARSE, STRIP-DATA) |
 | **Duplicates** | Pick keepers, reject bad groups, stage deletes |
 | **Restructure** | Preview vendor moves; execute approved sections (live, confirmed) |
-| **Archives** | Archive peek verdicts; redundant archive candidates |
+| **Archives** | Archive peek verdicts, redundant archive candidates, **Diff** wizard vs extracted folder |
 | **Scene renames** | Approve hash-folder → product name renames |
 | **Scan audit** | Full per-item identification audit table |
-| **Skipped files** | Failures, coverage gaps, cache hits, coexistence, targeted rescan |
-| **Space recovery** | Underscore whitelist, coexistence summary, hardlink/bloat plans |
-| **Security** | Malware heuristics, quarantine, hash lookup URLs |
-| **Environment** | Toolchain health, repairs, theme editor, manifest backup |
+| **Skipped files** | Failures, coverage gaps, cache hits, coexistence, run compare, targeted rescan |
+
+### System (sub-tabs)
+
+| Tab | What you do there |
+|-----|-------------------|
+| **Space recovery** | Underscore whitelist, coexistence summary, hardlink/bloat plan links |
+| **Security** | Malware scan, quarantine/delete/shred, hash lookup URLs, MEM-SCAN, QRNT-RPR |
+| **Environment** | Dependency health & repairs, **theme studio**, mount watcher (MNT-LSTN), **cloud & S3 telemetry**, **orchestration tools** (NET-SAFE, CLN-SWEEP, XFER-BNDL, …), **94-code spec catalog** panel, virtual paths, preview session, audit log |
 | **Vendors** | Vendor gaps, web harvest inbox, keyword export |
-| **Help** | Built-in install, workflow, layout, and deploy guides |
 
-**Cross-cutting UI features (engine 10 / UI 1.0):**
+**Cross-cutting UI features (engine 10 / UI 1.0.2):**
 
-- **In-app file explorer** — click **Browse** on path links to list folders or archive contents without extracting.
-- **Reorderable sections** — drag panel headers or ⠿ handles; save named layouts on Dashboard and Scan.
-- **Themes** — quick switcher in the top bar; full editor under **Environment → Themes**.
+- **In-app file explorer** — top-bar **Library**, or **Browse** on path links; list folders or archive contents without extracting.
+- **Audio preview (AUTO-AUD)** — hover/select WAV/MP3/FLAC in the explorer; waveform, LUFS/BPM/key badges; tempo sync and pitch from **Environment → Preview session**.
+- **DropZone (DRP-ZONE)** — drag files onto the explorer to route paths through the API.
+- **Reorderable sections** — drag panel headers or ⠿ handles; save named layouts on Dashboard, Scan, and Environment.
+- **Themes** — ◐ switcher in the top bar; full **theme studio** under **Environment**.
 - **Context sidebar** — search/filter on most data tabs.
+- **Spec catalog API** — `GET /api/spec/catalog` and per-code invoke; browse status in **Environment → Architecture spec catalog**.
 
 Built-in help text also lives in the **Help** tab; full prose docs are in [`docs/`](docs/README.md).
 
@@ -185,43 +234,111 @@ Built-in help text also lives in the **Help** tab; full prose docs are in [`docs
 
 ## Screenshots
 
-Place PNG/WebP files under `docs/assets/screenshots/` — see [docs/assets/ASSETS.md](docs/assets/ASSETS.md) for the full checklist.
+Place PNG/WebP files under `docs/assets/screenshots/` — see [docs/assets/ASSETS.md](docs/assets/ASSETS.md) for the full checklist and capture commands.
+
+Re-capture after UI changes (demo API + Playwright):
+
+```powershell
+$env:AUDIOTHECA_CAPTURE_UI_PORT="5175"
+$env:AUDIOTHECA_CAPTURE_API_PORT="8788"
+python scripts/capture_screenshots_only.py   # stills only
+python scripts/build_doc_gifs.py           # GIFs + sync to ui/public/help/
+```
 
 ### Dashboard & overview
 
 ![Audiotheca web UI overview](docs/assets/screenshots/ui-overview.png)
 
+*Grouped top nav (Dashboard · Scan · Review · Library · System · Help), run selector, and Dashboard KPIs.*
+
 ![Dashboard route-ready gauges](docs/assets/screenshots/dashboard-gauges.png)
+
+*Route-ready / identification gauges, throughput tiles, and reorderable dash widgets.*
 
 ### Scan & processing
 
 ![Scan tab with processing flow editor](docs/assets/screenshots/scan-panel.png)
 
+*Processing flow presets, skippable phases, live WebSocket log, and AI lookup analyzer.*
+
 ### Triage & review
 
 ![Investigation inbox with bucket filter](docs/assets/screenshots/investigation-inbox.png)
 
+*Investigation inbox with bucket chips and bucket filter.*
+
+![Investigation lookup panel](docs/assets/screenshots/investigation-lookup.png)
+
+*Investigation lookup — WEB-SPDR / TAG-GEN / NFO-PARSE queries and STRIP-DATA anonymization preview.*
+
 ![Duplicate keeper review](docs/assets/screenshots/duplicates-review.png)
 
+*Duplicate group with keeper selection and stage-delete preview.*
+
 ![Restructure route preview](docs/assets/screenshots/restructure-preview.png)
+
+*Planned vendor-folder moves with destination preview before live execute.*
+
+![Scene rename proposals](docs/assets/screenshots/scene-renames.png)
+
+*Hash-folder → product name rename plan with per-item approval.*
+
+![Scan audit table](docs/assets/screenshots/scan-audit.png)
+
+*Per-item identification method, confidence tier, and quick corrections.*
+
+![Skipped files hub](docs/assets/screenshots/skipped-files.png)
+
+*Scan failures, coverage gaps, cache hits, coexistence, and targeted rescan.*
 
 ### Library tools
 
 ![In-app file explorer browsing a library path](docs/assets/screenshots/file-explorer.png)
 
+*Library explorer — folder tree, inline archive listing, **audio preview** strip on WAV rows, **DropZone** overlay when dragging files.*
+
 ![Archive peek verdicts](docs/assets/screenshots/archives-verdicts.png)
 
+*Archives tab — peek verdicts and redundant archive size summary.*
+
 ![Archive diff wizard — side-by-side archive vs folder](docs/assets/screenshots/archive-diff-wizard.png)
+
+*Diff wizard comparing archive contents to an extracted sibling folder.*
 
 ### Security & environment
 
 ![Security / malware panel](docs/assets/screenshots/security-malware.png)
 
-![Environment tab theme editor](docs/assets/screenshots/environment-themes.png)
+*Malware heuristics, ClamAV option, quarantine/shred actions, hash lookup, MEM-SCAN.*
 
-### Help
+![Environment tab theme studio](docs/assets/screenshots/environment-themes.png)
+
+*Environment tab — theme studio and toolchain panels.*
+
+![Architecture spec catalog](docs/assets/screenshots/environment-spec-catalog.png)
+
+*Architecture spec catalog — 94-code registry with done / partial / mvp status.*
+
+![Orchestration tools](docs/assets/screenshots/environment-orchestration.png)
+
+*Orchestration tools — NET-SAFE, CLN-SWEEP, XFER-BNDL, PATH-RLOC, and related controls.*
+
+![Cloud and storage telemetry](docs/assets/screenshots/environment-cloud-storage.png)
+
+*Cloud & storage telemetry — CLD-CACHE + S3-CONN live status and sparklines.*
 
 ![Help tab — last in the tab bar](docs/assets/screenshots/help-panel.png)
+
+*Help tab (last in the bar) with topic screenshots and walkthrough GIFs.*
+
+### Pending captures (1.0.2 — library stills)
+
+Capture with the demo library (`python scripts/seed_demo_library.py`) and running UI, then add rows to [ASSETS.md](docs/assets/ASSETS.md):
+
+| Target file | What to show |
+|-------------|----------------|
+| `audio-preview.png` | **Library** — select a demo `.wav`; waveform strip with LUFS/BPM/key badges |
+| `dropzone-overlay.png` | **Library** — drag files over explorer to show active DropZone overlay |
 
 ---
 

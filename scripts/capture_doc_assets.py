@@ -803,6 +803,13 @@ def capture() -> None:
                 page.screenshot(path=str(SHOT_DIR / "file-explorer.png"), full_page=False)
             dismiss_explorer()
 
+            _capture_extended_screenshots(
+                page,
+                SHOT_DIR,
+                click_tab=click_tab,
+                dismiss_explorer=dismiss_explorer,
+            )
+
             # Videos — one context per clip
             for video_name, tabs in VIDEO_CLIPS:
                 video_dir = VIDEO_DIR / "_tmp"
@@ -838,6 +845,76 @@ def capture() -> None:
             browser.close()
     finally:
         stop_servers(api_proc, ui_proc)
+
+
+def _capture_extended_screenshots(
+    page: object,
+    shot_dir: Path,
+    *,
+    click_tab: object,
+    dismiss_explorer: object,
+) -> None:
+    """1.0.2 panels — investigation lookup, environment sub-panels, audio preview."""
+
+    def _shot_panel(name: str, selector: str) -> None:
+        loc = page.locator(selector).first  # type: ignore[union-attr]
+        if loc.count():
+            loc.scroll_into_view_if_needed()
+            page.wait_for_timeout(600)  # type: ignore[union-attr]
+            loc.screenshot(path=str(shot_dir / name))
+            print(f"  {name}")
+        else:
+            print(f"  skip {name} ({selector} not found)", file=sys.stderr)
+
+    dismiss_explorer()  # type: ignore[operator]
+    click_tab("investigation")  # type: ignore[operator]
+    _shot_panel("investigation-lookup.png", ".investigation-lookup-panel")
+
+    dismiss_explorer()  # type: ignore[operator]
+    click_tab("environment")  # type: ignore[operator]
+    for name, heading in (
+        ("environment-spec-catalog.png", "Architecture spec catalog"),
+        ("environment-orchestration.png", "Orchestration tools"),
+        ("environment-cloud-storage.png", "Cloud & storage telemetry"),
+    ):
+        loc = page.locator(f"text={heading}").first  # type: ignore[union-attr]
+        if loc.count():
+            loc.scroll_into_view_if_needed()
+            page.wait_for_timeout(500)  # type: ignore[union-attr]
+            section = page.locator(".reorderable-section").filter(has=loc).first  # type: ignore[union-attr]
+            if section.count():
+                section.screenshot(path=str(shot_dir / name))
+                print(f"  {name}")
+            else:
+                page.screenshot(path=str(shot_dir / name), full_page=False)  # type: ignore[union-attr]
+                print(f"  {name} (fallback full shell)")
+        else:
+            print(f"  skip {name} (heading not found)", file=sys.stderr)
+
+    dismiss_explorer()  # type: ignore[operator]
+    click_tab("investigation")  # type: ignore[operator]
+    page.locator("button.top-tab-library").click()  # type: ignore[union-attr]
+    page.wait_for_timeout(1200)  # type: ignore[union-attr]
+    wav_row = page.locator(".file-explorer-row").filter(has_text=".wav").first  # type: ignore[union-attr]
+    if not wav_row.count():
+        wav_row = page.locator(".file-explorer-row").filter(has_text="wav").first  # type: ignore[union-attr]
+    if wav_row.count():
+        wav_row.click()
+        page.wait_for_timeout(1000)  # type: ignore[union-attr]
+        preview = page.locator(".audio-preview-strip").first  # type: ignore[union-attr]
+        if preview.count():
+            explorer = page.locator(".file-explorer-shell").first  # type: ignore[union-attr]
+            if explorer.count():
+                explorer.screenshot(path=str(shot_dir / "audio-preview.png"))
+                print("  audio-preview.png")
+            else:
+                preview.screenshot(path=str(shot_dir / "audio-preview.png"))
+                print("  audio-preview.png (strip only)")
+        else:
+            print("  skip audio-preview.png (no preview strip)", file=sys.stderr)
+    else:
+        print("  skip audio-preview.png (no WAV row)", file=sys.stderr)
+    dismiss_explorer()  # type: ignore[operator]
 
 
 def _tab_label(tab_id: str) -> str:

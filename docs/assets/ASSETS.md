@@ -2,7 +2,7 @@
 
 Use this table when preparing documentation assets. Each row must exist at the listed path before the README media sections show real content.
 
-**Last refreshed:** 2026-07-05 (Web UI 1.0.1 — theme fixes, dashboard without run, library pop-out). Re-capture with demo API/UI running:
+**Last refreshed:** 2026-07-06 (Web UI **1.0.2** — spec catalog, investigation lookup, orchestration, cloud storage, audio preview, DropZone). Re-capture with demo API/UI running:
 
 ```powershell
 $env:AUDIOTHECA_CAPTURE_UI_PORT="5175"
@@ -11,24 +11,42 @@ python scripts/capture_screenshots_only.py
 python scripts/build_doc_gifs.py
 ```
 
+Full pipeline (seed demo + start servers + videos): `python scripts/capture_doc_assets.py`
+
 Playwright uses bundled Chromium only (`scripts/capture_doc_assets.py` — no Edge channel).
 
-## Screenshots
+## Screenshots — shipped in README
 
-| Status | Path | Alt text (for README) |
-|--------|------|------------------------|
-| ☑ | `docs/assets/screenshots/ui-overview.png` | Audiotheca web UI overview |
-| ☑ | `docs/assets/screenshots/dashboard-gauges.png` | Dashboard route-ready gauges |
-| ☑ | `docs/assets/screenshots/scan-panel.png` | Scan tab with processing flow |
-| ☑ | `docs/assets/screenshots/investigation-inbox.png` | Investigation inbox |
+| Status | Path | Alt text / caption |
+|--------|------|---------------------|
+| ☑ | `docs/assets/screenshots/ui-overview.png` | Grouped top nav, run selector, Dashboard KPIs |
+| ☑ | `docs/assets/screenshots/dashboard-gauges.png` | Route-ready gauges and reorderable dash widgets |
+| ☑ | `docs/assets/screenshots/scan-panel.png` | Scan tab — processing flow, phases, AI lookup |
+| ☑ | `docs/assets/screenshots/investigation-inbox.png` | Investigation inbox with bucket filter |
 | ☑ | `docs/assets/screenshots/duplicates-review.png` | Duplicate keeper review |
 | ☑ | `docs/assets/screenshots/restructure-preview.png` | Restructure route preview |
-| ☑ | `docs/assets/screenshots/file-explorer.png` | In-app file explorer |
+| ☑ | `docs/assets/screenshots/scene-renames.png` | Scene rename proposals |
+| ☑ | `docs/assets/screenshots/scan-audit.png` | Scan audit per-item table |
+| ☑ | `docs/assets/screenshots/skipped-files.png` | Skipped files hub |
+| ☑ | `docs/assets/screenshots/file-explorer.png` | Library explorer (tree, archives, audio preview) |
 | ☑ | `docs/assets/screenshots/archives-verdicts.png` | Archive peek verdicts |
 | ☑ | `docs/assets/screenshots/archive-diff-wizard.png` | Archive diff wizard modal |
 | ☑ | `docs/assets/screenshots/security-malware.png` | Security / malware panel |
-| ☑ | `docs/assets/screenshots/environment-themes.png` | Theme editor in Environment tab |
+| ☑ | `docs/assets/screenshots/environment-themes.png` | Environment — theme studio (scroll for more panels) |
 | ☑ | `docs/assets/screenshots/help-panel.png` | Help tab (last in tab bar) |
+| ☑ | `docs/assets/screenshots/investigation-lookup.png` | Investigation lookup panel (WEB-SPDR / STRIP-DATA) |
+| ☑ | `docs/assets/screenshots/environment-spec-catalog.png` | Architecture spec catalog (94-code registry) |
+| ☑ | `docs/assets/screenshots/environment-orchestration.png` | Orchestration tools (NET-SAFE, CLN-SWEEP, …) |
+| ☑ | `docs/assets/screenshots/environment-cloud-storage.png` | Cloud & storage telemetry (CLD-CACHE, S3-CONN) |
+
+## Screenshots — pending (1.0.2 library stills)
+
+| Status | Path | What to capture |
+|--------|------|-----------------|
+| ☐ | `docs/assets/screenshots/audio-preview.png` | Library — WAV row with waveform + LUFS/BPM/key badges |
+| ☐ | `docs/assets/screenshots/dropzone-overlay.png` | Library — active DropZone overlay while dragging files |
+
+Demo WAV for audio preview: `python scripts/seed_demo_library.py` → `docs/demo/library/`.
 
 ## Videos (source)
 
@@ -42,6 +60,14 @@ Playwright uses bundled Chromium only (`scripts/capture_doc_assets.py` — no Ed
 | ☑ | `docs/assets/videos/archive-diff-wizard.mp4` | Archive diff wizard |
 | ☑ | `docs/assets/videos/ai-lookup-review.mp4` | AI lookup review during scan |
 | ☑ | `docs/assets/videos/security-and-space-recovery.mp4` | Security scan and space recovery |
+
+### Suggested new videos (optional)
+
+| Status | Path | Topic |
+|--------|------|--------|
+| ☐ | `environment-and-spec-catalog.mp4` | Environment panels — orchestration, cloud, spec catalog |
+| ☐ | `investigation-lookup.mp4` | Investigation lookup + STRIP-DATA flow |
+| ☐ | `audio-preview-library.mp4` | Library audio preview and DropZone |
 
 ## GIFs (GitHub README + Help tab)
 
@@ -62,8 +88,10 @@ Help tab assets are copied to `ui/public/help/` by the same script for Vite dev/
 
 ## Capture notes
 
-- **Engine / UI version** shown in the header should match docs (currently engine **10.0.0**, Web UI **1.0.0**).
-- **Help tab** appears last in the tab bar (after Vendors).
+- **Engine / UI version** shown in the header should match docs (engine **10.0.0**, Web UI **1.0.2**).
+- **Primary nav** is grouped: Dashboard · Scan · Review · Library · System · Help (not a flat tab row).
+- **Help tab** appears last in the primary bar.
+- Scroll Environment panels to capture orchestration, spec catalog, and cloud sections — default capture scrolls to Themes only.
 - Do not include API tokens, real library paths you wish to keep private, or `.api_token` contents.
 
 See [README.md](README.md) for detailed capture instructions.
