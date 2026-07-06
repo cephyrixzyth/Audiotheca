@@ -7,10 +7,16 @@ import {
   flagSceneMissingPart01,
   overrideSceneName,
   rejectSceneRename,
+  type SceneExecuteResponse,
 } from "../api/client";
 import type { SceneRenameItem } from "../types";
 import { useContextSidebar } from "./ContextSidebar";
 import { PathLink } from "./PathLink";
+import {
+  ExecuteResultsPanel,
+  sceneExecuteRows,
+  type ExecuteResultRow,
+} from "./ExecuteResultsPanel";
 
 interface Props {
   stamp: string;
@@ -24,6 +30,11 @@ export function SceneRenames({ stamp }: Props) {
   const [rejected, setRejected] = useState<Record<string, string>>({});
   const [overrides, setOverrides] = useState<Record<string, string>>({});
   const [msg, setMsg] = useState<string | null>(null);
+  const [executeResults, setExecuteResults] = useState<ExecuteResultRow[]>([]);
+  const [executeDryRun, setExecuteDryRun] = useState(true);
+  const [executeSummary, setExecuteSummary] = useState<{ staged: number; failed: number } | null>(
+    null,
+  );
 
   useEffect(() => {
     fetchSceneFeedback(stamp)
@@ -91,14 +102,19 @@ export function SceneRenames({ stamp }: Props) {
   }
 
   async function handleExecute(dryRun: boolean) {
-    const res = await executeSceneRenames(stamp, {
+    const res: SceneExecuteResponse = await executeSceneRenames(stamp, {
       dry_run: dryRun,
       confirm_live: !dryRun ? true : undefined,
     });
-    if (res.error) {
-      setMsg(res.error);
+    if (!res.ok && !res.results?.length) {
+      setExecuteResults([]);
+      setExecuteSummary(null);
+      setMsg(res.error ?? "Approve scene renames first");
       return;
     }
+    setExecuteDryRun(dryRun);
+    setExecuteResults(sceneExecuteRows(res.results ?? [], dryRun));
+    setExecuteSummary({ staged: res.renamed, failed: res.failed });
     setMsg(
       dryRun
         ? `Dry run: ${res.renamed} rename(s) would apply`
@@ -154,6 +170,18 @@ export function SceneRenames({ stamp }: Props) {
         </button>
         {msg && <span className="count-muted">{msg}</span>}
       </div>
+
+      {executeResults.length > 0 && (
+        <ExecuteResultsPanel
+          title="Scene rename execute results"
+          dryRun={executeDryRun}
+          results={executeResults}
+          staged={executeSummary?.staged}
+          failed={executeSummary?.failed}
+          okDryRunLabel="Would rename"
+          okLiveLabel="Renamed"
+        />
+      )}
 
       <table className="data-table">
         <thead>

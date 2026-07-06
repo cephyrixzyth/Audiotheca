@@ -14,11 +14,18 @@ interface Props {
   results: ExecuteResultRow[];
   staged?: number;
   failed?: number;
+  okDryRunLabel?: string;
+  okLiveLabel?: string;
 }
 
-function statusLabel(ok: boolean, dryRun?: boolean): string {
+function statusLabel(
+  ok: boolean,
+  dryRun?: boolean,
+  okDryRunLabel = "Would move",
+  okLiveLabel = "Moved",
+): string {
   if (!ok) return "Failed";
-  return dryRun ? "Would move" : "Moved";
+  return dryRun ? okDryRunLabel : okLiveLabel;
 }
 
 function statusClass(ok: boolean): string {
@@ -31,6 +38,8 @@ export function ExecuteResultsPanel({
   results,
   staged,
   failed,
+  okDryRunLabel,
+  okLiveLabel,
 }: Props) {
   if (!results.length) return null;
 
@@ -65,7 +74,7 @@ export function ExecuteResultsPanel({
                 <td>{row.action}</td>
                 <td>
                   <span className={`badge ${statusClass(row.ok)}`}>
-                    {statusLabel(row.ok, dryRun)}
+                    {statusLabel(row.ok, dryRun, okDryRunLabel, okLiveLabel)}
                   </span>
                 </td>
                 <td className="execute-results-detail">
@@ -99,6 +108,52 @@ export function duplicateExecuteRows(
     action: dryRun || row.dry_run ? "Preview stage" : "Stage discard",
     ok: row.ok,
     detail: row.ok && row.staged_to ? `→ ${row.staged_to}` : undefined,
+    error: row.error,
+  }));
+}
+
+export function restructureExecuteRows(
+  results: Array<{
+    path: string;
+    ok: boolean;
+    dry_run?: boolean;
+    destination?: string;
+    relative_dest?: string;
+    error?: string;
+  }>,
+  dryRun: boolean,
+): ExecuteResultRow[] {
+  return results.map((row) => ({
+    path: row.path,
+    action: dryRun || row.dry_run ? "Preview move" : "Move",
+    ok: row.ok,
+    detail:
+      row.ok && row.destination
+        ? `→ ${row.relative_dest ?? row.destination}`
+        : undefined,
+    error: row.error,
+  }));
+}
+
+export function sceneExecuteRows(
+  results: Array<{
+    path: string;
+    ok: boolean;
+    dry_run?: boolean;
+    proposed_name?: string;
+    destination?: string;
+    error?: string;
+  }>,
+  dryRun: boolean,
+): ExecuteResultRow[] {
+  return results.map((row) => ({
+    path: row.path,
+    action: dryRun || row.dry_run ? "Preview rename" : "Rename",
+    ok: row.ok,
+    detail:
+      row.ok && (row.proposed_name || row.destination)
+        ? `→ ${row.proposed_name ?? row.destination}`
+        : undefined,
     error: row.error,
   }));
 }

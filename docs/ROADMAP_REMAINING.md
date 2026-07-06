@@ -28,7 +28,7 @@ Backend execute paths exist (`duplicate_execute`, `restructure_execute`, `scene_
 |---|------|-------|--------|
 | F1 | **Execute results panel** — shared component for path / status / error rows | Duplicates, Restructure, Scene, Archives | ☑ |
 | F2 | Wire `POST …/duplicates/stage` response into results UI | Show moved/skipped/failed per discard | ☑ |
-| F3 | Wire restructure + scene live execute responses | Section approve → execute → log | ☐ |
+| F3 | Wire restructure + scene live execute responses | Section approve → execute → log | ☑ |
 | F4 | Dashboard **feedback summary** link → execute history for last run | Builds on `/api/feedback/summary` | ☐ |
 | F5 | Fingerprint blocklist from duplicate rejections | `engine_hints.json` merge | ☐ |
 

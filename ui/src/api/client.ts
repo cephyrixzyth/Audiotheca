@@ -250,15 +250,7 @@ export function approveRestructureSection(
 export function executeRestructure(
   stamp: string,
   payload: { dry_run?: boolean; root?: string; confirm_live?: boolean },
-): Promise<{
-  ok: boolean;
-  dry_run: boolean;
-  moved: number;
-  failed: number;
-  approved_sections: string[];
-  results: Array<Record<string, unknown>>;
-  error?: string;
-}> {
+): Promise<RestructureExecuteResponse> {
   return postJson(`/runs/${stamp}/restructure/execute`, payload);
 }
 
@@ -307,14 +299,7 @@ export function flagSceneMissingPart01(
 export function executeSceneRenames(
   stamp: string,
   payload: { dry_run?: boolean; confirm_live?: boolean },
-): Promise<{
-  ok: boolean;
-  dry_run: boolean;
-  renamed: number;
-  failed: number;
-  results: Array<Record<string, unknown>>;
-  error?: string;
-}> {
+): Promise<SceneExecuteResponse> {
   return postJson(`/runs/${stamp}/scene-renames/execute`, payload);
 }
 
@@ -455,6 +440,50 @@ export type ExecuteResultItem = {
   ok: boolean;
   dry_run?: boolean;
   staged_to?: string;
+  error?: string;
+};
+
+export type RestructureExecuteResultItem = {
+  path: string;
+  section?: string;
+  ok: boolean;
+  dry_run?: boolean;
+  destination?: string;
+  relative_dest?: string;
+  error?: string;
+  batch_id?: string;
+};
+
+export type RestructureExecuteResponse = {
+  ok: boolean;
+  dry_run: boolean;
+  moved: number;
+  failed: number;
+  approved_sections?: string[];
+  library_root?: string;
+  batch_id?: string;
+  results: RestructureExecuteResultItem[];
+  error?: string;
+};
+
+export type SceneExecuteResultItem = {
+  path: string;
+  scene_id?: string;
+  ok: boolean;
+  dry_run?: boolean;
+  proposed_name?: string;
+  destination?: string;
+  error?: string;
+  batch_id?: string;
+};
+
+export type SceneExecuteResponse = {
+  ok: boolean;
+  dry_run: boolean;
+  renamed: number;
+  failed: number;
+  batch_id?: string;
+  results: SceneExecuteResultItem[];
   error?: string;
 };
 

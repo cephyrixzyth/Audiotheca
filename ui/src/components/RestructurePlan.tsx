@@ -5,11 +5,17 @@ import {
   fetchRestructure,
   fetchRestructureFeedback,
   overrideRestructureDest,
+  type RestructureExecuteResponse,
 } from "../api/client";
 import type { RestructureItem } from "../types";
 import { useLibraryRoot } from "../hooks/useLibraryRoot";
 import { PathLink } from "./PathLink";
 import { useContextSidebar } from "./ContextSidebar";
+import {
+  ExecuteResultsPanel,
+  restructureExecuteRows,
+  type ExecuteResultRow,
+} from "./ExecuteResultsPanel";
 
 interface Props {
   stamp: string;
@@ -25,6 +31,11 @@ export function RestructurePlan({ stamp }: Props) {
   const [approvedSections, setApprovedSections] = useState<string[]>([]);
   const [destOverrides, setDestOverrides] = useState<Record<string, string>>({});
   const [msg, setMsg] = useState<string | null>(null);
+  const [executeResults, setExecuteResults] = useState<ExecuteResultRow[]>([]);
+  const [executeDryRun, setExecuteDryRun] = useState(true);
+  const [executeSummary, setExecuteSummary] = useState<{ staged: number; failed: number } | null>(
+    null,
+  );
 
   useEffect(() => {
     fetchRestructureFeedback(stamp)
@@ -86,15 +97,20 @@ export function RestructurePlan({ stamp }: Props) {
   }
 
   async function handleExecute(dryRun: boolean, confirmLive = false) {
-    const res = await executeRestructure(stamp, {
+    const res: RestructureExecuteResponse = await executeRestructure(stamp, {
       dry_run: dryRun,
       confirm_live: confirmLive || undefined,
       root: libraryRoot || undefined,
     });
-    if (res.error) {
-      setMsg(res.error);
+    if (!res.ok && !res.results?.length) {
+      setExecuteResults([]);
+      setExecuteSummary(null);
+      setMsg(res.error ?? "Approve sections with READY items first");
       return;
     }
+    setExecuteDryRun(dryRun);
+    setExecuteResults(restructureExecuteRows(res.results ?? [], dryRun));
+    setExecuteSummary({ staged: res.moved, failed: res.failed });
     setMsg(
       dryRun
         ? `Dry run: ${res.moved} move(s) in sections ${res.approved_sections?.join(", ")}`
@@ -172,6 +188,16 @@ export function RestructurePlan({ stamp }: Props) {
       </div>
 
       {msg && <div className="banner dry">{msg}</div>}
+
+      {executeResults.length > 0 && (
+        <ExecuteResultsPanel
+          title="Restructure execute results"
+          dryRun={executeDryRun}
+          results={executeResults}
+          staged={executeSummary?.staged}
+          failed={executeSummary?.failed}
+        />
+      )}
 
       {!loading && items.length === 0 && (
         <div className="empty">No restructure routes match your filters.</div>
