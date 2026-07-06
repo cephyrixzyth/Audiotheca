@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import {
   compareRuns,
   fetchFeedbackEstimate,
+  fetchFeedbackExecuteHistory,
   fetchFeedbackSummary,
   fetchHarvestCandidates,
   fetchJobs,
   fetchSystemMetrics,
   fetchVerification,
+  type FeedbackExecuteHistory,
 } from "../api/client";
 import { useLibraryRoot } from "../hooks/useLibraryRoot";
 import type {
@@ -134,6 +136,19 @@ function QuickLink({ label, tab, onNavigate }: { label: string; tab: TabId; onNa
   );
 }
 
+const REVIEW_TAB_LINKS: Array<{ tab: TabId; label: string; feedbackKey: string; moduleKey: string }> = [
+  { tab: "duplicates", label: "Duplicate review", feedbackKey: "duplicate", moduleKey: "duplicate" },
+  { tab: "restructure", label: "Restructure plan", feedbackKey: "restructure", moduleKey: "restructure" },
+  { tab: "scene-renames", label: "Scene renames", feedbackKey: "scene", moduleKey: "scene" },
+  { tab: "archives", label: "Archive peek", feedbackKey: "archive", moduleKey: "archive" },
+  { tab: "investigation", label: "Investigation inbox", feedbackKey: "investigation", moduleKey: "investigation" },
+];
+
+function basename(path: string): string {
+  const parts = path.replace(/\\/g, "/").split("/");
+  return parts[parts.length - 1] || path;
+}
+
 export function Dashboard(props: Props) {
   if (!props.summary) {
     return <DashboardHome runs={props.runs} onNavigate={props.onNavigate} />;
@@ -161,6 +176,7 @@ function DashboardRun({
   const [jobs, setJobs] = useState<JobSnapshot[]>([]);
   const [feedback, setFeedback] = useState<Record<string, number> | null>(null);
   const [feedbackEstimate, setFeedbackEstimate] = useState<FeedbackApplyEstimate | null>(null);
+  const [executeHistory, setExecuteHistory] = useState<FeedbackExecuteHistory | null>(null);
   const [harvestPending, setHarvestPending] = useState(0);
   const [compareStamp, setCompareStamp] = useState("");
   const [compareResult, setCompareResult] = useState<Record<string, unknown> | null>(null);
@@ -195,6 +211,9 @@ function DashboardRun({
       void fetchJobs().then(setJobs).catch(() => undefined);
       void fetchFeedbackSummary(summary.stamp).then(setFeedback).catch(() => undefined);
       void fetchFeedbackEstimate(summary.stamp).then(setFeedbackEstimate).catch(() => undefined);
+      void fetchFeedbackExecuteHistory(summary.stamp, 6)
+        .then(setExecuteHistory)
+        .catch(() => undefined);
       void fetchHarvestCandidates(false)
         .then((r) => setHarvestPending(r.total_pending))
         .catch(() => undefined);
@@ -537,8 +556,8 @@ function DashboardRun({
       },
       {
         id: "feedback",
-        title: "Feedback & vendors",
-        subtitle: "Corrections awaiting next scan",
+        title: "Feedback & execute",
+        subtitle: "Corrections pending scan · recent staged moves for this run",
         content: (
           <>
             <div className="stat-grid compact">
@@ -578,6 +597,71 @@ function DashboardRun({
                 {feedbackEstimate.note}
               </p>
             )}
+            {executeHistory && executeHistory.total > 0 ? (
+              <div className="execute-results-panel" style={{ marginTop: "0.75rem" }}>
+                <header className="execute-results-header">
+                  <h3>Recent execute activity</h3>
+                  <span className="count-muted">
+                    {summary.stamp}
+                    {executeHistory.last_at ? ` · last ${executeHistory.last_at.slice(0, 19)}` : ""}
+                    {executeHistory.live_count > 0 ? ` · ${executeHistory.live_count} live` : ""}
+                  </span>
+                </header>
+                <ul className="finding-list">
+                  {executeHistory.items.map((item) => (
+                    <li key={`${item.created}:${item.path}`} className="finding-row">
+                      <span className="badge bucket">{item.module}</span>
+                      <span className="finding-detail" title={item.path}>
+                        {basename(item.path)}
+                        {item.destination ? ` → ${basename(item.destination)}` : ""}
+                      </span>
+                      <span className={`badge ${item.ok ? "ready" : "review"}`}>
+                        {item.dry_run ? "dry" : item.status === "committed" ? "live" : item.status}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <p className="count-muted" style={{ marginTop: "0.75rem", fontSize: "0.8rem" }}>
+                No execute activity for {summary.stamp} — stage or move from review tabs below.
+              </p>
+            )}
+            <div className="quick-links" style={{ marginTop: "0.75rem" }}>
+              {(() => {
+                const hasAnyActivity = REVIEW_TAB_LINKS.some((link) => {
+                  const pending = feedback?.[link.feedbackKey] ?? 0;
+                  const executed = executeHistory?.by_module?.[link.moduleKey] ?? 0;
+                  return pending > 0 || executed > 0;
+                });
+                const defaultTabs: TabId[] = ["duplicates", "restructure", "scene-renames", "archives"];
+                return REVIEW_TAB_LINKS.filter((link) => {
+                  const pending = feedback?.[link.feedbackKey] ?? 0;
+                  const executed = executeHistory?.by_module?.[link.moduleKey] ?? 0;
+                  if (pending > 0 || executed > 0) return true;
+                  return !hasAnyActivity && defaultTabs.includes(link.tab);
+                }).map((link) => {
+                  const pending = feedback?.[link.feedbackKey] ?? 0;
+                  const executed = executeHistory?.by_module?.[link.moduleKey] ?? 0;
+                  const suffix =
+                    pending > 0 && executed > 0
+                      ? ` (${pending} pending · ${executed} executed)`
+                      : pending > 0
+                        ? ` (${pending} pending)`
+                        : executed > 0
+                          ? ` (${executed} executed)`
+                          : "";
+                  return (
+                    <QuickLink
+                      key={link.tab}
+                      label={`${link.label}${suffix}`}
+                      tab={link.tab}
+                      onNavigate={onNavigate}
+                    />
+                  );
+                });
+              })()}
+            </div>
           </>
         ),
       },
@@ -702,6 +786,7 @@ function DashboardRun({
       bucketData,
       compareResult,
       compareStamp,
+      executeHistory,
       feedback,
       feedbackEstimate,
       findings,

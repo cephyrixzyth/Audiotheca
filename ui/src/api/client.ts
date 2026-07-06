@@ -531,6 +531,39 @@ export function fetchFeedbackSummary(stamp?: string): Promise<Record<string, num
   return getJson(`/feedback/summary${qs}`);
 }
 
+export interface FeedbackExecuteHistoryItem {
+  module: string;
+  tab: string;
+  op: string;
+  path: string;
+  destination: string;
+  dry_run: boolean;
+  ok: boolean;
+  status: string;
+  created: string;
+  batch_id: string;
+  stamp: string;
+}
+
+export interface FeedbackExecuteHistory {
+  stamp: string | null;
+  total: number;
+  live_count: number;
+  by_module: Record<string, number>;
+  items: FeedbackExecuteHistoryItem[];
+  last_at: string | null;
+}
+
+export function fetchFeedbackExecuteHistory(
+  stamp?: string,
+  limit = 8,
+): Promise<FeedbackExecuteHistory> {
+  const qs = new URLSearchParams();
+  if (stamp) qs.set("stamp", stamp);
+  qs.set("limit", String(limit));
+  return getJson(`/feedback/execute-history?${qs}`);
+}
+
 export function fetchVendors(): Promise<{
   known: string[];
   user_added: Array<{ company: string; keywords: string[]; category?: string }>;

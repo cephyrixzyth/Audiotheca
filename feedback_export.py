@@ -221,6 +221,98 @@ def feedback_summary(stamp: str | None = None) -> dict[str, int]:
     }
 
 
+EXECUTE_OPS: dict[str, tuple[str, str]] = {
+    "stage_duplicate": ("duplicate", "duplicates"),
+    "restructure": ("restructure", "restructure"),
+    "scene_rename": ("scene", "scene-renames"),
+    "stage_archive": ("archive", "archives"),
+}
+
+
+def execute_history(stamp: str | None = None, limit: int = 12) -> dict[str, object]:
+    """Recent staged moves/renames for dashboard — ledger first, duplicate store fallback."""
+    from audiotheca.transaction_ledger import list_entries
+
+    items: list[dict[str, object]] = []
+    seen: set[tuple[str, str, str]] = set()
+
+    for row in reversed(list_entries(limit=2000)):
+        op = str(row.get("op", ""))
+        if op not in EXECUTE_OPS:
+            continue
+        row_stamp = str(row.get("stamp", ""))
+        if stamp and row_stamp != stamp:
+            continue
+        module, tab = EXECUTE_OPS[op]
+        src = str(row.get("src", ""))
+        key = (op, src, str(row.get("ts", "")))
+        if key in seen:
+            continue
+        seen.add(key)
+        dry_run = bool(row.get("dry_run"))
+        status = str(row.get("status", "pending"))
+        items.append({
+            "module": module,
+            "tab": tab,
+            "op": op,
+            "path": src,
+            "destination": str(row.get("dst", "")),
+            "dry_run": dry_run,
+            "ok": status == "committed" or dry_run,
+            "status": status,
+            "created": str(row.get("ts", "")),
+            "batch_id": str(row.get("batch_id", "")),
+            "stamp": row_stamp,
+        })
+        if len(items) >= limit:
+            break
+
+    if len(items) < limit:
+        store = dup_fb.load_feedback_store()
+        for row in reversed(store.executed_deletes):
+            if stamp and row.stamp != stamp:
+                continue
+            key = ("stage_duplicate", row.discard_path, row.created)
+            if key in seen:
+                continue
+            seen.add(key)
+            items.append({
+                "module": "duplicate",
+                "tab": "duplicates",
+                "op": "stage_duplicate",
+                "path": row.discard_path,
+                "destination": row.staged_to,
+                "dry_run": row.dry_run,
+                "ok": True,
+                "status": "dry_run" if row.dry_run else "committed",
+                "created": row.created,
+                "batch_id": "",
+                "stamp": row.stamp,
+            })
+            if len(items) >= limit:
+                break
+
+    items.sort(key=lambda row: str(row.get("created", "")), reverse=True)
+    items = items[:limit]
+
+    by_module: dict[str, int] = {}
+    live_count = 0
+    for item in items:
+        mod = str(item["module"])
+        by_module[mod] = by_module.get(mod, 0) + 1
+        if not item.get("dry_run") and item.get("status") == "committed":
+            live_count += 1
+
+    return {
+        "stamp": stamp,
+        "total": len(items),
+        "live_count": live_count,
+        "by_module": by_module,
+        "items": items,
+        "last_at": items[0]["created"] if items else None,
+    }
+
+
 def feedback_apply_estimate(stamp: str | None = None) -> dict[str, object]:
     """Heuristic delta if pending feedback is applied on the next scan."""
     counts = feedback_summary(stamp)

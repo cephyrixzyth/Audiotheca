@@ -96,6 +96,33 @@ def test_feedback_estimate_with_stamp(client):
     assert res.json()["stamp"] == "20260611_0208"
 
 
+def test_feedback_execute_history(client, tmp_path, monkeypatch):
+    import audiotheca.transaction_ledger as ledger
+    import duplicate_feedback as dup
+
+    monkeypatch.setattr(ledger, "LEDGER_PATH", tmp_path / "ledger.jsonl")
+    monkeypatch.setattr(dup, "FEEDBACK_DIR", tmp_path)
+    monkeypatch.setattr(dup, "GLOBAL_FEEDBACK_PATH", tmp_path / "duplicate_feedback.json")
+
+    entry_id = ledger.log_move(
+        batch_id="batch01",
+        src=tmp_path / "lib" / "discard.wav",
+        dst=tmp_path / "lib" / "_delete-canidates" / "discard.wav",
+        op="stage_duplicate",
+        dry_run=False,
+        meta={"stamp": "20260611_0208", "dedup_key": "k1"},
+    )
+    ledger.commit_move(entry_id, batch_id="batch01")
+
+    res = client.get("/api/feedback/execute-history?stamp=20260611_0208&limit=5")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["stamp"] == "20260611_0208"
+    assert data["total"] >= 1
+    assert data["items"][0]["module"] == "duplicate"
+    assert data["items"][0]["tab"] == "duplicates"
+
+
 def test_custom_bucket(client, tmp_path, monkeypatch):
     import investigation_feedback as inv
 

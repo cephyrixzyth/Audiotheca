@@ -1198,6 +1198,14 @@ def feedback_apply_estimate(stamp: str | None = Query(default=None)) -> dict[str
     return feedback_export.feedback_apply_estimate(stamp)
 
 
+@app.get("/api/feedback/execute-history")
+def feedback_execute_history(
+    stamp: str | None = Query(default=None),
+    limit: int = Query(default=12, ge=1, le=50),
+) -> dict[str, object]:
+    return feedback_export.execute_history(stamp, limit=limit)
+
+
 @app.post("/api/feedback/custom-buckets")
 def create_custom_bucket(body: dict = Body(...)) -> dict[str, object]:
     name = str(body.get("name", "")).strip()
