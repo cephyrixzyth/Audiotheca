@@ -10,6 +10,11 @@ import {
 import type { ArchivePeekItem } from "../types";
 import { useLibraryRoot } from "../hooks/useLibraryRoot";
 import { ArchiveDiffWizard } from "./ArchiveDiffWizard";
+import {
+  archiveExecuteRows,
+  ExecuteResultsPanel,
+  type ExecuteResultRow,
+} from "./ExecuteResultsPanel";
 import { PathLink } from "./PathLink";
 import { useContextSidebar } from "./ContextSidebar";
 
@@ -32,6 +37,11 @@ export function ArchivePeek({ stamp }: Props) {
   const [keepers, setKeepers] = useState<Record<string, string>>({});
   const [msg, setMsg] = useState<string | null>(null);
   const [diffRow, setDiffRow] = useState<ArchivePeekItem | null>(null);
+  const [executeResults, setExecuteResults] = useState<ExecuteResultRow[]>([]);
+  const [executeDryRun, setExecuteDryRun] = useState(true);
+  const [executeSummary, setExecuteSummary] = useState<{ staged: number; failed: number } | null>(
+    null,
+  );
 
   useEffect(() => {
     fetchArchiveFeedback(stamp)
@@ -110,10 +120,27 @@ export function ArchivePeek({ stamp }: Props) {
       confirm_live: confirmLive || undefined,
       root: libraryRoot || undefined,
     });
-    if (res.error) {
-      setMsg(res.error);
+    if (!res.ok && !res.results?.length) {
+      setExecuteResults([]);
+      setExecuteSummary(null);
+      setMsg(res.error ?? "Confirm archive rows first, then preview staging");
       return;
     }
+    setExecuteDryRun(dryRun);
+    setExecuteResults(
+      archiveExecuteRows(
+        (res.results ?? []) as Array<{
+          path: string;
+          ok: boolean;
+          dry_run?: boolean;
+          staged_to?: string;
+          multipart?: boolean;
+          error?: string;
+        }>,
+        dryRun,
+      ),
+    );
+    setExecuteSummary({ staged: res.staged, failed: res.failed });
     setMsg(
       dryRun
         ? `Dry run: ${res.staged} archive(s) would stage to _delete-canidates`
@@ -177,6 +204,16 @@ export function ArchivePeek({ stamp }: Props) {
         </button>
         {msg && <span className="count-muted">{msg}</span>}
       </div>
+
+      {executeResults.length > 0 && (
+        <ExecuteResultsPanel
+          title="Archive staging results"
+          dryRun={executeDryRun}
+          results={executeResults}
+          staged={executeSummary?.staged}
+          failed={executeSummary?.failed}
+        />
+      )}
 
       <div className="bucket-grid" style={{ marginBottom: "1rem" }}>
         {Object.entries(verdictCounts).map(([name, count]) => (

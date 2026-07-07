@@ -157,3 +157,26 @@ export function sceneExecuteRows(
     error: row.error,
   }));
 }
+
+export function archiveExecuteRows(
+  results: Array<{
+    path: string;
+    ok: boolean;
+    dry_run?: boolean;
+    staged_to?: string;
+    multipart?: boolean;
+    error?: string;
+  }>,
+  dryRun: boolean,
+): ExecuteResultRow[] {
+  return results.map((row) => ({
+    path: row.path,
+    action: dryRun || row.dry_run ? "Preview stage" : "Stage archive",
+    ok: row.ok,
+    detail:
+      row.ok && row.staged_to
+        ? `→ ${row.staged_to}${row.multipart ? " (multipart)" : ""}`
+        : undefined,
+    error: row.error,
+  }));
+}
