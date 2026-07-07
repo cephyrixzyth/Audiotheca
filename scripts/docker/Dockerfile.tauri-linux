@@ -15,6 +15,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
     python3-venv \
+    libpython3.12 \
+    
     libwebkit2gtk-4.1-dev \
     libappindicator3-dev \
     librsvg2-dev \
@@ -39,6 +41,7 @@ WORKDIR /work
 RUN pip3 install --break-system-packages pyinstaller
 
 COPY scripts/docker/linux-entrypoint.sh /usr/local/bin/linux-entrypoint.sh
+RUN sed -i 's/\r$//' /usr/local/bin/linux-entrypoint.sh
 RUN chmod +x /usr/local/bin/linux-entrypoint.sh
 
 ENTRYPOINT ["/usr/local/bin/linux-entrypoint.sh"]

@@ -19,10 +19,16 @@ $Dockerfile = Join-Path $Root "scripts\docker\Dockerfile.tauri-linux"
 
 Write-Host "Building Docker image $Image ..." -ForegroundColor Cyan
 docker build -f $Dockerfile -t $Image $Root
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Docker image build failed (exit $LASTEXITCODE)."
+}
 
 $mount = "${Root}:/work"
 Write-Host "Building Linux installers inside container ..." -ForegroundColor Cyan
-docker run --rm -v $mount -w /work $Image
+docker run --rm -v $mount -v audiotheca-linux-node-modules:/work/ui/node_modules -w /work $Image
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Linux installer build in container failed (exit $LASTEXITCODE)."
+}
 
 $LinuxDir = Join-Path $Root "dist\installers\linux"
 if (-not (Test-Path $LinuxDir)) {
