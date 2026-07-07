@@ -2,7 +2,7 @@
 
 How Audiotheca evolved from a CLI script into a desktop product. **v10.0.0** ships the scan engine plus a **Web UI 1.0** (FastAPI + React) and **Tauri 2** desktop shell with PyInstaller sidecars. The UI consumes existing CSV/JSON report contracts — it does not reimplement peek or matching logic.
 
-**Shipped (UI 1.0.3 / engine 10.0):** Report viewer, investigation inbox, duplicate keeper export, restructure preview, archive tab, scan jobs with WebSocket progress, in-app file explorer, AI lookup fallback, Security/Environment tabs, reorderable layouts, themes, Help tab, **94-code spec catalog** with invoke API, audio preview strip, orchestration tools, cloud storage panel, malware shred/quarantine with CTX-PROF.
+**Shipped (UI 1.0.5 / engine 10.0):** Report viewer, investigation inbox, duplicate keeper export, restructure preview, archive tab, scan jobs with WebSocket progress, in-app file explorer, AI lookup fallback, Security/Environment tabs, reorderable layouts, themes, Help tab, **94-code spec catalog** with invoke API, audio preview strip, orchestration tools, cloud storage panel, malware shred/quarantine with CTX-PROF.
 
 **Roadmap complete:** SQLite job store, archive diff wizard, reference dedupe, feedback exports, and spec waves A–R are implemented. Optional future work: native chromaprint, live Gluetun routing, full JUCE DAW plugin build.
 

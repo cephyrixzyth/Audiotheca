@@ -343,16 +343,19 @@ python scripts/build_doc_gifs.py           # GIFs + sync to ui/public/help/
 
 ## Video walkthroughs
 
-All eight walkthroughs are in-repo — click to open or download on GitHub:
+All eleven walkthroughs are in-repo — click to open or download on GitHub:
 
 | Topic | Video |
 |-------|-------|
 | First scan from install to Dashboard | [first-scan-walkthrough.mp4](docs/assets/videos/first-scan-walkthrough.mp4) |
 | Scan phases and processing flow presets | [scan-phases-and-flow.mp4](docs/assets/videos/scan-phases-and-flow.mp4) |
 | Investigation triage and vendor keywords | [investigation-and-vendors.mp4](docs/assets/videos/investigation-and-vendors.mp4) |
+| Investigation lookup (WEB-SPDR / STRIP-DATA) | [investigation-lookup.mp4](docs/assets/videos/investigation-lookup.mp4) |
 | Restructure preview and staged live execute | [restructure-live-staging.mp4](docs/assets/videos/restructure-live-staging.mp4) |
 | File explorer and archive peek | [file-explorer-and-archives.mp4](docs/assets/videos/file-explorer-and-archives.mp4) |
 | Archive diff wizard | [archive-diff-wizard.mp4](docs/assets/videos/archive-diff-wizard.mp4) |
+| Environment orchestration, cloud, spec catalog | [environment-and-spec-catalog.mp4](docs/assets/videos/environment-and-spec-catalog.mp4) |
+| Library audio preview and DropZone | [audio-preview-library.mp4](docs/assets/videos/audio-preview-library.mp4) |
 | AI lookup review during scan | [ai-lookup-review.mp4](docs/assets/videos/ai-lookup-review.mp4) |
 | Security scan and space recovery | [security-and-space-recovery.mp4](docs/assets/videos/security-and-space-recovery.mp4) |
 
@@ -382,6 +385,14 @@ Animated previews render inline on GitHub. [Download full video](#download-full-
 
 [Download full video](docs/assets/videos/investigation-and-vendors.mp4)
 
+### Investigation lookup (WEB-SPDR / STRIP-DATA)
+
+![Investigation lookup](docs/assets/gifs/investigation-lookup.gif)
+
+*Investigation lookup panel — anonymization gate, tier badges, confirm/reject flow.*
+
+[Download full video](docs/assets/videos/investigation-lookup.mp4)
+
 ### Restructure preview and staged live execute
 
 ![Restructure live staging](docs/assets/gifs/restructure-live-staging.gif)
@@ -405,6 +416,22 @@ Animated previews render inline on GitHub. [Download full video](#download-full-
 *Side-by-side archive vs extracted folder — confirm redundant archives without re-scanning.*
 
 [Download full video](docs/assets/videos/archive-diff-wizard.mp4)
+
+### Environment orchestration, cloud, and spec catalog
+
+![Environment and spec catalog](docs/assets/gifs/environment-and-spec-catalog.gif)
+
+*Environment tab — orchestration tools, cloud telemetry, 94-code spec registry.*
+
+[Download full video](docs/assets/videos/environment-and-spec-catalog.mp4)
+
+### Library audio preview and DropZone
+
+![Audio preview library](docs/assets/gifs/audio-preview-library.gif)
+
+*Library explorer — WAV preview strip (waveform, LUFS/BPM/key) and DropZone overlay.*
+
+[Download full video](docs/assets/videos/audio-preview-library.mp4)
 
 ### AI lookup review during scan
 
