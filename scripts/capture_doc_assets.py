@@ -50,11 +50,11 @@ VIDEO_CLIPS: list[tuple[str, list[str]]] = [
     ("first-scan-walkthrough.mp4", ["dashboard", "scan", "dashboard"]),
     ("scan-phases-and-flow.mp4", ["scan"]),
     ("investigation-and-vendors.mp4", ["investigation", "vendors"]),
-    ("investigation-lookup-walkthrough.mp4", ["investigation"]),
+    ("investigation-lookup.mp4", ["investigation"]),
     ("restructure-live-staging.mp4", ["restructure"]),
     ("file-explorer-and-archives.mp4", ["archives"]),
-    ("environment-spec-catalog.mp4", ["environment"]),
-    ("audio-preview-walkthrough.mp4", ["dashboard"]),
+    ("environment-and-spec-catalog.mp4", ["environment"]),
+    ("audio-preview-library.mp4", ["dashboard"]),
     ("ai-lookup-review.mp4", ["scan"]),
     ("security-and-space-recovery.mp4", ["security", "space-recovery"]),
 ]
@@ -63,6 +63,22 @@ REVIEW_TAB_IDS = frozenset(
     {"investigation", "duplicates", "restructure", "archives", "scene-renames", "scan-audit", "skipped"}
 )
 SYSTEM_TAB_IDS = frozenset({"space-recovery", "security", "environment", "vendors"})
+
+
+def _save_screenshot(target: object, path: Path) -> None:
+    """Write PNG via bytes — avoids Windows path quirks with Playwright path=."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    data = target.screenshot()  # type: ignore[union-attr]
+    for attempt in range(4):
+        try:
+            if path.exists():
+                path.unlink()
+            path.write_bytes(data)
+            return
+        except OSError:
+            if attempt == 3:
+                raise
+            time.sleep(0.4 * (attempt + 1))
 
 
 DEMO_LIB_ROOT = Path("D:/Libraries/demo")
@@ -779,18 +795,70 @@ def capture() -> None:
                     if not target.count():
                         target = page.locator(".dash").first
                     if target.count():
-                        target.screenshot(path=str(out))
+                        _save_screenshot(target, out)
                     else:
-                        page.screenshot(path=str(out), full_page=False)
+                        _save_screenshot(page, out)
                 else:
                     target = page.locator(".app-shell").first
                     if target.count():
-                        target.screenshot(path=str(out))
+                        _save_screenshot(target, out)
                     else:
-                        page.screenshot(path=str(out), full_page=False)
+                        _save_screenshot(page, out)
 
             for filename, tab_id in SCREENSHOT_PLAN:
                 shot(filename, tab_id)
+
+            if os.environ.get("AUDIOTHECA_CAPTURE_VIDEOS_ONLY", "").strip().lower() in {
+                "1",
+                "true",
+                "yes",
+            }:
+                video_clips = VIDEO_CLIPS
+                only_names = os.environ.get("AUDIOTHECA_CAPTURE_VIDEO_NAMES", "").strip()
+                if only_names:
+                    wanted = {n.strip() for n in only_names.split(",") if n.strip()}
+                    video_clips = [(n, t) for n, t in VIDEO_CLIPS if n in wanted]
+                for video_name, tabs in video_clips:
+                    video_dir = VIDEO_DIR / "_tmp"
+                    video_dir.mkdir(parents=True, exist_ok=True)
+                    vctx = browser.new_context(
+                        viewport=VIEWPORT,
+                        record_video_dir=str(video_dir),
+                        record_video_size=VIEWPORT,
+                    )
+                    vctx.add_init_script(FIRST_RUN_INIT)
+                    vpage = vctx.new_page()
+                    vpage.goto(UI_URL, wait_until="load")
+                    vpage.wait_for_timeout(1000)
+                    run_select = vpage.locator("select.field-input").first
+                    run_select.wait_for(state="visible", timeout=15000)
+                    run_select.select_option(value=STAMP)
+                    vpage.wait_for_timeout(800)
+                    for tab_id in tabs:
+                        _click_tab(vpage, tab_id)
+                        vpage.wait_for_timeout(1600)
+                    if "file-explorer" in video_name or "audio-preview" in video_name:
+                        if "audio-preview" in video_name:
+                            wav_dir = str((LIB / "a" / "AcmeAudio" / "SynthOne").resolve())
+                            _open_explorer_at_path(
+                                vpage,
+                                wav_dir,
+                                click_tab=lambda tab_id: _click_tab(vpage, tab_id),
+                            )
+                        else:
+                            vpage.locator("button.top-tab-library").click()
+                            vpage.wait_for_timeout(2000)
+                        vpage.keyboard.press("Escape")
+                    vpage.close()
+                    vctx.close()
+                    webm_files = list(video_dir.glob("*.webm"))
+                    if webm_files:
+                        target = VIDEO_DIR / video_name
+                        _webm_to_mp4(webm_files[0], target)
+                        print(f"  video {video_name}")
+                    shutil.rmtree(video_dir, ignore_errors=True)
+                browser.close()
+                return
 
             dismiss_explorer()
             click_tab("archives")
@@ -802,7 +870,7 @@ def capture() -> None:
                 page.wait_for_timeout(1200)
                 wizard = page.locator(".archive-diff-wizard").first
                 if wizard.count():
-                    wizard.screenshot(path=str(SHOT_DIR / "archive-diff-wizard.png"))
+                    _save_screenshot(wizard, SHOT_DIR / "archive-diff-wizard.png")
 
             # File explorer screenshot — after archives; close explorer when done
             dismiss_explorer()
@@ -811,9 +879,9 @@ def capture() -> None:
             page.wait_for_timeout(1500)
             explorer = page.locator(".file-explorer-shell").first
             if explorer.count():
-                explorer.screenshot(path=str(SHOT_DIR / "file-explorer.png"))
+                _save_screenshot(explorer, SHOT_DIR / "file-explorer.png")
             else:
-                page.screenshot(path=str(SHOT_DIR / "file-explorer.png"), full_page=False)
+                _save_screenshot(page, SHOT_DIR / "file-explorer.png")
             dismiss_explorer()
 
             _capture_extended_screenshots(
@@ -843,9 +911,23 @@ def capture() -> None:
                 for tab_id in tabs:
                     _click_tab(vpage, tab_id)
                     vpage.wait_for_timeout(1600)
-                if "file-explorer" in video_name:
-                    vpage.locator("button.top-tab-library").click()
-                    vpage.wait_for_timeout(2000)
+                if "file-explorer" in video_name or "audio-preview" in video_name:
+                    if "audio-preview" in video_name:
+                        wav_dir = str((LIB / "a" / "AcmeAudio" / "SynthOne").resolve())
+                        _open_explorer_at_path(
+                            vpage,
+                            wav_dir,
+                            click_tab=lambda tab_id: _click_tab(vpage, tab_id),
+                        )
+                        wav_btn = vpage.locator(".file-explorer-shell .linkish-btn").filter(
+                            has_text="kick_120bpm"
+                        ).first
+                        if wav_btn.count():
+                            wav_btn.hover()
+                            vpage.wait_for_timeout(2500)
+                    else:
+                        vpage.locator("button.top-tab-library").click()
+                        vpage.wait_for_timeout(2000)
                     vpage.keyboard.press("Escape")
                 vpage.close()
                 vctx.close()
@@ -874,7 +956,7 @@ def _capture_extended_screenshots(
         if loc.count():
             loc.scroll_into_view_if_needed()
             page.wait_for_timeout(600)  # type: ignore[union-attr]
-            loc.screenshot(path=str(shot_dir / name))
+            _save_screenshot(loc, shot_dir / name)
             print(f"  {name}")
         else:
             print(f"  skip {name} ({selector} not found)", file=sys.stderr)
@@ -896,10 +978,10 @@ def _capture_extended_screenshots(
             page.wait_for_timeout(500)  # type: ignore[union-attr]
             section = page.locator(".reorderable-section").filter(has=loc).first  # type: ignore[union-attr]
             if section.count():
-                section.screenshot(path=str(shot_dir / name))
+                _save_screenshot(section, shot_dir / name)
                 print(f"  {name}")
             else:
-                page.screenshot(path=str(shot_dir / name), full_page=False)  # type: ignore[union-attr]
+                _save_screenshot(page, shot_dir / name)  # type: ignore[union-attr]
                 print(f"  {name} (fallback full shell)")
         else:
             print(f"  skip {name} (heading not found)", file=sys.stderr)
@@ -922,10 +1004,10 @@ def _capture_extended_screenshots(
         page.wait_for_timeout(400)  # type: ignore[union-attr]
         shell = page.locator(".file-explorer-shell").first  # type: ignore[union-attr]
         if shell.count():
-            shell.screenshot(path=str(shot_dir / "dropzone-overlay.png"))
+            _save_screenshot(shell, shot_dir / "dropzone-overlay.png")
             print("  dropzone-overlay.png")
         else:
-            overlay.screenshot(path=str(shot_dir / "dropzone-overlay.png"))
+            _save_screenshot(overlay, shot_dir / "dropzone-overlay.png")
             print("  dropzone-overlay.png (overlay only)")
     else:
         print("  skip dropzone-overlay.png (no overlay)", file=sys.stderr)
@@ -984,7 +1066,7 @@ def _capture_audio_preview_shot(page: object, shot_dir: Path, *, click_tab: obje
             preview = page.locator(".file-explorer-shell .audio-preview-strip").first  # type: ignore[union-attr]
     if preview.count():
         explorer = page.locator(".file-explorer-shell").first  # type: ignore[union-attr]
-        explorer.screenshot(path=str(shot_dir / "audio-preview.png"))
+        _save_screenshot(explorer, shot_dir / "audio-preview.png")
         print("  audio-preview.png")
     else:
         print("  skip audio-preview.png (no preview strip)", file=sys.stderr)

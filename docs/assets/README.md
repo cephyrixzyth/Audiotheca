@@ -56,7 +56,7 @@ Capture at **1920×1080** or your usual monitor size. Save as PNG (lossless UI t
 | `screenshots/environment-themes.png` | Environment → theme studio | Any theme selected |
 | `screenshots/help-panel.png` | Help tab (last primary tab) with a topic open | Default install |
 
-### 1.0.2 additions (shipped)
+### 1.0.5 additions (shipped)
 
 | File | What to show |
 |------|----------------|
@@ -64,11 +64,6 @@ Capture at **1920×1080** or your usual monitor size. Save as PNG (lossless UI t
 | `screenshots/environment-spec-catalog.png` | Environment → **Architecture spec catalog** (94 codes, done counts) |
 | `screenshots/environment-orchestration.png` | Environment → **Orchestration tools** panel |
 | `screenshots/environment-cloud-storage.png` | Environment → **Cloud & storage telemetry** |
-
-### 1.0.2 library stills (pending — see [ASSETS.md](ASSETS.md))
-
-| File | What to show |
-|------|----------------|
 | `screenshots/audio-preview.png` | Library → select demo `.wav`; waveform + LUFS/BPM/key badges |
 | `screenshots/dropzone-overlay.png` | Library → drag files to show DropZone overlay |
 
@@ -87,7 +82,7 @@ Record at **1080p**, 30 fps, with brief on-screen captions if helpful. Keep each
 | `videos/ai-lookup-review.mp4` | Scan tab AI analyzer, confirm/reject lookup, cache | After unknown targets queue |
 | `videos/security-and-space-recovery.mp4` | Malware heuristics, underscore whitelist, coexistence summary | System tabs |
 
-Optional 1.0.2 topics: Environment orchestration/spec catalog, investigation lookup, audio preview + DropZone.
+Optional 1.0.5 topics (see [ASSETS.md](ASSETS.md)): Environment orchestration/spec catalog (`environment-and-spec-catalog.mp4`), investigation lookup (`investigation-lookup.mp4`), audio preview + DropZone (`audio-preview-library.mp4`).
 
 ## GIFs for GitHub README
 

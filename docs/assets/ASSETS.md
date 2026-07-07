@@ -56,13 +56,13 @@ Demo WAV for audio preview: `python scripts/seed_demo_library.py` → `docs/demo
 | ☑ | `docs/assets/videos/ai-lookup-review.mp4` | AI lookup review during scan |
 | ☑ | `docs/assets/videos/security-and-space-recovery.mp4` | Security scan and space recovery |
 
-### Suggested new videos (optional)
+### Optional walkthroughs (1.0.5)
 
 | Status | Path | Topic |
 |--------|------|--------|
-| ☐ | `environment-and-spec-catalog.mp4` | Environment panels — orchestration, cloud, spec catalog |
-| ☐ | `investigation-lookup.mp4` | Investigation lookup + STRIP-DATA flow |
-| ☐ | `audio-preview-library.mp4` | Library audio preview and DropZone |
+| ☑ | `environment-and-spec-catalog.mp4` | Environment panels — orchestration, cloud, spec catalog |
+| ☑ | `investigation-lookup.mp4` | Investigation lookup + STRIP-DATA flow |
+| ☑ | `audio-preview-library.mp4` | Library audio preview and DropZone |
 
 ## GIFs (GitHub README + Help tab)
 
@@ -78,6 +78,9 @@ Built from MP4 sources via `python scripts/build_doc_gifs.py` (~1280px wide, 10 
 | ☑ | `docs/assets/gifs/archive-diff-wizard.gif` | `archive-diff-wizard.mp4` |
 | ☑ | `docs/assets/gifs/ai-lookup-review.gif` | `ai-lookup-review.mp4` |
 | ☑ | `docs/assets/gifs/security-and-space-recovery.gif` | `security-and-space-recovery.mp4` |
+| ☑ | `docs/assets/gifs/environment-and-spec-catalog.gif` | `environment-and-spec-catalog.mp4` |
+| ☑ | `docs/assets/gifs/investigation-lookup.gif` | `investigation-lookup.mp4` |
+| ☑ | `docs/assets/gifs/audio-preview-library.gif` | `audio-preview-library.mp4` |
 
 Help tab assets are copied to `ui/public/help/` by the same script for Vite dev/build.
 
