@@ -68,6 +68,16 @@ def test_classify_installer_product():
     assert verdict == "LOOKS_LIKE_PRODUCT"
 
 
+def test_diagnose_iso_disk_image(tmp_path: Path):
+    folder = tmp_path / "scene12345"
+    folder.mkdir()
+    (folder / "installer.iso").write_bytes(b"x" * 100)
+    result = diagnose_multipart_folder(folder, None)
+    assert result["diagnosis"] == "DISK_IMAGE_ISO"
+    assert result["diagnosis_label"] == "ISO disk image"
+    assert "ISO" in result["detail"]
+
+
 def test_diagnose_missing_part01(tmp_path: Path):
     folder = tmp_path / "287901"
     folder.mkdir()

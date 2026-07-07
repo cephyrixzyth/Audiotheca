@@ -13,6 +13,28 @@ from collections import defaultdict
 from pathlib import Path
 
 ARCHIVE_EXTS = {".zip", ".rar", ".7z", ".iso", ".tar", ".gz", ".001"}
+
+DIAGNOSIS_LABELS: dict[str, str] = {
+    "OK": "Multipart RAR set looks complete",
+    "MISSING_PART01": "Missing part 01",
+    "GAP_IN_SEQUENCE": "Gap in part sequence",
+    "CORRUPT_OR_UNREADABLE_PART01": "Part 01 unreadable",
+    "NEEDS_7ZIP": "Needs 7-Zip to verify part 01",
+    "NO_MULTIPART_ARCHIVES": "Not a multipart RAR set",
+    "DISK_IMAGE_ISO": "ISO disk image",
+    "SINGLE_ARCHIVE_ONLY": "Single archive (not multipart RAR)",
+}
+
+
+def diagnosis_label(code: str) -> str:
+    return DIAGNOSIS_LABELS.get(code, code.replace("_", " ").title())
+
+
+def enrich_diagnosis_row(row: dict) -> dict:
+    code = str(row.get("diagnosis", ""))
+    row = dict(row)
+    row["diagnosis_label"] = diagnosis_label(code)
+    return row
 MAX_LIST_ENTRIES = 40
 MAX_PEEK_BYTES = 500 * 1024 * 1024 * 1024
 MULTIPART_RE = re.compile(r"(?i)^(.+?)\.part(\d+)\.(rar|zip|7z)$")
@@ -303,19 +325,48 @@ def diagnose_multipart_folder(folder: Path, seven_zip: Path | None) -> dict:
             part_files[base].append((idx, entry))
 
     if not part_files:
-        return {
-            "folder_path": str(folder),
-            "scene_id": folder.name,
-            "multipart_base": "",
-            "part_count": 0,
-            "part_min": "",
-            "part_max": "",
-            "missing_parts": "",
-            "part01_path": "",
-            "part01_openable": "",
-            "diagnosis": "NO_MULTIPART_ARCHIVES",
-            "detail": "no .partN.rar files at folder root",
-        }
+        iso_files = sorted(
+            entry.name
+            for entry in folder.iterdir()
+            if entry.is_file() and entry.suffix.lower() == ".iso"
+        )
+        other_archives = sorted(
+            entry.name
+            for entry in folder.iterdir()
+            if entry.is_file() and entry.suffix.lower() in ARCHIVE_EXTS and entry.suffix.lower() != ".iso"
+        )
+        if iso_files:
+            diagnosis = "DISK_IMAGE_ISO"
+            detail = (
+                f"contains ISO disk image(s): {', '.join(iso_files[:3])}"
+                + (" …" if len(iso_files) > 3 else "")
+                + " — not a multipart .partN.rar release"
+            )
+        elif other_archives:
+            diagnosis = "SINGLE_ARCHIVE_ONLY"
+            detail = (
+                f"top-level archive(s): {', '.join(other_archives[:3])}"
+                + (" …" if len(other_archives) > 3 else "")
+                + " — multipart diagnosis only applies to .partN.rar sets"
+            )
+        else:
+            diagnosis = "NO_MULTIPART_ARCHIVES"
+            detail = "no .partN.rar archives at folder root"
+        return enrich_diagnosis_row(
+            {
+                "folder_path": str(folder),
+                "scene_id": folder.name,
+                "multipart_base": "",
+                "part_count": 0,
+                "part_min": "",
+                "part_max": "",
+                "missing_parts": "",
+                "part01_path": "",
+                "part01_openable": "",
+                "diagnosis": diagnosis,
+                "detail": detail,
+            }
+        )
 
     base, parts = max(part_files.items(), key=lambda row: len(row[1]))
     parts.sort(key=lambda row: row[0])
@@ -345,19 +396,21 @@ def diagnose_multipart_folder(folder: Path, seven_zip: Path | None) -> dict:
         diagnosis = "NEEDS_7ZIP"
         detail = "install 7-Zip to test part01"
 
-    return {
-        "folder_path": str(folder),
-        "scene_id": folder.name,
-        "multipart_base": base,
-        "part_count": len(parts),
-        "part_min": part_min,
-        "part_max": part_max,
-        "missing_parts": ", ".join(missing[:20]),
-        "part01_path": str(part01) if part01 else "",
-        "part01_openable": openable,
-        "diagnosis": diagnosis,
-        "detail": detail,
-    }
+    return enrich_diagnosis_row(
+        {
+            "folder_path": str(folder),
+            "scene_id": folder.name,
+            "multipart_base": base,
+            "part_count": len(parts),
+            "part_min": part_min,
+            "part_max": part_max,
+            "missing_parts": ", ".join(missing[:20]),
+            "part01_path": str(part01) if part01 else "",
+            "part01_openable": openable,
+            "diagnosis": diagnosis,
+            "detail": detail,
+        }
+    )
 
 
 def peek_sibling_groups(

@@ -1410,6 +1410,19 @@ export function exportDawSideBlueprint(home?: string): Promise<Record<string, un
   return postJson("/tools/daw-side/blueprint", home ? { home } : {});
 }
 
+export function installDawSidecar(body: {
+  home?: string;
+  dry_run?: boolean;
+  confirm_live?: boolean;
+  copy_to_system?: boolean;
+}): Promise<Record<string, unknown>> {
+  return postJson("/tools/daw-side/install", body);
+}
+
+export function fetchScanInsights(stamp: string): Promise<Record<string, unknown>> {
+  return getJson(`/runs/${stamp}/scan-insights`);
+}
+
 export function fetchSpecCatalog(section?: string): Promise<{
   summary: Record<string, unknown>;
   entries: Array<Record<string, unknown>>;

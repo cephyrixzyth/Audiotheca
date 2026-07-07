@@ -9,10 +9,10 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "tauri": "tauri",
-    "tauri:dev": "tauri dev",
+    "tauri": "npx tauri",
+    "tauri:dev": "npx tauri dev",
     "sidecars": "python ../scripts/build_sidecars.py",
-    "tauri:build": "npm run sidecars && tauri build",
+    "tauri:build": "npm run sidecars && npx tauri build",
     "icons": "python ../scripts/setup_tauri_icons.py",
     "audit:deps": "npm audit --audit-level=moderate"
   },

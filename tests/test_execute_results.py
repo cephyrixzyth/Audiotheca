@@ -101,6 +101,58 @@ def test_restructure_execute_api_returns_result_rows(client, tmp_path, monkeypat
     assert "destination" in row
 
 
+def test_scene_execute_live_removes_plan_row(client, tmp_path, monkeypatch):
+    import scene_feedback as scene
+
+    library = tmp_path / "library"
+    src = library / "a" / "294336"
+    src.mkdir(parents=True)
+    (src / "part01.wav").write_text("audio", encoding="utf-8")
+
+    stamp = "20260704_1601"
+    report_dir = tmp_path / "reports"
+    report_dir.mkdir()
+    monkeypatch.setattr(report_loader, "REPORT_DIR", report_dir)
+    monkeypatch.setattr(scene, "FEEDBACK_DIR", tmp_path)
+    monkeypatch.setattr(scene, "GLOBAL_PATH", tmp_path / "scene_feedback.json")
+    monkeypatch.setattr(scene, "HINTS_PATH", tmp_path / "scene_hints.json")
+
+    proposed = "RenamedProduct"
+    _write_scene_plan(
+        report_dir,
+        stamp,
+        [
+            {
+                "scene_id": "294336",
+                "source_path": str(src),
+                "proposed_name": proposed,
+                "destination_path": str(src.parent / proposed),
+                "inferred_product": proposed,
+                "multipart_diagnosis": "",
+            }
+        ],
+    )
+    scene.approve_rename(stamp=stamp, source_path=str(src), scene_id="294336")
+
+    monkeypatch.setenv("AUDIOTHECA_LIBRARY_ROOTS", str(library))
+    monkeypatch.setattr("api.security.library_roots", lambda: [library])
+
+    res = client.post(
+        f"/api/runs/{stamp}/scene-renames/execute",
+        json={"dry_run": False, "confirm_live": True},
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert body["ok"] is True
+    assert body["renamed"] == 1
+    assert not (src).exists()
+    assert (src.parent / proposed).is_dir()
+
+    remaining = report_loader.load_scene_renames(stamp)
+    assert remaining == []
+    assert str(src) in scene.load_store().executed_renames
+
+
 def test_scene_execute_api_returns_result_rows(client, tmp_path, monkeypatch):
     import scene_feedback as scene
 

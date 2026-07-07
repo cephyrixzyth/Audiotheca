@@ -117,6 +117,7 @@ class SceneRenameItem:
     destination_path: str = ""
     inferred_product: str = ""
     multipart_diagnosis: str = ""
+    multipart_diagnosis_label: str = ""
 
 
 @dataclass

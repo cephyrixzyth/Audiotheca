@@ -148,8 +148,15 @@ export const FLOW_PRESETS: FlowPreset[] = [
   {
     id: "fast",
     label: "Fast identify",
-    description: "Skip archive peeks — route planning only (~40% faster on large libraries).",
-    skipPhases: ["archive_peek", "scene_peek"],
+    description: "Skip archive peeks and malware scan — route planning only (~40% faster on large libraries).",
+    skipPhases: ["archive_peek", "scene_peek", "malware_scan"],
+    pauseBetweenPhases: false,
+  },
+  {
+    id: "almost_full",
+    label: "Almost full",
+    description: "Full audit without malware scan — all routing and peek phases, faster on huge libraries.",
+    skipPhases: ["malware_scan"],
     pauseBetweenPhases: false,
   },
   {

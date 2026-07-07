@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { EDITABLE_TOKEN_GROUPS, useTheme } from "../contexts/ThemeContext";
 import type { ThemePreset } from "../themes/types";
 
@@ -59,6 +59,13 @@ export function ThemePanel() {
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const bootstrapped = useRef(false);
+
+  useEffect(() => {
+    if (bootstrapped.current) return;
+    bootstrapped.current = true;
+    setEditorId(activeId);
+  }, [activeId]);
 
   const editorTheme = editorId ? themes.find((t) => t.id === editorId) ?? null : null;
   const isCustomEditor = editorTheme && !editorTheme.builtIn;

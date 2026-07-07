@@ -127,6 +127,14 @@ def test_daw_side_api(client, tmp_path, monkeypatch):
     assert body.get("ok") is True
 
 
+def test_daw_side_install_dry_run(client, tmp_path, monkeypatch):
+    monkeypatch.setenv("AUDIOTHECA_HOME", str(tmp_path))
+    res = client.post("/api/tools/daw-side/install", json={"dry_run": True})
+    assert res.status_code == 200
+    body = res.json()
+    assert body.get("dry_run") is True or body.get("ok") is not None
+
+
 def test_rolling_hash_api(client, tmp_path):
     f = tmp_path / "t.bin"
     f.write_bytes(b"api-hash-test")

@@ -49,6 +49,7 @@ class SceneStore:
     rejected_paths: dict[str, str] = field(default_factory=dict)
     approved_renames: dict[str, list[str]] = field(default_factory=dict)
     missing_part01: dict[str, str] = field(default_factory=dict)
+    executed_renames: dict[str, dict[str, str]] = field(default_factory=dict)
     active_approval_stamp: str = ""
     corrections: list[SceneCorrection] = field(default_factory=list)
 
@@ -60,6 +61,7 @@ class SceneStore:
             "rejected_paths": self.rejected_paths,
             "approved_renames": self.approved_renames,
             "missing_part01": self.missing_part01,
+            "executed_renames": self.executed_renames,
             "active_approval_stamp": self.active_approval_stamp,
             "corrections": [row.to_dict() for row in self.corrections],
         }
@@ -80,6 +82,7 @@ def load_store() -> SceneStore:
         rejected_paths=data.get("rejected_paths", {}),
         approved_renames=data.get("approved_renames", {}),
         missing_part01=data.get("missing_part01", {}),
+        executed_renames=data.get("executed_renames", {}),
         active_approval_stamp=data.get("active_approval_stamp", ""),
         corrections=[SceneCorrection(**row) for row in data.get("corrections", [])],
     )
@@ -232,6 +235,7 @@ def export_engine_hints(store: SceneStore | None = None) -> Path:
         "rejected_paths": store.rejected_paths,
         "approved_renames": store.approved_renames,
         "missing_part01": store.missing_part01,
+        "executed_renames": store.executed_renames,
         "active_approval_stamp": store.active_approval_stamp,
     }
     FEEDBACK_DIR.mkdir(parents=True, exist_ok=True)
@@ -239,13 +243,60 @@ def export_engine_hints(store: SceneStore | None = None) -> Path:
     return HINTS_PATH
 
 
+def get_executed_paths(stamp: str | None = None, store: SceneStore | None = None) -> set[str]:
+    store = store or load_store()
+    executed: set[str] = set()
+    for path, meta in store.executed_renames.items():
+        if stamp is None or meta.get("stamp") == stamp:
+            executed.add(normalize_path(path))
+    return executed
+
+
+def mark_executed(
+    *,
+    stamp: str,
+    source_path: str,
+    destination: str,
+    scene_id: str = "",
+) -> SceneStore:
+    store = load_store()
+    norm = normalize_path(source_path)
+    store.executed_renames[norm] = {
+        "stamp": stamp,
+        "destination": destination,
+        "scene_id": scene_id,
+        "executed_at": _now_iso(),
+    }
+    paths = store.approved_renames.get(stamp, [])
+    store.approved_renames[stamp] = [path for path in paths if path != norm]
+    store.corrections.append(
+        SceneCorrection(
+            path=norm,
+            action="execute_rename",
+            value=destination,
+            stamp=stamp,
+            created=_now_iso(),
+            scene_id=scene_id,
+            proposed_name=destination,
+        )
+    )
+    save_store(store)
+    return store
+
+
 def get_state_for_ui(stamp: str) -> dict:
     store = load_store()
+    executed_for_stamp = {
+        path: meta
+        for path, meta in store.executed_renames.items()
+        if meta.get("stamp") == stamp
+    }
     return {
         "stamp": stamp,
         "name_overrides": store.name_overrides,
         "rejected_paths": store.rejected_paths,
         "approved_renames": store.approved_renames.get(stamp, []),
+        "executed_renames": executed_for_stamp,
         "missing_part01": store.missing_part01,
         "active_approval_stamp": store.active_approval_stamp,
         "reject_reasons": list(REJECT_REASONS),

@@ -85,6 +85,7 @@ export interface SceneRenameItem {
   proposed_name: string;
   destination_path: string;
   multipart_diagnosis: string;
+  multipart_diagnosis_label?: string;
 }
 
 export interface ArchivePeekItem {

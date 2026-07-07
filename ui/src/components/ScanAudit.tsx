@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { correctInvestigation, fetchInvestigationFeedback, fetchScanAudit } from "../api/client";
+import { correctInvestigation, fetchInvestigationFeedback, fetchScanAudit, fetchScanInsights } from "../api/client";
 import type { ScanAuditItem } from "../types";
 import { PathLink } from "./PathLink";
 import { useContextSidebar, useSidebarFilters } from "./ContextSidebar";
@@ -40,6 +40,13 @@ export function ScanAudit({ stamp }: Props) {
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<string | null>(null);
   const [bucketOptions, setBucketOptions] = useState<string[]>([]);
+  const [insights, setInsights] = useState<Record<string, unknown> | null>(null);
+
+  useEffect(() => {
+    void fetchScanInsights(stamp)
+      .then(setInsights)
+      .catch(() => setInsights(null));
+  }, [stamp]);
 
   useEffect(() => {
     fetchInvestigationFeedback(stamp)
@@ -83,6 +90,25 @@ export function ScanAudit({ stamp }: Props) {
       <div className="banner dry">
         Full scan audit — every folder/archive target. Fix vendors here; overrides apply on the next scan.
       </div>
+
+      {insights && Array.isArray(insights.recommendations) && insights.recommendations.length > 0 && (
+        <details className="log-panel" style={{ marginBottom: "1rem" }}>
+          <summary>
+            Scan insights ({insights.recommendations.length} recommendation
+            {insights.recommendations.length === 1 ? "" : "s"})
+          </summary>
+          <ul style={{ margin: "0.5rem 0 0", paddingLeft: "1.25rem" }}>
+            {(insights.recommendations as Array<{ priority?: string; action?: string; detail?: string }>).map(
+              (rec) => (
+                <li key={`${rec.action}-${rec.detail}`}>
+                  <strong>{rec.priority ?? "info"}:</strong> {rec.action}
+                  {rec.detail ? ` — ${rec.detail}` : ""}
+                </li>
+              ),
+            )}
+          </ul>
+        </details>
+      )}
 
       <div className="toolbar" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
         {QUICK_FILTERS.map((filter) => (

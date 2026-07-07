@@ -66,9 +66,9 @@ function loadInitialReferenceMode(): boolean {
 function loadInitialSkipPhases(): string[] {
   try {
     const presetId = localStorage.getItem(FLOW_PRESET_STORAGE) || "fast";
-    return FLOW_PRESETS.find((p) => p.id === presetId)?.skipPhases ?? ["archive_peek", "scene_peek"];
+    return FLOW_PRESETS.find((p) => p.id === presetId)?.skipPhases ?? ["archive_peek", "scene_peek", "malware_scan"];
   } catch {
-    return ["archive_peek", "scene_peek"];
+    return ["archive_peek", "scene_peek", "malware_scan"];
   }
 }
 

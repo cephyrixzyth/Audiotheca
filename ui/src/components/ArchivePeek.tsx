@@ -18,6 +18,19 @@ import {
 import { PathLink } from "./PathLink";
 import { useContextSidebar } from "./ContextSidebar";
 
+const VERDICT_LABELS: Record<string, string> = {
+  MATCHES_EXTRACTED_FOLDER: "Matches extracted folder",
+  NO_TOP_LEVEL_ARCHIVE: "No top-level archive",
+  LOOKS_LIKE_PRODUCT: "Looks like product",
+  NEEDS_7ZIP: "Needs 7-Zip",
+  DISK_IMAGE_ISO: "ISO disk image",
+  NO_MULTIPART_ARCHIVES: "Not multipart RAR",
+};
+
+function verdictLabel(code: string): string {
+  return VERDICT_LABELS[code] ?? code.replaceAll("_", " ").toLowerCase();
+}
+
 interface Props {
   stamp: string;
 }
@@ -221,10 +234,10 @@ export function ArchivePeek({ stamp }: Props) {
             key={name}
             type="button"
             className={`bucket-chip ${verdict === name ? "active-chip" : ""}`}
-            title={`Filter rows with verdict ${name}`}
+            title={`Filter rows with verdict ${verdictLabel(name)}`}
             onClick={() => setVerdict(name)}
           >
-            {name}
+            {verdictLabel(name)}
             <strong>{count}</strong>
           </button>
         ))}
@@ -272,8 +285,9 @@ export function ArchivePeek({ stamp }: Props) {
                       className={`badge ${
                         row.verdict === "MATCHES_EXTRACTED_FOLDER" ? "ready" : "bucket"
                       }`}
+                      title={row.verdict}
                     >
-                      {row.verdict}
+                      {verdictLabel(row.verdict)}
                     </span>
                     {isRejected && <span className="badge bucket">rejected</span>}
                     {isConfirmed && <span className="badge ready">confirmed</span>}

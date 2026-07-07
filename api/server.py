@@ -333,6 +333,16 @@ def get_run_metrics(stamp: str) -> dict[str, object]:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+@app.get("/api/runs/{stamp}/scan-insights")
+def get_scan_insights(stamp: str) -> dict[str, object]:
+    from scan_insights import analyze_run
+
+    try:
+        return analyze_run(stamp)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @app.get("/api/runs/{stamp}/buckets")
 def get_buckets(stamp: str) -> dict[str, int]:
     return report_loader.list_investigation_buckets(stamp)
@@ -2666,6 +2676,21 @@ def tools_daw_side_blueprint(body: dict = Body(default_factory=dict)) -> dict[st
 
     home = body.get("home")
     return write_blueprint(home=home)
+
+
+@app.post("/api/tools/daw-side/install")
+def tools_daw_side_install(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from daw_side import install_daw_sidecar
+
+    home = body.get("home")
+    dry_run = bool(body.get("dry_run", True))
+    if not dry_run and not body.get("confirm_live"):
+        raise HTTPException(status_code=400, detail="confirm_live required for live install")
+    return install_daw_sidecar(
+        home=home,
+        dry_run=dry_run,
+        copy_to_system=bool(body.get("copy_to_system", True)),
+    )
 
 
 @app.post("/api/tools/rolling-hash")

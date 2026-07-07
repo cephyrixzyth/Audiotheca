@@ -128,6 +128,14 @@ class DedupeMixin:
         ]
         conflict_bases = {conflict["base_name"] for conflict in self.vendor_conflicts}
 
+        fp_to_vendors: dict[str, dict[str, str]] = defaultdict(dict)
+        for item in all_items:
+            if item["company"] and item["id_confidence"] == "CONFIRMED":
+                fp = item.get("fingerprint") or ""
+                if fp:
+                    fp_to_vendors[fp][_squash(item["company"])] = item["company"]
+        fp_conflicts = {fp for fp, vendors in fp_to_vendors.items() if len(vendors) > 1}
+
         reconciled = 0
         for item in all_items:
             base = item["base_name"]
@@ -135,11 +143,21 @@ class DedupeMixin:
                 continue
             vendors = base_to_vendors.get(base)
             if not vendors or len(vendors) != 1:
-                continue
+                fp = item.get("fingerprint") or ""
+                if fp and fp not in fp_conflicts:
+                    fp_vendors = fp_to_vendors.get(fp)
+                    if fp_vendors and len(fp_vendors) == 1:
+                        vendors = fp_vendors
+                    else:
+                        continue
+                else:
+                    continue
             confirmed_vendor = next(iter(vendors.values()))
             if item["company"] is None:
                 item["company"] = confirmed_vendor
             elif item["id_confidence"] == "TENTATIVE" and _squash(item["company"]) not in vendors:
+                item["company"] = confirmed_vendor
+            elif not item.get("company") and item.get("id_confidence") in {None, "", "LOW"}:
                 item["company"] = confirmed_vendor
             else:
                 continue

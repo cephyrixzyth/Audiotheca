@@ -406,18 +406,57 @@ def load_restructure(
 
 
 def load_scene_renames(stamp: str) -> list[SceneRenameItem]:
+    import scene_feedback as scene_fb
+    from archive_peek import diagnosis_label
+
+    executed = scene_fb.get_executed_paths(stamp)
     rows = _read_csv(stamp, "Scene_Rename_Plan")
-    return [
-        SceneRenameItem(
-            scene_id=row.get("scene_id", ""),
-            source_path=row.get("source_path", ""),
-            proposed_name=row.get("proposed_name", ""),
-            destination_path=row.get("destination_path", ""),
-            inferred_product=row.get("inferred_product", ""),
-            multipart_diagnosis=row.get("multipart_diagnosis", ""),
+    items: list[SceneRenameItem] = []
+    for row in rows:
+        source_path = row.get("source_path", "")
+        if scene_fb.normalize_path(source_path) in executed:
+            continue
+        items.append(
+            SceneRenameItem(
+                scene_id=row.get("scene_id", ""),
+                source_path=source_path,
+                proposed_name=row.get("proposed_name", ""),
+                destination_path=row.get("destination_path", ""),
+                inferred_product=row.get("inferred_product", ""),
+                multipart_diagnosis=row.get("multipart_diagnosis", ""),
+                multipart_diagnosis_label=diagnosis_label(row.get("multipart_diagnosis", "")),
+            )
         )
+    return items
+
+
+def remove_scene_rename_rows(stamp: str, source_paths: set[str]) -> int:
+    """Remove completed rename rows from the on-disk Scene_Rename_Plan CSV."""
+    import scene_feedback as scene_fb
+
+    if not source_paths:
+        return 0
+    path = _report_path(stamp, "Scene_Rename_Plan")
+    if not path.is_file():
+        return 0
+    normalized = {scene_fb.normalize_path(p) for p in source_paths}
+    with path.open(encoding="utf-8-sig", newline="") as handle:
+        reader = csv.DictReader(handle)
+        fieldnames = reader.fieldnames or []
+        rows = list(reader)
+    kept = [
+        row
         for row in rows
+        if scene_fb.normalize_path(row.get("source_path", "")) not in normalized
     ]
+    removed = len(rows) - len(kept)
+    if removed <= 0 or not fieldnames:
+        return 0
+    with path.open("w", encoding="utf-8-sig", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(kept)
+    return removed
 
 
 def load_items(

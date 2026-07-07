@@ -120,6 +120,16 @@ export function SceneRenames({ stamp }: Props) {
         ? `Dry run: ${res.renamed} rename(s) would apply`
         : `Live: ${res.renamed} folder(s) renamed (${res.failed} failed)`,
     );
+    if (!dryRun && res.renamed > 0) {
+      const [nextItems, state] = await Promise.all([
+        fetchSceneRenames(stamp),
+        fetchSceneFeedback(stamp),
+      ]);
+      setItems(nextItems);
+      setApproved(state.approved_renames ?? []);
+      setRejected(state.rejected_paths ?? {});
+      setOverrides(state.name_overrides ?? {});
+    }
   }
 
   const visibleItems = useMemo(() => {
@@ -210,7 +220,12 @@ export function SceneRenames({ stamp }: Props) {
                   <PathLink path={row.destination_path} />
                 </td>
                 <td>
-                  <span className="badge bucket">{row.multipart_diagnosis || "—"}</span>
+                  <span
+                    className="badge bucket"
+                    title={row.multipart_diagnosis || undefined}
+                  >
+                    {row.multipart_diagnosis_label || row.multipart_diagnosis || "—"}
+                  </span>
                 </td>
                 <td>
                   <PathLink path={row.source_path} />

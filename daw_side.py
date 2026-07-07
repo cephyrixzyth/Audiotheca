@@ -227,3 +227,99 @@ def _install_instructions(plugin_dir: Path) -> list[str]:
         "   Windows: %COMMONPROGRAMFILES%/VST3/  ·  macOS: ~/Library/Audio/Plug-Ins/VST3/",
         "4. Rescan plugins in your DAW; sidecar connects to Audiotheca API on port 8787.",
     ]
+
+
+def install_daw_sidecar(
+    *,
+    home: str | Path | None = None,
+    dry_run: bool = True,
+    copy_to_system: bool = True,
+) -> dict[str, Any]:
+    """Export blueprint (if needed) and run CMake build for the DAW sidecar plugin."""
+    import os
+    import shutil
+    import subprocess
+
+    blueprint = write_blueprint(home=home)
+    plugin_dir = Path(blueprint["plugin_dir"])
+    build_script = Path(blueprint["build_script"])
+    log: list[str] = []
+
+    if not shutil.which("cmake"):
+        return {
+            **blueprint,
+            "ok": False,
+            "built": False,
+            "error": "cmake not found on PATH — install CMake 3.22+",
+            "log": log,
+        }
+
+    if dry_run:
+        log.append(f"Would run: {build_script}")
+        if copy_to_system:
+            log.append("Would copy VST3 to system plugin folder after build")
+        return {**blueprint, "ok": True, "built": False, "dry_run": True, "log": log}
+
+    try:
+        if os.name == "nt":
+            proc = subprocess.run(
+                ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(build_script)],
+                cwd=str(plugin_dir),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        else:
+            proc = subprocess.run(
+                [str(build_script)],
+                cwd=str(plugin_dir),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        if proc.stdout:
+            log.extend(proc.stdout.splitlines())
+        if proc.stderr:
+            log.extend(proc.stderr.splitlines())
+        if proc.returncode != 0:
+            return {
+                **blueprint,
+                "ok": False,
+                "built": False,
+                "error": f"build failed (exit {proc.returncode})",
+                "log": log,
+            }
+    except OSError as exc:
+        return {**blueprint, "ok": False, "built": False, "error": str(exc), "log": log}
+
+    artefacts = plugin_dir / "build" / "AudiothecaSidecar_artefacts"
+    vst3_src = artefacts / "VST3"
+    installed_to = ""
+    if copy_to_system and vst3_src.is_dir():
+        if os.name == "nt":
+            common = os.environ.get("COMMONPROGRAMFILES", r"C:\Program Files\Common Files")
+            dest_root = Path(common) / "VST3"
+        else:
+            dest_root = Path.home() / "Library" / "Audio" / "Plug-Ins" / "VST3"
+        dest_root.mkdir(parents=True, exist_ok=True)
+        for bundle in vst3_src.glob("*.vst3"):
+            target = dest_root / bundle.name
+            if target.exists():
+                shutil.rmtree(target)
+            shutil.copytree(bundle, target)
+            installed_to = str(target)
+            log.append(f"Installed {bundle.name} -> {target}")
+
+    manifest = plugin_manifest()
+    manifest["built"] = True
+    manifest_path = plugin_dir / "plugin_manifest.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+
+    return {
+        **blueprint,
+        "ok": True,
+        "built": True,
+        "artefacts_dir": str(artefacts),
+        "installed_vst3": installed_to,
+        "log": log,
+    }

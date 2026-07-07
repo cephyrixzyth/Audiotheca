@@ -117,6 +117,20 @@ def execute_approved_renames(
             })
 
     ok_count = sum(1 for row in results if row.get("ok"))
+    if not dry_run:
+        completed_sources: set[str] = set()
+        for row in results:
+            if row.get("ok") and not row.get("dry_run"):
+                scene_fb.mark_executed(
+                    stamp=stamp,
+                    source_path=row["path"],
+                    destination=str(row.get("destination", "")),
+                    scene_id=str(row.get("scene_id", "")),
+                )
+                completed_sources.add(row["path"])
+        if completed_sources:
+            report_loader.remove_scene_rename_rows(stamp, completed_sources)
+
     return {
         "ok": ok_count > 0,
         "dry_run": dry_run,
