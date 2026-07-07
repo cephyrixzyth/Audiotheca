@@ -45,6 +45,11 @@
       "nsis": {
         "installerHooks": "./windows/hooks.nsh"
       }
+    },
+    "macOS": {
+      "minimumSystemVersion": "11.0",
+      "entitlements": "entitlements.plist",
+      "signingIdentity": "-"
     }
   },
   "plugins": {}

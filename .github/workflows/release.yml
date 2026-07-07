@@ -101,6 +101,11 @@ jobs:
             python scripts/build_sidecars.py
           fi
 
+      - name: Ensure macOS sidecar execute bits
+        if: matrix.platform == 'macos-latest'
+        shell: bash
+        run: chmod +x ui/src-tauri/binaries/*-apple-darwin
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

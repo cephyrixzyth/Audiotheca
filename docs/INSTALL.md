@@ -45,9 +45,32 @@ Installers built from 1.0.5+ include NSIS hooks that terminate these processes a
 2. Double-click **`Run Audiotheca.bat`** (no terminal window).
 3. Reports and cache go in `data/` (`portable.json` documents `AUDIOTHECA_HOME` relative to the exe).
 
-### macOS / Linux
+### macOS (Apple Silicon M1–M4 and Intel)
 
-- **macOS:** open the `.dmg`, drag to Applications; allow in Privacy & Security on first launch.
+1. Download the correct `.dmg` from [GitHub Releases](https://github.com/chrisjrovira/Audiotheca/releases/latest):
+   - **Apple Silicon (M1–M4):** `*_aarch64.dmg` or `*_arm64.dmg`
+   - **Intel Mac:** `*_x64.dmg` or `*_x86_64.dmg`
+2. Open the DMG and drag **Audiotheca** into **Applications**.
+3. **First launch:** right-click **Audiotheca** in Applications → **Open** → confirm **Open** (unsigned download from GitHub).
+4. If **nothing happens** when double-clicking (no window, no dialog):
+   ```bash
+   cd /path/to/audiotheca   # optional: repo checkout
+   ./scripts/macos_fixup_app.sh /Applications/Audiotheca.app
+   ```
+   Or manually:
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/Audiotheca.app
+   codesign --force --deep --sign - /Applications/Audiotheca.app
+   ```
+   Then right-click → **Open** again.
+5. **Diagnostics:** startup log at  
+   `~/Library/Application Support/com.audiotheca.desktop/audiotheca-desktop.log`  
+   Crash reports: **Console.app** → search `Audiotheca`.
+
+App data (reports, cache) is stored under `~/Library/Application Support/com.audiotheca.desktop/` — not inside the read-only `.app` bundle.
+
+### Linux
+
 - **Linux AppImage:** `chmod +x Audiotheca_*.AppImage && ./Audiotheca_*.AppImage`
 - **Linux deb:** `sudo dpkg -i audiotheca_*.deb`
 

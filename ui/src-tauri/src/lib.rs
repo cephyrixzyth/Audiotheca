@@ -20,6 +20,7 @@ enum ApiProcess {
 
 struct ApiChild(Mutex<Option<ApiProcess>>);
 struct ApiPort(Mutex<u16>);
+struct AppHome(PathBuf);
 
 fn portable_home_from_config(exe_dir: &Path) -> Option<PathBuf> {
     let config_path = exe_dir.join("portable.json");
@@ -54,6 +55,36 @@ fn workspace_root() -> PathBuf {
     }
 }
 
+fn app_home_dir(app: &tauri::App) -> PathBuf {
+    if let Ok(home) = std::env::var("AUDIOTHECA_HOME") {
+        return PathBuf::from(home);
+    }
+    if let Ok(data) = app.path().app_data_dir() {
+        return data;
+    }
+    workspace_root()
+}
+
+fn append_startup_log(home: &Path, message: &str) {
+    if let Err(err) = (|| -> std::io::Result<()> {
+        std::fs::create_dir_all(home)?;
+        let path = home.join("audiotheca-desktop.log");
+        use std::io::Write;
+        let mut file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)?;
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        writeln!(file, "[{stamp}] {message}")?;
+        Ok(())
+    })() {
+        eprintln!("[audiotheca] could not write startup log: {err}");
+    }
+}
+
 fn sidecar_env(
     app: &tauri::App,
     root: &Path,
@@ -83,6 +114,20 @@ fn engine_resource_path(app: &tauri::App) -> Option<PathBuf> {
 }
 
 fn free_port_listeners(port: u16) {
+    #[cfg(target_os = "macos")]
+    {
+        let script = format!(
+            "pids=$(lsof -ti tcp:{port} 2>/dev/null || true); \
+             if [ -n \"$pids\" ]; then kill -9 $pids 2>/dev/null || true; fi"
+        );
+        let _ = Command::new("sh")
+            .args(["-c", &script])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+
     #[cfg(windows)]
     {
         let script = format!(
@@ -125,6 +170,10 @@ fn pick_api_port() -> u16 {
 fn spawn_api_server(app: &tauri::App, root: &Path, port: u16) -> Option<ApiProcess> {
     let port_str = port.to_string();
     let (home, engine) = sidecar_env(app, root);
+    append_startup_log(
+        &PathBuf::from(&home),
+        &format!("spawn_api_server port={port} engine={}", engine.is_some()),
+    );
 
     if let Ok(mut sidecar) = app.shell().sidecar("api-server") {
         sidecar = sidecar
@@ -134,15 +183,34 @@ fn spawn_api_server(app: &tauri::App, root: &Path, port: u16) -> Option<ApiProce
         if let Some(engine_path) = &engine {
             sidecar = sidecar.env("AUDIOTHECA_ENGINE", engine_path);
         }
-        if let Ok((_rx, child)) = sidecar.spawn() {
-            eprintln!("[audiotheca] API sidecar started on port {port} (AUDIOTHECA_HOME={home})");
-            return Some(ApiProcess::Sidecar(child));
+        match sidecar.spawn() {
+            Ok((_rx, child)) => {
+                let msg = format!("API sidecar started on port {port} (AUDIOTHECA_HOME={home})");
+                eprintln!("[audiotheca] {msg}");
+                append_startup_log(&PathBuf::from(&home), &msg);
+                return Some(ApiProcess::Sidecar(child));
+            }
+            Err(err) => {
+                let msg = format!("API sidecar spawn failed: {err}");
+                eprintln!("[audiotheca] {msg}");
+                append_startup_log(&PathBuf::from(&home), &msg);
+            }
         }
+    } else {
+        let msg = "API sidecar binary not found in bundle";
+        eprintln!("[audiotheca] {msg}");
+        append_startup_log(&PathBuf::from(&home), msg);
     }
+
+    let python_cwd = if cfg!(debug_assertions) {
+        workspace_root()
+    } else {
+        root.to_path_buf()
+    };
 
     for launcher in ["python", "python3", "py"] {
         let mut cmd = Command::new(launcher);
-        cmd.current_dir(root);
+        cmd.current_dir(&python_cwd);
         if launcher == "py" {
             cmd.arg("-3");
         }
@@ -193,8 +261,8 @@ fn api_base_url(port: State<ApiPort>) -> String {
 }
 
 #[tauri::command]
-fn workspace_path() -> String {
-    workspace_root().display().to_string()
+fn workspace_path(home: State<AppHome>) -> String {
+    home.0.display().to_string()
 }
 
 #[tauri::command]
@@ -231,10 +299,13 @@ fn setup_system_tray(app: &tauri::App) -> tauri::Result<()> {
     let show_item = MenuItem::with_id(app, "tray-show", "Show Audiotheca", true, None::<&str>)?;
     let quit_item = MenuItem::with_id(app, "tray-quit", "Quit", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
-    let icon = app
-        .default_window_icon()
-        .expect("missing default window icon")
-        .clone();
+    let icon = match app.default_window_icon() {
+        Some(icon) => icon.clone(),
+        None => {
+            eprintln!("[audiotheca] tray: missing default window icon — skipping tray");
+            return Ok(());
+        }
+    };
 
     let _tray = TrayIconBuilder::new()
         .icon(icon)
@@ -285,7 +356,12 @@ pub fn run() {
             quit_app
         ])
         .setup(|app| {
-            let root = workspace_root();
+            let root = app_home_dir(app);
+            if let Err(err) = std::fs::create_dir_all(&root) {
+                eprintln!("[audiotheca] could not create app home {root:?}: {err}");
+            }
+            append_startup_log(&root, "Audiotheca desktop starting");
+            app.manage(AppHome(root.clone()));
             let api_port = pick_api_port();
             app.manage(ApiPort(Mutex::new(api_port)));
             let child = spawn_api_server(app, &root, api_port);
@@ -293,8 +369,16 @@ pub fn run() {
 
             #[cfg(desktop)]
             {
-                setup_system_tray(app)?;
+                if let Err(err) = setup_system_tray(app) {
+                    eprintln!("[audiotheca] system tray unavailable: {err}");
+                    append_startup_log(&root, &format!("system tray unavailable: {err}"));
+                }
                 wire_close_requested(&app.handle());
+            }
+
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
             }
 
             Ok(())

@@ -200,6 +200,8 @@ def install_to_binaries(name: str, built: Path, triple: str) -> Path:
     BIN_DIR.mkdir(parents=True, exist_ok=True)
     dest = BIN_DIR / f"{name}-{triple}{sidecar_suffix(triple)}"
     shutil.copy2(built, dest)
+    if triple.endswith("-apple-darwin"):
+        dest.chmod(0o755)
     print(f"Installed {dest} ({dest.stat().st_size / (1024 * 1024):.1f} MB)")
     return dest
 

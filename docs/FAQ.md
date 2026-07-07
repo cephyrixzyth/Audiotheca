@@ -269,6 +269,28 @@ The **Help** tab is the **last** tab in the top bar (after Vendors). It mirrors 
 
 ---
 
+## macOS desktop
+
+### I installed from the DMG on my M-series Mac and nothing happens
+
+This usually means **Gatekeeper** blocked the unsigned download, or the wrong architecture DMG was used.
+
+1. Use the **Apple Silicon** build (`*_aarch64.dmg` / `*_arm64.dmg`), not the Intel `*_x64.dmg`.
+2. Drag the app to **Applications**, then **right-click → Open** (not double-click) on first launch.
+3. If still no window:
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/Audiotheca.app
+   codesign --force --deep --sign - /Applications/Audiotheca.app
+   ```
+   Or run `./scripts/macos_fixup_app.sh` from a repo checkout.
+4. Check the startup log:  
+   `~/Library/Application Support/com.audiotheca.desktop/audiotheca-desktop.log`
+5. Open **Console.app** and filter for `Audiotheca` if the app crashes immediately.
+
+From **1.0.12** onward, the desktop shell stores data in Application Support (writable) instead of inside the `.app` bundle, and ad-hoc signing is applied at build time.
+
+---
+
 ## Getting help
 
 1. [Main README](../README.md)
