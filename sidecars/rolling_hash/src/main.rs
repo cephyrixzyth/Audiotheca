@@ -1,10 +1,10 @@
 //! Rolling full-file hash sidecar — JSON output for Python subprocess calls.
 
-use md5::{Digest, Md5};
+use md5::Context;
 use serde::Serialize;
 use std::env;
 use std::fs::File;
-use std::io::{self, Read};
+use std::io::Read;
 use std::path::PathBuf;
 use std::process;
 
@@ -22,16 +22,16 @@ struct HashResult {
 fn hash_file(path: &PathBuf) -> Result<(String, u64), String> {
     let mut file = File::open(path).map_err(|e| e.to_string())?;
     let size = file.metadata().map_err(|e| e.to_string())?.len();
-    let mut hasher = Md5::new();
+    let mut context = Context::new();
     let mut buffer = [0u8; 1024 * 1024];
     loop {
         let n = file.read(&mut buffer).map_err(|e| e.to_string())?;
         if n == 0 {
             break;
         }
-        hasher.update(&buffer[..n]);
+        context.consume(&buffer[..n]);
     }
-    Ok((format!("{:x}", hasher.finalize()), size))
+    Ok((format!("{:x}", context.compute()), size))
 }
 
 fn main() {

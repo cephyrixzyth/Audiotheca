@@ -206,6 +206,37 @@ python scripts/library_probe.py
 
 ---
 
+## Optional: Rust native sidecars
+
+Rolling-hash and parallel-walk accelerators live under `sidecars/`. Binaries are **not** committed — build locally when needed:
+
+```powershell
+python scripts/build_native_sidecars.py --release
+```
+
+Output: `sidecars/bin/audiotheca-rolling-hash.exe` and `audiotheca-parallel-walk.exe` (no extension on Linux/macOS).
+
+The engine auto-discovers these paths, or set:
+
+- `AUDIOTHECA_ROLLING_HASH_PATH`
+- `AUDIOTHECA_PARALLEL_WALK_PATH`
+
+Requires [Rust](https://rustup.rs/) (`cargo` on PATH). Tauri desktop builds use a separate PyInstaller sidecar pipeline (`scripts/build_sidecars.py`).
+
+---
+
+## Optional: DAW sidecar plugin (JUCE)
+
+The **Environment → DAW sidecar plugin** panel exports a JUCE scaffold (spec **DAW-SIDE**). Full VST3/AU builds need CMake 3.22+, a C++17 compiler, and JUCE 7 — too heavy for CI.
+
+1. Export blueprint from the UI (or `POST /api/tools/daw-side/blueprint`).
+2. Build with the generated `build.ps1` / `build.sh` in the export folder, or from repo template:
+   - Windows: `.\scripts\build_daw_sidecar.ps1`
+   - Linux/macOS: `./scripts/build_daw_sidecar.sh`
+3. Copy the VST3 from `build/AudiothecaSidecar_artefacts/VST3/` into your DAW plugin folder and rescan.
+
+---
+
 ## Performance (network shares)
 
 | Setting | Recommendation |

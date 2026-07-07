@@ -222,6 +222,7 @@ def _install_instructions(plugin_dir: Path) -> list[str]:
         "Prerequisites: CMake 3.22+, C++17 compiler, JUCE 7.0.9 (set JUCE_PATH or auto-fetch).",
         f"1. Blueprint exported to: {plugin_dir}",
         f"2. Run build script: {plugin_dir / ('build.ps1' if os.name == 'nt' else 'build.sh')}",
+        "   Repo template (no export): scripts/build_daw_sidecar.ps1 (Windows) or scripts/build_daw_sidecar.sh",
         "3. Copy VST3 from build/AudiothecaSidecar_artefacts/VST3/ to your DAW plugin folder.",
         "   Windows: %COMMONPROGRAMFILES%/VST3/  ·  macOS: ~/Library/Audio/Plug-Ins/VST3/",
         "4. Rescan plugins in your DAW; sidecar connects to Audiotheca API on port 8787.",

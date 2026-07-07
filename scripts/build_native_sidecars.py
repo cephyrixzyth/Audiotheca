@@ -27,13 +27,21 @@ def _cargo() -> str:
 
 def build_crate(crate_dir: Path, binary_name: str, *, release: bool) -> Path:
     cargo = _cargo()
-    cmd = [cargo, "build", "--manifest-path", str(crate_dir / "Cargo.toml")]
+    target_dir = crate_dir / "target"
+    cmd = [
+        cargo,
+        "build",
+        "--manifest-path",
+        str(crate_dir / "Cargo.toml"),
+        "--target-dir",
+        str(target_dir),
+    ]
     if release:
         cmd.append("--release")
     print(f"=== Building {binary_name} ===")
-    subprocess.run(cmd, cwd=str(ROOT), check=True)
+    subprocess.run(cmd, cwd=str(crate_dir), check=True)
     profile = "release" if release else "debug"
-    built = crate_dir / "target" / profile / binary_name
+    built = target_dir / profile / binary_name
     if platform.system() == "Windows":
         built = built.with_suffix(".exe")
     if not built.is_file():

@@ -17,6 +17,8 @@ ui/dist/
 ui/src-tauri/binaries/
 build/sidecars/
 build/sidecars-work/
+sidecars/bin/
+sidecars/*/target/
 build/specs/
 dedupe_reports/decisions/
 dedupe_reports/.progress_*.jsonl

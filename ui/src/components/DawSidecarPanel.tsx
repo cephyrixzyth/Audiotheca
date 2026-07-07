@@ -26,6 +26,9 @@ export function DawSidecarPanel() {
       <h3>DAW Sidecar (VST3 / AU)</h3>
       <p className="muted">
         Export a JUCE plugin scaffold that connects to the Audiotheca API for drag-from-library and cue markers.
+        Full builds require CMake, a C++17 compiler, and JUCE 7 — use{" "}
+        <code>scripts/build_daw_sidecar.ps1</code> / <code>.sh</code> on the repo template, or the generated build
+        script after export. See the Install guide (DAW sidecar section) in repo docs/INSTALL.md.
       </p>
       <div className="btn-row">
         <button type="button" className="primary-btn" disabled={busy} onClick={() => void exportBlueprint()}>
