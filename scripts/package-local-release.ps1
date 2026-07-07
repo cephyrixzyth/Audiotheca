@@ -42,7 +42,7 @@ if (-not $SkipBuild) {
 }
 
 if (-not (Test-Path $WinDir)) {
-    Write-Error "Missing $WinDir — build failed or was skipped without artifacts."
+    Write-Error "Missing $WinDir - build failed or was skipped without artifacts."
 }
 
 $artifacts = Get-ChildItem -Path $WinDir -File | Where-Object {
