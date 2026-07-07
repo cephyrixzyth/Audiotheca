@@ -52,6 +52,9 @@ if ($artifacts.Count -eq 0) {
     Write-Error "No installer artifacts matching version $UiVersion in $WinDir"
 }
 
+if (Test-Path $ReleaseDir) {
+    Remove-Item -Recurse -Force $ReleaseDir
+}
 New-Item -ItemType Directory -Force -Path $ReleaseDir | Out-Null
 foreach ($file in $artifacts) {
     Copy-Item -LiteralPath $file.FullName -Destination $ReleaseDir -Force

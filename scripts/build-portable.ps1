@@ -2,6 +2,10 @@
 # Outputs: dist/installers/windows/Audiotheca-Portable-<version>-win64.zip
 # Requires: same toolchain as build-installers.ps1
 
+param(
+    [switch]$SkipBuild
+)
+
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path | Split-Path -Parent
 Set-Location -LiteralPath $Root
@@ -23,13 +27,17 @@ $ZipPath = Join-Path $OutDir "Audiotheca-Portable-$UiVersion-win64.zip"
 
 Write-Host "Building Audiotheca portable bundle..." -ForegroundColor Cyan
 
-$env:CARGO_TARGET_DIR = Join-Path $UiDir "src-tauri\target"
-Push-Location $UiDir
-if (-not (Test-Path "node_modules")) {
-    npm install
+if (-not $SkipBuild) {
+    $env:CARGO_TARGET_DIR = Join-Path $UiDir "src-tauri\target"
+    Push-Location $UiDir
+    if (-not (Test-Path "node_modules")) {
+        npm install
+    }
+    npm run tauri:build
+    Pop-Location
+} else {
+    Write-Host "Skipping tauri:build (-SkipBuild); using existing release output." -ForegroundColor Yellow
 }
-npm run tauri:build
-Pop-Location
 
 $Exe = Join-Path $ReleaseDir "audiotheca.exe"
 if (-not (Test-Path $Exe)) {
