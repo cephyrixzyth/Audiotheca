@@ -1,24 +1,33 @@
-# Create GitHub release v1.0.0 and upload Windows installer artifacts.
+# Create or update a GitHub release and upload Windows installer artifacts.
 # Requires: gh CLI (winget install GitHub.cli) OR GITHUB_TOKEN env var with repo scope.
+#
+# Usage:
+#   .\scripts\create-github-release.ps1 -Tag v1.0.12
+
+param(
+    [string]$Tag = "v1.0.12"
+)
 
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path | Split-Path -Parent
-$Tag = "v1.0.0"
-$Name = "Audiotheca 1.0.0"
+$UiVersion = & "$Root\scripts\read-tauri-version.ps1"
+if ($Tag -notmatch '^v') { $Tag = "v$Tag" }
+$Name = "Audiotheca $Tag"
 $WinDir = Join-Path $Root "dist\installers\windows"
 
 $Body = @"
-Web UI / API / desktop shell **1.0.0** (engine **10.0.0**).
+Web UI / API / desktop shell **$UiVersion** (engine **10.0.0**).
 
 ## Windows downloads
-- **Audiotheca_1.0.0_x64_en-US.msi** - recommended installer
-- **Audiotheca_1.0.0_x64-setup.exe** - NSIS setup
-- **Audiotheca-Portable-1.0.0-win64.zip** - portable (double-click Run Audiotheca.bat)
+- **Audiotheca_${UiVersion}_x64_en-US.msi** — recommended installer
+- **Audiotheca_${UiVersion}_x64-setup.exe** — NSIS setup
+- **Audiotheca-Portable-$UiVersion-win64.zip** — portable (double-click Run Audiotheca.bat)
 
-## Highlights
-- Grouped Review / System navigation, 18 themes, Help tab with per-section guides
-- Archive diff wizard, doc GIF walkthroughs, in-app dependency install
-- First-run wizard on desktop builds
+## v1.0.12
+- Fix macOS Apple Silicon launch after DMG install (Application Support data dir, ad-hoc signing, startup log)
+- See ``docs/INSTALL.md`` and ``scripts/macos_fixup_app.sh`` for Gatekeeper workarounds
+
+macOS ``*_aarch64.dmg`` and Linux artifacts require building on those platforms when GitHub Actions quota is unavailable.
 
 See README and INSTALL.md in the repo.
 "@

@@ -24,6 +24,8 @@ dedupe_reports/decisions/
 dedupe_reports/.progress_*.jsonl
 dist/installers/
 dist/portable/
+dist/releases/*
+!dist/releases/README.md
 docs/demo/capture_ws/
 docs/assets/screenshots/page-*.png
 pytest_*.txt

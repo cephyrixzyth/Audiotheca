@@ -1,10 +1,12 @@
 # Build a Windows portable zip (no installer, no terminal launcher).
-# Outputs: dist/installers/windows/Audiotheca-Portable-1.0.0-win64.zip
+# Outputs: dist/installers/windows/Audiotheca-Portable-<version>-win64.zip
 # Requires: same toolchain as build-installers.ps1
 
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path | Split-Path -Parent
 Set-Location -LiteralPath $Root
+
+$UiVersion = & "$Root\scripts\read-tauri-version.ps1"
 
 . "$Root\scripts\ensure_rust_path.ps1"
 
@@ -17,7 +19,7 @@ $UiDir = Join-Path $Root "ui"
 $ReleaseDir = Join-Path $UiDir "src-tauri\target\release"
 $PortableRoot = Join-Path $Root "dist\portable\Audiotheca-Portable"
 $OutDir = Join-Path $Root "dist\installers\windows"
-$ZipPath = Join-Path $OutDir "Audiotheca-Portable-1.0.2-win64.zip"
+$ZipPath = Join-Path $OutDir "Audiotheca-Portable-$UiVersion-win64.zip"
 
 Write-Host "Building Audiotheca portable bundle..." -ForegroundColor Cyan
 

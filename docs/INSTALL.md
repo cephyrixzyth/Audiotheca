@@ -14,10 +14,12 @@ End users do **not** need Python, Node, or Rust when using release installers �
 
 **Download:** [GitHub Releases (latest)](https://github.com/chrisjrovira/Audiotheca/releases/latest) — Windows `.msi`, NSIS setup, portable zip; macOS `.dmg` (Intel + Apple Silicon); Linux `.AppImage` and `.deb` (built on each release tag via GitHub Actions).
 
+**No GitHub Actions quota?** Build locally: `.\scripts\package-local-release.ps1` — artifacts land in `dist/releases/<tag>/` (see `dist/releases/README.md`).
+
 | Platform | Build script (maintainers) | Output folder | Artifacts |
 | --- | --- | --- | --- |
-| **Windows** | `.\scripts\build-installers.ps1` | `dist/installers/windows/` | `.msi`, NSIS `-setup.exe` |
-| **Windows portable** | `.\scripts\build-portable.ps1` | `dist/installers/windows/` | `Audiotheca-Portable-1.0.5-win64.zip` |
+| **Windows** | `.\scripts\build-installers.ps1` or `.\scripts\package-local-release.ps1` | `dist/installers/windows/` and `dist/releases/<tag>/` | `.msi`, NSIS `-setup.exe` |
+| **Windows portable** | `.\scripts\build-portable.ps1` | `dist/installers/windows/` | `Audiotheca-Portable-<version>-win64.zip` |
 | **macOS** | `./scripts/build-installers.sh` | `dist/installers/mac/` | `.dmg` |
 | **Linux** | `./scripts/build-installers.sh` | `dist/installers/linux/` | `.AppImage`, `.deb` |
 

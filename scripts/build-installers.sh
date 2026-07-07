@@ -40,8 +40,9 @@ esac
 
 OUT_DIR="$ROOT/dist/installers/$PLATFORM"
 BUNDLE_DIR="$ROOT/ui/src-tauri/target/release/bundle"
+UI_VERSION="$(python3 -c "import json; print(json.load(open('$ROOT/ui/src-tauri/tauri.conf.json'))['version'])" 2>/dev/null || python -c "import json; print(json.load(open('$ROOT/ui/src-tauri/tauri.conf.json'))['version'])")"
 
-echo "Building Audiotheca $PLATFORM installers (v1.0.0)..."
+echo "Building Audiotheca $PLATFORM installers (v${UI_VERSION})..."
 
 export CARGO_TARGET_DIR="$ROOT/ui/src-tauri/target"
 cd "$ROOT/ui"
