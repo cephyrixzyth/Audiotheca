@@ -52,67 +52,6 @@ if ($artifacts.Count -eq 0) {
     Write-Error "No installer artifacts matching version $UiVersion in $WinDir"
 }
 
-if (Test-Path $ReleaseDir) {
-    Remove-Item -Recurse -Force $ReleaseDir
-}
-New-Item -ItemType Directory -Force -Path $ReleaseDir | Out-Null
-foreach ($file in $artifacts) {
-    Copy-Item -LiteralPath $file.FullName -Destination $ReleaseDir -Force
-    Write-Host "  -> $($file.Name)" -ForegroundColor Green
-}
-
-$artifactList = ($artifacts | ForEach-Object { "  * $($_.Name)" }) -join [Environment]::NewLine
-$builtAt = Get-Date -Format 'yyyy-MM-dd HH:mm'
-$notesLines = @(
-    "Audiotheca $Tag (desktop shell $UiVersion, engine 10.0.0)"
-    "Built locally on $builtAt."
-    ""
-    "Windows artifacts in this folder:"
-    $artifactList
-    ""
-    "v1.0.12 highlights:"
-    "  * Fix macOS Apple Silicon launch after DMG install"
-    "  * Writable app data under Application Support on macOS"
-    "  * Startup log: ~/Library/Application Support/com.audiotheca.desktop/audiotheca-desktop.log"
-    "  * macOS Gatekeeper workaround: scripts/macos_fixup_app.sh"
-    ""
-    "macOS .dmg / Linux AppImage must be built on those platforms:"
-    "  ./scripts/build-installers.sh"
-    ""
-    "GitHub Releases (when Actions quota available):"
-    "  https://github.com/chrisjrovira/Audiotheca/releases/tag/$Tag"
-)
-$notesLines -join [Environment]::NewLine | Set-Content -Path (Join-Path $ReleaseDir "RELEASE_NOTES.txt") -Encoding UTF8
-
-$readme = @'
-# Local release artifacts
-
-These folders mirror GitHub Release assets when CI is unavailable or you prefer
-building on your own machine.
-
-| Folder | Contents |
-| --- | --- |
-| `v1.0.12/` | Windows MSI, NSIS setup, portable zip (this machine) |
-
-Rebuild everything:
-
-```powershell
-.\scripts\package-local-release.ps1 -Tag v1.0.12
-```
-
-Skip rebuild and only re-copy existing `dist/installers/windows` artifacts:
-
-```powershell
-.\scripts\package-local-release.ps1 -Tag v1.0.12 -SkipBuild
-```
-
-End users on **macOS Apple Silicon** need the `*_aarch64.dmg` built on a Mac.
-See `docs/INSTALL.md` and `scripts/macos_fixup_app.sh`.
-'@
-
-New-Item -ItemType Directory -Force -Path (Join-Path $Root "dist\releases") | Out-Null
-$readme | Set-Content -Path (Join-Path $Root "dist\releases\README.md") -Encoding UTF8
-
 Write-Host ""
 Write-Host "Local release ready: $ReleaseDir" -ForegroundColor Green
-Get-ChildItem -Path $ReleaseDir -File | Format-Table Name, @{n='MB';e={[math]::Round($_.Length/1MB,2)}}, LastWriteTime
+& "$Root\scripts\stage-local-release.ps1" -Tag $Tag -Merge

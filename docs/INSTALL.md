@@ -14,7 +14,16 @@ End users do **not** need Python, Node, or Rust when using release installers �
 
 **Download:** [GitHub Releases (latest)](https://github.com/chrisjrovira/Audiotheca/releases/latest) — Windows `.msi`, NSIS setup, portable zip; macOS `.dmg` (Intel + Apple Silicon); Linux `.AppImage` and `.deb` (built on each release tag via GitHub Actions).
 
-**No GitHub Actions quota?** Build locally: `.\scripts\package-local-release.ps1` — artifacts land in `dist/releases/<tag>/` (see `dist/releases/README.md`).
+**No GitHub Actions quota?** Build locally:
+
+| Platform | Command |
+| --- | --- |
+| Windows | `.\scripts\package-local-release.ps1 -Tag v1.0.12` |
+| Linux (Docker on Windows) | `.\scripts\build-linux-docker.ps1` |
+| macOS (M4 / Intel Mac) | `./scripts/build-release-mac.sh --both` |
+| Stage all | `.\scripts\stage-local-release.ps1 -Tag v1.0.12 -Merge` |
+
+Artifacts land in `dist/releases/<tag>/` (see `dist/releases/README.md`).
 
 | Platform | Build script (maintainers) | Output folder | Artifacts |
 | --- | --- | --- | --- |

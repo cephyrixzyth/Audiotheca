@@ -1,23 +1,25 @@
-# Local release artifacts
+﻿# Local release artifacts
 
-These folders mirror GitHub Release assets when CI is unavailable or you prefer
-building on your own machine.
+Mirror GitHub Release assets when Actions quota is exhausted.
 
-| Folder | Contents |
-| --- | --- |
-| `v1.0.12/` | Windows MSI, NSIS setup, portable zip (after local build) |
+| Platform | Build command | Output |
+| --- | --- | --- |
+| **Windows** | `.\scripts\package-local-release.ps1 -Tag v1.0.12` | `dist/installers/windows/` |
+| **Linux** | `.\scripts\build-linux-docker.ps1` | `dist/installers/linux/` |
+| **macOS** | `./scripts/build-release-mac.sh --both` (on a Mac) | `dist/installers/mac/` |
 
-Rebuild everything:
-
-```powershell
-.\scripts\package-local-release.ps1 -Tag v1.0.12
-```
-
-Skip rebuild and only re-copy existing `dist/installers/windows` artifacts:
+Stage everything into one folder:
 
 ```powershell
-.\scripts\package-local-release.ps1 -Tag v1.0.12 -SkipBuild
+.\scripts\stage-local-release.ps1 -Tag v1.0.12 -Merge
 ```
 
-End users on **macOS Apple Silicon** need the `*_aarch64.dmg` built on a Mac.
-See `docs/INSTALL.md` and `scripts/macos_fixup_app.sh`.
+**macOS DMGs cannot be built on Windows.** On your M4 Mac:
+
+```bash
+git pull
+chmod +x scripts/build-release-mac.sh scripts/macos_fixup_app.sh
+./scripts/build-release-mac.sh --both
+```
+
+Copy `dist/installers/mac/*.dmg` back to this PC (or re-run stage on the Mac).
