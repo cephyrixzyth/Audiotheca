@@ -14,7 +14,10 @@ HINTS_PATH = FEEDBACK_DIR / "restructure_hints.json"
 
 
 def normalize_path(path: str) -> str:
-    return str(Path(path).resolve())
+    """Stable feedback key (lowercase, / separators) — no Path.resolve()."""
+    from api.path_logic import normalize_logical_path
+
+    return normalize_logical_path(path)
 
 
 @dataclass
@@ -62,7 +65,10 @@ def load_store() -> RestructureStore:
     return RestructureStore(
         version=int(data.get("version", FEEDBACK_VERSION)),
         updated=data.get("updated", ""),
-        path_dest_overrides=data.get("path_dest_overrides", {}),
+        path_dest_overrides={
+            normalize_path(str(k)): str(v)
+            for k, v in (data.get("path_dest_overrides") or {}).items()
+        },
         section_approvals=data.get("section_approvals", {}),
         active_approval_stamp=data.get("active_approval_stamp", ""),
         corrections=[RestructureCorrection(**row) for row in data.get("corrections", [])],

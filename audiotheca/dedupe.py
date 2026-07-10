@@ -196,6 +196,8 @@ class DedupeMixin:
         if min_similarity >= MIN_DUPE_NAME_SIMILARITY and same_version:
             confidence = "HIGH"
         elif min_similarity >= MIN_DUPE_NAME_SIMILARITY:
+            # Side-by-side versions of the same product — keep grouped for upgrade
+            # review, but never promote to HIGH solely on name match.
             confidence = "MEDIUM"
         else:
             confidence = "LOW"
@@ -204,12 +206,13 @@ class DedupeMixin:
             confidence = "MEDIUM"
 
         items_sorted = sorted(items, key=lambda entry: (entry["version_key"], entry["size"]), reverse=True)
+        group_kind = "SAME_VERSION" if same_version else "VERSION_COEXIST"
         return {
             "confidence": confidence,
             "name_similarity": min_similarity,
             "same_version": same_version,
             "size_ratio": size_ratio,
-            "group_kind": "SAME_VERSION" if same_version else "VERSION_UPGRADE",
+            "group_kind": group_kind,
             "recommended_keep": items_sorted[0],
             "items": items_sorted,
         }
@@ -228,26 +231,39 @@ class DedupeMixin:
         """Size-bucket blocking pass (dedupe.io style) before name-based grouping."""
         return find_size_blocked_pairs(all_items, hash_fn=content_hash)
 
-    def _largest_top_file(self, item: dict) -> tuple[int, Path] | None:
+    def _top_file_refs(self, item: dict, *, limit: int = 3) -> list[tuple[int, Path]]:
+        """Up to `limit` largest top-level files for multi-sample content checks."""
         if not item["is_dir"]:
-            return (item["size"], item["path"])
+            return [(item["size"], item["path"])]
         candidates = item.get("largest_files") or item.get("top_files") or []
         if not candidates:
-            return None
-        size, rel_path = max(candidates, key=lambda f: f[0])
-        return (size, Path(item["path"]) / rel_path)
+            return []
+        ranked = sorted(candidates, key=lambda f: f[0], reverse=True)[:limit]
+        return [(size, Path(item["path"]) / rel_path) for size, rel_path in ranked]
+
+    def _largest_top_file(self, item: dict) -> tuple[int, Path] | None:
+        refs = self._top_file_refs(item, limit=1)
+        return refs[0] if refs else None
 
     def _content_check(self, items: list[dict]) -> str:
-        """Compare largest top-level file per copy — full hash when under 200 MB."""
-        refs = [self._largest_top_file(item) for item in items]
-        if any(ref is None for ref in refs):
+        """Compare up to 3 largest top-level files per copy — full hash when under 200 MB."""
+        per_item = [self._top_file_refs(item, limit=3) for item in items]
+        if any(not refs for refs in per_item):
             return "SKIPPED"
-        if len({ref[0] for ref in refs}) > 1:
-            return "DIFFERS"
-        hashes = {content_hash(ref[1], prefer_full=True) for ref in refs}
-        if None in hashes:
-            return "SKIPPED"
-        return "MATCH" if len(hashes) == 1 else "DIFFERS"
+        # Align by relative rank (largest, 2nd, 3rd). Require at least one comparable pair.
+        max_slots = min(len(refs) for refs in per_item)
+        matched_slots = 0
+        for slot in range(max_slots):
+            sizes = {refs[slot][0] for refs in per_item}
+            if len(sizes) > 1:
+                return "DIFFERS"
+            hashes = {content_hash(refs[slot][1], prefer_full=True) for refs in per_item}
+            if None in hashes:
+                continue
+            if len(hashes) > 1:
+                return "DIFFERS"
+            matched_slots += 1
+        return "MATCH" if matched_slots > 0 else "SKIPPED"
 
     def find_cross_item_archive_pairs(self, all_items: list[dict]) -> list[dict]:
         """

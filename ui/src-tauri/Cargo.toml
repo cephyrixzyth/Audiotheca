@@ -1,6 +1,6 @@
 [package]
 name = "audiotheca"
-version = "1.0.5"
+version = "1.0.12"
 description = "Audiotheca desktop shell"
 authors = ["Audiotheca"]
 edition = "2021"

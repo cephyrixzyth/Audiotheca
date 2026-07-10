@@ -33,7 +33,10 @@ CORRECTION_REASONS = (
 
 
 def normalize_path(path: str) -> str:
-    return str(Path(path).resolve())
+    """Stable feedback key (lowercase, / separators) — no Path.resolve()."""
+    from api.path_logic import normalize_logical_path
+
+    return normalize_logical_path(path)
 
 
 @dataclass
@@ -102,10 +105,19 @@ def load_store() -> InvestigationStore:
     return InvestigationStore(
         version=int(data.get("version", FEEDBACK_VERSION)),
         updated=data.get("updated", ""),
-        path_vendor_overrides=data.get("path_vendor_overrides", {}),
-        path_bucket_overrides=data.get("path_bucket_overrides", {}),
-        resolved_paths=data.get("resolved_paths", []),
-        parent_links=data.get("parent_links", {}),
+        path_vendor_overrides={
+            normalize_path(str(k)): str(v)
+            for k, v in (data.get("path_vendor_overrides") or {}).items()
+        },
+        path_bucket_overrides={
+            normalize_path(str(k)): str(v)
+            for k, v in (data.get("path_bucket_overrides") or {}).items()
+        },
+        resolved_paths=[normalize_path(p) for p in data.get("resolved_paths", [])],
+        parent_links={
+            normalize_path(str(k)): normalize_path(str(v))
+            for k, v in (data.get("parent_links") or {}).items()
+        },
         custom_buckets=data.get("custom_buckets", {}),
         vendor_additions=[VendorAddition(**row) for row in data.get("vendor_additions", [])],
         corrections=[InvestigationCorrection(**row) for row in data.get("corrections", [])],

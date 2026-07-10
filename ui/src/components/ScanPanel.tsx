@@ -65,10 +65,19 @@ function loadInitialReferenceMode(): boolean {
 }
 function loadInitialSkipPhases(): string[] {
   try {
-    const presetId = localStorage.getItem(FLOW_PRESET_STORAGE) || "fast";
-    return FLOW_PRESETS.find((p) => p.id === presetId)?.skipPhases ?? ["archive_peek", "scene_peek", "malware_scan"];
+    const presetId = localStorage.getItem(FLOW_PRESET_STORAGE) || "almost_full";
+    return FLOW_PRESETS.find((p) => p.id === presetId)?.skipPhases ?? ["malware_scan"];
   } catch {
-    return ["archive_peek", "scene_peek", "malware_scan"];
+    return ["malware_scan"];
+  }
+}
+
+function loadInitialPauseBetweenPhases(): boolean {
+  try {
+    const presetId = localStorage.getItem(FLOW_PRESET_STORAGE) || "almost_full";
+    return FLOW_PRESETS.find((p) => p.id === presetId)?.pauseBetweenPhases ?? false;
+  } catch {
+    return false;
   }
 }
 
@@ -256,7 +265,7 @@ export function ScanPanel({ onRunComplete }: Props) {
   const [extraRoots, setExtraRoots] = useState("");
   const [referenceRoots, setReferenceRoots] = useState(loadInitialReferenceRoots);
   const [referenceDedupe, setReferenceDedupe] = useState(loadInitialReferenceMode);
-  const [pauseBetweenPhases, setPauseBetweenPhases] = useState(false);
+  const [pauseBetweenPhases, setPauseBetweenPhases] = useState(loadInitialPauseBetweenPhases);
   const [skipPhases, setSkipPhases] = useState<string[]>(loadInitialSkipPhases);
   const [job, setJob] = useState<JobSnapshot | null>(null);
   const [events, setEvents] = useState<ProgressEvent[]>([]);

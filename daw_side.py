@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -12,7 +13,16 @@ PLUGIN_VERSION = "0.1.0"
 REPO_TEMPLATE = Path(__file__).resolve().parent / "plugins" / "daw_side" / "template"
 
 
-def plugin_manifest(*, formats: tuple[str, ...] = ("vst3", "au")) -> dict[str, Any]:
+def plugin_manifest(
+    *,
+    formats: tuple[str, ...] = ("vst3", "au"),
+    api_base: str | None = None,
+) -> dict[str, Any]:
+    base = (api_base or os.environ.get("AUDIOTHECA_API_BASE") or "http://127.0.0.1:8787").rstrip("/")
+    if not base.endswith("/api"):
+        # Accept host-only or full /api base from desktop discovery.
+        if "://" in base and not base.rstrip("/").endswith("/api"):
+            base = f"{base.rstrip('/')}"
     return {
         "name": "AudiothecaSidecar",
         "vendor": "Audiotheca",
@@ -20,7 +30,7 @@ def plugin_manifest(*, formats: tuple[str, ...] = ("vst3", "au")) -> dict[str, A
         "formats": list(formats),
         "built": False,
         "features": ["drag_from_library", "cue_markers", "tempo_sync"],
-        "api_base": "http://127.0.0.1:8787",
+        "api_base": base if base.endswith("/api") else f"{base}/api",
         "juce_minimum": "7.0.9",
     }
 
@@ -30,12 +40,16 @@ def _write_file(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
-def write_blueprint(*, home: str | Path | None = None) -> dict[str, Any]:
+def write_blueprint(
+    *,
+    home: str | Path | None = None,
+    api_base: str | None = None,
+) -> dict[str, Any]:
     root = Path(home or os.environ.get("AUDIOTHECA_HOME", Path.home() / ".audiotheca"))
     plugin_dir = root / "plugins" / "daw_side"
     plugin_dir.mkdir(parents=True, exist_ok=True)
 
-    manifest = plugin_manifest()
+    manifest = plugin_manifest(api_base=api_base)
     manifest_path = plugin_dir / "plugin_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
@@ -229,18 +243,21 @@ def _install_instructions(plugin_dir: Path) -> list[str]:
     ]
 
 
+BUILD_TIMEOUT_SEC = 45 * 60
+
+
 def install_daw_sidecar(
     *,
     home: str | Path | None = None,
     dry_run: bool = True,
     copy_to_system: bool = True,
+    api_base: str | None = None,
+    timeout_sec: int = BUILD_TIMEOUT_SEC,
 ) -> dict[str, Any]:
     """Export blueprint (if needed) and run CMake build for the DAW sidecar plugin."""
-    import os
-    import shutil
     import subprocess
 
-    blueprint = write_blueprint(home=home)
+    blueprint = write_blueprint(home=home, api_base=api_base)
     plugin_dir = Path(blueprint["plugin_dir"])
     build_script = Path(blueprint["build_script"])
     log: list[str] = []
@@ -255,9 +272,9 @@ def install_daw_sidecar(
         }
 
     if dry_run:
-        log.append(f"Would run: {build_script}")
+        log.append(f"Would run: {build_script} (timeout {timeout_sec}s)")
         if copy_to_system:
-            log.append("Would copy VST3 to system plugin folder after build")
+            log.append("Would copy VST3 (and AU on macOS) to system plugin folders after build")
         return {**blueprint, "ok": True, "built": False, "dry_run": True, "log": log}
 
     try:
@@ -268,6 +285,7 @@ def install_daw_sidecar(
                 capture_output=True,
                 text=True,
                 check=False,
+                timeout=timeout_sec,
             )
         else:
             proc = subprocess.run(
@@ -276,6 +294,7 @@ def install_daw_sidecar(
                 capture_output=True,
                 text=True,
                 check=False,
+                timeout=timeout_sec,
             )
         if proc.stdout:
             log.extend(proc.stdout.splitlines())
@@ -289,12 +308,22 @@ def install_daw_sidecar(
                 "error": f"build failed (exit {proc.returncode})",
                 "log": log,
             }
+    except subprocess.TimeoutExpired:
+        return {
+            **blueprint,
+            "ok": False,
+            "built": False,
+            "error": f"build timed out after {timeout_sec}s",
+            "log": log,
+        }
     except OSError as exc:
         return {**blueprint, "ok": False, "built": False, "error": str(exc), "log": log}
 
     artefacts = plugin_dir / "build" / "AudiothecaSidecar_artefacts"
     vst3_src = artefacts / "VST3"
+    au_src = artefacts / "AU"
     installed_to = ""
+    installed_au = ""
     if copy_to_system and vst3_src.is_dir():
         if os.name == "nt":
             common = os.environ.get("COMMONPROGRAMFILES", r"C:\Program Files\Common Files")
@@ -310,7 +339,18 @@ def install_daw_sidecar(
             installed_to = str(target)
             log.append(f"Installed {bundle.name} -> {target}")
 
-    manifest = plugin_manifest()
+    if copy_to_system and sys.platform == "darwin" and au_src.is_dir():
+        au_dest = Path.home() / "Library" / "Audio" / "Plug-Ins" / "Components"
+        au_dest.mkdir(parents=True, exist_ok=True)
+        for bundle in list(au_src.glob("*.component")) + list(au_src.glob("*.au")):
+            target = au_dest / bundle.name
+            if target.exists():
+                shutil.rmtree(target)
+            shutil.copytree(bundle, target)
+            installed_au = str(target)
+            log.append(f"Installed AU {bundle.name} -> {target}")
+
+    manifest = plugin_manifest(api_base=api_base)
     manifest["built"] = True
     manifest_path = plugin_dir / "plugin_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
@@ -321,5 +361,6 @@ def install_daw_sidecar(
         "built": True,
         "artefacts_dir": str(artefacts),
         "installed_vst3": installed_to,
+        "installed_au": installed_au,
         "log": log,
     }

@@ -48,7 +48,12 @@ def execute_approved_renames(
             })
             continue
 
-        proposed = scene_fb.get_proposed_name(row.source_path, row.proposed_name, store)
+        proposed = scene_fb.get_proposed_name(
+            row.source_path,
+            row.proposed_name,
+            store,
+            stamp=stamp,
+        )
         dest = src.parent / proposed
         _, dest_err = validate_execute_path(str(dest), must_exist=False, label="destination")
         if dest_err:
@@ -117,6 +122,7 @@ def execute_approved_renames(
             })
 
     ok_count = sum(1 for row in results if row.get("ok"))
+    fail_count = len(results) - ok_count
     if not dry_run:
         completed_sources: set[str] = set()
         for row in results:
@@ -132,11 +138,12 @@ def execute_approved_renames(
             report_loader.remove_scene_rename_rows(stamp, completed_sources)
 
     return {
-        "ok": ok_count > 0,
+        "ok": fail_count == 0 and ok_count > 0,
+        "partial": ok_count > 0 and fail_count > 0,
         "dry_run": dry_run,
         "stamp": stamp,
         "batch_id": batch_id,
         "renamed": ok_count,
-        "failed": len(results) - ok_count,
+        "failed": fail_count,
         "results": results,
     }

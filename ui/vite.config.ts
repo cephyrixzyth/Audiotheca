@@ -10,6 +10,10 @@ export default defineConfig({
   plugins: [react()],
   clearScreen: false,
   envPrefix: ["VITE_", "TAURI_"],
+  test: {
+    environment: "node",
+    include: ["src/**/*.test.ts"],
+  },
   server: {
     port: 5173,
     strictPort: true,

@@ -10,6 +10,7 @@ import {
   type SceneExecuteResponse,
 } from "../api/client";
 import type { SceneRenameItem } from "../types";
+import { listHasPath, lookupByPath, pathKey } from "../utils/pathKey";
 import { useContextSidebar } from "./ContextSidebar";
 import { PathLink } from "./PathLink";
 import {
@@ -36,18 +37,19 @@ export function SceneRenames({ stamp }: Props) {
     null,
   );
 
+  async function refreshFeedback() {
+    const state = await fetchSceneFeedback(stamp);
+    setApproved(state.approved_renames ?? []);
+    setRejected(state.rejected_paths ?? {});
+    setOverrides(state.name_overrides ?? {});
+  }
+
   useEffect(() => {
-    fetchSceneFeedback(stamp)
-      .then((state) => {
-        setApproved(state.approved_renames ?? []);
-        setRejected(state.rejected_paths ?? {});
-        setOverrides(state.name_overrides ?? {});
-      })
-      .catch(() => {
-        setApproved([]);
-        setRejected({});
-        setOverrides({});
-      });
+    refreshFeedback().catch(() => {
+      setApproved([]);
+      setRejected({});
+      setOverrides({});
+    });
   }, [stamp]);
 
   useEffect(() => {
@@ -58,77 +60,90 @@ export function SceneRenames({ stamp }: Props) {
   }, [stamp]);
 
   async function handleApprove(row: SceneRenameItem) {
-    const res = await approveSceneRename(stamp, {
-      source_path: row.source_path,
-      scene_id: row.scene_id,
-    });
-    setApproved(res.state.approved_renames ?? []);
-    setMsg(`Approved rename for ${row.scene_id}`);
+    try {
+      const res = await approveSceneRename(stamp, {
+        source_path: row.source_path,
+        scene_id: row.scene_id,
+      });
+      setApproved(res.state.approved_renames ?? []);
+      setMsg(`Approved rename for ${row.scene_id}`);
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : "Approve failed");
+    }
   }
 
   async function handleReject(row: SceneRenameItem) {
-    await rejectSceneRename(stamp, {
-      source_path: row.source_path,
-      scene_id: row.scene_id,
-      reason: "bad_inference",
-    });
-    setRejected((prev) => ({ ...prev, [row.source_path]: "bad_inference" }));
-    setApproved((prev) => prev.filter((path) => path !== row.source_path));
-    setMsg(`Rejected rename for ${row.scene_id}`);
+    try {
+      await rejectSceneRename(stamp, {
+        source_path: row.source_path,
+        scene_id: row.scene_id,
+        reason: "bad_inference",
+      });
+      await refreshFeedback();
+      setMsg(`Rejected rename for ${row.scene_id}`);
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : "Reject failed");
+    }
   }
 
   async function handleOverride(row: SceneRenameItem) {
-    const proposed = window
-      .prompt("Proposed folder name:", overrides[row.source_path] ?? row.proposed_name)
-      ?.trim();
+    const current = lookupByPath(overrides, row.source_path) ?? row.proposed_name;
+    const proposed = window.prompt("Proposed folder name:", current)?.trim();
     if (!proposed) return;
-    const res = await overrideSceneName(stamp, {
-      source_path: row.source_path,
-      proposed_name: proposed,
-      scene_id: row.scene_id,
-      old_name: row.proposed_name,
-    });
-    setOverrides(res.state.name_overrides ?? {});
-    setMsg(`Name override saved for ${row.scene_id}`);
+    try {
+      const res = await overrideSceneName(stamp, {
+        source_path: row.source_path,
+        proposed_name: proposed,
+        scene_id: row.scene_id,
+        old_name: row.proposed_name,
+      });
+      setOverrides(res.state.name_overrides ?? {});
+      setMsg(`Name override saved for ${row.scene_id}`);
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : "Override failed");
+    }
   }
 
   async function handleMissingPart01(row: SceneRenameItem) {
-    await flagSceneMissingPart01(stamp, {
-      source_path: row.source_path,
-      scene_id: row.scene_id,
-    });
-    setRejected((prev) => ({ ...prev, [row.source_path]: "missing_part01" }));
-    setMsg(`Flagged ${row.scene_id} as missing part01`);
+    try {
+      await flagSceneMissingPart01(stamp, {
+        source_path: row.source_path,
+        scene_id: row.scene_id,
+      });
+      await refreshFeedback();
+      setMsg(`Flagged ${row.scene_id} as missing part01`);
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : "Flag failed");
+    }
   }
 
   async function handleExecute(dryRun: boolean) {
-    const res: SceneExecuteResponse = await executeSceneRenames(stamp, {
-      dry_run: dryRun,
-      confirm_live: !dryRun ? true : undefined,
-    });
-    if (!res.ok && !res.results?.length) {
-      setExecuteResults([]);
-      setExecuteSummary(null);
-      setMsg(res.error ?? "Approve scene renames first");
-      return;
-    }
-    setExecuteDryRun(dryRun);
-    setExecuteResults(sceneExecuteRows(res.results ?? [], dryRun));
-    setExecuteSummary({ staged: res.renamed, failed: res.failed });
-    setMsg(
-      dryRun
-        ? `Dry run: ${res.renamed} rename(s) would apply`
-        : `Live: ${res.renamed} folder(s) renamed (${res.failed} failed)`,
-    );
-    if (!dryRun && res.renamed > 0) {
-      const [nextItems, state] = await Promise.all([
-        fetchSceneRenames(stamp),
-        fetchSceneFeedback(stamp),
-      ]);
-      setItems(nextItems);
-      setApproved(state.approved_renames ?? []);
-      setRejected(state.rejected_paths ?? {});
-      setOverrides(state.name_overrides ?? {});
+    try {
+      const res: SceneExecuteResponse = await executeSceneRenames(stamp, {
+        dry_run: dryRun,
+        confirm_live: !dryRun ? true : undefined,
+      });
+      if (!res.ok && !res.partial && !res.results?.length) {
+        setExecuteResults([]);
+        setExecuteSummary(null);
+        setMsg(res.error ?? "Approve scene renames first");
+        return;
+      }
+      setExecuteDryRun(dryRun);
+      setExecuteResults(sceneExecuteRows(res.results ?? [], dryRun));
+      setExecuteSummary({ staged: res.renamed, failed: res.failed });
+      const outcome = res.partial ? "partial" : res.ok ? "ok" : "failed";
+      setMsg(
+        dryRun
+          ? `Dry run (${outcome}): ${res.renamed} rename(s) would apply (${res.failed} failed)`
+          : `Live (${outcome}): ${res.renamed} folder(s) renamed (${res.failed} failed)`,
+      );
+      if (!dryRun) {
+        const [nextItems] = await Promise.all([fetchSceneRenames(stamp), refreshFeedback()]);
+        setItems(nextItems);
+      }
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : "Execute failed");
     }
   }
 
@@ -140,7 +155,7 @@ export function SceneRenames({ stamp }: Props) {
         row.scene_id.toLowerCase().includes(q) ||
         row.proposed_name.toLowerCase().includes(q) ||
         row.source_path.toLowerCase().includes(q) ||
-        (overrides[row.source_path] ?? "").toLowerCase().includes(q),
+        (lookupByPath(overrides, row.source_path) ?? "").toLowerCase().includes(q),
     );
   }, [items, query, overrides]);
 
@@ -205,11 +220,11 @@ export function SceneRenames({ stamp }: Props) {
         </thead>
         <tbody>
           {visibleItems.map((row) => {
-            const isApproved = approved.includes(row.source_path);
-            const isRejected = row.source_path in rejected;
-            const displayName = overrides[row.source_path] ?? row.proposed_name;
+            const isApproved = listHasPath(approved, row.source_path);
+            const isRejected = lookupByPath(rejected, row.source_path) != null;
+            const displayName = lookupByPath(overrides, row.source_path) ?? row.proposed_name;
             return (
-              <tr key={row.source_path} className={isRejected ? "rejected-row" : undefined}>
+              <tr key={pathKey(row.source_path)} className={isRejected ? "rejected-row" : undefined}>
                 <td>
                   <code>{row.scene_id}</code>
                   {isApproved && <span className="badge ready">approved</span>}

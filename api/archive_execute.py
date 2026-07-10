@@ -19,7 +19,7 @@ def stage_confirmed_archives(
     root: str | None = None,
 ) -> dict:
     store = arch_fb.load_store()
-    confirmed = list(store.confirmed_deletes.keys())
+    confirmed = arch_fb.confirmed_paths_for_stamp(stamp, store)
     if not confirmed:
         return {
             "ok": False,
@@ -38,7 +38,7 @@ def stage_confirmed_archives(
     batch_id = new_batch_id()
 
     for archive_path_str in confirmed:
-        if arch_fb.is_archive_rejected(archive_path_str, store):
+        if arch_fb.is_archive_rejected(archive_path_str, store, stamp=stamp):
             results.append({
                 "path": archive_path_str,
                 "ok": False,
@@ -66,7 +66,7 @@ def stage_confirmed_archives(
             })
             continue
 
-        keeper = store.keeper_choice.get(arch_fb.normalize_path(archive_path_str))
+        keeper = arch_fb.get_keeper(archive_path_str, store, stamp=stamp)
         if keeper == "folder":
             results.append({
                 "path": archive_path_str,
@@ -136,14 +136,16 @@ def stage_confirmed_archives(
                     })
 
     ok_count = sum(1 for row in results if row.get("ok"))
+    fail_count = len(results) - ok_count
     return {
-        "ok": ok_count > 0,
+        "ok": fail_count == 0 and ok_count > 0,
+        "partial": ok_count > 0 and fail_count > 0,
         "dry_run": dry_run,
         "stamp": stamp,
         "batch_id": batch_id,
         "library_root": str(library_root) if library_root else None,
         "delete_dir": str(library_root / "_delete-canidates") if library_root else None,
         "staged": ok_count,
-        "failed": len(results) - ok_count,
+        "failed": fail_count,
         "results": results,
     }

@@ -12,6 +12,7 @@ import {
   type InvestigationFeedbackState,
 } from "../api/client";
 import type { InvestigationItem } from "../types";
+import { pathKey } from "../utils/pathKey";
 import { useContextSidebar, useSidebarFilters } from "./ContextSidebar";
 import { HoverMenu } from "./HoverMenu";
 import { InvestigationLookupPanel } from "./InvestigationLookupPanel";
@@ -31,10 +32,6 @@ const BUCKET_HINTS: Record<string, string> = {
   _library_internal: "Merge into parent library",
   _preset_or_snippet: "Link to parent or mark resolved",
 };
-
-function pathKey(path: string) {
-  return path.toLowerCase().replace(/\\/g, "/");
-}
 
 function methodClass(method: string, confidence: string) {
   if (method === "NONE") return "badge review";

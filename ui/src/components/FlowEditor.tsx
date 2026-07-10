@@ -23,9 +23,9 @@ const GROUP_LABELS: Record<string, string> = {
 
 function loadPresetId(): string {
   try {
-    return localStorage.getItem(FLOW_PRESET_STORAGE) || "fast";
+    return localStorage.getItem(FLOW_PRESET_STORAGE) || "almost_full";
   } catch {
-    return "fast";
+    return "almost_full";
   }
 }
 

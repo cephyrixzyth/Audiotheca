@@ -41,11 +41,22 @@ export function ScanAudit({ stamp }: Props) {
   const [msg, setMsg] = useState<string | null>(null);
   const [bucketOptions, setBucketOptions] = useState<string[]>([]);
   const [insights, setInsights] = useState<Record<string, unknown> | null>(null);
+  const [insightsStatus, setInsightsStatus] = useState<"loading" | "ready" | "empty" | "error">(
+    "loading",
+  );
 
   useEffect(() => {
+    setInsightsStatus("loading");
     void fetchScanInsights(stamp)
-      .then(setInsights)
-      .catch(() => setInsights(null));
+      .then((payload) => {
+        setInsights(payload);
+        const recs = payload.recommendations;
+        setInsightsStatus(Array.isArray(recs) && recs.length > 0 ? "ready" : "empty");
+      })
+      .catch(() => {
+        setInsights(null);
+        setInsightsStatus("error");
+      });
   }, [stamp]);
 
   useEffect(() => {
@@ -91,7 +102,25 @@ export function ScanAudit({ stamp }: Props) {
         Full scan audit — every folder/archive target. Fix vendors here; overrides apply on the next scan.
       </div>
 
-      {insights && Array.isArray(insights.recommendations) && insights.recommendations.length > 0 && (
+      {insightsStatus === "loading" && (
+        <div className="count-muted" style={{ marginBottom: "1rem" }}>
+          Loading scan insights…
+        </div>
+      )}
+      {insightsStatus === "error" && (
+        <div className="banner warn" style={{ marginBottom: "1rem" }}>
+          Scan insights could not be loaded for this run.
+        </div>
+      )}
+      {insightsStatus === "empty" && (
+        <div className="count-muted" style={{ marginBottom: "1rem" }}>
+          No tuning suggestions for this run — coverage looks healthy.
+        </div>
+      )}
+      {insightsStatus === "ready" &&
+        insights &&
+        Array.isArray(insights.recommendations) &&
+        insights.recommendations.length > 0 && (
         <details className="log-panel" style={{ marginBottom: "1rem" }}>
           <summary>
             Scan insights ({insights.recommendations.length} recommendation

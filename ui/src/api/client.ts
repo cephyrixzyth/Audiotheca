@@ -36,6 +36,21 @@ async function ensureApiToken(): Promise<string> {
   return cachedToken;
 }
 
+/** Short-lived ticket for query-string surfaces (WS / media / downloads). */
+async function issueAccessTicket(): Promise<string> {
+  const res = await fetch(await apiUrl("/auth/ticket"), {
+    method: "POST",
+    headers: await authHeaders({ "Content-Type": "application/json" }),
+    body: "{}",
+  });
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(detail || "Failed to issue access ticket");
+  }
+  const data = (await res.json()) as { ticket: string };
+  return data.ticket;
+}
+
 async function authHeaders(extra?: HeadersInit): Promise<HeadersInit> {
   const token = await ensureApiToken();
   return {
@@ -481,6 +496,7 @@ export type SceneExecuteResultItem = {
 
 export type SceneExecuteResponse = {
   ok: boolean;
+  partial?: boolean;
   dry_run: boolean;
   renamed: number;
   failed: number;
@@ -1031,13 +1047,13 @@ export function fetchSpaceRecoverySummary(stamp: string): Promise<Record<string,
 }
 
 export async function spaceRecoveryReportUrl(filename: string): Promise<string> {
-  const token = await ensureApiToken();
-  return `${await apiUrl(`/space-recovery/reports/${encodeURIComponent(filename)}`)}?token=${encodeURIComponent(token)}`;
+  const ticket = await issueAccessTicket();
+  return `${await apiUrl(`/space-recovery/reports/${encodeURIComponent(filename)}`)}?ticket=${encodeURIComponent(ticket)}`;
 }
 
 export async function jobEventsUrl(jobId: string): Promise<string> {
-  const token = await ensureApiToken();
-  return `${await getWsBase()}/api/jobs/${jobId}/events?token=${encodeURIComponent(token)}`;
+  const ticket = await issueAccessTicket();
+  return `${await getWsBase()}/api/jobs/${jobId}/events?ticket=${encodeURIComponent(ticket)}`;
 }
 
 export async function openInExplorer(path: string): Promise<void> {
@@ -1406,8 +1422,11 @@ export function runReferenceDedupeEngine(body: {
   return postJson("/reference-dedupe/engine-scan", body);
 }
 
-export function exportDawSideBlueprint(home?: string): Promise<Record<string, unknown>> {
-  return postJson("/tools/daw-side/blueprint", home ? { home } : {});
+export function exportDawSideBlueprint(home?: string, apiBase?: string): Promise<Record<string, unknown>> {
+  const body: Record<string, string> = {};
+  if (home) body.home = home;
+  if (apiBase) body.api_base = apiBase;
+  return postJson("/tools/daw-side/blueprint", body);
 }
 
 export function installDawSidecar(body: {
@@ -1415,6 +1434,8 @@ export function installDawSidecar(body: {
   dry_run?: boolean;
   confirm_live?: boolean;
   copy_to_system?: boolean;
+  api_base?: string;
+  timeout_sec?: number;
 }): Promise<Record<string, unknown>> {
   return postJson("/tools/daw-side/install", body);
 }
@@ -1459,8 +1480,8 @@ export function exportWorkspaceBundle(body: {
 }
 
 export async function mediaStreamUrl(path: string): Promise<string> {
-  const token = await ensureApiToken();
-  return apiUrl(`/media/stream?path=${encodeURIComponent(path)}&token=${encodeURIComponent(token)}`);
+  const ticket = await issueAccessTicket();
+  return apiUrl(`/media/stream?path=${encodeURIComponent(path)}&ticket=${encodeURIComponent(ticket)}`);
 }
 
 export function fetchAudioWaveform(

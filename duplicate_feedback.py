@@ -22,6 +22,13 @@ REJECT_REASONS = (
 )
 
 
+def normalize_feedback_path(path: str) -> str:
+    """Stable feedback key (lowercase, / separators) — no Path.resolve()."""
+    from api.path_logic import normalize_logical_path
+
+    return normalize_logical_path(path)
+
+
 @dataclass
 class Rejection:
     dedup_key: str
@@ -198,18 +205,18 @@ def is_group_rejected(dedup_key: str, paths: list[str], store: FeedbackStore | N
     if dedup_key and (dedup_key in blocked_keys or dedup_key in blocked_fps):
         return True
 
-    path_set = {str(Path(p).resolve()) for p in paths if p}
+    path_set = {normalize_feedback_path(p) for p in paths if p}
     for row in store.rejections:
         if not row.paths:
             continue
-        rejected = {str(Path(p).resolve()) for p in row.paths if p}
+        rejected = {normalize_feedback_path(p) for p in row.paths if p}
         if rejected and rejected == path_set:
             return True
 
     for path_set_hint in hints.get("rejected_path_sets", []):
         if not path_set_hint:
             continue
-        hinted = {str(Path(p).resolve()) for p in path_set_hint if p}
+        hinted = {normalize_feedback_path(p) for p in path_set_hint if p}
         if hinted and hinted == path_set:
             return True
     return False

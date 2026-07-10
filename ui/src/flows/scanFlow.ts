@@ -46,9 +46,9 @@ export const SCAN_FLOW_PHASES: FlowPhase[] = [
   },
   {
     id: "malware_scan",
-    label: "Malware scan",
+    label: "Malware heuristics",
     description:
-      "Heuristic pass for crack tools, trojans, and suspicious executables. Review findings in the Security tab.",
+      "Fast name/content heuristics for crack tools and suspicious executables (not ClamAV). Full AV is available in the Security tab.",
     enginePhase: "Phase 1.4",
     skipKey: "malware_scan",
     group: "analyze",
@@ -60,6 +60,15 @@ export const SCAN_FLOW_PHASES: FlowPhase[] = [
     description: "Second pass for unknowns: fuzzy vendor matching and sibling-folder inference.",
     enginePhase: "Phase 1.7",
     skipKey: "deep_identify",
+    group: "analyze",
+    estimatedWeight: 6,
+  },
+  {
+    id: "ai_lookup",
+    label: "AI lookup queue",
+    description: "Offline/online lookup for remaining unknowns after deep identify.",
+    enginePhase: "Phase 1b-fallback",
+    skipKey: "ai_lookup",
     group: "analyze",
     estimatedWeight: 6,
   },
@@ -148,8 +157,8 @@ export const FLOW_PRESETS: FlowPreset[] = [
   {
     id: "fast",
     label: "Fast identify",
-    description: "Skip archive peeks and malware scan — route planning only (~40% faster on large libraries).",
-    skipPhases: ["archive_peek", "scene_peek", "malware_scan"],
+    description: "Skip archive peeks, malware scan, and AI lookup — route planning only (~40% faster on large libraries).",
+    skipPhases: ["archive_peek", "scene_peek", "malware_scan", "ai_lookup"],
     pauseBetweenPhases: false,
   },
   {
@@ -163,7 +172,16 @@ export const FLOW_PRESETS: FlowPreset[] = [
     id: "identify",
     label: "Identify only",
     description: "Scan and identify only — skip routing plan, dupes, OS lanes, and peeks.",
-    skipPhases: ["archive_peek", "scene_peek", "quarantine", "duplicates", "restructure", "verification", "malware_scan"],
+    skipPhases: [
+      "archive_peek",
+      "scene_peek",
+      "quarantine",
+      "duplicates",
+      "restructure",
+      "verification",
+      "malware_scan",
+      "ai_lookup",
+    ],
     pauseBetweenPhases: false,
   },
   {

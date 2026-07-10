@@ -113,49 +113,13 @@ fn engine_resource_path(app: &tauri::App) -> Option<PathBuf> {
     None
 }
 
-fn free_port_listeners(port: u16) {
-    #[cfg(target_os = "macos")]
-    {
-        let script = format!(
-            "pids=$(lsof -ti tcp:{port} 2>/dev/null || true); \
-             if [ -n \"$pids\" ]; then kill -9 $pids 2>/dev/null || true; fi"
-        );
-        let _ = Command::new("sh")
-            .args(["-c", &script])
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status();
-    }
-
-    #[cfg(windows)]
-    {
-        let script = format!(
-            "Get-NetTCPConnection -LocalPort {port} -ErrorAction SilentlyContinue | \
-             Select-Object -ExpandProperty OwningProcess -Unique | \
-             ForEach-Object {{ Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }}"
-        );
-        let _ = Command::new("powershell")
-            .args([
-                "-NoProfile",
-                "-NonInteractive",
-                "-Command",
-                &script,
-            ])
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status();
-    }
-}
-
 fn can_bind(port: u16) -> bool {
     TcpListener::bind(("127.0.0.1", port)).is_ok()
 }
 
 fn pick_api_port() -> u16 {
+    // Prefer a free port without killing foreign listeners on 8787–8797.
     for port in API_PORT_MIN..=API_PORT_MAX {
-        free_port_listeners(port);
         if can_bind(port) {
             if port != API_PORT_MIN {
                 eprintln!("[audiotheca] Port {API_PORT_MIN} busy — using {port} for API");

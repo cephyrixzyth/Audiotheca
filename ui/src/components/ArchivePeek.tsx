@@ -9,6 +9,7 @@ import {
 } from "../api/client";
 import type { ArchivePeekItem } from "../types";
 import { useLibraryRoot } from "../hooks/useLibraryRoot";
+import { lookupByPath, pathKey } from "../utils/pathKey";
 import { ArchiveDiffWizard } from "./ArchiveDiffWizard";
 import {
   archiveExecuteRows,
@@ -25,6 +26,9 @@ const VERDICT_LABELS: Record<string, string> = {
   NEEDS_7ZIP: "Needs 7-Zip",
   DISK_IMAGE_ISO: "ISO disk image",
   NO_MULTIPART_ARCHIVES: "Not multipart RAR",
+  SINGLE_ARCHIVE_ONLY: "Single archive only",
+  SCENE_CRACK_JUNK: "Scene / crack junk",
+  UNKNOWN_CONTENT: "Unknown content",
 };
 
 function verdictLabel(code: string): string {
@@ -43,7 +47,7 @@ export function ArchivePeek({ stamp }: Props) {
   const [verdictCounts, setVerdictCounts] = useState<Record<string, number>>({});
   const [deleteFiles, setDeleteFiles] = useState(0);
   const [deleteMb, setDeleteMb] = useState(0);
-  const [verdict, setVerdict] = useState("MATCHES_EXTRACTED_FOLDER");
+  const [verdict, setVerdict] = useState("");
   const [loading, setLoading] = useState(true);
   const [rejected, setRejected] = useState<Record<string, string>>({});
   const [confirmed, setConfirmed] = useState<Record<string, string>>({});
@@ -56,18 +60,19 @@ export function ArchivePeek({ stamp }: Props) {
     null,
   );
 
+  async function refreshFeedback() {
+    const state = await fetchArchiveFeedback(stamp);
+    setRejected(state.rejected_archives ?? {});
+    setConfirmed(state.confirmed_deletes ?? {});
+    setKeepers(state.keeper_choice ?? {});
+  }
+
   useEffect(() => {
-    fetchArchiveFeedback(stamp)
-      .then((state) => {
-        setRejected(state.rejected_archives ?? {});
-        setConfirmed(state.confirmed_deletes ?? {});
-        setKeepers(state.keeper_choice ?? {});
-      })
-      .catch(() => {
-        setRejected({});
-        setConfirmed({});
-        setKeepers({});
-      });
+    refreshFeedback().catch(() => {
+      setRejected({});
+      setConfirmed({});
+      setKeepers({});
+    });
   }, [stamp]);
 
   useEffect(() => {
@@ -91,74 +96,90 @@ export function ArchivePeek({ stamp }: Props) {
   }, [stamp, verdict, query]);
 
   async function handleReject(row: ArchivePeekItem) {
-    await rejectArchiveVerdict(stamp, {
-      archive_path: row.archive_path,
-      archive_name: row.archive_name,
-      item_name: row.item_name,
-      reason: "not_redundant",
-    });
-    setRejected((prev) => ({ ...prev, [row.archive_path]: "not_redundant" }));
-    setConfirmed((prev) => {
-      const next = { ...prev };
-      delete next[row.archive_path];
-      return next;
-    });
-    setMsg(`Marked ${row.archive_name} as not redundant`);
+    try {
+      await rejectArchiveVerdict(stamp, {
+        archive_path: row.archive_path,
+        archive_name: row.archive_name,
+        item_name: row.item_name,
+        reason: "not_redundant",
+      });
+      await refreshFeedback();
+      setMsg(`Marked ${row.archive_name} as not redundant`);
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : "Reject failed");
+    }
   }
 
   async function handleConfirm(row: ArchivePeekItem) {
-    await confirmArchiveDelete(stamp, {
-      archive_path: row.archive_path,
-      archive_name: row.archive_name,
-      item_name: row.item_name,
-    });
-    setConfirmed((prev) => ({ ...prev, [row.archive_path]: stamp }));
-    setMsg(`Confirmed delete for ${row.archive_name}`);
+    try {
+      await confirmArchiveDelete(stamp, {
+        archive_path: row.archive_path,
+        archive_name: row.archive_name,
+        item_name: row.item_name,
+      });
+      await refreshFeedback();
+      setMsg(`Confirmed delete for ${row.archive_name}`);
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : "Confirm failed");
+    }
   }
 
   async function handleKeeper(row: ArchivePeekItem, keeper: "archive" | "folder") {
-    await setArchiveKeeper(stamp, {
-      archive_path: row.archive_path,
-      keeper,
-      archive_name: row.archive_name,
-      item_name: row.item_name,
-    });
-    setKeepers((prev) => ({ ...prev, [row.archive_path]: keeper }));
-    setMsg(`Keeper set to ${keeper} for ${row.archive_name}`);
+    try {
+      await setArchiveKeeper(stamp, {
+        archive_path: row.archive_path,
+        keeper,
+        archive_name: row.archive_name,
+        item_name: row.item_name,
+      });
+      await refreshFeedback();
+      setMsg(`Keeper set to ${keeper} for ${row.archive_name}`);
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : "Keeper update failed");
+    }
   }
 
   async function handleExecute(dryRun: boolean, confirmLive = false) {
-    const res = await executeArchiveStaging(stamp, {
-      dry_run: dryRun,
-      confirm_live: confirmLive || undefined,
-      root: libraryRoot || undefined,
-    });
-    if (!res.ok && !res.results?.length) {
-      setExecuteResults([]);
-      setExecuteSummary(null);
-      setMsg(res.error ?? "Confirm archive rows first, then preview staging");
-      return;
+    try {
+      const res = await executeArchiveStaging(stamp, {
+        dry_run: dryRun,
+        confirm_live: confirmLive || undefined,
+        root: libraryRoot || undefined,
+      });
+      if (!res.ok && !(res as { partial?: boolean }).partial && !res.results?.length) {
+        setExecuteResults([]);
+        setExecuteSummary(null);
+        setMsg(res.error ?? "Confirm archive rows first, then preview staging");
+        return;
+      }
+      setExecuteDryRun(dryRun);
+      setExecuteResults(
+        archiveExecuteRows(
+          (res.results ?? []) as Array<{
+            path: string;
+            ok: boolean;
+            dry_run?: boolean;
+            staged_to?: string;
+            multipart?: boolean;
+            error?: string;
+          }>,
+          dryRun,
+        ),
+      );
+      setExecuteSummary({ staged: res.staged, failed: res.failed });
+      const partial = Boolean((res as { partial?: boolean }).partial);
+      const outcome = partial ? "partial" : res.ok ? "ok" : "failed";
+      setMsg(
+        dryRun
+          ? `Dry run (${outcome}): ${res.staged} archive(s) would stage to _delete-canidates`
+          : `Live (${outcome}): ${res.staged} archive(s) staged (${res.failed} failed)`,
+      );
+      if (!dryRun) {
+        await refreshFeedback();
+      }
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : "Execute failed");
     }
-    setExecuteDryRun(dryRun);
-    setExecuteResults(
-      archiveExecuteRows(
-        (res.results ?? []) as Array<{
-          path: string;
-          ok: boolean;
-          dry_run?: boolean;
-          staged_to?: string;
-          multipart?: boolean;
-          error?: string;
-        }>,
-        dryRun,
-      ),
-    );
-    setExecuteSummary({ staged: res.staged, failed: res.failed });
-    setMsg(
-      dryRun
-        ? `Dry run: ${res.staged} archive(s) would stage to _delete-canidates`
-        : `Live: ${res.staged} archive(s) staged (${res.failed} failed)`,
-    );
   }
 
   const confirmedCount = Object.keys(confirmed).length;
@@ -275,11 +296,11 @@ export function ArchivePeek({ stamp }: Props) {
           </thead>
           <tbody>
             {items.map((row) => {
-              const isRejected = row.archive_path in rejected;
-              const isConfirmed = row.archive_path in confirmed;
-              const keeper = keepers[row.archive_path];
+              const isRejected = lookupByPath(rejected, row.archive_path) != null;
+              const isConfirmed = lookupByPath(confirmed, row.archive_path) != null;
+              const keeper = lookupByPath(keepers, row.archive_path);
               return (
-                <tr key={row.archive_path}>
+                <tr key={pathKey(row.archive_path)}>
                   <td>
                     <span
                       className={`badge ${

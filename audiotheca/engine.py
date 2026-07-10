@@ -584,7 +584,7 @@ class DeduplicationEngine(
 
             max_malware_files = 25_000
             malware_progress = PhaseProgress(
-                "Phase 1.4 - Malware scan", max_malware_files, "file"
+                "Phase 1.4 - Malware heuristics", max_malware_files, "file"
             )
 
             def _malware_progress(scanned: int, detail: str) -> None:
@@ -608,7 +608,7 @@ class DeduplicationEngine(
             )
         else:
             print("  [SKIP] Malware scan disabled by scan options.")
-        self._checkpoint("malware_scan", "Phase 1.4 - Malware scan")
+        self._checkpoint("malware_scan", "Phase 1.4 - Malware heuristics")
 
         results.sort(key=lambda r: (r["source_bin"], r["original_name"].lower()))
 

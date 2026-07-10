@@ -30,10 +30,23 @@ Write-Host "Building Audiotheca Windows installers (v$UiVersion)..." -Foreground
 
 $env:CARGO_TARGET_DIR = Join-Path $Root "ui\src-tauri\target"
 Push-Location (Join-Path $Root "ui")
-if (-not (Test-Path "node_modules")) {
-    npm install
+if (-not (Test-Path "node_modules\@tauri-apps\cli")) {
+    Write-Host "Installing UI dependencies (npm ci)..." -ForegroundColor Cyan
+    npm ci
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "npm ci failed — falling back to npm install"
+        npm install
+    }
+}
+$tauriCli = Join-Path (Get-Location) "node_modules\@tauri-apps\cli\tauri.js"
+if (-not (Test-Path $tauriCli)) {
+    Write-Error "Tauri CLI missing after npm install: $tauriCli"
 }
 npm run tauri:build
+if ($LASTEXITCODE -ne 0) {
+    Pop-Location
+    Write-Error "tauri:build failed with exit $LASTEXITCODE"
+}
 Pop-Location
 
 if (-not (Test-Path $BundleDir)) {

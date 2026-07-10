@@ -51,6 +51,66 @@ _BLOCKED_NETS = (
 
 PUBLIC_HTTP_PATHS = frozenset({"/api/health", "/api/auth/token"})
 
+# Short-lived URL tickets for WS / media / file downloads (avoid long-lived bearer in query strings).
+_TICKET_TTL_S = float(os.environ.get("AUDIOTHECA_TICKET_TTL_S", "300"))
+_tickets: dict[str, float] = {}
+
+
+def issue_access_ticket(*, ttl_s: float | None = None) -> dict[str, object]:
+    """Create a single-purpose access ticket for query-string auth surfaces."""
+    ttl = float(ttl_s if ttl_s is not None else _TICKET_TTL_S)
+    ttl = max(30.0, min(ttl, 3600.0))
+    now = time.monotonic()
+    # Drop expired tickets opportunistically.
+    expired = [key for key, exp in _tickets.items() if exp <= now]
+    for key in expired:
+        _tickets.pop(key, None)
+    ticket = secrets.token_urlsafe(24)
+    _tickets[ticket] = now + ttl
+    audit("access_ticket_issued", ttl_s=ttl)
+    return {"ticket": ticket, "expires_in": int(ttl)}
+
+
+def verify_access_ticket(ticket: str | None) -> bool:
+    if not ticket:
+        return False
+    now = time.monotonic()
+    expires = _tickets.get(ticket)
+    if expires is None:
+        return False
+    if expires <= now:
+        _tickets.pop(ticket, None)
+        return False
+    return True
+
+
+def extract_bearer_token(request: Request) -> str | None:
+    auth = request.headers.get("authorization", "")
+    if auth.lower().startswith("bearer "):
+        return auth[7:].strip()
+    # Prefer short-lived tickets over the long-lived API token in query strings.
+    ticket = request.query_params.get("ticket")
+    if ticket and verify_access_ticket(ticket):
+        return get_api_token()
+    # Legacy fallback: still accept ?token= for older clients / bookmarks.
+    return request.query_params.get("token") or None
+
+
+def verify_token(token: str | None) -> bool:
+    if not token:
+        return False
+    expected = get_api_token()
+    return secrets.compare_digest(token, expected)
+
+
+def verify_ws_credential(credential: str | None) -> bool:
+    """Accept either a short-lived ticket or the long-lived API token (legacy)."""
+    if not credential:
+        return False
+    if verify_access_ticket(credential):
+        return True
+    return verify_token(credential)
+
 
 class RateLimiter:
     """Simple in-memory sliding-window rate limiter."""
@@ -87,20 +147,6 @@ def get_api_token() -> str:
     TOKEN_PATH.write_text(token, encoding="utf-8")
     audit("api_token_created", path=str(TOKEN_PATH))
     return token
-
-
-def extract_bearer_token(request: Request) -> str | None:
-    auth = request.headers.get("authorization", "")
-    if auth.lower().startswith("bearer "):
-        return auth[7:].strip()
-    return request.query_params.get("token") or None
-
-
-def verify_token(token: str | None) -> bool:
-    if not token:
-        return False
-    expected = get_api_token()
-    return secrets.compare_digest(token, expected)
 
 
 def require_token(request: Request) -> str:
