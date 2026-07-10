@@ -2,7 +2,52 @@
 
 ### Release note: v1.0.7 (failed)
 
-Git tag **v1.0.7** was published with a broken Windows NSIS pre-install hook (sidecar processes not terminated before file copy). Installers from that tag may report locked files. Use **v1.0.8+** or **v1.0.10**. The remote tag is retained for history; do not delete without maintainer coordination.
+Git tag **v1.0.7** was published with a broken Windows NSIS pre-install hook (sidecar processes not terminated before file copy). Installers from that tag may report locked files. Use **v1.0.8+** or **v1.0.12**. The remote tag is retained for history; do not delete without maintainer coordination.
+
+## Web UI & API 1.0.12
+
+Engine remains **10.0.0**.
+
+### API architecture & security
+
+- **Domain routers** — `api/server.py` slimmed to app wiring; routes live under `api/routers/` (auth, runs, jobs, browse, vendors, system, tools, environment, security) with shared deps in `api/deps.py`
+- **Short-lived access tickets** — `POST /api/auth/ticket` issues 5-minute tickets; UI uses `?ticket=` for WebSocket progress, media preview, and file downloads instead of embedding the long-lived bearer token in URLs (legacy `?token=` still accepted)
+- **`AUDIOTHECA_TICKET_TTL_S`** — optional env override (30 s–1 h)
+
+### Feedback & execute hardening
+
+- **Logical path keys** — scene, archive, investigation, restructure, and duplicate feedback stores normalize paths via `api.path_logic`; v2 stores with `_legacy` migration for stamp-scoped rejects/overrides
+- **Execute semantics** — scene and archive live execute return `partial` when some items fail; `ok` only when all succeed; UI always refetches after live execute
+- **Dedupe** — `VERSION_COEXIST` group kind for side-by-side product versions; multi-file content check (up to 3 files) in `audiotheca/dedupe.py`
+
+### UI & scan polish
+
+- **Scan defaults** — **Almost full** preset; pause restored; **ai_lookup** included in processing flow
+- **Scan audit UX** — loading, empty, and error states in `ScanAudit.tsx`
+- **Malware labels** — user-facing copy uses “Malware heuristics”
+- **DAW sidecar** — dynamic `api_base`, 45-minute timeout, AU install on macOS; panel uses `getApiBase()`
+- **Theme studio** — auto-opens editor on first visit; archive chips readable; ISO multipart labels; scan insights API
+
+### Desktop & build
+
+- **Version alignment** — package, Tauri, API service, and Help panel at **1.0.12**
+- **Tauri shell** — removed aggressive `free_port_listeners` kill on startup (no longer terminates unrelated processes on API port)
+- **macOS** — desktop data in Application Support (writable); ad-hoc signing at build time
+- **Build scripts** — `scripts/build-installers.ps1` uses `npm ci`; local Tauri via `node ./node_modules/@tauri-apps/cli/tauri.js`
+- **`requirements.txt`** — pins `pydantic-core==2.46.4` for reproducible pytest
+
+### Tests
+
+- **Vitest** — `ui/src/utils/pathKey.test.ts` (logical path key helpers)
+- **Playwright** — `ui/e2e/scan-flow.spec.ts` happy-path smoke (`npm run test:e2e`)
+
+### Documentation
+
+- All user-facing guides bumped to **1.0.12**; `SECURITY.md` documents access tickets; `TESTING.md` covers Vitest/Playwright
+
+## Web UI & API 1.0.6 – 1.0.11 (installer & desktop)
+
+Intermediate releases between **1.0.5** and **1.0.12** focused on Windows NSIS/MSI upgrade hooks (**1.0.8+**), portable launcher polish, macOS quarantine/signing fixes, and GHCR image tags aligned to each release. See GitHub Releases for per-tag notes.
 
 ## Web UI & API 1.0.5
 
@@ -213,7 +258,7 @@ Engine remains **10.0.0**. This release marks the browser UI, FastAPI layer, and
 
 ### Web UI & API (v0.2)
 
-- **FastAPI** (`api/server.py`) — runs, investigation, duplicates, restructure, archive-peek, scene renames, decisions, explorer, jobs + WebSocket.
+- **FastAPI** (`api/server.py`, domain routers added in **1.0.12**) — runs, investigation, duplicates, restructure, archive-peek, scene renames, decisions, explorer, jobs + WebSocket.
 - **React/Vite UI** (`ui/`) — Dashboard, Scan, Investigation, Duplicates, Restructure, Archives, Scene renames tabs.
 - **Features** — Open in Explorer, duplicate keeper export to `approved_{stamp}.json`, scan trigger with live progress.
 - **Launchers** — `start-ui.ps1`, `start-api.ps1`, `start-tauri.ps1` (quoted paths, prerequisite checks).

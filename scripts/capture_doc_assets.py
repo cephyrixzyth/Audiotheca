@@ -53,6 +53,7 @@ VIDEO_CLIPS: list[tuple[str, list[str]]] = [
     ("investigation-lookup.mp4", ["investigation"]),
     ("restructure-live-staging.mp4", ["restructure"]),
     ("file-explorer-and-archives.mp4", ["archives"]),
+    ("archive-diff-wizard.mp4", ["archives"]),
     ("environment-and-spec-catalog.mp4", ["environment"]),
     ("audio-preview-library.mp4", ["dashboard"]),
     ("ai-lookup-review.mp4", ["scan"]),
@@ -837,6 +838,13 @@ def capture() -> None:
                     for tab_id in tabs:
                         _click_tab(vpage, tab_id)
                         vpage.wait_for_timeout(1600)
+                    if "archive-diff" in video_name:
+                        vpage.locator('button.bucket-chip:has-text("All")').click()
+                        vpage.wait_for_timeout(600)
+                        diff_btn = vpage.get_by_role("button", name="Diff", exact=True).first
+                        if diff_btn.count():
+                            diff_btn.click()
+                            vpage.wait_for_timeout(2200)
                     if "file-explorer" in video_name or "audio-preview" in video_name:
                         if "audio-preview" in video_name:
                             wav_dir = str((LIB / "a" / "AcmeAudio" / "SynthOne").resolve())
@@ -911,6 +919,13 @@ def capture() -> None:
                 for tab_id in tabs:
                     _click_tab(vpage, tab_id)
                     vpage.wait_for_timeout(1600)
+                if "archive-diff" in video_name:
+                    vpage.locator('button.bucket-chip:has-text("All")').click()
+                    vpage.wait_for_timeout(600)
+                    diff_btn = vpage.get_by_role("button", name="Diff", exact=True).first
+                    if diff_btn.count():
+                        diff_btn.click()
+                        vpage.wait_for_timeout(2200)
                 if "file-explorer" in video_name or "audio-preview" in video_name:
                     if "audio-preview" in video_name:
                         wav_dir = str((LIB / "a" / "AcmeAudio" / "SynthOne").resolve())

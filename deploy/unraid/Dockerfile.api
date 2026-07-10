@@ -1,13 +1,13 @@
 # Audiotheca API + engine — Unraid / Docker Compose
-# Web UI / API 1.0.0 · Engine 10.0.0
+# Web UI / API 1.0.12 · Engine 10.0.0
 # syntax=docker/dockerfile:1
 
 ARG PYTHON_VERSION=3.13
-ARG AUDIOTHECA_VERSION=1.0.0
+ARG AUDIOTHECA_VERSION=1.0.12
 ARG ENGINE_VERSION=10.0.0
 FROM python:${PYTHON_VERSION}-slim-bookworm AS runtime
 
-ARG AUDIOTHECA_VERSION=1.0.0
+ARG AUDIOTHECA_VERSION=1.0.12
 ARG ENGINE_VERSION=10.0.0
 
 RUN apt-get update \

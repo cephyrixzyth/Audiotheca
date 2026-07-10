@@ -1,9 +1,9 @@
 # Audiotheca all-in-one — API + nginx UI (Unraid Add Container)
-# Web UI / API 1.0.0 · Engine 10.0.0
+# Web UI / API 1.0.12 · Engine 10.0.0
 # syntax=docker/dockerfile:1
 
 ARG PYTHON_VERSION=3.13
-ARG AUDIOTHECA_VERSION=1.0.0
+ARG AUDIOTHECA_VERSION=1.0.12
 ARG ENGINE_VERSION=10.0.0
 FROM node:24-alpine AS ui-build
 
@@ -18,7 +18,7 @@ RUN npm run build
 
 FROM python:${PYTHON_VERSION}-slim-bookworm
 
-ARG AUDIOTHECA_VERSION=1.0.0
+ARG AUDIOTHECA_VERSION=1.0.12
 ARG ENGINE_VERSION=10.0.0
 
 RUN apt-get update \

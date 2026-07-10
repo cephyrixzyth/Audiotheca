@@ -2,7 +2,7 @@
 
 This guide is for **another machine or another user** validating Audiotheca without the original author's library paths or network share.
 
-Engine **10.0.0** · Web UI **1.0.5**
+Engine **10.0.0** · Web UI **1.0.12**
 
 **Overview and UI tour:** [main README](../README.md) · **Doc screenshots:** [assets/ASSETS.md](assets/ASSETS.md)
 
@@ -142,6 +142,8 @@ Use this order on **your** library (dry-run only until you trust results).
 | Step | Action | Pass criteria |
 |------|--------|---------------|
 | 1 | `python -m pytest tests/ -q` | All tests green |
+| 1b | `cd ui && npm test` | Vitest unit tests green (`pathKey.test.ts`) |
+| 1c | `cd ui && npm run test:e2e` | Playwright scan-flow smoke passes (API must be running) |
 | 2 | Temp-folder dry run (above) | `Run_Summary_*.txt` appears |
 | 3 | Full dry run on real library | Engine completes; 0 unexpected failures in log |
 | 4 | Open UI → **Dashboard** | Latest run listed; gauges load |
@@ -156,12 +158,31 @@ Do **not** run live moves (`--live` or `dry_run: false`) until you have reviewed
 
 ---
 
+## 5b. UI automated tests (Vitest + Playwright)
+
+From `ui/` after `npm install`:
+
+```powershell
+cd ui
+npm test                  # Vitest — path key helpers (fast, no browser)
+npm run test:e2e          # Playwright — scan flow smoke (needs API on 8787 + dev server)
+```
+
+Playwright config: `ui/playwright.config.ts`. E2E spec: `ui/e2e/scan-flow.spec.ts`.
+
+For CI-style runs, start the API in one terminal (`python -m api.server`) before `npm run test:e2e`.
+
+---
+
 ## 6. API smoke test (no browser)
 
 ```powershell
 # Token (localhost only)
 $token = (Invoke-RestMethod http://127.0.0.1:8787/api/auth/token).token
 $headers = @{ Authorization = "Bearer $token" }
+
+# Optional: short-lived ticket for query-string surfaces (1.0.12+)
+$ticket = (Invoke-RestMethod http://127.0.0.1:8787/api/auth/ticket -Method Post -Headers $headers).ticket
 
 Invoke-RestMethod http://127.0.0.1:8787/api/health -Headers $headers
 Invoke-RestMethod http://127.0.0.1:8787/api/runs -Headers $headers

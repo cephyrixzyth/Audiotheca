@@ -2,7 +2,7 @@
 
 Start with the [main README](../README.md) for overview, quick start, UI tour, and media placeholders.
 
-Engine **10.0.0** · Web UI **1.0.5**
+Engine **10.0.0** · Web UI **1.0.12**
 
 ---
 
@@ -17,7 +17,7 @@ Engine **10.0.0** · Web UI **1.0.5**
 | Set library path & env vars | [CONFIGURATION.md](CONFIGURATION.md) |
 | Understand scan phases & reports | [FEATURE_GUIDE.md](FEATURE_GUIDE.md) |
 | Fix problems | [DEBUG_RUNBOOK.md](DEBUG_RUNBOOK.md) · [FAQ.md](FAQ.md) |
-| API security & tokens | [SECURITY.md](SECURITY.md) |
+| API security, tokens & tickets | [SECURITY.md](SECURITY.md) |
 | Build desktop installer | [TAURI_BUILD.md](TAURI_BUILD.md) |
 | Architecture & roadmap | [ARCHITECTURE_AND_UI_ROADMAP.md](ARCHITECTURE_AND_UI_ROADMAP.md) |
 | **94-code spec catalog** | [SPEC_CATALOG.md](SPEC_CATALOG.md) |

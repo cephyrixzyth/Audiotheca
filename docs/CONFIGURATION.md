@@ -1,6 +1,6 @@
 # Audiotheca — Configuration Reference
 
-Engine **10.0.0** · API **1.0.5**
+Engine **10.0.0** · API **1.0.12**
 
 Overview and env quick-start: [main README](../README.md).
 
@@ -35,6 +35,7 @@ Alternative allowlist file: `dedupe_reports/.library_roots.json` (see API securi
 | `AUDIOTHECA_API_PORT` | `8787` | HTTP port |
 | `AUDIOTHECA_API_HOST` | `127.0.0.1` | Bind address — keep localhost unless you know what you are doing |
 | `AUDIOTHECA_API_TOKEN` | *(auto)* | Fixed bearer token; else written to `dedupe_reports/.api_token` |
+| `AUDIOTHECA_TICKET_TTL_S` | `300` | Short-lived access ticket lifetime (30–3600 s) for WebSocket/media URLs |
 | `AUDIOTHECA_NO_RELOAD` | unset | Set `1` to disable uvicorn reload in dev |
 
 ### UI (Vite dev server)
@@ -136,6 +137,7 @@ Without 7-Zip, `.zip` peek still works; `.rar`/`.7z`/`.iso` show `NEEDS_7ZIP` in
 
 - API binds **127.0.0.1** only
 - Bearer token required for all `/api/*` except `/api/health` and localhost `/api/auth/token`
+- WebSocket, media, and download URLs use short-lived tickets from `POST /api/auth/ticket` (`?ticket=`) — see [Security](SECURITY.md)
 - Live execute endpoints require explicit `dry_run: false` + `confirm_live: true`
 
 Details: [Security](SECURITY.md)

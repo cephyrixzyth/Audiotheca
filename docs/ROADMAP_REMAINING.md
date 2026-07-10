@@ -1,8 +1,8 @@
 # Audiotheca — Remaining Roadmap (phases E–L)
 
-**As of 2026-07-06** · Engine **10.0.0** · Web UI **1.0.5** · Release **[v1.0.10](https://github.com/chrisjrovira/Audiotheca/releases/tag/v1.0.10)**
+**As of 2026-07-10** · Engine **10.0.0** · Web UI **1.0.12** · Release **[v1.0.12](https://github.com/chrisjrovira/Audiotheca/releases/tag/v1.0.12)**
 
-Phases **0–5** and spec waves **A–R** are complete ([PHASED_ROADMAP.md](PHASED_ROADMAP.md), [SPEC_CATALOG.md](SPEC_CATALOG.md)). Phases **E–L** below are complete as of v1.0.10.
+Phases **0–5** and spec waves **A–R** are complete ([PHASED_ROADMAP.md](PHASED_ROADMAP.md), [SPEC_CATALOG.md](SPEC_CATALOG.md)). Phases **E–L** below are complete as of v1.0.12. The **1.0.12 review upgrade** (API routers, access tickets, path keys, UI tests) is also complete.
 
 ---
 
@@ -11,12 +11,12 @@ Phases **0–5** and spec waves **A–R** are complete ([PHASED_ROADMAP.md](PHAS
 | # | Item | Owner | Status |
 |---|------|-------|--------|
 | E1 | `audio-preview.png` — fix capture or manual still | scripts + README | ☑ |
-| E2 | Align secondary docs to current version | docs | ☑ |
+| E2 | Align secondary docs to current version | docs | ☑ (2026-07-10 → **1.0.12**) |
 | E3 | Help panel in-app copy — installer/portable strings | `HelpPanel.tsx` | ☑ |
-| E4 | Re-capture header screenshots showing Web UI **1.0.5** | `capture_doc_assets.py` | ☑ |
+| E4 | Re-capture header screenshots showing Web UI **1.0.12** | `capture_doc_assets.py` | ☑ (2026-07-10) |
 | E5 | Optional walkthrough MP4s: environment/spec, investigation lookup, audio preview | `docs/assets/videos/` | ☑ |
 
-**Exit:** README + ASSETS checklist fully ☑; no stale version strings in user-facing docs.
+**Exit:** README + ASSETS checklist fully ☑; version strings in user-facing docs match **1.0.12** (screenshot re-capture optional follow-up).
 
 ---
 
@@ -100,7 +100,7 @@ From [ARCHITECTURE_AND_UI_ROADMAP.md](ARCHITECTURE_AND_UI_ROADMAP.md) Phase 4:
 |---|------|--------|
 | L1 | Delete or document failed **v1.0.7** tag on GitHub | ☑ |
 | L2 | Tag **v1.0.9+** after Phase E–F land | ☑ |
-| L3 | Docker GHCR images aligned to 1.0.5 | ☑ |
+| L3 | Docker GHCR images aligned to 1.0.12 | ☑ |
 
 ---
 
@@ -110,7 +110,7 @@ From [ARCHITECTURE_AND_UI_ROADMAP.md](ARCHITECTURE_AND_UI_ROADMAP.md) Phase 4:
 E (polish) → F (execute UI) → G (reference engine) → H (SQLite) → I (engine) → J/K (optional)
 ```
 
-**All phases E–L complete** as of v1.0.10.
+**All phases E–L complete** as of v1.0.12.
 
 ---
 

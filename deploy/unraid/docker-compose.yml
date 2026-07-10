@@ -10,7 +10,7 @@ services:
       dockerfile: deploy/unraid/Dockerfile.api
       args:
         PYTHON_VERSION: ${PYTHON_VERSION:-3.13}
-        AUDIOTHECA_VERSION: "1.0.5"
+        AUDIOTHECA_VERSION: "${AUDIOTHECA_VERSION:-1.0.12}"
         ENGINE_VERSION: "10.0.0"
     container_name: audiotheca-api
     restart: unless-stopped
@@ -46,7 +46,7 @@ services:
       context: ../..
       dockerfile: deploy/unraid/Dockerfile.ui
       args:
-        AUDIOTHECA_VERSION: "1.0.5"
+        AUDIOTHECA_VERSION: "${AUDIOTHECA_VERSION:-1.0.12}"
         VITE_DEFAULT_LIBRARY_ROOT: ${LIBRARY_CONTAINER_PATH:-/library}
     container_name: audiotheca-ui
     restart: unless-stopped
@@ -106,7 +106,7 @@ services:
       dockerfile: deploy/unraid/Dockerfile.api
       args:
         PYTHON_VERSION: ${PYTHON_VERSION:-3.13}
-        AUDIOTHECA_VERSION: "1.0.5"
+        AUDIOTHECA_VERSION: "${AUDIOTHECA_VERSION:-1.0.12}"
         ENGINE_VERSION: "10.0.0"
     container_name: audiotheca-space-recovery
     env_file: .env
@@ -179,7 +179,7 @@ services:
       dockerfile: deploy/unraid/Dockerfile
       args:
         PYTHON_VERSION: ${PYTHON_VERSION:-3.13}
-        AUDIOTHECA_VERSION: "1.0.5"
+        AUDIOTHECA_VERSION: "${AUDIOTHECA_VERSION:-1.0.12}"
         ENGINE_VERSION: "10.0.0"
         VITE_DEFAULT_LIBRARY_ROOT: ${LIBRARY_CONTAINER_PATH:-/library}
     container_name: audiotheca

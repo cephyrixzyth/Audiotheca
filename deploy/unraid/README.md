@@ -4,7 +4,7 @@ Production Docker stack: **API** (FastAPI + scan engine) + **UI** (nginx + Vite 
 
 Designed for Unraid 6.x/7.x where the audio library lives on local array paths (`/mnt/user/...`), not over SMB from a PC.
 
-Main project docs: [README](../../README.md) · Engine **10.0.0** · Web UI **1.0.5**
+Main project docs: [README](../../README.md) · Engine **10.0.0** · Web UI **1.0.12**
 
 ## Add Container (recommended)
 
@@ -24,7 +24,7 @@ git clone <your-repo-url> audiotheca-src
 ```bash
 cd /mnt/user/appdata/audiotheca-src
 bash deploy/unraid/build-image.sh
-# tags: audiotheca/unraid:latest
+# tags: audiotheca/unraid:latest and audiotheca/unraid:<version from tauri.conf.json>
 ```
 
 ### 3. Install the Docker template

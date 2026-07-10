@@ -2,7 +2,7 @@
 
 Use this runbook when a scan fails, produces unexpected results, or appears hung.
 
-Engine version at time of writing: **10.0.0**
+Engine version at time of writing: **10.0.0** · Web UI **1.0.12**
 
 See also [main README](../README.md) troubleshooting table and [FAQ](FAQ.md).
 

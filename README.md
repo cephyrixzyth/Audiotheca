@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | **Engine** | 10.0.0 |
-| **Web UI / API** | 1.0.5 |
+| **Web UI / API** | 1.0.12 |
 | **Primary platform** | Windows (CLI, browser UI, Tauri desktop) |
 
 ---
@@ -13,7 +13,7 @@
 ## Table of contents
 
 - [What Audiotheca does](#what-audiotheca-does)
-- [Capabilities overview (UI 1.0.5)](#capabilities-overview-ui-103)
+- [Capabilities overview (UI 1.0.12)](#capabilities-overview-ui-1012)
 - [Who should read what](#who-should-read-what)
 - [Quick start (Windows)](#quick-start-windows)
 - [First scan walkthrough](#first-scan-walkthrough)
@@ -49,9 +49,9 @@ When you are ready, live runs support **per-section or per-item approval** with 
 
 ---
 
-## Capabilities overview (UI 1.0.5)
+## Capabilities overview (UI 1.0.12)
 
-Web UI **1.0.5** completes the **94-code architecture spec catalog** (waves A–R). Every SYS-ING, AUD-PIP, AI-SEC, LFC-ORCH, and UI-LOG code has a backend handler or UI surface, API route, and pytest coverage. See [Spec catalog](docs/SPEC_CATALOG.md).
+Web UI **1.0.12** ships the full **94-code architecture spec catalog** (waves A–R) plus review-hardening from the 1.0.12 upgrade: domain **API routers**, short-lived **access tickets** for WebSocket/media URLs, **logical path keys** across feedback stores, stamp-scoped scene/archive overrides, Vitest + Playwright smoke tests, and dedupe **VERSION_COEXIST** grouping. See [Spec catalog](docs/SPEC_CATALOG.md) and [Changelog](docs/CHANGELOG.md).
 
 | Area | What you get in the UI |
 |------|-------------------------|
@@ -89,7 +89,7 @@ Set `AUDIOTHECA_LIBRARY_ROOT` to **your** library path before scanning — never
 
 **Desktop installer (recommended):** download from [GitHub Releases](https://github.com/chrisjrovira/Audiotheca/releases/latest) (Windows `.msi`, NSIS setup, portable zip; macOS `.dmg`; Linux `.AppImage` / `.deb`) or build with `.\scripts\build-installers.ps1` — see [Install guide](docs/INSTALL.md#pre-built-installers).
 
-**Portable:** extract `Audiotheca-Portable-1.0.0-win64.zip` and run `Run Audiotheca.bat`.
+**Portable:** extract `Audiotheca-Portable-1.0.12-win64.zip` and run `Run Audiotheca.bat`.
 
 **Developer / CLI path:**
 
@@ -218,7 +218,7 @@ Dashboard · Scan · Review ▾ · Library · System ▾ · Help
 | **Environment** | Dependency health & repairs, **theme studio**, mount watcher (MNT-LSTN), **cloud & S3 telemetry**, **orchestration tools** (NET-SAFE, CLN-SWEEP, XFER-BNDL, …), **94-code spec catalog** panel, virtual paths, preview session, audit log |
 | **Vendors** | Vendor gaps, web harvest inbox, keyword export |
 
-**Cross-cutting UI features (engine 10 / UI 1.0.5):**
+**Cross-cutting UI features (engine 10 / UI 1.0.12):**
 
 - **In-app file explorer** — top-bar **Library**, or **Browse** on path links; list folders or archive contents without extracting.
 - **Audio preview (AUTO-AUD)** — hover/select WAV/MP3/FLAC in the explorer; waveform, LUFS/BPM/key badges; tempo sync and pitch from **Environment → Preview session**.
@@ -464,7 +464,7 @@ Build GIFs from MP4 sources: `python scripts/build_doc_gifs.py`. Capture instruc
 | **[Configuration](docs/CONFIGURATION.md)** | Environment variables, paths, scan options |
 | **[Feature guide](docs/FEATURE_GUIDE.md)** | Phases, archive peek, reports, API |
 | **[FAQ](docs/FAQ.md)** | Common questions |
-| **[Security](docs/SECURITY.md)** | API token, path allowlist, live-run guards |
+| **[Security](docs/SECURITY.md)** | API token, access tickets, path allowlist, live-run guards |
 | **[Debug runbook](docs/DEBUG_RUNBOOK.md)** | Troubleshooting, hung scans |
 | **[Changelog](docs/CHANGELOG.md)** | Version history |
 | **[Tauri build](docs/TAURI_BUILD.md)** | Desktop app packaging |
@@ -483,7 +483,7 @@ Full index: [docs/README.md](docs/README.md).
 ```
 audiotheca/
 ├── main.py                      # Engine entry point
-├── api/                         # FastAPI report viewer + job runner
+├── api/                         # FastAPI app (server.py + domain routers/)
 ├── ui/                          # React + Vite + Tauri shell
 ├── audiotheca/                  # Engine modules (config, routing, scan, ai_lookup, …)
 ├── archive_peek.py              # Archive listing, scene identity
@@ -514,17 +514,17 @@ python scripts/library_probe.py                      # Lightweight library stats
 
 ## Docker (Unraid / Linux / Docker Desktop)
 
-Engine **10.0.0** · Web UI / API **1.0.5**
+Engine **10.0.0** · Web UI / API **1.0.12**
 
 ### Pull from GitHub Container Registry
 
-Release tags (`v*`) publish three images to GHCR (replace `1.0.2` with your release version):
+Release tags (`v*`) publish three images to GHCR (replace `1.0.12` with your release version):
 
 | Image | Use |
 | --- | --- |
-| `ghcr.io/chrisjrovira/audiotheca:1.0.2` | All-in-one — API + nginx UI (Unraid Add Container) |
-| `ghcr.io/chrisjrovira/audiotheca-api:1.0.2` | API / engine only (Docker Compose `api` service) |
-| `ghcr.io/chrisjrovira/audiotheca-ui:1.0.2` | Static UI only (Docker Compose `ui` service) |
+| `ghcr.io/chrisjrovira/audiotheca:1.0.12` | All-in-one — API + nginx UI (Unraid Add Container) |
+| `ghcr.io/chrisjrovira/audiotheca-api:1.0.12` | API / engine only (Docker Compose `api` service) |
+| `ghcr.io/chrisjrovira/audiotheca-ui:1.0.12` | Static UI only (Docker Compose `ui` service) |
 
 Each release tag also publishes `:latest` on the all-in-one, API, and UI images.
 
@@ -532,7 +532,7 @@ Each release tag also publishes `:latest` on the all-in-one, API, and UI images.
 # Log in once (read:packages is enough to pull public images)
 echo "$GITHUB_TOKEN" | docker login ghcr.io -u YOUR_GITHUB_USER --password-stdin
 
-docker pull ghcr.io/chrisjrovira/audiotheca:1.0.2
+docker pull ghcr.io/chrisjrovira/audiotheca:1.0.12
 ```
 
 **All-in-one** — API + nginx UI in a single container (Unraid Add Container template):
@@ -542,7 +542,7 @@ docker run -d --name audiotheca \
   -p 4210:80 -p 4211:8787 \
   -v /path/to/appdata:/data \
   -v /path/to/library:/library:ro \
-  ghcr.io/chrisjrovira/audiotheca:1.0.2
+  ghcr.io/chrisjrovira/audiotheca:1.0.12
 ```
 
 Open `http://localhost:4210`. Appdata holds reports, scan cache, and the API token (`AUDIOTHECA_HOME=/data`).
@@ -552,11 +552,11 @@ Open `http://localhost:4210`. Appdata holds reports, scan cache, and the API tok
 ```bash
 cd deploy/unraid
 cp .env.example .env   # set LIBRARY_HOST_PATH to your library on the host
-# Optional: set image: ghcr.io/chrisjrovira/audiotheca-api:1.0.2 in compose overrides
+# Optional: set image: ghcr.io/chrisjrovira/audiotheca-api:1.0.12 in compose overrides
 docker compose up -d --build
 ```
 
-Build locally instead: `bash deploy/unraid/build-image.sh` (tags `audiotheca/unraid:1.0.2`, `:latest`).
+Build locally instead: `bash deploy/unraid/build-image.sh` (tags `audiotheca/unraid:1.0.12`, `:latest`).
 
 **Windows Docker Desktop:** `deploy/unraid/start-local.ps1` after copying `.env.example` → `.env`.
 

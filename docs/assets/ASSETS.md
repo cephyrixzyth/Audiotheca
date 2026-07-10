@@ -2,7 +2,7 @@
 
 Use this table when preparing documentation assets. Each row must exist at the listed path before the README media sections show real content.
 
-**Last refreshed:** 2026-07-06 (Web UI **1.0.5** — spec catalog, investigation lookup, orchestration, cloud storage, audio preview, DropZone). Re-capture with demo API/UI running:
+**Last refreshed:** 2026-07-10 (Web UI **1.0.12** — full screenshot + walkthrough re-capture). Re-capture with demo API/UI running:
 
 ```powershell
 $env:AUDIOTHECA_CAPTURE_UI_PORT="5175"
@@ -56,7 +56,7 @@ Demo WAV for audio preview: `python scripts/seed_demo_library.py` → `docs/demo
 | ☑ | `docs/assets/videos/ai-lookup-review.mp4` | AI lookup review during scan |
 | ☑ | `docs/assets/videos/security-and-space-recovery.mp4` | Security scan and space recovery |
 
-### Optional walkthroughs (1.0.5)
+### Optional walkthroughs (1.0.5+, still valid at 1.0.12)
 
 | Status | Path | Topic |
 |--------|------|--------|
@@ -86,7 +86,7 @@ Help tab assets are copied to `ui/public/help/` by the same script for Vite dev/
 
 ## Capture notes
 
-- **Engine / UI version** shown in the header should match docs (engine **10.0.0**, Web UI **1.0.5**).
+- **Engine / UI version** shown in the header should match docs (engine **10.0.0**, Web UI **1.0.12**).
 - **Primary nav** is grouped: Dashboard · Scan · Review · Library · System · Help (not a flat tab row).
 - **Help tab** appears last in the primary bar.
 - Scroll Environment panels to capture orchestration, spec catalog, and cloud sections — default capture scrolls to Themes only.

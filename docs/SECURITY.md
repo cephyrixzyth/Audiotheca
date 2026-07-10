@@ -18,10 +18,26 @@ The API uses a **Bearer token** stored at:
 
 - Auto-generated on first API start (unless `AUDIOTHECA_API_TOKEN` is set in the environment).
 - The UI bootstraps the token via `GET /api/auth/token` (localhost only, no auth required).
-- All other `/api/*` routes require `Authorization: Bearer <token>`.
-- WebSocket job events require `?token=` matching the job’s creation token.
+- All other `/api/*` routes require `Authorization: Bearer <token>` unless a valid short-lived ticket is supplied (see below).
 
 **Do not commit `.api_token` to git** (it is gitignored).
+
+### Short-lived access tickets (1.0.12+)
+
+Some surfaces cannot send an `Authorization` header (WebSocket URLs, `<audio>` / `<img>` src, file download links). For those, the UI exchanges the long-lived bearer for a **single-purpose ticket**:
+
+1. `POST /api/auth/ticket` (requires Bearer auth) → `{ "ticket": "…", "expires_in": 300 }`
+2. Append `?ticket=<ticket>` to WebSocket, media, or download URLs
+
+Tickets expire after **300 seconds** by default (`AUDIOTHECA_TICKET_TTL_S` env, clamped 30 s–1 h). They are held in memory only and are not written to disk.
+
+**Legacy:** `?token=<api_token>` is still accepted for older bookmarks and external tools. Prefer tickets for anything that might appear in browser history or server access logs.
+
+| Surface | Auth |
+|---------|------|
+| REST `/api/*` | `Authorization: Bearer <token>` |
+| WebSocket job events | `?ticket=` (preferred) or `?token=` (legacy) |
+| Media preview / downloads | `?ticket=` (preferred) or `?token=` (legacy) |
 
 ## Network exposure
 

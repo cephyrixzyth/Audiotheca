@@ -1,6 +1,6 @@
 # Audiotheca — Install Guide
 
-Engine version: **10.0.0** · Web UI: **1.0.5**
+Engine version: **10.0.0** · Web UI: **1.0.12**
 
 For overview and first-run walkthrough, see the [main README](../README.md).
 
@@ -34,7 +34,7 @@ Artifacts land in `dist/releases/<tag>/` (see `dist/releases/README.md`).
 
 ### Windows installer
 
-1. Download or build `Audiotheca_1.0.5_x64_en-US.msi` or `Audiotheca_1.0.5_x64-setup.exe` from [GitHub Releases](https://github.com/chrisjrovira/Audiotheca/releases/latest).
+1. Download or build `Audiotheca_1.0.12_x64_en-US.msi` or `Audiotheca_1.0.12_x64-setup.exe` from [GitHub Releases](https://github.com/chrisjrovira/Audiotheca/releases/latest).
 2. **Close Audiotheca completely** before upgrading (including any background API sidecar).
 3. Run the installer as Administrator — WebView2 bootstrapper is included when needed.
 4. Launch **Audiotheca** from the Start menu; use the first-run wizard to set your library root.
@@ -52,7 +52,7 @@ Installers built from 1.0.5+ include NSIS hooks that terminate these processes a
 
 ### Windows portable zip
 
-1. Extract `Audiotheca-Portable-1.0.5-win64.zip` to any writable folder.
+1. Extract `Audiotheca-Portable-1.0.12-win64.zip` to any writable folder.
 2. Double-click **`Run Audiotheca.bat`** (no terminal window).
 3. Reports and cache go in `data/` (`portable.json` documents `AUDIOTHECA_HOME` relative to the exe).
 

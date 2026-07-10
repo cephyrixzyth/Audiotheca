@@ -56,7 +56,7 @@ Capture at **1920×1080** or your usual monitor size. Save as PNG (lossless UI t
 | `screenshots/environment-themes.png` | Environment → theme studio | Any theme selected |
 | `screenshots/help-panel.png` | Help tab (last primary tab) with a topic open | Default install |
 
-### 1.0.5 additions (shipped)
+### 1.0.5 additions (shipped; re-capture at 1.0.12 when refreshing media)
 
 | File | What to show |
 |------|----------------|
@@ -82,7 +82,7 @@ Record at **1080p**, 30 fps, with brief on-screen captions if helpful. Keep each
 | `videos/ai-lookup-review.mp4` | Scan tab AI analyzer, confirm/reject lookup, cache | After unknown targets queue |
 | `videos/security-and-space-recovery.mp4` | Malware heuristics, underscore whitelist, coexistence summary | System tabs |
 
-Optional 1.0.5 topics (see [ASSETS.md](ASSETS.md)): Environment orchestration/spec catalog (`environment-and-spec-catalog.mp4`), investigation lookup (`investigation-lookup.mp4`), audio preview + DropZone (`audio-preview-library.mp4`).
+Optional 1.0.5+ topics (see [ASSETS.md](ASSETS.md)): Environment orchestration/spec catalog (`environment-and-spec-catalog.mp4`), investigation lookup (`investigation-lookup.mp4`), audio preview + DropZone (`audio-preview-library.mp4`).
 
 ## GIFs for GitHub README
 

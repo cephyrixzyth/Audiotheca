@@ -1,6 +1,6 @@
 # Audiotheca — Feature Guide
 
-Engine version: **10.0.0** · Web UI: **1.0.5**
+Engine version: **10.0.0** · Web UI: **1.0.12**
 
 See also the [main README](../README.md) and [User Guide](USER_GUIDE.md) for launch commands and tab workflows.
 
@@ -152,7 +152,7 @@ Scene-hash folders (`_scene_release_id`) are prime candidates for **Phase 1.6 pe
 
 ### 12. Web UI & API (v1.0 / engine 10.0)
 
-FastAPI on `http://127.0.0.1:8787` serves dry-run reports and runs scan jobs. Bearer token auth — see [Security](SECURITY.md).
+FastAPI on `http://127.0.0.1:8787` serves dry-run reports and runs scan jobs. Routes are split across `api/routers/` (see [Architecture](ARCHITECTURE_AND_UI_ROADMAP.md)). Bearer token auth plus short-lived access tickets for WebSocket/media — see [Security](SECURITY.md).
 
 #### Tabs
 

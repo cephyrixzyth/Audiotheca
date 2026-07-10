@@ -2,6 +2,8 @@
 
 Native Windows app with **bundled Python sidecars** — end users do not need Python installed.
 
+Engine **10.0.0** · Web UI **1.0.12** (see `ui/package.json` / `ui/src-tauri/tauri.conf.json`).
+
 For day-to-day use without building an installer, prefer the **browser UI**: `.\start-ui.ps1` (Node.js + Python only, no Rust). Overview: [main README](../README.md).
 
 | Sidecar | Role |
@@ -88,8 +90,8 @@ Installer:
 
 ```
 ui/src-tauri/target/release/bundle/
-  msi/Audiotheca_1.0.0_x64_en-US.msi
-  nsis/Audiotheca_1.0.0_x64-setup.exe
+  msi/Audiotheca_1.0.12_x64_en-US.msi
+  nsis/Audiotheca_1.0.12_x64-setup.exe
 ```
 
 Sidecars are embedded in the app bundle automatically via `externalBin`.

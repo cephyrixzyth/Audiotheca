@@ -1,8 +1,8 @@
 # Audiotheca UI — nginx + Vite static build
-# Web UI 1.0.0
+# Web UI 1.0.12
 # syntax=docker/dockerfile:1
 
-ARG AUDIOTHECA_VERSION=1.0.0
+ARG AUDIOTHECA_VERSION=1.0.12
 
 FROM node:24-alpine AS build
 
@@ -20,7 +20,7 @@ RUN npm run build
 
 FROM nginx:1.27-alpine
 
-ARG AUDIOTHECA_VERSION=1.0.0
+ARG AUDIOTHECA_VERSION=1.0.12
 
 LABEL org.opencontainers.image.title="Audiotheca UI" \
     org.opencontainers.image.version="${AUDIOTHECA_VERSION}"

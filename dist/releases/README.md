@@ -2,6 +2,8 @@
 
 Mirror GitHub Release assets when Actions quota is exhausted.
 
+**Note:** `dist/installers/`, `dist/portable/`, and `dist/releases/v*` are gitignored build outputs. Rebuild after source changes — do not keep stale 1.0.x artifacts in these folders.
+
 | Platform | Build command | Output |
 | --- | --- | --- |
 | **Windows** | `.\scripts\package-local-release.ps1 -Tag v1.0.12` | `dist/installers/windows/` |
