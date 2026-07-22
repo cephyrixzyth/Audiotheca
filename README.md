@@ -464,7 +464,7 @@ Build GIFs from MP4 sources: `python scripts/build_doc_gifs.py`. Capture instruc
 | **[Configuration](docs/CONFIGURATION.md)** | Environment variables, paths, scan options |
 | **[Feature guide](docs/FEATURE_GUIDE.md)** | Phases, archive peek, reports, API |
 | **[FAQ](docs/FAQ.md)** | Common questions |
-| **[Security](docs/SECURITY.md)** | API token, access tickets, path allowlist, live-run guards |
+| **[Security](docs/SECURITY.md)** | Sessions, proxy secret, access tickets, path allowlist, live-run guards |
 | **[Debug runbook](docs/DEBUG_RUNBOOK.md)** | Troubleshooting, hung scans |
 | **[Changelog](docs/CHANGELOG.md)** | Version history |
 | **[Tauri build](docs/TAURI_BUILD.md)** | Desktop app packaging |

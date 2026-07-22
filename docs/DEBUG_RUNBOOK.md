@@ -138,9 +138,16 @@ python -m api.server
 ### Scan from UI hangs or fails
 
 - Map network drive (`Z:`) before starting API
-- Check job status: `GET http://127.0.0.1:8787/api/jobs`
+- Check job status: `GET http://127.0.0.1:8787/api/jobs` (requires auth)
 - Engine log: `dedupe_engine.log`
-- WebSocket events: `ws://127.0.0.1:8787/api/jobs/{id}/events`
+- WebSocket events need a scoped ticket: `ws://127.0.0.1:8787/api/jobs/{id}/events?ticket=…`
+  (issue via `POST /api/auth/ticket` with `scope=/api/jobs/{id}/events`; see [Security](SECURITY.md))
+
+### UI 401 / auth loops
+
+- Local: confirm API is on `127.0.0.1` and `/api/auth/token` or `/api/auth/session` succeeds
+- Docker/Unraid: confirm `AUDIOTHECA_PROXY_SECRET` matches on API + UI nginx; bootstrap stays disabled
+- After API container restart, reload the UI so it can mint a fresh opaque session cookie
 
 ### Open in Explorer does nothing
 

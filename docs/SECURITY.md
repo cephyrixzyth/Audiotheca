@@ -23,6 +23,7 @@ The API uses a **Bearer token** stored at:
 - `AUDIOTHECA_PROXY_SECRET` must match between the API and UI nginx for session establishment. When token bootstrap is disabled, the proxy secret is **required** even if nginx→API looks like localhost (all-in-one image).
 - Session cookies hold an opaque id mapped server-side — not the API token itself.
 - Mutating cookie-authenticated requests require a matching `Origin`/`Referer` host (CSRF guard for same-site different ports on a NAS).
+- Library path allowlisting collapses `.` / `..` and rejects symlink-ancestor escapes before accepting a path.
 - `AUDIOTHECA_TRUST_INTERNAL_NETWORK=1` and `AUDIOTHECA_ALLOW_REMOTE_TOKEN_BOOTSTRAP=1` are explicit opt-ins — do not enable them on LAN without reverse-proxy auth.
 - All other `/api/*` routes require `Authorization: Bearer <token>`, the session cookie, or a valid short-lived ticket (see below).
 

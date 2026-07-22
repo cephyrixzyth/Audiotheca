@@ -152,7 +152,7 @@ Scene-hash folders (`_scene_release_id`) are prime candidates for **Phase 1.6 pe
 
 ### 12. Web UI & API (v1.0 / engine 10.0)
 
-FastAPI on `http://127.0.0.1:8787` serves dry-run reports and runs scan jobs. Routes are split across `api/routers/` (see [Architecture](ARCHITECTURE_AND_UI_ROADMAP.md)). Bearer token auth plus short-lived access tickets for WebSocket/media — see [Security](SECURITY.md).
+FastAPI on `http://127.0.0.1:8787` serves dry-run reports and runs scan jobs. Routes are split across `api/routers/` (see [Architecture](ARCHITECTURE_AND_UI_ROADMAP.md)). Local/dev uses bearer bootstrap; Docker/LAN uses an HttpOnly session cookie via nginx proxy secret; WebSocket/media/downloads use short-lived scoped tickets — see [Security](SECURITY.md).
 
 #### Tabs
 

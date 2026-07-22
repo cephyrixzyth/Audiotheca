@@ -35,8 +35,13 @@ Alternative allowlist file: `dedupe_reports/.library_roots.json` (see API securi
 | `AUDIOTHECA_API_PORT` | `8787` | HTTP port |
 | `AUDIOTHECA_API_HOST` | `127.0.0.1` | Bind address — keep localhost unless you know what you are doing |
 | `AUDIOTHECA_API_TOKEN` | *(auto)* | Fixed bearer token; else written to `dedupe_reports/.api_token` |
-| `AUDIOTHECA_TICKET_TTL_S` | `300` | Short-lived access ticket lifetime (30–3600 s) for WebSocket/media URLs |
+| `AUDIOTHECA_PROXY_SECRET` | *(unset)* | Shared secret between UI nginx and API for `POST /api/auth/session` (required for Docker/LAN when bootstrap is disabled) |
+| `AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP` | unset | Set `1` to disable unauthenticated `GET /api/auth/token` (Docker/LAN default) |
+| `AUDIOTHECA_TICKET_TTL_S` | `300` | Short-lived access ticket lifetime (30–3600 s) for WebSocket/media/download URLs |
+| `AUDIOTHECA_SESSION_TTL_S` | `2592000` | Opaque session cookie lifetime in seconds (default 30 days) |
 | `AUDIOTHECA_NO_RELOAD` | unset | Set `1` to disable uvicorn reload in dev |
+| `AUDIOTHECA_ALLOW_REMOTE_TOKEN_BOOTSTRAP` | unset | Opt-in: allow token bootstrap from non-localhost (do not enable on LAN) |
+| `AUDIOTHECA_TRUST_INTERNAL_NETWORK` | unset | Opt-in: treat private-network clients like trusted bootstrap peers |
 
 ### UI (Vite dev server)
 
@@ -135,9 +140,12 @@ Without 7-Zip, `.zip` peek still works; `.rar`/`.7z`/`.iso` show `NEEDS_7ZIP` in
 
 ## Security defaults
 
-- API binds **127.0.0.1** only
-- Bearer token required for all `/api/*` except `/api/health` and localhost `/api/auth/token`
-- WebSocket, media, and download URLs use short-lived tickets from `POST /api/auth/ticket` (`?ticket=`) — see [Security](SECURITY.md)
+- Local/dev API binds **127.0.0.1** only
+- Auth for `/api/*` (except public bootstrap paths): session cookie, `Authorization: Bearer`, or scoped `?ticket=`
+- Public without auth: `/api/health`, `/api/auth/token` (localhost unless disabled), `/api/auth/session` (localhost or proxy secret)
+- Docker/LAN: disable token bootstrap; mint an **opaque HttpOnly** session via nginx + `AUDIOTHECA_PROXY_SECRET` (token never in the JS bundle or cookie value)
+- Downloads use **single-use**, path-scoped tickets issued on click; media tickets are also **resource-bound**
+- Library paths collapse `.` / `..` and reject symlink-ancestor escapes — see [Security](SECURITY.md)
 - Live execute endpoints require explicit `dry_run: false` + `confirm_live: true`
 
 Details: [Security](SECURITY.md)

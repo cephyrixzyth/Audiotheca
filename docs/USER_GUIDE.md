@@ -202,7 +202,8 @@ Full list: [Feature Guide](FEATURE_GUIDE.md).
 | --- | --- |
 | Scans wrong / empty library | Set `AUDIOTHECA_LIBRARY_ROOT` to your path |
 | `npm: not recognized` | Install Node.js; reopen terminal |
-| API 401 in UI | Restart API; UI re-fetches token from localhost |
+| API 401 in UI | Restart API; UI re-establishes session (`/api/auth/session`) or localhost token; hard-refresh if a stale cookie remains |
+| Docker UI never authenticates | Set matching `AUDIOTHECA_API_TOKEN` + `AUDIOTHECA_PROXY_SECRET`; token bootstrap is disabled in compose |
 | Port in use | `$env:AUDIOTHECA_API_PORT=8790` + `$env:VITE_API_PORT=8790` |
 | No terminal output | `$env:PYTHONUNBUFFERED=1` |
 | `NEEDS_7ZIP` | Install 7-Zip; `where.exe 7z` |
@@ -230,6 +231,6 @@ python -m pytest tests/ -q
 | [Install Guide](INSTALL.md) | Full setup |
 | [Feature Guide](FEATURE_GUIDE.md) | Phases, reports, API |
 | [Doc assets](assets/README.md) | Screenshot/video capture |
-| [Security](SECURITY.md) | Token, allowlist |
+| [Security](SECURITY.md) | Sessions, tickets, path allowlist, live-run guards |
 | [FAQ](FAQ.md) | Q&A |
 | [Changelog](CHANGELOG.md) | Version history |

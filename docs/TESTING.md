@@ -47,7 +47,8 @@ python -c "import pefile, rapidfuzz, tqdm, fastapi; print('deps OK')"
 python -m pytest tests/ -q
 ```
 
-Expect **569+ tests passing** (4 skipped without local Run_Summary fixtures). Failures often mean missing packages or wrong Python version.
+Expect **591+ tests passing** (4 skipped without local Run_Summary fixtures). Failures often mean missing packages or wrong Python version.
+Auth/session/ticket regressions live in `tests/test_auth_session_tickets.py` and path-hardening cases in `tests/test_review_hardening.py`.
 
 ---
 
@@ -178,18 +179,20 @@ For CI-style runs, start the API in one terminal (`python -m api.server`) before
 ## 6. API smoke test (no browser)
 
 ```powershell
-# Token (localhost only)
+# Localhost token bootstrap (disabled in Docker/LAN)
 $token = (Invoke-RestMethod http://127.0.0.1:8787/api/auth/token).token
 $headers = @{ Authorization = "Bearer $token" }
 
-# Optional: short-lived ticket for query-string surfaces (1.0.12+)
-$ticket = (Invoke-RestMethod http://127.0.0.1:8787/api/auth/ticket -Method Post -Headers $headers).ticket
+# Optional: short-lived scoped ticket for query-string surfaces
+$ticketBody = @{ scope = "/api/feedback/export"; single_use = $true } | ConvertTo-Json
+$ticket = (Invoke-RestMethod http://127.0.0.1:8787/api/auth/ticket -Method Post -Headers $headers -ContentType "application/json" -Body $ticketBody).ticket
 
-Invoke-RestMethod http://127.0.0.1:8787/api/health -Headers $headers
+Invoke-RestMethod http://127.0.0.1:8787/api/health
 Invoke-RestMethod http://127.0.0.1:8787/api/runs -Headers $headers
 Invoke-RestMethod http://127.0.0.1:8787/api/security/library-roots -Headers $headers
 ```
 
+On Docker/Unraid, use the UI (session cookie via proxy secret) or `Authorization: Bearer $AUDIOTHECA_API_TOKEN` — do not rely on `/api/auth/token`.
 ---
 
 ## 7. What gets written on disk

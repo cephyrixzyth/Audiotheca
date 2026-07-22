@@ -31,7 +31,7 @@ Path: c:\Users\Cephyrix Zyth\Desktop\audiotheca
 
 ## Must-haves
 - docker-compose.yml for Unraid (Community Applications → Compose plugin or manual)
-- .env.example with UNRAID paths
+- .env.example with UNRAID paths + required `AUDIOTHECA_API_TOKEN` and `AUDIOTHECA_PROXY_SECRET`
 - Dockerfile(s) multi-stage: Python 3.12+ deps, Node build for ui/
 - ROOT_DIR / library root from env (config.py currently hardcodes Z:\ — add AUDIOTHECA_LIBRARY_ROOT)
 - UI DEFAULT_LIBRARY_ROOT from build-time or runtime config endpoint
@@ -39,13 +39,14 @@ Path: c:\Users\Cephyrix Zyth\Desktop\audiotheca
 - Document Unraid volume mappings:
   - /mnt/user/appdata/audiotheca → AUDIOTHECA_HOME (reports, cache, token)
   - /mnt/user/.../_software/_audio → library (local disk path on array)
-- Security: API token, bind UI to LAN or reverse proxy (Nginx Proxy Manager / SWAG)
+- Security: disable token bootstrap; opaque HttpOnly session via nginx proxy secret;
+  do not publish API :8787 to LAN by default; never bake the API token into the UI bundle
 
 ## Nice-to-haves
-- Unraid XML template snippet for CA
+- Unraid XML template snippet for CA (must include PROXY_SECRET + API_TOKEN fields)
 - space_recovery.py as optional one-shot profile
 - scripts/searx_search.py wired to searxng service on same compose network
-- Watch scan progress via existing WebSocket /api/jobs/{id}/events
+- Watch scan progress via existing WebSocket /api/jobs/{id}/events?ticket=…
 
 ## Recent features to preserve
 - Underscore vendor whitelist (dedupe_reports/feedback/underscore_whitelist.json)
@@ -66,9 +67,9 @@ Start from deploy/unraid/ skeleton in the repo and flesh out Dockerfiles + compo
 From `deploy/unraid/`:
 
 ```powershell
-copy .env.example .env   # edit LIBRARY_HOST_PATH
+copy .env.example .env   # edit LIBRARY_HOST_PATH, API token, proxy secret
 .\start-local.ps1
-# UI http://localhost:4210 · API http://localhost:4211/api/health
+# UI http://localhost:4210  (API is proxied at /api — not published on 4211 by default)
 ```
 
 ## What already exists in repo
@@ -109,9 +110,12 @@ copy .env.example .env   # edit LIBRARY_HOST_PATH
 
 | Service | Port |
 |---------|------|
-| UI | 4210 (nginx) |
-| API | 4211 (host) / 8787 (container) |
+| UI | 4210 (nginx; proxies `/api` — preferred entry) |
+| API | Not published by default (container `:8787` on Docker network only) |
 | SearXNG | 8080 (different host port, e.g. 8081) |
+
+Compose and the Unraid template require `AUDIOTHECA_API_TOKEN` + `AUDIOTHECA_PROXY_SECRET`.
+Sessions are opaque HttpOnly cookies; see [docs/SECURITY.md](../../docs/SECURITY.md).
 
 ---
 
