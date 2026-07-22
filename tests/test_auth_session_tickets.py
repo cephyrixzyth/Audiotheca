@@ -43,6 +43,7 @@ def test_session_via_proxy_secret_omits_token(api_token, monkeypatch):
 def test_session_localhost_may_return_token_when_bootstrap_enabled(api_token, monkeypatch):
     monkeypatch.delenv("AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP", raising=False)
     monkeypatch.delenv("AUDIOTHECA_PROXY_SECRET", raising=False)
+    monkeypatch.setattr(security, "is_localhost", lambda _request: True)
     client = TestClient(app)
     res = client.post("/api/auth/session")
     assert res.status_code == 200
@@ -51,6 +52,7 @@ def test_session_localhost_may_return_token_when_bootstrap_enabled(api_token, mo
 
 def test_session_omits_token_when_bootstrap_disabled_even_on_localhost(api_token, monkeypatch):
     monkeypatch.setenv("AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP", "1")
+    monkeypatch.setattr(security, "is_localhost", lambda _request: True)
     client = TestClient(app)
     res = client.post("/api/auth/session")
     assert res.status_code == 200

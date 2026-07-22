@@ -55,13 +55,6 @@ async function ensureAuth(): Promise<void> {
   sessionReady = true;
 }
 
-async function ensureApiToken(): Promise<string> {
-  await ensureAuth();
-  if (cachedToken) return cachedToken;
-  // Session-cookie mode: no bearer in JS; return empty and rely on credentials.
-  return "";
-}
-
 /** Short-lived ticket for query-string surfaces (WS / media / downloads). */
 async function issueAccessTicket(options?: {
   scope?: string;
