@@ -126,7 +126,8 @@ See `.env.example`. Key variables:
 
 - API binds `0.0.0.0` inside the Docker network only and is **not published** to the host by default.
 - Expose the UI port to LAN (nginx proxies `/api/`). Do not publish API port `8787` unless debugging.
-- Set a strong `AUDIOTHECA_API_TOKEN` in `.env`. Compose bakes the same value into the UI as `VITE_API_TOKEN`.
+- Set strong `AUDIOTHECA_API_TOKEN` and `AUDIOTHECA_PROXY_SECRET` in `.env`.
+- The UI nginx injects the proxy secret so `/api/auth/session` can set an **HttpOnly** cookie — the long-lived bearer is never baked into the JS bundle.
 - Token bootstrap (`GET /api/auth/token`) is disabled in the default compose (`AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP=1`).
 - For reverse proxy (Nginx Proxy Manager / SWAG): proxy to `ui:80`, enable WebSocket upgrade for scan progress, and prefer proxy auth.
 

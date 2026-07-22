@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
 import {
   addManualDuplicate,
-  downloadDecisionsUrl,
+  downloadDecisionsDownload,
   executeDuplicateStaging,
   fetchDecisions,
   fetchDuplicates,
   fetchLibraryRoots,
   fetchReferenceConfig,
   fetchReferenceExtras,
-  feedbackExportUrl,
+  feedbackExportDownload,
   rejectDuplicateGroup,
   saveDecisions,
   type DuplicateRejection,
@@ -55,8 +55,6 @@ export function DuplicateReview({ stamp }: Props) {
   const [manualFindings, setManualFindings] = useState<ManualDuplicateFinding[]>([]);
   const [rejectReasons, setRejectReasons] = useState<string[]>([]);
   const [savedCount, setSavedCount] = useState(0);
-  const [downloadUrl, setDownloadUrl] = useState("");
-  const [feedbackUrl, setFeedbackUrl] = useState("");
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const [showManual, setShowManual] = useState(false);
@@ -116,7 +114,6 @@ export function DuplicateReview({ stamp }: Props) {
       setManualFindings(res.manual_findings ?? []);
       setRejectReasons(res.reject_reasons ?? Object.keys(REJECT_LABELS));
     });
-    void feedbackExportUrl(stamp).then(setFeedbackUrl);
   }, [stamp]);
 
   useEffect(() => {
@@ -145,8 +142,6 @@ export function DuplicateReview({ stamp }: Props) {
     const res = await saveDecisions(stamp, keepers);
     setSavedCount(res.count);
     setSaveMsg(`Saved ${res.count} keeper decisions`);
-    setDownloadUrl(await downloadDecisionsUrl(stamp));
-    setFeedbackUrl(await feedbackExportUrl(stamp));
   }
 
   async function handleReject(group: DuplicateGroup, reason: string) {
@@ -175,7 +170,6 @@ export function DuplicateReview({ stamp }: Props) {
       return next;
     });
     setActionMsg(`Marked "${group.dedup_key}" as bad match — engine will skip on next scan`);
-    setFeedbackUrl(await feedbackExportUrl(stamp));
   }
 
   async function handlePreviewDeletes() {
@@ -221,7 +215,6 @@ export function DuplicateReview({ stamp }: Props) {
     setExecuteResults(duplicateExecuteRows(res.results ?? [], false));
     setExecuteSummary({ staged: res.staged, failed: res.failed });
     setActionMsg(`Staged ${res.staged} discard(s) to _delete-canidates`);
-    setFeedbackUrl(await feedbackExportUrl(stamp));
   }
 
   async function handleManualSubmit() {
@@ -240,7 +233,6 @@ export function DuplicateReview({ stamp }: Props) {
     setManualNote("");
     setShowManual(false);
     setActionMsg("Manual duplicate finding recorded for backend refinement");
-    setFeedbackUrl(await feedbackExportUrl(stamp));
   }
 
   const visibleGroups = hideRejected
@@ -323,15 +315,21 @@ export function DuplicateReview({ stamp }: Props) {
         >
           Report manual dupe
         </button>
-        {feedbackUrl && (
-          <a className="text-btn" href={feedbackUrl} download>
-            Export feedback CSV
-          </a>
-        )}
-        {savedCount > 0 && downloadUrl && (
-          <a className="text-btn" href={downloadUrl} download>
+        <button
+          type="button"
+          className="text-btn"
+          onClick={() => void feedbackExportDownload(stamp)}
+        >
+          Export feedback CSV
+        </button>
+        {savedCount > 0 && (
+          <button
+            type="button"
+            className="text-btn"
+            onClick={() => void downloadDecisionsDownload(stamp)}
+          >
             approved.json
-          </a>
+          </button>
         )}
       </div>
 

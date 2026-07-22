@@ -24,29 +24,57 @@ async function apiUrl(path: string): Promise<string> {
 }
 
 let cachedToken: string | null = null;
+let sessionReady = false;
 
-async function ensureApiToken(): Promise<string> {
-  if (cachedToken) return cachedToken;
-  const baked = (import.meta.env.VITE_API_TOKEN as string | undefined)?.trim();
-  if (baked) {
-    cachedToken = baked;
-    return cachedToken;
+async function ensureAuth(): Promise<void> {
+  if (sessionReady || cachedToken) return;
+
+  // Prefer HttpOnly session cookie (Docker behind nginx / same-origin proxy).
+  const sessionRes = await fetch(await apiUrl("/auth/session"), {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: "{}",
+  });
+  if (sessionRes.ok) {
+    sessionReady = true;
+    const data = (await sessionRes.json()) as { token?: string };
+    if (data.token) {
+      cachedToken = data.token;
+    }
+    return;
   }
-  const res = await fetch(await apiUrl("/auth/token"));
+
+  // Localhost / Tauri bearer bootstrap (never bake the long-lived token into the UI bundle).
+  const res = await fetch(await apiUrl("/auth/token"), { credentials: "include" });
   if (!res.ok) {
-    throw new Error("Failed to obtain API token — is the API running on 127.0.0.1:8787?");
+    throw new Error("Failed to obtain API auth — is the API running on 127.0.0.1:8787?");
   }
   const data = (await res.json()) as { token: string };
   cachedToken = data.token;
-  return cachedToken;
+  sessionReady = true;
+}
+
+async function ensureApiToken(): Promise<string> {
+  await ensureAuth();
+  if (cachedToken) return cachedToken;
+  // Session-cookie mode: no bearer in JS; return empty and rely on credentials.
+  return "";
 }
 
 /** Short-lived ticket for query-string surfaces (WS / media / downloads). */
-async function issueAccessTicket(): Promise<string> {
+async function issueAccessTicket(options?: {
+  scope?: string;
+  singleUse?: boolean;
+}): Promise<string> {
   const res = await fetch(await apiUrl("/auth/ticket"), {
     method: "POST",
+    credentials: "include",
     headers: await authHeaders({ "Content-Type": "application/json" }),
-    body: "{}",
+    body: JSON.stringify({
+      scope: options?.scope || "",
+      single_use: Boolean(options?.singleUse),
+    }),
   });
   if (!res.ok) {
     const detail = await res.text();
@@ -57,15 +85,19 @@ async function issueAccessTicket(): Promise<string> {
 }
 
 async function authHeaders(extra?: HeadersInit): Promise<HeadersInit> {
-  const token = await ensureApiToken();
-  return {
-    ...extra,
-    Authorization: `Bearer ${token}`,
-  };
+  await ensureAuth();
+  const headers: Record<string, string> = { ...(extra as Record<string, string>) };
+  if (cachedToken) {
+    headers.Authorization = `Bearer ${cachedToken}`;
+  }
+  return headers;
 }
 
 async function getJson<T>(path: string): Promise<T> {
-  const res = await fetch(await apiUrl(path), { headers: await authHeaders() });
+  const res = await fetch(await apiUrl(path), {
+    credentials: "include",
+    headers: await authHeaders(),
+  });
   if (!res.ok) {
     const detail = await res.text();
     throw new Error(detail || res.statusText);
@@ -76,6 +108,7 @@ async function getJson<T>(path: string): Promise<T> {
 async function putJson<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(await apiUrl(path), {
     method: "PUT",
+    credentials: "include",
     headers: await authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(body),
   });
@@ -89,6 +122,7 @@ async function putJson<T>(path: string, body: unknown): Promise<T> {
 async function postJson<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(await apiUrl(path), {
     method: "POST",
+    credentials: "include",
     headers: await authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(body),
   });
@@ -198,9 +232,66 @@ export function correctInvestigation(
   return postJson(`/runs/${stamp}/investigation/correct`, payload);
 }
 
-export async function investigationFeedbackExportUrl(stamp: string): Promise<string> {
-  const ticket = await issueAccessTicket();
-  return `${await apiUrl(`/runs/${stamp}/investigation/export`)}?ticket=${encodeURIComponent(ticket)}`;
+/** Build a ticketed URL scoped to an API path. Downloads should use singleUse. */
+async function ticketedApiUrl(
+  apiPath: string,
+  options?: {
+    singleUse?: boolean;
+    extraQuery?: Record<string, string>;
+  },
+): Promise<string> {
+  const singleUse = Boolean(options?.singleUse);
+  let normalized = apiPath.startsWith("/api/")
+    ? apiPath
+    : `/api${apiPath.startsWith("/") ? apiPath : `/${apiPath}`}`;
+  const qIndex = normalized.indexOf("?");
+  if (qIndex >= 0) {
+    normalized = normalized.slice(0, qIndex);
+  }
+  // Scope must match FastAPI's decoded request.url.path (unencoded segments).
+  const scopePath = normalized;
+  const ticket = await issueAccessTicket({ scope: scopePath, singleUse });
+  const encodedPath = normalized
+    .split("/")
+    .map((part) => {
+      if (!part) return "";
+      try {
+        return encodeURIComponent(decodeURIComponent(part));
+      } catch {
+        return encodeURIComponent(part);
+      }
+    })
+    .join("/");
+  const relative = encodedPath.startsWith("/api/") ? encodedPath.slice(4) : encodedPath;
+  const base = await apiUrl(relative);
+  const url = new URL(base, typeof window !== "undefined" ? window.location.origin : "http://localhost");
+  url.searchParams.set("ticket", ticket);
+  if (options?.extraQuery) {
+    for (const [key, value] of Object.entries(options.extraQuery)) {
+      url.searchParams.set(key, value);
+    }
+  }
+  return url.toString();
+}
+
+/** Issue a fresh single-use ticket and trigger a browser download (call on click). */
+export async function downloadAuthenticated(
+  apiPath: string,
+  filename?: string,
+  extraQuery?: Record<string, string>,
+): Promise<void> {
+  const href = await ticketedApiUrl(apiPath, { singleUse: true, extraQuery });
+  const anchor = document.createElement("a");
+  anchor.href = href;
+  if (filename) anchor.download = filename;
+  anchor.rel = "noopener";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+}
+
+export async function investigationFeedbackExportDownload(stamp: string): Promise<void> {
+  await downloadAuthenticated(`/runs/${stamp}/investigation/export`, `investigation_${stamp}.csv`);
 }
 
 export function fetchInvestigation(
@@ -530,27 +621,23 @@ export function executeDuplicateStaging(
   return postJson(`/runs/${stamp}/duplicates/execute`, payload);
 }
 
-export async function downloadDecisionsUrl(stamp: string): Promise<string> {
-  const ticket = await issueAccessTicket();
-  return `${await apiUrl(`/runs/${stamp}/decisions/download`)}?ticket=${encodeURIComponent(ticket)}`;
+export async function downloadDecisionsDownload(stamp: string): Promise<void> {
+  await downloadAuthenticated(`/runs/${stamp}/decisions/download`, `decisions_${stamp}.csv`);
 }
 
-export async function feedbackExportUrl(
+export async function feedbackExportDownload(
   stamp?: string,
   format: "csv" | "json" = "csv",
   module: "duplicates" | "investigation" | "all" = "duplicates",
-): Promise<string> {
-  const qs = new URLSearchParams();
-  if (stamp) qs.set("stamp", stamp);
-  qs.set("format", format);
-  qs.set("module", module);
-  const ticket = await issueAccessTicket();
-  qs.set("ticket", ticket);
-  return `${await apiUrl(`/feedback/export?${qs}`)}`;
+): Promise<void> {
+  const qs: Record<string, string> = { format, module };
+  if (stamp) qs.stamp = stamp;
+  const suffix = format === "json" ? "json" : "csv";
+  await downloadAuthenticated(`/feedback/export`, `feedback_${module}.${suffix}`, qs);
 }
 
-export async function unifiedFeedbackExportUrl(stamp?: string): Promise<string> {
-  return feedbackExportUrl(stamp, "csv", "all");
+export async function unifiedFeedbackExportDownload(stamp?: string): Promise<void> {
+  await feedbackExportDownload(stamp, "csv", "all");
 }
 
 export function fetchFeedbackSummary(stamp?: string): Promise<Record<string, number>> {
@@ -672,14 +759,11 @@ export function rejectHarvestCandidates(
   return postJson("/vendors/harvest/reject", { harvest_ids: harvestIds });
 }
 
-export async function vendorResearchExportUrl(includeKnown = false): Promise<string> {
-  const ticket = await issueAccessTicket();
-  const qs = new URLSearchParams({
+export async function vendorResearchExportDownload(includeKnown = false): Promise<void> {
+  await downloadAuthenticated(`/vendors/harvest/export`, "harvest_inbox.csv", {
     include_known: includeKnown ? "true" : "false",
     status: "pending",
-    ticket,
   });
-  return `${await apiUrl(`/vendors/harvest/export?${qs}`)}`;
 }
 
 export function fetchJobs(): Promise<JobSnapshot[]> {
@@ -1061,13 +1145,14 @@ export function fetchSpaceRecoverySummary(stamp: string): Promise<Record<string,
   return getJson(`/runs/${stamp}/space-recovery/summary`);
 }
 
-export async function spaceRecoveryReportUrl(filename: string): Promise<string> {
-  const ticket = await issueAccessTicket();
-  return `${await apiUrl(`/space-recovery/reports/${encodeURIComponent(filename)}`)}?ticket=${encodeURIComponent(ticket)}`;
+export async function spaceRecoveryReportDownload(filename: string): Promise<void> {
+  // Pass the raw filename so ticket scope matches the decoded URL path.
+  await downloadAuthenticated(`/space-recovery/reports/${filename}`, filename);
 }
 
 export async function jobEventsUrl(jobId: string): Promise<string> {
-  const ticket = await issueAccessTicket();
+  const scope = `/api/jobs/${jobId}/events`;
+  const ticket = await issueAccessTicket({ scope, singleUse: false });
   return `${await getWsBase()}/api/jobs/${jobId}/events?ticket=${encodeURIComponent(ticket)}`;
 }
 
@@ -1495,7 +1580,8 @@ export function exportWorkspaceBundle(body: {
 }
 
 export async function mediaStreamUrl(path: string): Promise<string> {
-  const ticket = await issueAccessTicket();
+  const scope = "/api/media/stream";
+  const ticket = await issueAccessTicket({ scope, singleUse: false });
   return apiUrl(`/media/stream?path=${encodeURIComponent(path)}&ticket=${encodeURIComponent(ticket)}`);
 }
 

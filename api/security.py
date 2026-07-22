@@ -49,38 +49,103 @@ _BLOCKED_NETS = (
     ipaddress.ip_network("fe80::/10"),
 )
 
-PUBLIC_HTTP_PATHS = frozenset({"/api/health", "/api/auth/token"})
+PUBLIC_HTTP_PATHS = frozenset({"/api/health", "/api/auth/token", "/api/auth/session"})
+
+SESSION_COOKIE = "audiotheca_session"
+PROXY_SECRET_HEADER = "x-audiotheca-proxy-secret"
 
 # Short-lived URL tickets for WS / media / file downloads (avoid long-lived bearer in query strings).
 _TICKET_TTL_S = float(os.environ.get("AUDIOTHECA_TICKET_TTL_S", "300"))
-_tickets: dict[str, float] = {}
+# ticket -> {expires: float, scope: str, single_use: bool}
+_tickets: dict[str, dict[str, object]] = {}
 
 
-def issue_access_ticket(*, ttl_s: float | None = None) -> dict[str, object]:
-    """Create a single-purpose access ticket for query-string auth surfaces."""
+def proxy_secret_expected() -> str:
+    return os.environ.get("AUDIOTHECA_PROXY_SECRET", "").strip()
+
+
+def has_proxy_secret(request: Request) -> bool:
+    expected = proxy_secret_expected()
+    if not expected:
+        return False
+    got = request.headers.get(PROXY_SECRET_HEADER, "")
+    if not got:
+        return False
+    return secrets.compare_digest(got, expected)
+
+
+def issue_access_ticket(
+    *,
+    scope: str = "",
+    single_use: bool = False,
+    ttl_s: float | None = None,
+) -> dict[str, object]:
+    """Create a short-lived ticket, optionally path-scoped and/or single-use."""
     ttl = float(ttl_s if ttl_s is not None else _TICKET_TTL_S)
     ttl = max(30.0, min(ttl, 3600.0))
     now = time.monotonic()
-    # Drop expired tickets opportunistically.
-    expired = [key for key, exp in _tickets.items() if exp <= now]
+    expired = [key for key, meta in _tickets.items() if float(meta.get("expires", 0)) <= now]
     for key in expired:
         _tickets.pop(key, None)
     ticket = secrets.token_urlsafe(24)
-    _tickets[ticket] = now + ttl
-    audit("access_ticket_issued", ttl_s=ttl)
-    return {"ticket": ticket, "expires_in": int(ttl)}
+    scope_text = str(scope or "").strip()
+    _tickets[ticket] = {
+        "expires": now + ttl,
+        "scope": scope_text,
+        "single_use": bool(single_use),
+    }
+    audit(
+        "access_ticket_issued",
+        ttl_s=ttl,
+        scope=scope_text or "*",
+        single_use=bool(single_use),
+    )
+    return {
+        "ticket": ticket,
+        "expires_in": int(ttl),
+        "scope": scope_text,
+        "single_use": bool(single_use),
+    }
 
 
-def verify_access_ticket(ticket: str | None) -> bool:
+def _path_matches_ticket_scope(path: str, scope: str) -> bool:
+    """True when path equals scope or is a nested path under scope (not a prefix sibling)."""
+    if not scope:
+        return True
+    if path == scope:
+        return True
+    prefix = scope if scope.endswith("/") else f"{scope}/"
+    return path.startswith(prefix)
+
+
+def verify_access_ticket(
+    ticket: str | None,
+    *,
+    path: str | None = None,
+    consume: bool | None = None,
+) -> bool:
+    """Validate a ticket. When scoped, path must equal or nest under the ticket scope.
+
+    Single-use tickets are retired on successful verification unless ``consume=False``
+    (peek). Reusable tickets are never removed here — only TTL expiry retires them.
+    """
     if not ticket:
         return False
     now = time.monotonic()
-    expires = _tickets.get(ticket)
-    if expires is None:
+    meta = _tickets.get(ticket)
+    if meta is None:
         return False
+    expires = float(meta.get("expires", 0))
     if expires <= now:
         _tickets.pop(ticket, None)
         return False
+    scope = str(meta.get("scope") or "")
+    if scope:
+        if not path or not _path_matches_ticket_scope(path, scope):
+            return False
+    # Only single-use tickets are ever consumed; consume=False allows a peek.
+    if bool(meta.get("single_use")) and consume is not False:
+        _tickets.pop(ticket, None)
     return True
 
 
@@ -88,9 +153,12 @@ def extract_bearer_token(request: Request) -> str | None:
     auth = request.headers.get("authorization", "")
     if auth.lower().startswith("bearer "):
         return auth[7:].strip()
+    cookie_token = request.cookies.get(SESSION_COOKIE)
+    if cookie_token:
+        return cookie_token
     # Prefer short-lived tickets over the long-lived API token in query strings.
     ticket = request.query_params.get("ticket")
-    if ticket and verify_access_ticket(ticket):
+    if ticket and verify_access_ticket(ticket, path=request.url.path):
         return get_api_token()
     # Legacy fallback: still accept ?token= for older clients / bookmarks.
     return request.query_params.get("token") or None
@@ -103,11 +171,11 @@ def verify_token(token: str | None) -> bool:
     return secrets.compare_digest(token, expected)
 
 
-def verify_ws_credential(credential: str | None) -> bool:
+def verify_ws_credential(credential: str | None, *, path: str | None = None) -> bool:
     """Accept either a short-lived ticket or the long-lived API token (legacy)."""
     if not credential:
         return False
-    if verify_access_ticket(credential):
+    if verify_access_ticket(credential, path=path, consume=False):
         return True
     return verify_token(credential)
 
@@ -169,9 +237,9 @@ def is_localhost(request: Request) -> bool:
 def can_bootstrap_token(request: Request) -> bool:
     """Allow unauthenticated token bootstrap only from trusted clients.
 
-    Localhost is always allowed (desktop / Vite / Tauri). Remote bootstrap requires
-    an explicit env opt-in. Docker LAN installs should set AUDIOTHECA_API_TOKEN and
-    bake it into the UI via VITE_API_TOKEN instead of trusting private networks.
+    Localhost is always allowed (desktop / Vite / Tauri) unless explicitly disabled.
+    Docker LAN installs should disable bootstrap and establish an HttpOnly session
+    via the UI nginx proxy secret instead of baking the token into JS.
     """
     if os.environ.get("AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP") == "1":
         return False
@@ -188,6 +256,15 @@ def can_bootstrap_token(request: Request) -> bool:
             return False
         return addr.is_private or addr.is_loopback
     return False
+
+
+def can_establish_session(request: Request) -> bool:
+    """Allow HttpOnly session cookie creation for localhost or trusted reverse proxy."""
+    if is_localhost(request):
+        return True
+    if has_proxy_secret(request):
+        return True
+    return can_bootstrap_token(request)
 
 
 def _client_host(request: Request) -> str:

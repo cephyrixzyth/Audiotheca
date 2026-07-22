@@ -195,7 +195,8 @@ async def job_events(
     token: str = Query(default=""),
 ) -> None:
     credential = ticket or token
-    if not security.verify_ws_credential(credential):
+    ws_path = f"/api/jobs/{job_id}/events"
+    if not security.verify_ws_credential(credential, path=ws_path):
         await websocket.close(code=4401)
         return
     await websocket.accept()

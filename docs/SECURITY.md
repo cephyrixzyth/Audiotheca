@@ -17,30 +17,35 @@ The API uses a **Bearer token** stored at:
 `dedupe_reports/.api_token`
 
 - Auto-generated on first API start (unless `AUDIOTHECA_API_TOKEN` is set in the environment).
-- The UI bootstraps the token via `GET /api/auth/token` (**localhost only** by default; no auth required).
-- Docker / Unraid installs should set `AUDIOTHECA_API_TOKEN` and bake the same value into the UI as `VITE_API_TOKEN`, with `AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP=1`.
-- **Residual risk:** `VITE_API_TOKEN` is embedded in the built JS bundle. Anyone who can load the UI can read it. Prefer reverse-proxy auth in front of the UI on any shared LAN; treat the baked token as host-operator credential, not multi-user isolation.
+- The UI bootstraps auth via:
+  - **Local/Tauri:** `GET /api/auth/token` (localhost only) → bearer in memory, or
+  - **Docker/LAN behind nginx:** `POST /api/auth/session` with the reverse-proxy secret header → **HttpOnly** session cookie (token never appears in the JS bundle).
+- `AUDIOTHECA_PROXY_SECRET` must match between the API and UI nginx for session establishment.
 - `AUDIOTHECA_TRUST_INTERNAL_NETWORK=1` and `AUDIOTHECA_ALLOW_REMOTE_TOKEN_BOOTSTRAP=1` are explicit opt-ins — do not enable them on LAN without reverse-proxy auth.
-- All other `/api/*` routes require `Authorization: Bearer <token>` unless a valid short-lived ticket is supplied (see below).
+- All other `/api/*` routes require `Authorization: Bearer <token>`, the session cookie, or a valid short-lived ticket (see below).
 
 **Do not commit `.api_token` to git** (it is gitignored).
 
 ### Short-lived access tickets (1.0.12+)
 
-Some surfaces cannot send an `Authorization` header (WebSocket URLs, `<audio>` / `<img>` src, file download links). For those, the UI exchanges the long-lived bearer for a **single-purpose ticket**:
+Some surfaces cannot send an `Authorization` header (WebSocket URLs, `<audio>` / `<img>` src, file download links). For those, the UI exchanges the session/bearer for a **scoped ticket**:
 
-1. `POST /api/auth/ticket` (requires Bearer auth) → `{ "ticket": "…", "expires_in": 300 }`
+1. `POST /api/auth/ticket` (requires auth) → `{ "ticket": "…", "expires_in": 300, "scope": "/api/…", "single_use": true|false }`
 2. Append `?ticket=<ticket>` to WebSocket, media, or download URLs
 
 Tickets expire after **300 seconds** by default (`AUDIOTHECA_TICKET_TTL_S` env, clamped 30 s–1 h). They are held in memory only and are not written to disk.
+
+- **Downloads:** issued **on click**, path-scoped, **single-use** (consumed on first successful auth).
+- **WebSocket / media:** path-scoped, reusable until expiry (media range requests need reuse).
 
 **Legacy:** `?token=<api_token>` is still accepted for older bookmarks and external tools. Prefer tickets for anything that might appear in browser history or server access logs.
 
 | Surface | Auth |
 |---------|------|
-| REST `/api/*` | `Authorization: Bearer <token>` |
-| WebSocket job events | `?ticket=` (preferred) or `?token=` (legacy) |
-| Media preview / downloads | `?ticket=` (preferred) or `?token=` (legacy) |
+| REST `/api/*` | Session cookie, `Authorization: Bearer <token>`, or scoped `?ticket=` |
+| WebSocket job events | Path-scoped `?ticket=` (preferred) or `?token=` (legacy) |
+| Media preview | Path-scoped reusable `?ticket=` (preferred) or `?token=` (legacy) |
+| File downloads | Path-scoped **single-use** `?ticket=` issued on click |
 
 ## Network exposure
 

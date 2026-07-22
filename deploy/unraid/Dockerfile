@@ -22,7 +22,7 @@ ARG AUDIOTHECA_VERSION=1.0.12
 ARG ENGINE_VERSION=10.0.0
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends nginx p7zip-full curl tini clamav \
+    && apt-get install -y --no-install-recommends nginx p7zip-full curl tini clamav gettext-base \
     && rm -rf /var/lib/apt/lists/* \
     && rm -f /etc/nginx/sites-enabled/default
 
@@ -36,9 +36,10 @@ COPY api/ api/
 COPY *.py ./
 
 COPY --from=ui-build /app/ui/dist /usr/share/nginx/html
-COPY deploy/unraid/nginx-local.conf /etc/nginx/conf.d/default.conf
+COPY deploy/unraid/nginx-local.conf.template /etc/nginx/templates/default.conf.template
 COPY deploy/unraid/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+# Official nginx image layout is not used here; entrypoint runs envsubst into conf.d.
 
 LABEL org.opencontainers.image.title="Audiotheca" \
     org.opencontainers.image.version="${AUDIOTHECA_VERSION}" \
@@ -52,7 +53,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     AUDIOTHECA_LIBRARY_ROOTS=/library \
     AUDIOTHECA_NO_RELOAD=1 \
     AUDIOTHECA_API_HOST=0.0.0.0 \
-    AUDIOTHECA_API_PORT=8787
+    AUDIOTHECA_API_PORT=8787 \
+    AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP=1
 
 EXPOSE 80 8787
 
