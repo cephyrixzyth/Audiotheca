@@ -25,40 +25,49 @@ async function apiUrl(path: string): Promise<string> {
 
 let cachedToken: string | null = null;
 let sessionReady = false;
+let authInFlight: Promise<void> | null = null;
 
 async function ensureAuth(): Promise<void> {
   if (sessionReady || cachedToken) return;
+  if (authInFlight) return authInFlight;
 
-  // Prefer HttpOnly session cookie (Docker behind nginx / same-origin proxy).
-  const sessionRes = await fetch(await apiUrl("/auth/session"), {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: "{}",
-  });
-  if (sessionRes.ok) {
-    sessionReady = true;
-    const data = (await sessionRes.json()) as { token?: string };
-    if (data.token) {
-      cachedToken = data.token;
+  authInFlight = (async () => {
+    // Prefer HttpOnly session cookie (Docker behind nginx / same-origin proxy).
+    const sessionRes = await fetch(await apiUrl("/auth/session"), {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    if (sessionRes.ok) {
+      sessionReady = true;
+      const data = (await sessionRes.json()) as { token?: string };
+      if (data.token) {
+        cachedToken = data.token;
+      }
+      return;
     }
-    return;
-  }
 
-  // Localhost / Tauri bearer bootstrap (never bake the long-lived token into the UI bundle).
-  const res = await fetch(await apiUrl("/auth/token"), { credentials: "include" });
-  if (!res.ok) {
-    throw new Error("Failed to obtain API auth — is the API running on 127.0.0.1:8787?");
-  }
-  const data = (await res.json()) as { token: string };
-  cachedToken = data.token;
-  sessionReady = true;
+    // Localhost / Tauri bearer bootstrap (never bake the long-lived token into the UI bundle).
+    const res = await fetch(await apiUrl("/auth/token"), { credentials: "include" });
+    if (!res.ok) {
+      throw new Error("Failed to obtain API auth — is the API running on 127.0.0.1:8787?");
+    }
+    const data = (await res.json()) as { token: string };
+    cachedToken = data.token;
+    sessionReady = true;
+  })().finally(() => {
+    authInFlight = null;
+  });
+
+  return authInFlight;
 }
 
 /** Short-lived ticket for query-string surfaces (WS / media / downloads). */
 async function issueAccessTicket(options?: {
   scope?: string;
   singleUse?: boolean;
+  resource?: string;
 }): Promise<string> {
   const res = await fetch(await apiUrl("/auth/ticket"), {
     method: "POST",
@@ -67,6 +76,7 @@ async function issueAccessTicket(options?: {
     body: JSON.stringify({
       scope: options?.scope || "",
       single_use: Boolean(options?.singleUse),
+      resource: options?.resource || "",
     }),
   });
   if (!res.ok) {
@@ -615,7 +625,7 @@ export function executeDuplicateStaging(
 }
 
 export async function downloadDecisionsDownload(stamp: string): Promise<void> {
-  await downloadAuthenticated(`/runs/${stamp}/decisions/download`, `decisions_${stamp}.csv`);
+  await downloadAuthenticated(`/runs/${stamp}/decisions/download`, `approved_${stamp}.json`);
 }
 
 export async function feedbackExportDownload(
@@ -1574,7 +1584,7 @@ export function exportWorkspaceBundle(body: {
 
 export async function mediaStreamUrl(path: string): Promise<string> {
   const scope = "/api/media/stream";
-  const ticket = await issueAccessTicket({ scope, singleUse: false });
+  const ticket = await issueAccessTicket({ scope, singleUse: false, resource: path });
   return apiUrl(`/media/stream?path=${encodeURIComponent(path)}&ticket=${encodeURIComponent(ticket)}`);
 }
 

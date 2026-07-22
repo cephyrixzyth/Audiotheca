@@ -22,21 +22,22 @@ def bootstrap_api_token(request: Request) -> dict[str, str]:
 def establish_session(request: Request, response: Response) -> dict[str, object]:
     """Set an HttpOnly session cookie (preferred for Docker/LAN behind nginx).
 
-    Does not return the long-lived token in the response body when authenticated
-    via the reverse-proxy secret — keeps credentials out of the JS bundle.
+    The cookie holds an opaque session id — never the long-lived API token —
+    so XSS/log leakage cannot exfiltrate the permanent credential.
     """
     if not security.can_establish_session(request):
         raise HTTPException(status_code=403, detail="Session bootstrap not allowed for this client")
-    token = security.get_api_token()
+    session_id = security.create_session()
     secure = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+    max_age = int(max(300.0, security._SESSION_TTL_S))
     response.set_cookie(
         key=security.SESSION_COOKIE,
-        value=token,
+        value=session_id,
         httponly=True,
         samesite="lax",
         secure=secure,
         path="/",
-        max_age=60 * 60 * 24 * 30,
+        max_age=max_age,
     )
     security.audit(
         "session_established",
@@ -45,15 +46,14 @@ def establish_session(request: Request, response: Response) -> dict[str, object]
     )
     payload: dict[str, object] = {"ok": True, "session": True}
     # Local/dev (Tauri / Vite) may still want the bearer for non-cookie transports.
-    # Never return the long-lived token when bootstrap is disabled (Docker/LAN) —
-    # even if nginx→API looks like localhost — so it cannot leak into JS memory.
+    # Never return the long-lived token when bootstrap is disabled (Docker/LAN).
     bootstrap_disabled = os.environ.get("AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP") == "1"
     if (
         security.is_localhost(request)
         and not security.has_proxy_secret(request)
         and not bootstrap_disabled
     ):
-        payload["token"] = token
+        payload["token"] = security.get_api_token()
     return payload
 
 
@@ -62,11 +62,15 @@ def issue_access_ticket(body: dict = Body(default_factory=dict)) -> dict[str, ob
     """Issue a short-lived ticket for WebSocket / media / download URLs (auth required)."""
     ttl_raw = body.get("ttl_s")
     ttl_s = float(ttl_raw) if ttl_raw is not None else None
-    return security.issue_access_ticket(
-        scope=str(body.get("scope") or ""),
-        single_use=bool(body.get("single_use", False)),
-        ttl_s=ttl_s,
-    )
+    try:
+        return security.issue_access_ticket(
+            scope=str(body.get("scope") or ""),
+            single_use=bool(body.get("single_use", False)),
+            resource=str(body.get("resource") or ""),
+            ttl_s=ttl_s,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/api/health")

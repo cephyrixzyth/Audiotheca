@@ -10,10 +10,12 @@ from api.server import app
 
 
 @pytest.fixture(autouse=True)
-def _clear_tickets():
+def _clear_auth_state():
     security._tickets.clear()
+    security._sessions.clear()
     yield
     security._tickets.clear()
+    security._sessions.clear()
 
 
 def test_session_via_proxy_secret_omits_token(api_token, monkeypatch):
@@ -33,11 +35,22 @@ def test_session_via_proxy_secret_omits_token(api_token, monkeypatch):
     body = res.json()
     assert body.get("ok") is True
     assert "token" not in body
-    assert res.cookies.get(security.SESSION_COOKIE) == api_token
+    cookie = res.cookies.get(security.SESSION_COOKIE)
+    assert cookie
+    assert cookie != api_token  # opaque session id, not the API token
 
     # Cookie alone authenticates subsequent API calls.
     runs = client.get("/api/runs")
     assert runs.status_code == 200
+
+
+def test_session_blocked_on_localhost_when_bootstrap_disabled(api_token, monkeypatch):
+    """All-in-one nginx→API looks like localhost; bootstrap-disabled must still require proxy secret."""
+    monkeypatch.setenv("AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP", "1")
+    monkeypatch.delenv("AUDIOTHECA_PROXY_SECRET", raising=False)
+    monkeypatch.setattr(security, "is_localhost", lambda _request: True)
+    client = TestClient(app)
+    assert client.post("/api/auth/session").status_code == 403
 
 
 def test_session_localhost_may_return_token_when_bootstrap_enabled(api_token, monkeypatch):
@@ -48,16 +61,32 @@ def test_session_localhost_may_return_token_when_bootstrap_enabled(api_token, mo
     res = client.post("/api/auth/session")
     assert res.status_code == 200
     assert res.json().get("token") == api_token
+    assert res.cookies.get(security.SESSION_COOKIE)
 
 
-def test_session_omits_token_when_bootstrap_disabled_even_on_localhost(api_token, monkeypatch):
+def test_session_omits_token_when_bootstrap_disabled_with_proxy(api_token, monkeypatch):
     monkeypatch.setenv("AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP", "1")
+    monkeypatch.setenv("AUDIOTHECA_PROXY_SECRET", "proxy-secret-for-tests")
     monkeypatch.setattr(security, "is_localhost", lambda _request: True)
     client = TestClient(app)
-    res = client.post("/api/auth/session")
+    res = client.post(
+        "/api/auth/session",
+        headers={security.PROXY_SECRET_HEADER: "proxy-secret-for-tests"},
+    )
     assert res.status_code == 200
     assert "token" not in res.json()
-    assert res.cookies.get(security.SESSION_COOKIE) == api_token
+    assert res.cookies.get(security.SESSION_COOKIE) != api_token
+
+
+def test_ticket_requires_auth():
+    bare = TestClient(app)
+    assert bare.post("/api/auth/ticket", json={"scope": "/api/feedback/export"}).status_code == 401
+
+
+def test_ticket_rejects_empty_and_broad_scope(client):
+    assert client.post("/api/auth/ticket", json={"scope": ""}).status_code == 400
+    assert client.post("/api/auth/ticket", json={"scope": "/api"}).status_code == 400
+    assert client.post("/api/auth/ticket", json={"scope": "/evil"}).status_code == 400
 
 
 def test_ticket_rejects_wrong_path_scope(client):
@@ -96,6 +125,40 @@ def test_single_use_ticket_consumed_after_one_auth(client):
     assert second.status_code == 401
 
 
+def test_single_use_consumed_even_when_session_cookie_present(client, monkeypatch):
+    """Browser downloads send cookies; single-use must still retire the ticket URL."""
+    monkeypatch.delenv("AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP", raising=False)
+    monkeypatch.setattr(security, "is_localhost", lambda _request: True)
+    session_client = TestClient(app)
+    assert session_client.post("/api/auth/session").status_code == 200
+
+    issued = client.post(
+        "/api/auth/ticket",
+        json={"scope": "/api/feedback/export", "single_use": True},
+    ).json()
+    ticket = issued["ticket"]
+
+    first = session_client.get("/api/feedback/export", params={"ticket": ticket, "format": "csv"})
+    assert first.status_code == 200
+    assert ticket not in security._tickets
+
+    # Unauthenticated replay of the URL must fail.
+    bare = TestClient(app)
+    assert bare.get("/api/feedback/export", params={"ticket": ticket}).status_code == 401
+
+
+def test_stale_cookie_falls_through_to_valid_ticket(client, api_token):
+    issued = client.post(
+        "/api/auth/ticket",
+        json={"scope": "/api/feedback/export", "single_use": False},
+    ).json()
+    ticket = issued["ticket"]
+    bare = TestClient(app)
+    bare.cookies.set(security.SESSION_COOKIE, "not-a-real-session")
+    ok = bare.get("/api/feedback/export", params={"ticket": ticket, "format": "csv"})
+    assert ok.status_code == 200
+
+
 def test_reusable_ticket_survives_multiple_auths(client):
     issued = client.post(
         "/api/auth/ticket",
@@ -106,6 +169,54 @@ def test_reusable_ticket_survives_multiple_auths(client):
     bare = TestClient(app)
     assert bare.get("/api/feedback/export", params={"ticket": ticket}).status_code == 200
     assert bare.get("/api/feedback/export", params={"ticket": ticket}).status_code == 200
+
+
+def test_media_ticket_bound_to_resource(client):
+    issued = client.post(
+        "/api/auth/ticket",
+        json={
+            "scope": "/api/media/stream",
+            "single_use": False,
+            "resource": r"Z:\lib\a.wav",
+        },
+    ).json()
+    ticket = issued["ticket"]
+    assert issued["resource"] == r"Z:\lib\a.wav"
+
+    assert security.verify_access_ticket(
+        ticket,
+        path="/api/media/stream",
+        resource=r"Z:\lib\a.wav",
+        consume=False,
+    )
+    assert not security.verify_access_ticket(
+        ticket,
+        path="/api/media/stream",
+        resource=r"Z:\lib\other.wav",
+        consume=False,
+    )
+
+
+def test_csrf_blocks_cross_origin_cookie_mutation(api_token, monkeypatch):
+    monkeypatch.delenv("AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP", raising=False)
+    monkeypatch.setattr(security, "is_localhost", lambda _request: True)
+    client = TestClient(app)
+    assert client.post("/api/auth/session").status_code == 200
+
+    # Cross-origin mutation with session cookie must fail.
+    denied = client.post(
+        "/api/auth/ticket",
+        json={"scope": "/api/feedback/export"},
+        headers={"Origin": "http://evil.example:9999", "Host": "localhost:8787"},
+    )
+    assert denied.status_code == 403
+
+    allowed = client.post(
+        "/api/auth/ticket",
+        json={"scope": "/api/feedback/export"},
+        headers={"Origin": "http://localhost:8787", "Host": "localhost:8787"},
+    )
+    assert allowed.status_code == 200
 
 
 def test_verify_access_ticket_path_helpers():

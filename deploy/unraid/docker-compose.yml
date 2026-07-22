@@ -193,16 +193,20 @@ services:
     container_name: audiotheca
     restart: unless-stopped
     env_file: .env
+    ports:
+      - "${UI_PORT:-4210}:80"
+    # API stays on the container network only (nginx proxies /api/). Publish
+    # 8787 only for debugging: ports: ["${API_PORT:-4211}:8787"]
     environment:
       AUDIOTHECA_HOME: /data
       AUDIOTHECA_LIBRARY_ROOT: ${LIBRARY_CONTAINER_PATH:-/library}
       AUDIOTHECA_LIBRARY_ROOTS: ${LIBRARY_CONTAINER_PATH:-/library}
+      AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP: "${AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP:-1}"
+      AUDIOTHECA_API_TOKEN: "${AUDIOTHECA_API_TOKEN:?Set AUDIOTHECA_API_TOKEN in .env}"
+      AUDIOTHECA_PROXY_SECRET: "${AUDIOTHECA_PROXY_SECRET:?Set AUDIOTHECA_PROXY_SECRET in .env}"
     volumes:
       - ${APPDATA_PATH:-./appdata}:/data
       - ${LIBRARY_HOST_PATH}:${LIBRARY_CONTAINER_PATH:-/library}:ro
-    ports:
-      - "${UI_PORT:-4210}:80"
-      - "${API_PORT:-4211}:8787"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1/api/health"]
       interval: 30s

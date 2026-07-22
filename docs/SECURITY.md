@@ -19,8 +19,10 @@ The API uses a **Bearer token** stored at:
 - Auto-generated on first API start (unless `AUDIOTHECA_API_TOKEN` is set in the environment).
 - The UI bootstraps auth via:
   - **Local/Tauri:** `GET /api/auth/token` (localhost only) → bearer in memory, or
-  - **Docker/LAN behind nginx:** `POST /api/auth/session` with the reverse-proxy secret header → **HttpOnly** session cookie (token never appears in the JS bundle).
-- `AUDIOTHECA_PROXY_SECRET` must match between the API and UI nginx for session establishment.
+  - **Docker/LAN behind nginx:** `POST /api/auth/session` with the reverse-proxy secret header → **HttpOnly** opaque session cookie (long-lived API token never appears in the cookie or JS bundle).
+- `AUDIOTHECA_PROXY_SECRET` must match between the API and UI nginx for session establishment. When token bootstrap is disabled, the proxy secret is **required** even if nginx→API looks like localhost (all-in-one image).
+- Session cookies hold an opaque id mapped server-side — not the API token itself.
+- Mutating cookie-authenticated requests require a matching `Origin`/`Referer` host (CSRF guard for same-site different ports on a NAS).
 - `AUDIOTHECA_TRUST_INTERNAL_NETWORK=1` and `AUDIOTHECA_ALLOW_REMOTE_TOKEN_BOOTSTRAP=1` are explicit opt-ins — do not enable them on LAN without reverse-proxy auth.
 - All other `/api/*` routes require `Authorization: Bearer <token>`, the session cookie, or a valid short-lived ticket (see below).
 
@@ -35,8 +37,8 @@ Some surfaces cannot send an `Authorization` header (WebSocket URLs, `<audio>` /
 
 Tickets expire after **300 seconds** by default (`AUDIOTHECA_TICKET_TTL_S` env, clamped 30 s–1 h). They are held in memory only and are not written to disk.
 
-- **Downloads:** issued **on click**, path-scoped, **single-use** (consumed on first successful auth).
-- **WebSocket / media:** path-scoped, reusable until expiry (media range requests need reuse).
+- **Downloads:** issued **on click**, path-scoped, **single-use** (consumed on first successful auth, even when a session cookie is also present).
+- **WebSocket / media:** path-scoped, reusable until expiry (media range requests need reuse). Media tickets are also **resource-bound** to the library file path.
 
 **Legacy:** `?token=<api_token>` is still accepted for older bookmarks and external tools. Prefer tickets for anything that might appear in browser history or server access logs.
 

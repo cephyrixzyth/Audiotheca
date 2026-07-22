@@ -11,6 +11,11 @@ export AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP="${AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP:
 export AUDIOTHECA_PROXY_SECRET="${AUDIOTHECA_PROXY_SECRET:-}"
 export PYTHONUNBUFFERED=1
 
+if [ "${AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP}" = "1" ] && [ -z "${AUDIOTHECA_PROXY_SECRET}" ]; then
+    echo "AUDIOTHECA_PROXY_SECRET is required when AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP=1" >&2
+    exit 1
+fi
+
 # Render nginx config so the proxy secret can be injected without baking tokens into JS.
 if [ -f /etc/nginx/templates/default.conf.template ]; then
     envsubst '${AUDIOTHECA_PROXY_SECRET}' \

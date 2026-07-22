@@ -9,6 +9,7 @@ import os.path
 import re
 import secrets
 import socket
+import threading
 import time
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -56,8 +57,13 @@ PROXY_SECRET_HEADER = "x-audiotheca-proxy-secret"
 
 # Short-lived URL tickets for WS / media / file downloads (avoid long-lived bearer in query strings).
 _TICKET_TTL_S = float(os.environ.get("AUDIOTHECA_TICKET_TTL_S", "300"))
-# ticket -> {expires: float, scope: str, single_use: bool}
+_SESSION_TTL_S = float(os.environ.get("AUDIOTHECA_SESSION_TTL_S", str(60 * 60 * 24 * 30)))
+# ticket -> {expires, scope, single_use, resource}
 _tickets: dict[str, dict[str, object]] = {}
+# Opaque session id -> expiry (monotonic). Cookie never holds the long-lived API token.
+_sessions: dict[str, float] = {}
+_ticket_lock = threading.Lock()
+_session_lock = threading.Lock()
 
 
 def proxy_secret_expected() -> str:
@@ -74,54 +80,81 @@ def has_proxy_secret(request: Request) -> bool:
     return secrets.compare_digest(got, expected)
 
 
+def _normalize_ticket_scope(scope: str) -> str:
+    text = str(scope or "").strip()
+    if len(text) > 1:
+        text = text.rstrip("/")
+    return text
+
+
+def validate_ticket_scope(scope: str) -> str:
+    """Require a non-empty /api/... scope that is not a bare /api wildcard."""
+    scope_text = _normalize_ticket_scope(scope)
+    if not scope_text.startswith("/api/"):
+        raise ValueError("Ticket scope must be an /api/... path")
+    parts = [part for part in scope_text.split("/") if part]
+    # Reject /api alone (parts == ["api"]) — that would authorize every API route.
+    if len(parts) < 2:
+        raise ValueError("Ticket scope is too broad")
+    return scope_text
+
+
 def issue_access_ticket(
     *,
     scope: str = "",
     single_use: bool = False,
+    resource: str = "",
     ttl_s: float | None = None,
 ) -> dict[str, object]:
-    """Create a short-lived ticket, optionally path-scoped and/or single-use."""
+    """Create a short-lived ticket, path-scoped and optionally resource-bound / single-use."""
+    scope_text = validate_ticket_scope(scope)
+    resource_text = str(resource or "").strip()
     ttl = float(ttl_s if ttl_s is not None else _TICKET_TTL_S)
     ttl = max(30.0, min(ttl, 3600.0))
     now = time.monotonic()
-    expired = [key for key, meta in _tickets.items() if float(meta.get("expires", 0)) <= now]
-    for key in expired:
-        _tickets.pop(key, None)
-    ticket = secrets.token_urlsafe(24)
-    scope_text = str(scope or "").strip()
-    _tickets[ticket] = {
-        "expires": now + ttl,
-        "scope": scope_text,
-        "single_use": bool(single_use),
-    }
+    with _ticket_lock:
+        expired = [key for key, meta in _tickets.items() if float(meta.get("expires", 0)) <= now]
+        for key in expired:
+            _tickets.pop(key, None)
+        ticket = secrets.token_urlsafe(24)
+        _tickets[ticket] = {
+            "expires": now + ttl,
+            "scope": scope_text,
+            "single_use": bool(single_use),
+            "resource": resource_text,
+        }
     audit(
         "access_ticket_issued",
         ttl_s=ttl,
-        scope=scope_text or "*",
+        scope=scope_text,
         single_use=bool(single_use),
+        resource=bool(resource_text),
     )
     return {
         "ticket": ticket,
         "expires_in": int(ttl),
         "scope": scope_text,
         "single_use": bool(single_use),
+        "resource": resource_text,
     }
 
 
 def _path_matches_ticket_scope(path: str, scope: str) -> bool:
     """True when path equals scope or is a nested path under scope (not a prefix sibling)."""
-    if not scope:
+    path_n = _normalize_ticket_scope(path)
+    scope_n = _normalize_ticket_scope(scope)
+    if not scope_n:
+        return False
+    if path_n == scope_n:
         return True
-    if path == scope:
-        return True
-    prefix = scope if scope.endswith("/") else f"{scope}/"
-    return path.startswith(prefix)
+    return path_n.startswith(f"{scope_n}/")
 
 
 def verify_access_ticket(
     ticket: str | None,
     *,
     path: str | None = None,
+    resource: str | None = None,
     consume: bool | None = None,
 ) -> bool:
     """Validate a ticket. When scoped, path must equal or nest under the ticket scope.
@@ -132,33 +165,91 @@ def verify_access_ticket(
     if not ticket:
         return False
     now = time.monotonic()
-    meta = _tickets.get(ticket)
-    if meta is None:
-        return False
-    expires = float(meta.get("expires", 0))
-    if expires <= now:
-        _tickets.pop(ticket, None)
-        return False
-    scope = str(meta.get("scope") or "")
-    if scope:
-        if not path or not _path_matches_ticket_scope(path, scope):
+    with _ticket_lock:
+        meta = _tickets.get(ticket)
+        if meta is None:
             return False
-    # Only single-use tickets are ever consumed; consume=False allows a peek.
-    if bool(meta.get("single_use")) and consume is not False:
-        _tickets.pop(ticket, None)
-    return True
+        expires = float(meta.get("expires", 0))
+        if expires <= now:
+            _tickets.pop(ticket, None)
+            return False
+        scope = str(meta.get("scope") or "")
+        if not scope or not path or not _path_matches_ticket_scope(path, scope):
+            return False
+        expected_resource = str(meta.get("resource") or "")
+        if expected_resource:
+            got = str(resource or "")
+            if not got or not secrets.compare_digest(got, expected_resource):
+                return False
+        # Only single-use tickets are ever consumed; consume=False allows a peek.
+        if bool(meta.get("single_use")) and consume is not False:
+            _tickets.pop(ticket, None)
+        return True
+
+
+def create_session() -> str:
+    """Mint an opaque session id (not the long-lived API token)."""
+    now = time.monotonic()
+    ttl = max(300.0, _SESSION_TTL_S)
+    sid = secrets.token_urlsafe(32)
+    with _session_lock:
+        expired = [key for key, exp in _sessions.items() if float(exp) <= now]
+        for key in expired:
+            _sessions.pop(key, None)
+        _sessions[sid] = now + ttl
+    return sid
+
+
+def resolve_session(session_id: str | None) -> bool:
+    if not session_id:
+        return False
+    now = time.monotonic()
+    with _session_lock:
+        expires = _sessions.get(session_id)
+        if expires is None:
+            return False
+        if float(expires) <= now:
+            _sessions.pop(session_id, None)
+            return False
+        return True
 
 
 def extract_bearer_token(request: Request) -> str | None:
+    """Resolve auth credentials for HTTP requests.
+
+    When ``?ticket=`` is present it is always verified (and single-use tickets are
+    consumed) even if a session cookie or Bearer header is also valid — otherwise
+    browser downloads with cookies would never retire single-use tickets.
+    """
+    ticket = request.query_params.get("ticket")
+    ticket_ok = False
+    if ticket:
+        ticket_ok = verify_access_ticket(
+            ticket,
+            path=request.url.path,
+            resource=request.query_params.get("path"),
+        )
+
     auth = request.headers.get("authorization", "")
     if auth.lower().startswith("bearer "):
-        return auth[7:].strip()
+        bearer = auth[7:].strip()
+        if verify_token(bearer):
+            return bearer
+        if ticket_ok:
+            return get_api_token()
+        # Invalid bearer must not shadow a missing/failed ticket.
+
     cookie_token = request.cookies.get(SESSION_COOKIE)
     if cookie_token:
-        return cookie_token
-    # Prefer short-lived tickets over the long-lived API token in query strings.
-    ticket = request.query_params.get("ticket")
-    if ticket and verify_access_ticket(ticket, path=request.url.path):
+        if resolve_session(cookie_token):
+            return get_api_token()
+        # Legacy: older builds stored the API token itself in the cookie.
+        if verify_token(cookie_token):
+            return cookie_token
+        if ticket_ok:
+            return get_api_token()
+
+    if ticket_ok:
         return get_api_token()
     # Legacy fallback: still accept ?token= for older clients / bookmarks.
     return request.query_params.get("token") or None
@@ -178,6 +269,31 @@ def verify_ws_credential(credential: str | None, *, path: str | None = None) -> 
     if verify_access_ticket(credential, path=path, consume=False):
         return True
     return verify_token(credential)
+
+
+def cookie_csrf_ok(request: Request) -> bool:
+    """Reject cross-origin mutating requests authenticated only by session cookie."""
+    if request.method in {"GET", "HEAD", "OPTIONS"}:
+        return True
+    auth = request.headers.get("authorization", "")
+    if auth.lower().startswith("bearer "):
+        return True
+    if not request.cookies.get(SESSION_COOKIE):
+        return True
+    host = (request.headers.get("host") or "").lower()
+    for header in ("origin", "referer"):
+        raw = request.headers.get(header) or ""
+        if not raw:
+            continue
+        try:
+            netloc = urlparse(raw).netloc.lower()
+        except ValueError:
+            continue
+        if netloc and netloc == host:
+            return True
+        return False
+    # No Origin/Referer: allow loopback (Tauri / local tools); block LAN cookie CSRF.
+    return is_localhost(request)
 
 
 class RateLimiter:
@@ -259,10 +375,17 @@ def can_bootstrap_token(request: Request) -> bool:
 
 
 def can_establish_session(request: Request) -> bool:
-    """Allow HttpOnly session cookie creation for localhost or trusted reverse proxy."""
-    if is_localhost(request):
-        return True
+    """Allow HttpOnly session cookie creation for trusted reverse proxy or local/dev.
+
+    When token bootstrap is disabled (Docker/LAN), TCP localhost alone is not
+    enough — all-in-one nginx always connects to the API on loopback, which would
+    otherwise let any LAN client mint a session via the UI proxy.
+    """
     if has_proxy_secret(request):
+        return True
+    if os.environ.get("AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP") == "1":
+        return False
+    if is_localhost(request):
         return True
     return can_bootstrap_token(request)
 

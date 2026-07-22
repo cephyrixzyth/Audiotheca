@@ -26,7 +26,14 @@ export async function getDefaultLibraryRoot(): Promise<string> {
     return BUILD_DEFAULT_LIBRARY_ROOT;
   }
   try {
-    const res = await fetch("/api/security/library-roots");
+    // Establish session first so library-roots (auth-required) can succeed.
+    await fetch("/api/auth/session", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    const res = await fetch("/api/security/library-roots", { credentials: "include" });
     if (res.ok) {
       const data = (await res.json()) as { roots?: string[] };
       const first = data.roots?.find((item) => item.trim());
@@ -36,9 +43,8 @@ export async function getDefaultLibraryRoot(): Promise<string> {
       }
     }
   } catch {
-    /* offline / API not ready */
+    /* offline / API not ready — do not cache the fallback forever */
   }
-  cachedLibraryRoot = BUILD_DEFAULT_LIBRARY_ROOT;
   return BUILD_DEFAULT_LIBRARY_ROOT;
 }
 

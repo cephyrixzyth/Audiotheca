@@ -60,6 +60,16 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
     setTrimEnd(session.trimEnd);
   }, [session.trimStart, session.trimEnd]);
 
+  // Drop cached ticketed URL when the selected file changes.
+  useEffect(() => {
+    setStreamUrl(null);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    setPlaying(false);
+  }, [path]);
+
   const applyMix = useCallback((audio: HTMLAudioElement) => {
     if (session.mixChannel === "mono") {
       audio.style.filter = "none";

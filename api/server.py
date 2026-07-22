@@ -94,6 +94,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if not security.verify_token(token):
             security.audit("auth_failed", path=path, client=security._client_host(request))
             return JSONResponse(status_code=401, content={"detail": "Invalid or missing API token"})
+        if not security.cookie_csrf_ok(request):
+            security.audit("csrf_rejected", path=path, client=security._client_host(request))
+            return JSONResponse(status_code=403, content={"detail": "CSRF check failed"})
         if path.startswith("/api/runs/") and not path.startswith("/api/runs/compare"):
             match = _RUN_STAMP_SEGMENT.match(path)
             if match and match.group(1) != "compare":
