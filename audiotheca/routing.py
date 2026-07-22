@@ -304,12 +304,11 @@ class RoutingMixin:
                     self._inc("errors")
                 return ok
 
-            # Preflight collisions so we do not partially merge then fail.
-            for item in src_path.iterdir():
-                target_item = dst_path / item.name
-                if item.is_file() and target_item.exists():
-                    self.logger.warning("Merge collision: %s already exists in %s", item.name, dst_path)
-                    return False
+            # Preflight the full merge tree so we do not partially move then fail.
+            collision = self._merge_collision(src_path, dst_path)
+            if collision is not None:
+                self.logger.warning("Merge collision: %s already exists in %s", collision.name, dst_path)
+                return False
 
             ok = True
             for item in list(src_path.iterdir()):
@@ -318,7 +317,7 @@ class RoutingMixin:
                 if source_item.is_dir():
                     if not self.move_and_merge(source_item, target_item):
                         ok = False
-                elif not target_item.exists():
+                else:
                     moved, err = guarded_move(
                         source_item,
                         target_item,
@@ -335,9 +334,6 @@ class RoutingMixin:
                         )
                         self._inc("errors")
                         ok = False
-                else:
-                    self.logger.warning("Merge collision: %s already exists in %s", item.name, dst_path)
-                    ok = False
 
             if src_path.exists() and not any(src_path.iterdir()):
                 try:
@@ -350,6 +346,23 @@ class RoutingMixin:
             self.logger.error("move_and_merge failed %s -> %s: %s", src_path, dst_path, exc)
             self._inc("errors")
             return False
+
+    def _merge_collision(self, src_path: Path, dst_path: Path) -> Path | None:
+        """Return the first source entry that would collide under dst_path (recursive)."""
+        if not dst_path.exists():
+            return None
+        for item in src_path.iterdir():
+            target_item = dst_path / item.name
+            if item.is_dir():
+                if target_item.exists() and target_item.is_file():
+                    return item
+                if target_item.exists() and target_item.is_dir():
+                    nested = self._merge_collision(item, target_item)
+                    if nested is not None:
+                        return nested
+            elif target_item.exists():
+                return item
+        return None
 
     def safe_move(self, src: Path, dst: Path) -> bool:
         from audiotheca.transaction_ledger import guarded_move, new_batch_id

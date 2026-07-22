@@ -28,6 +28,19 @@ def test_symlink_escape_rejected(tmp_path, monkeypatch):
         security.ensure_library_path(str(link), must_exist=True)
 
 
+def test_symlink_ancestor_nonexistent_child_rejected(tmp_path, monkeypatch):
+    library = tmp_path / "library"
+    library.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    link = library / "escape"
+    link.symlink_to(outside)
+    monkeypatch.setattr(security, "library_roots", lambda: [library])
+
+    with pytest.raises(ValueError, match="library root"):
+        security.ensure_library_path(str(link / "newfile.txt"))
+
+
 def test_canonical_path_under_library_still_allowed(tmp_path, monkeypatch):
     library = tmp_path / "library"
     library.mkdir()

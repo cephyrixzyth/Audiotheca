@@ -19,6 +19,7 @@ The API uses a **Bearer token** stored at:
 - Auto-generated on first API start (unless `AUDIOTHECA_API_TOKEN` is set in the environment).
 - The UI bootstraps the token via `GET /api/auth/token` (**localhost only** by default; no auth required).
 - Docker / Unraid installs should set `AUDIOTHECA_API_TOKEN` and bake the same value into the UI as `VITE_API_TOKEN`, with `AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP=1`.
+- **Residual risk:** `VITE_API_TOKEN` is embedded in the built JS bundle. Anyone who can load the UI can read it. Prefer reverse-proxy auth in front of the UI on any shared LAN; treat the baked token as host-operator credential, not multi-user isolation.
 - `AUDIOTHECA_TRUST_INTERNAL_NETWORK=1` and `AUDIOTHECA_ALLOW_REMOTE_TOKEN_BOOTSTRAP=1` are explicit opt-ins — do not enable them on LAN without reverse-proxy auth.
 - All other `/api/*` routes require `Authorization: Bearer <token>` unless a valid short-lived ticket is supplied (see below).
 

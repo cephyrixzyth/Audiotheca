@@ -144,7 +144,7 @@ def guarded_move(
     try:
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(src), str(dst))
-    except OSError as exc:
+    except (OSError, shutil.Error) as exc:
         fail_move(entry_id, batch_id=batch_id, error=str(exc))
         return False, str(exc)
     commit_move(entry_id, batch_id=batch_id)

@@ -17,7 +17,7 @@ from urllib.parse import urlparse
 
 from fastapi import HTTPException, Request
 
-from api.path_logic import is_logical_path_under
+from api.path_logic import is_logical_path_under, logical_path_from_parts, logical_path_parts
 from api.paths import report_dir, workspace_root
 from audiotheca.config import ROOT_DIR as DEFAULT_LIBRARY_ROOT
 
@@ -258,6 +258,39 @@ def library_roots() -> list[Path]:
     return resolved
 
 
+def _nearest_existing_ancestor(path: Path) -> Path | None:
+    """Return the nearest existing path or symlink walking up from path.
+
+    Windows-style paths on POSIX hosts keep backslashes inside a single Path
+    component, so Path.parent collapses to '.' — walk logical parts instead.
+    """
+    text = str(path)
+    if "\\" in text or (len(text) >= 2 and text[1] == ":"):
+        parts = logical_path_parts(path)
+        while len(parts) > 1:
+            parts = parts[:-1]
+            candidate = logical_path_from_parts(parts)
+            try:
+                if candidate.exists() or candidate.is_symlink():
+                    return candidate
+            except OSError:
+                return None
+        return None
+
+    cursor = path
+    for _ in range(256):
+        try:
+            if cursor.exists() or cursor.is_symlink():
+                return cursor
+        except OSError:
+            return None
+        parent = cursor.parent
+        if parent == cursor:
+            return None
+        cursor = parent
+    return None
+
+
 def _validate_library_path(raw: str, *, must_exist: bool = False, label: str = "path") -> Path:
     if not raw or not str(raw).strip():
         raise ValueError(f"{label} is required")
@@ -272,14 +305,20 @@ def _validate_library_path(raw: str, *, must_exist: bool = False, label: str = "
         # Existing paths / symlinks must be canonically under a root (no symlink escape).
         allowed = any(is_canonical_path_under(path, root) for root in roots)
     else:
-        # Non-existent paths may be Windows-style logical paths on a non-Windows host.
-        # Compare both the resolved and raw forms; logical_path_parts normalizes '\'.
-        allowed = any(
-            is_canonical_path_under(path, root)
-            or is_logical_path_under(path, root)
-            or is_logical_path_under(raw_path, root)
-            for root in roots
-        )
+        # Non-existent destinations: block symlink-ancestor escapes first.
+        # resolve() follows existing symlink parents, so a path like
+        # library/escape_symlink/new.txt can canonicalize outside the root.
+        nearest = _nearest_existing_ancestor(raw_path)
+        if nearest is not None:
+            allowed = any(is_canonical_path_under(nearest, root) for root in roots)
+        else:
+            # No existing ancestor (typical Windows drive paths on Linux hosts).
+            allowed = any(
+                is_canonical_path_under(path, root)
+                or is_logical_path_under(path, root)
+                or is_logical_path_under(raw_path, root)
+                for root in roots
+            )
     if not allowed:
         audit("library_path_denied", path=str(path), label=label)
         raise ValueError(f"{label} must be under a configured library root")
