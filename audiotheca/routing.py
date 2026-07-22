@@ -279,29 +279,61 @@ class RoutingMixin:
         return dest_path, relative_dest
 
     def move_and_merge(self, src: str | Path, dst: str | Path) -> bool:
+        from audiotheca.transaction_ledger import guarded_move, new_batch_id
+
         src_path = Path(src)
         dst_path = Path(dst)
 
         if self.dry_run:
             return True
 
+        batch_id = getattr(self, "_move_batch_id", None) or new_batch_id()
+        self._move_batch_id = batch_id
+
         try:
             if not dst_path.exists():
-                shutil.move(str(src_path), str(dst_path))
-                return True
+                ok, err = guarded_move(
+                    src_path,
+                    dst_path,
+                    batch_id=batch_id,
+                    op="move_and_merge",
+                    dry_run=False,
+                )
+                if not ok:
+                    self.logger.error("move_and_merge failed %s -> %s: %s", src_path, dst_path, err)
+                    self._inc("errors")
+                return ok
+
+            # Preflight the full merge tree so we do not partially move then fail.
+            collision = self._merge_collision(src_path, dst_path)
+            if collision is not None:
+                self.logger.warning("Merge collision: %s already exists in %s", collision.name, dst_path)
+                return False
 
             ok = True
-            for item in src_path.iterdir():
+            for item in list(src_path.iterdir()):
                 source_item = src_path / item.name
                 target_item = dst_path / item.name
                 if source_item.is_dir():
                     if not self.move_and_merge(source_item, target_item):
                         ok = False
-                elif not target_item.exists():
-                    shutil.move(str(source_item), str(target_item))
                 else:
-                    self.logger.warning("Merge collision: %s already exists in %s", item.name, dst_path)
-                    ok = False
+                    moved, err = guarded_move(
+                        source_item,
+                        target_item,
+                        batch_id=batch_id,
+                        op="move_and_merge_child",
+                        dry_run=False,
+                    )
+                    if not moved:
+                        self.logger.error(
+                            "move_and_merge child failed %s -> %s: %s",
+                            source_item,
+                            target_item,
+                            err,
+                        )
+                        self._inc("errors")
+                        ok = False
 
             if src_path.exists() and not any(src_path.iterdir()):
                 try:
@@ -315,17 +347,49 @@ class RoutingMixin:
             self._inc("errors")
             return False
 
+    def _merge_collision(self, src_path: Path, dst_path: Path) -> Path | None:
+        """Return the first source entry that would collide under dst_path (recursive)."""
+        if not dst_path.exists():
+            return None
+        for item in src_path.iterdir():
+            target_item = dst_path / item.name
+            if item.is_dir():
+                if target_item.exists() and target_item.is_file():
+                    return item
+                if target_item.exists() and target_item.is_dir():
+                    nested = self._merge_collision(item, target_item)
+                    if nested is not None:
+                        return nested
+            elif target_item.exists():
+                return item
+        return None
+
     def safe_move(self, src: Path, dst: Path) -> bool:
+        from audiotheca.transaction_ledger import guarded_move, new_batch_id
+
         if self.dry_run:
             return True
-        try:
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            shutil.move(str(src), str(dst))
-            return True
-        except (OSError, PermissionError, shutil.Error) as exc:
-            self.logger.error("safe_move failed %s -> %s: %s", src, dst, exc)
+        batch_id = getattr(self, "_move_batch_id", None) or new_batch_id()
+        self._move_batch_id = batch_id
+        final_dst = Path(dst)
+        if final_dst.exists():
+            stem = final_dst.name
+            parent = final_dst.parent
+            suffix = 1
+            while final_dst.exists():
+                final_dst = parent / f"{stem}_{suffix}"
+                suffix += 1
+        ok, err = guarded_move(
+            Path(src),
+            final_dst,
+            batch_id=batch_id,
+            op="safe_move",
+            dry_run=False,
+        )
+        if not ok:
+            self.logger.error("safe_move failed %s -> %s: %s", src, final_dst, err)
             self._inc("errors")
-            return False
+        return ok
 
     def write_sidecar_metadata(self, folder_path: Path, original_data: dict) -> None:
         if self.dry_run or folder_path.is_file():

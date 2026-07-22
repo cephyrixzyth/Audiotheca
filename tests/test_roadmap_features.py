@@ -144,15 +144,21 @@ def test_archive_index_zip(tmp_path):
     assert any("item.txt" in entry for entry in result["entries"])
 
 
-def test_scan_extensions_api(client, tmp_path):
-    wav_path = tmp_path / "test.wav"
+def test_scan_extensions_api(client, tmp_path, monkeypatch):
+    from api import security
+
+    library = tmp_path / "library"
+    library.mkdir()
+    monkeypatch.setattr(security, "library_roots", lambda: [library])
+
+    wav_path = library / "test.wav"
     _write_minimal_wav(wav_path, axml="<root><NOTE>Sound Ideas library</NOTE></root>")
 
     res = client.get("/api/scan-extensions/bwf", params={"path": str(wav_path)})
     assert res.status_code == 200
     assert "vendor_hints" in res.json()
 
-    folder = tmp_path / "tracks"
+    folder = library / "tracks"
     folder.mkdir()
     _write_minimal_wav(folder / "A.wav")
     _write_minimal_wav(folder / "A_01.wav")
@@ -161,7 +167,7 @@ def test_scan_extensions_api(client, tmp_path):
     assert res.status_code == 200
     assert res.json()["group_count"] >= 0
 
-    archive = tmp_path / "demo.zip"
+    archive = library / "demo.zip"
     import zipfile
 
     with zipfile.ZipFile(archive, "w") as zf:

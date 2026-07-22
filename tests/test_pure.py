@@ -397,3 +397,19 @@ class TestMoveAndMerge:
         assert engine.move_and_merge(src, dst) is True
         assert not src.exists()
         assert (dst / "only.txt").read_text(encoding="utf-8") == "data"
+
+    def test_nested_merge_collision_leaves_source_intact(self, tmp_path):
+        engine = DeduplicationEngine(tmp_path, dry_run=False, max_workers=1)
+        src = tmp_path / "src_nested"
+        dst = tmp_path / "dst_nested"
+        (src / "sub").mkdir(parents=True)
+        (dst / "sub").mkdir(parents=True)
+        (src / "sub" / "a.txt").write_text("a", encoding="utf-8")
+        (src / "sub" / "b.txt").write_text("b", encoding="utf-8")
+        (dst / "sub" / "b.txt").write_text("keep", encoding="utf-8")
+
+        assert engine.move_and_merge(src, dst) is False
+        assert (src / "sub" / "a.txt").exists()
+        assert (src / "sub" / "b.txt").exists()
+        assert (dst / "sub" / "b.txt").read_text(encoding="utf-8") == "keep"
+        assert not (dst / "sub" / "a.txt").exists()

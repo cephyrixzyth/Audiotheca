@@ -120,24 +120,38 @@ See `.env.example`. Key variables:
 - `LIBRARY_HOST_PATH` — your array path (e.g. `/mnt/user/infernal-data-streams/_software/_audio`)
 - `LIBRARY_CONTAINER_PATH` — leave as `/library` unless you change volume targets
 - `APPDATA_PATH` — persistent config and reports
-- `AUDIOTHECA_API_TOKEN` — optional fixed token; otherwise auto-written to appdata on first start
+- `AUDIOTHECA_API_TOKEN` — **required** fixed bearer (server-side / never in the JS bundle)
+- `AUDIOTHECA_PROXY_SECRET` — **required** shared secret for opaque HttpOnly session minting via nginx
 
 ## Security
 
-- API binds `0.0.0.0` inside the Docker network only; expose UI port to LAN, not API, when possible.
-- Token bootstrap trusts the UI nginx container on the internal Docker network.
-- For reverse proxy (Nginx Proxy Manager / SWAG): proxy to `ui:80`, enable WebSocket upgrade for scan progress.
-- Set `AUDIOTHECA_API_TOKEN` in `.env` for a stable token across rebuilds.
+- API binds `0.0.0.0` inside the Docker network only and is **not published** to the host by default.
+- Expose the UI port to LAN (nginx proxies `/api/`). Do not publish API port `8787` unless debugging.
+- Set strong `AUDIOTHECA_API_TOKEN` and `AUDIOTHECA_PROXY_SECRET` in `.env` (and in the Unraid Add Container template).
+- The UI nginx injects the proxy secret so `/api/auth/session` can set an **opaque HttpOnly** cookie — the long-lived bearer is never baked into the JS bundle or stored in the cookie value.
+- Token bootstrap (`GET /api/auth/token`) is disabled in the default compose (`AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP=1`).
+- For reverse proxy (Nginx Proxy Manager / SWAG): proxy to `ui:80`, enable WebSocket upgrade for scan progress, and prefer proxy auth.
 
 ## Smoke test
 
 ```bash
-curl -sf http://127.0.0.1:4211/api/health | jq .
+# UI (includes proxied /api/)
 curl -sf http://127.0.0.1:4210/ | head
-curl -sf http://127.0.0.1:4210/api/security/library-roots | jq .
+# Direct bearer still works for scripting; the browser uses a session cookie instead.
+curl -sf -H "Authorization: Bearer $AUDIOTHECA_API_TOKEN" \
+  http://127.0.0.1:4210/api/security/library-roots | jq .
+# Session via nginx proxy secret (opaque cookie — not the API token):
+curl -sf -c - -X POST http://127.0.0.1:4210/api/auth/session | head
 ```
 
-Start a dry-run scan from the **Scan** tab; progress streams over WebSocket at `/api/jobs/{id}/events`.
+Start a dry-run scan from the **Scan** tab; progress streams over WebSocket at `/api/jobs/{id}/events?ticket=…`.
+
+To debug the API on the host, temporarily add under the `api` service:
+
+```yaml
+ports:
+  - "${API_PORT:-4211}:8787"
+```
 
 ## Run tests in the API image
 

@@ -9,6 +9,7 @@ import os.path
 import re
 import secrets
 import socket
+import threading
 import time
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -17,7 +18,12 @@ from urllib.parse import urlparse
 
 from fastapi import HTTPException, Request
 
-from api.path_logic import is_logical_path_under
+from api.path_logic import (
+    collapse_logical_path,
+    is_logical_path_under,
+    logical_path_from_parts,
+    logical_path_parts,
+)
 from api.paths import report_dir, workspace_root
 from audiotheca.config import ROOT_DIR as DEFAULT_LIBRARY_ROOT
 
@@ -49,48 +55,212 @@ _BLOCKED_NETS = (
     ipaddress.ip_network("fe80::/10"),
 )
 
-PUBLIC_HTTP_PATHS = frozenset({"/api/health", "/api/auth/token"})
+PUBLIC_HTTP_PATHS = frozenset({"/api/health", "/api/auth/token", "/api/auth/session"})
+
+SESSION_COOKIE = "audiotheca_session"
+PROXY_SECRET_HEADER = "x-audiotheca-proxy-secret"
 
 # Short-lived URL tickets for WS / media / file downloads (avoid long-lived bearer in query strings).
 _TICKET_TTL_S = float(os.environ.get("AUDIOTHECA_TICKET_TTL_S", "300"))
-_tickets: dict[str, float] = {}
+_SESSION_TTL_S = float(os.environ.get("AUDIOTHECA_SESSION_TTL_S", str(60 * 60 * 24 * 30)))
+# ticket -> {expires, scope, single_use, resource}
+_tickets: dict[str, dict[str, object]] = {}
+# Opaque session id -> expiry (monotonic). Cookie never holds the long-lived API token.
+_sessions: dict[str, float] = {}
+_ticket_lock = threading.Lock()
+_session_lock = threading.Lock()
 
 
-def issue_access_ticket(*, ttl_s: float | None = None) -> dict[str, object]:
-    """Create a single-purpose access ticket for query-string auth surfaces."""
+def proxy_secret_expected() -> str:
+    return os.environ.get("AUDIOTHECA_PROXY_SECRET", "").strip()
+
+
+def has_proxy_secret(request: Request) -> bool:
+    expected = proxy_secret_expected()
+    if not expected:
+        return False
+    got = request.headers.get(PROXY_SECRET_HEADER, "")
+    if not got:
+        return False
+    return secrets.compare_digest(got, expected)
+
+
+def _normalize_ticket_scope(scope: str) -> str:
+    text = str(scope or "").strip()
+    if len(text) > 1:
+        text = text.rstrip("/")
+    return text
+
+
+def validate_ticket_scope(scope: str) -> str:
+    """Require a non-empty /api/... scope that is not a bare /api wildcard."""
+    scope_text = _normalize_ticket_scope(scope)
+    if not scope_text.startswith("/api/"):
+        raise ValueError("Ticket scope must be an /api/... path")
+    parts = [part for part in scope_text.split("/") if part]
+    # Reject /api alone (parts == ["api"]) — that would authorize every API route.
+    if len(parts) < 2:
+        raise ValueError("Ticket scope is too broad")
+    return scope_text
+
+
+def issue_access_ticket(
+    *,
+    scope: str = "",
+    single_use: bool = False,
+    resource: str = "",
+    ttl_s: float | None = None,
+) -> dict[str, object]:
+    """Create a short-lived ticket, path-scoped and optionally resource-bound / single-use."""
+    scope_text = validate_ticket_scope(scope)
+    resource_text = str(resource or "").strip()
+    # Any /api/media… scope can authorize /api/media/stream via nesting — require bind.
+    if scope_text == "/api/media" or scope_text.startswith("/api/media/"):
+        if not resource_text:
+            raise ValueError("Media tickets require a resource path")
     ttl = float(ttl_s if ttl_s is not None else _TICKET_TTL_S)
     ttl = max(30.0, min(ttl, 3600.0))
     now = time.monotonic()
-    # Drop expired tickets opportunistically.
-    expired = [key for key, exp in _tickets.items() if exp <= now]
-    for key in expired:
-        _tickets.pop(key, None)
-    ticket = secrets.token_urlsafe(24)
-    _tickets[ticket] = now + ttl
-    audit("access_ticket_issued", ttl_s=ttl)
-    return {"ticket": ticket, "expires_in": int(ttl)}
+    with _ticket_lock:
+        expired = [key for key, meta in _tickets.items() if float(meta.get("expires", 0)) <= now]
+        for key in expired:
+            _tickets.pop(key, None)
+        ticket = secrets.token_urlsafe(24)
+        _tickets[ticket] = {
+            "expires": now + ttl,
+            "scope": scope_text,
+            "single_use": bool(single_use),
+            "resource": resource_text,
+        }
+    audit(
+        "access_ticket_issued",
+        ttl_s=ttl,
+        scope=scope_text,
+        single_use=bool(single_use),
+        resource=bool(resource_text),
+    )
+    return {
+        "ticket": ticket,
+        "expires_in": int(ttl),
+        "scope": scope_text,
+        "single_use": bool(single_use),
+        "resource": resource_text,
+    }
 
 
-def verify_access_ticket(ticket: str | None) -> bool:
+def _path_matches_ticket_scope(path: str, scope: str) -> bool:
+    """True when path equals scope or is a nested path under scope (not a prefix sibling)."""
+    path_n = _normalize_ticket_scope(path)
+    scope_n = _normalize_ticket_scope(scope)
+    if not scope_n:
+        return False
+    if path_n == scope_n:
+        return True
+    return path_n.startswith(f"{scope_n}/")
+
+
+def verify_access_ticket(
+    ticket: str | None,
+    *,
+    path: str | None = None,
+    resource: str | None = None,
+    consume: bool | None = None,
+) -> bool:
+    """Validate a ticket. When scoped, path must equal or nest under the ticket scope.
+
+    Single-use tickets are retired on successful verification unless ``consume=False``
+    (peek). Reusable tickets are never removed here — only TTL expiry retires them.
+    """
     if not ticket:
         return False
     now = time.monotonic()
-    expires = _tickets.get(ticket)
-    if expires is None:
-        return False
-    if expires <= now:
-        _tickets.pop(ticket, None)
-        return False
-    return True
+    with _ticket_lock:
+        meta = _tickets.get(ticket)
+        if meta is None:
+            return False
+        expires = float(meta.get("expires", 0))
+        if expires <= now:
+            _tickets.pop(ticket, None)
+            return False
+        scope = str(meta.get("scope") or "")
+        if not scope or not path or not _path_matches_ticket_scope(path, scope):
+            return False
+        expected_resource = str(meta.get("resource") or "")
+        if expected_resource:
+            got = str(resource or "")
+            if not got or not secrets.compare_digest(got, expected_resource):
+                return False
+        # Only single-use tickets are ever consumed; consume=False allows a peek.
+        if bool(meta.get("single_use")) and consume is not False:
+            _tickets.pop(ticket, None)
+        return True
 
 
-def extract_bearer_token(request: Request) -> str | None:
+def create_session() -> str:
+    """Mint an opaque session id (not the long-lived API token)."""
+    now = time.monotonic()
+    ttl = max(300.0, _SESSION_TTL_S)
+    sid = secrets.token_urlsafe(32)
+    with _session_lock:
+        expired = [key for key, exp in _sessions.items() if float(exp) <= now]
+        for key in expired:
+            _sessions.pop(key, None)
+        _sessions[sid] = now + ttl
+    return sid
+
+
+def resolve_session(session_id: str | None) -> bool:
+    if not session_id:
+        return False
+    now = time.monotonic()
+    with _session_lock:
+        expires = _sessions.get(session_id)
+        if expires is None:
+            return False
+        if float(expires) <= now:
+            _sessions.pop(session_id, None)
+            return False
+        return True
+
+
+def extract_bearer_token(request: Request, *, consume_tickets: bool = True) -> str | None:
+    """Resolve auth credentials for HTTP requests.
+
+    When ``?ticket=`` is present it is always verified (and single-use tickets are
+    consumed when ``consume_tickets`` is true) even if a session cookie or Bearer
+    header is also valid — otherwise browser downloads with cookies would never
+    retire single-use tickets.
+    """
+    ticket = request.query_params.get("ticket")
+    ticket_ok = False
+    if ticket:
+        ticket_ok = verify_access_ticket(
+            ticket,
+            path=request.url.path,
+            resource=request.query_params.get("path"),
+            consume=True if consume_tickets else False,
+        )
+
     auth = request.headers.get("authorization", "")
     if auth.lower().startswith("bearer "):
-        return auth[7:].strip()
-    # Prefer short-lived tickets over the long-lived API token in query strings.
-    ticket = request.query_params.get("ticket")
-    if ticket and verify_access_ticket(ticket):
+        bearer = auth[7:].strip()
+        if verify_token(bearer):
+            return bearer
+        if ticket_ok:
+            return get_api_token()
+        # Invalid bearer must not shadow a missing/failed ticket.
+
+    cookie_token = request.cookies.get(SESSION_COOKIE)
+    if cookie_token:
+        if resolve_session(cookie_token):
+            return get_api_token()
+        # Legacy: older builds stored the API token itself in the cookie.
+        if verify_token(cookie_token):
+            return cookie_token
+        if ticket_ok:
+            return get_api_token()
+
+    if ticket_ok:
         return get_api_token()
     # Legacy fallback: still accept ?token= for older clients / bookmarks.
     return request.query_params.get("token") or None
@@ -103,13 +273,40 @@ def verify_token(token: str | None) -> bool:
     return secrets.compare_digest(token, expected)
 
 
-def verify_ws_credential(credential: str | None) -> bool:
+def verify_ws_credential(credential: str | None, *, path: str | None = None) -> bool:
     """Accept either a short-lived ticket or the long-lived API token (legacy)."""
     if not credential:
         return False
-    if verify_access_ticket(credential):
+    if verify_access_ticket(credential, path=path, consume=False):
         return True
     return verify_token(credential)
+
+
+def cookie_csrf_ok(request: Request) -> bool:
+    """Reject cross-origin mutating requests authenticated only by session cookie."""
+    if request.method in {"GET", "HEAD", "OPTIONS"}:
+        return True
+    auth = request.headers.get("authorization", "")
+    if auth.lower().startswith("bearer "):
+        # Only a *valid* bearer skips the cookie CSRF check.
+        if verify_token(auth[7:].strip()):
+            return True
+    if not request.cookies.get(SESSION_COOKIE):
+        return True
+    host = (request.headers.get("host") or "").lower()
+    for header in ("origin", "referer"):
+        raw = request.headers.get(header) or ""
+        if not raw:
+            continue
+        try:
+            netloc = urlparse(raw).netloc.lower()
+        except ValueError:
+            continue
+        if netloc and netloc == host:
+            return True
+        return False
+    # No Origin/Referer: allow loopback (Tauri / local tools); block LAN cookie CSRF.
+    return is_localhost(request)
 
 
 class RateLimiter:
@@ -145,6 +342,10 @@ def get_api_token() -> str:
     TOKEN_PATH.parent.mkdir(parents=True, exist_ok=True)
     token = secrets.token_urlsafe(32)
     TOKEN_PATH.write_text(token, encoding="utf-8")
+    try:
+        os.chmod(TOKEN_PATH, 0o600)
+    except OSError:
+        pass
     audit("api_token_created", path=str(TOKEN_PATH))
     return token
 
@@ -163,10 +364,19 @@ def is_localhost(request: Request) -> bool:
 
 
 def can_bootstrap_token(request: Request) -> bool:
+    """Allow unauthenticated token bootstrap only from trusted clients.
+
+    Localhost is always allowed (desktop / Vite / Tauri) unless explicitly disabled.
+    Docker LAN installs should disable bootstrap and establish an HttpOnly session
+    via the UI nginx proxy secret instead of baking the token into JS.
+    """
+    if os.environ.get("AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP") == "1":
+        return False
     if is_localhost(request):
         return True
     if os.environ.get("AUDIOTHECA_ALLOW_REMOTE_TOKEN_BOOTSTRAP") == "1":
         return True
+    # Opt-in only — do not enable by default in published Docker compose.
     if os.environ.get("AUDIOTHECA_TRUST_INTERNAL_NETWORK") == "1":
         host = _client_host(request)
         try:
@@ -175,6 +385,22 @@ def can_bootstrap_token(request: Request) -> bool:
             return False
         return addr.is_private or addr.is_loopback
     return False
+
+
+def can_establish_session(request: Request) -> bool:
+    """Allow HttpOnly session cookie creation for trusted reverse proxy or local/dev.
+
+    When token bootstrap is disabled (Docker/LAN), TCP localhost alone is not
+    enough — all-in-one nginx always connects to the API on loopback, which would
+    otherwise let any LAN client mint a session via the UI proxy.
+    """
+    if has_proxy_secret(request):
+        return True
+    if os.environ.get("AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP") == "1":
+        return False
+    if is_localhost(request):
+        return True
+    return can_bootstrap_token(request)
 
 
 def _client_host(request: Request) -> str:
@@ -210,12 +436,19 @@ def canonical_path(path: Path) -> Path:
         return path.expanduser()
 
 
-def is_path_under(child: Path, parent: Path) -> bool:
+def is_canonical_path_under(child: Path, parent: Path) -> bool:
+    """True only when the resolved (symlink-followed) child is under parent."""
     try:
         canonical_path(child).relative_to(canonical_path(parent))
         return True
     except (OSError, ValueError):
-        return is_logical_path_under(child, parent)
+        return False
+
+
+def is_path_under(child: Path, parent: Path) -> bool:
+    if is_canonical_path_under(child, parent):
+        return True
+    return is_logical_path_under(child, parent)
 
 
 def library_roots() -> list[Path]:
@@ -238,16 +471,74 @@ def library_roots() -> list[Path]:
     return resolved
 
 
+def _nearest_existing_ancestor(path: Path) -> Path | None:
+    """Return the nearest existing path or symlink walking up from path.
+
+    Windows-style paths on POSIX hosts keep backslashes inside a single Path
+    component, so Path.parent collapses to '.' — walk logical parts instead.
+    """
+    text = str(path)
+    if "\\" in text or (len(text) >= 2 and text[1] == ":"):
+        parts = logical_path_parts(path)
+        while len(parts) > 1:
+            parts = parts[:-1]
+            candidate = logical_path_from_parts(parts)
+            try:
+                if candidate.exists() or candidate.is_symlink():
+                    return candidate
+            except OSError:
+                return None
+        return None
+
+    cursor = path
+    for _ in range(256):
+        try:
+            if cursor.exists() or cursor.is_symlink():
+                return cursor
+        except OSError:
+            return None
+        parent = cursor.parent
+        if parent == cursor:
+            return None
+        cursor = parent
+    return None
+
+
 def _validate_library_path(raw: str, *, must_exist: bool = False, label: str = "path") -> Path:
     if not raw or not str(raw).strip():
         raise ValueError(f"{label} is required")
     raw_path = Path(str(raw)).expanduser()
-    path = canonical_path(raw_path)
+    # Collapse . / .. before any ancestor walk so library/nope/../../etc is rejected.
+    try:
+        collapsed = collapse_logical_path(raw_path)
+    except ValueError as exc:
+        audit("library_path_denied", path=str(raw_path), label=label, reason="dotdot_escape")
+        raise ValueError(f"{label} must be under a configured library root") from exc
+
+    path = canonical_path(collapsed)
     roots = library_roots()
-    allowed = any(
-        is_path_under(path, root) or is_logical_path_under(raw_path, root)
-        for root in roots
-    )
+    try:
+        exists_or_link = collapsed.exists() or collapsed.is_symlink()
+    except OSError:
+        exists_or_link = False
+    if exists_or_link:
+        # Existing paths / symlinks must be canonically under a root (no symlink escape).
+        allowed = any(is_canonical_path_under(path, root) for root in roots)
+    else:
+        # Non-existent destinations: block symlink-ancestor escapes, and require the
+        # collapsed path itself to remain under a configured root (no .. escape).
+        nearest = _nearest_existing_ancestor(collapsed)
+        collapsed_under_root = any(
+            is_canonical_path_under(path, root)
+            or is_logical_path_under(collapsed, root)
+            or is_logical_path_under(path, root)
+            for root in roots
+        )
+        if nearest is not None:
+            nearest_ok = any(is_canonical_path_under(nearest, root) for root in roots)
+            allowed = nearest_ok and collapsed_under_root
+        else:
+            allowed = collapsed_under_root
     if not allowed:
         audit("library_path_denied", path=str(path), label=label)
         raise ValueError(f"{label} must be under a configured library root")

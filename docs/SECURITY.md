@@ -17,32 +17,44 @@ The API uses a **Bearer token** stored at:
 `dedupe_reports/.api_token`
 
 - Auto-generated on first API start (unless `AUDIOTHECA_API_TOKEN` is set in the environment).
-- The UI bootstraps the token via `GET /api/auth/token` (localhost only, no auth required).
-- All other `/api/*` routes require `Authorization: Bearer <token>` unless a valid short-lived ticket is supplied (see below).
+- The UI bootstraps auth via:
+  - **Local/Tauri:** `GET /api/auth/token` (localhost only) → bearer in memory, or
+  - **Docker/LAN behind nginx:** `POST /api/auth/session` with the reverse-proxy secret header → **HttpOnly** opaque session cookie (long-lived API token never appears in the cookie or JS bundle).
+- `AUDIOTHECA_PROXY_SECRET` must match between the API and UI nginx for session establishment. When token bootstrap is disabled, the proxy secret is **required** even if nginx→API looks like localhost (all-in-one image).
+- Session cookies hold an opaque id mapped server-side — not the API token itself.
+- Mutating cookie-authenticated requests require a matching `Origin`/`Referer` host (CSRF guard for same-site different ports on a NAS).
+- Library path allowlisting collapses `.` / `..` and rejects symlink-ancestor escapes before accepting a path.
+- `AUDIOTHECA_TRUST_INTERNAL_NETWORK=1` and `AUDIOTHECA_ALLOW_REMOTE_TOKEN_BOOTSTRAP=1` are explicit opt-ins — do not enable them on LAN without reverse-proxy auth.
+- All other `/api/*` routes require `Authorization: Bearer <token>`, the session cookie, or a valid short-lived ticket (see below).
 
 **Do not commit `.api_token` to git** (it is gitignored).
 
 ### Short-lived access tickets (1.0.12+)
 
-Some surfaces cannot send an `Authorization` header (WebSocket URLs, `<audio>` / `<img>` src, file download links). For those, the UI exchanges the long-lived bearer for a **single-purpose ticket**:
+Some surfaces cannot send an `Authorization` header (WebSocket URLs, `<audio>` / `<img>` src, file download links). For those, the UI exchanges the session/bearer for a **scoped ticket**:
 
-1. `POST /api/auth/ticket` (requires Bearer auth) → `{ "ticket": "…", "expires_in": 300 }`
+1. `POST /api/auth/ticket` (requires auth) → `{ "ticket": "…", "expires_in": 300, "scope": "/api/…", "single_use": true|false }`
 2. Append `?ticket=<ticket>` to WebSocket, media, or download URLs
 
 Tickets expire after **300 seconds** by default (`AUDIOTHECA_TICKET_TTL_S` env, clamped 30 s–1 h). They are held in memory only and are not written to disk.
+
+- **Downloads:** issued **on click**, path-scoped, **single-use** (consumed on first successful auth, even when a session cookie is also present).
+- **WebSocket / media:** path-scoped, reusable until expiry (media range requests need reuse). Media tickets are also **resource-bound** to the library file path.
 
 **Legacy:** `?token=<api_token>` is still accepted for older bookmarks and external tools. Prefer tickets for anything that might appear in browser history or server access logs.
 
 | Surface | Auth |
 |---------|------|
-| REST `/api/*` | `Authorization: Bearer <token>` |
-| WebSocket job events | `?ticket=` (preferred) or `?token=` (legacy) |
-| Media preview / downloads | `?ticket=` (preferred) or `?token=` (legacy) |
+| REST `/api/*` | Session cookie, `Authorization: Bearer <token>`, or scoped `?ticket=` |
+| WebSocket job events | Path-scoped `?ticket=` (preferred) or `?token=` (legacy) |
+| Media preview | Path-scoped reusable `?ticket=` (preferred) or `?token=` (legacy) |
+| File downloads | Path-scoped **single-use** `?ticket=` issued on click |
 
 ## Network exposure
 
 - Default bind: `127.0.0.1:8787` — not reachable from other machines.
 - Do **not** bind to `0.0.0.0` without adding reverse-proxy auth and TLS.
+- Unraid compose does **not** publish the API port by default; use the UI proxy, a fixed `AUDIOTHECA_API_TOKEN`, and matching `AUDIOTHECA_PROXY_SECRET`.
 
 ## Library root allowlist
 
@@ -52,6 +64,7 @@ Paths used for scans, explorer (`/api/browse`), cache invalidation, rescans, and
 2. `dedupe_reports/.library_roots.json`, or
 3. Default: `ROOT_DIR` from `audiotheca/config.py`
 
+Validation **collapses `.` / `..`** before the allowlist check (so `library/nope/../../outside` cannot escape), and rejects destinations whose nearest existing ancestor is a symlink out of the root.
 ## Live filesystem operations
 
 Endpoints that move/rename/stage files require:

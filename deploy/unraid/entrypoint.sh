@@ -7,7 +7,25 @@ export AUDIOTHECA_LIBRARY_ROOTS="${AUDIOTHECA_LIBRARY_ROOTS:-${AUDIOTHECA_LIBRAR
 export AUDIOTHECA_API_HOST="${AUDIOTHECA_API_HOST:-0.0.0.0}"
 export AUDIOTHECA_API_PORT="${AUDIOTHECA_API_PORT:-8787}"
 export AUDIOTHECA_NO_RELOAD="${AUDIOTHECA_NO_RELOAD:-1}"
+export AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP="${AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP:-1}"
+export AUDIOTHECA_PROXY_SECRET="${AUDIOTHECA_PROXY_SECRET:-}"
 export PYTHONUNBUFFERED=1
+
+if [ "${AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP}" = "1" ] && [ -z "${AUDIOTHECA_PROXY_SECRET}" ]; then
+    echo "AUDIOTHECA_PROXY_SECRET is required when AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP=1" >&2
+    exit 1
+fi
+
+# Render nginx config so the proxy secret can be injected without baking tokens into JS.
+if [ -f /etc/nginx/templates/default.conf.template ]; then
+    envsubst '${AUDIOTHECA_PROXY_SECRET}' \
+        < /etc/nginx/templates/default.conf.template \
+        > /etc/nginx/conf.d/default.conf
+elif [ -f /etc/nginx/conf.d/default.conf.template ]; then
+    envsubst '${AUDIOTHECA_PROXY_SECRET}' \
+        < /etc/nginx/conf.d/default.conf.template \
+        > /etc/nginx/conf.d/default.conf
+fi
 
 python -m api.server &
 API_PID=$!

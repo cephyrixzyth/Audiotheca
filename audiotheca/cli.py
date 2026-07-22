@@ -52,6 +52,8 @@ def _cmd_scan(args: argparse.Namespace) -> int:
     result = engine.run()
     if result == "stopped":
         return 2
+    if result == "error":
+        return 1
     return 0
 
 

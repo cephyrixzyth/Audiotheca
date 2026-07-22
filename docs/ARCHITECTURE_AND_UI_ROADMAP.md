@@ -260,8 +260,10 @@ Never auto-delete both — same safety model as today.
 3. ~~React report viewer + investigation inbox~~ ✓
 4. ~~Duplicate review + keeper export~~ ✓
 5. ~~Tauri shell + PyInstaller sidecars~~ ✓
-6. Wire `approved.json` into engine execute step
-7. Split `main.py` → `audiotheca/` package + `cli.py`
-8. SQLite schema + import from scan results
-9. Live execute from UI (section/item approval)
-10. Archive extract + compare wizard
+6. ~~Wire `approved.json` into engine execute step~~ ✓
+7. ~~Split `main.py` → `audiotheca/` package + `cli.py`~~ ✓
+8. ~~SQLite schema + import from scan results~~ ✓
+9. ~~Live execute from UI (section/item approval)~~ ✓
+10. ~~Archive extract + compare wizard~~ ✓
+
+Optional follow-ups: native chromaprint packaging in release CI, live Gluetun routing polish, full JUCE DAW plugin build.

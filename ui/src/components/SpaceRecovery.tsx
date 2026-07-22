@@ -8,7 +8,7 @@ import {
   removeUnderscoreVendors,
   rescanUnderscorePaths,
   seedKnownUnderscoreVendors,
-  spaceRecoveryReportUrl,
+  spaceRecoveryReportDownload,
 } from "../api/client";
 import type { CoexistenceItem, JobSnapshot } from "../types";
 import { PathLink } from "./PathLink";
@@ -37,7 +37,7 @@ export function SpaceRecovery({ stamp }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [job, setJob] = useState<JobSnapshot | null>(null);
-  const [reportLinks, setReportLinks] = useState<Array<{ label: string; href: string }>>([]);
+  const [reportLinks, setReportLinks] = useState<Array<{ label: string; filename: string }>>([]);
 
   const reload = useCallback(() => {
     setError(null);
@@ -70,16 +70,14 @@ export function SpaceRecovery({ stamp }: Props) {
       hardlink?: Array<{ stamp: string; csv: string }>;
       bloat?: Array<{ stamp: string; csv: string }>;
     }) || { hardlink: [], bloat: [] };
-    void (async () => {
-      const links: Array<{ label: string; href: string }> = [];
-      for (const row of offline.bloat?.slice(0, 3) || []) {
-        links.push({ label: `Bloat report ${row.stamp}`, href: await spaceRecoveryReportUrl(row.csv) });
-      }
-      for (const row of offline.hardlink?.slice(0, 3) || []) {
-        links.push({ label: `Hardlink plan ${row.stamp}`, href: await spaceRecoveryReportUrl(row.csv) });
-      }
-      setReportLinks(links);
-    })();
+    const links: Array<{ label: string; filename: string }> = [];
+    for (const row of offline.bloat?.slice(0, 3) || []) {
+      links.push({ label: `Bloat report ${row.stamp}`, filename: row.csv });
+    }
+    for (const row of offline.hardlink?.slice(0, 3) || []) {
+      links.push({ label: `Hardlink plan ${row.stamp}`, filename: row.csv });
+    }
+    setReportLinks(links);
   }, [summary]);
 
   const byIssue = useMemo(() => {
@@ -241,9 +239,14 @@ export function SpaceRecovery({ stamp }: Props) {
         {reportLinks.length > 0 && (
           <div className="toolbar" style={{ marginTop: "0.5rem" }}>
             {reportLinks.map((link) => (
-              <a key={link.href} className="primary-btn" href={link.href} download style={{ textDecoration: "none" }}>
+              <button
+                key={link.filename}
+                type="button"
+                className="primary-btn"
+                onClick={() => void spaceRecoveryReportDownload(link.filename)}
+              >
                 {link.label}
-              </a>
+              </button>
             ))}
           </div>
         )}

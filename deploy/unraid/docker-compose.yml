@@ -22,13 +22,19 @@ services:
       AUDIOTHECA_API_PORT: "8787"
       AUDIOTHECA_API_HOST: "0.0.0.0"
       AUDIOTHECA_NO_RELOAD: "1"
-      AUDIOTHECA_TRUST_INTERNAL_NETWORK: "1"
+      # Token bootstrap is disabled for Docker/LAN. UI establishes an HttpOnly
+      # session via nginx + AUDIOTHECA_PROXY_SECRET (token never baked into JS).
+      AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP: "${AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP:-1}"
+      AUDIOTHECA_API_TOKEN: "${AUDIOTHECA_API_TOKEN:?Set AUDIOTHECA_API_TOKEN in .env}"
+      AUDIOTHECA_PROXY_SECRET: "${AUDIOTHECA_PROXY_SECRET:?Set AUDIOTHECA_PROXY_SECRET in .env}"
       SEARXNG_URL: ${SEARXNG_URL:-http://searxng:8080}
     volumes:
       - ${APPDATA_PATH:-./appdata}:/data
       - ${LIBRARY_HOST_PATH}:${LIBRARY_CONTAINER_PATH:-/library}:ro
-    ports:
-      - "${API_PORT:-4211}:8787"
+    # Reachable on the Docker network (UI nginx proxies /api/). Do not publish
+    # 8787 to the host/LAN by default — add ports only for local debugging.
+    expose:
+      - "8787"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:8787/api/health"]
       interval: 30s
@@ -50,6 +56,8 @@ services:
         VITE_DEFAULT_LIBRARY_ROOT: ${LIBRARY_CONTAINER_PATH:-/library}
     container_name: audiotheca-ui
     restart: unless-stopped
+    environment:
+      AUDIOTHECA_PROXY_SECRET: "${AUDIOTHECA_PROXY_SECRET:?Set AUDIOTHECA_PROXY_SECRET in .env}"
     depends_on:
       api:
         condition: service_healthy
@@ -185,16 +193,20 @@ services:
     container_name: audiotheca
     restart: unless-stopped
     env_file: .env
+    ports:
+      - "${UI_PORT:-4210}:80"
+    # API stays on the container network only (nginx proxies /api/). Publish
+    # 8787 only for debugging: ports: ["${API_PORT:-4211}:8787"]
     environment:
       AUDIOTHECA_HOME: /data
       AUDIOTHECA_LIBRARY_ROOT: ${LIBRARY_CONTAINER_PATH:-/library}
       AUDIOTHECA_LIBRARY_ROOTS: ${LIBRARY_CONTAINER_PATH:-/library}
+      AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP: "${AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP:-1}"
+      AUDIOTHECA_API_TOKEN: "${AUDIOTHECA_API_TOKEN:?Set AUDIOTHECA_API_TOKEN in .env}"
+      AUDIOTHECA_PROXY_SECRET: "${AUDIOTHECA_PROXY_SECRET:?Set AUDIOTHECA_PROXY_SECRET in .env}"
     volumes:
       - ${APPDATA_PATH:-./appdata}:/data
       - ${LIBRARY_HOST_PATH}:${LIBRARY_CONTAINER_PATH:-/library}:ro
-    ports:
-      - "${UI_PORT:-4210}:80"
-      - "${API_PORT:-4211}:8787"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1/api/health"]
       interval: 30s

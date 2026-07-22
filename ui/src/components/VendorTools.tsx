@@ -11,7 +11,8 @@ import {
   rejectHarvestCandidates,
   runVendorHarvest,
   testVendorKeyword,
-  unifiedFeedbackExportUrl,
+  unifiedFeedbackExportDownload,
+  vendorResearchExportDownload,
   type HarvestCandidate,
   type HarvestSourcePreset,
   type VendorGap,
@@ -30,7 +31,6 @@ export function VendorTools({ stamp }: Props) {
   const [known, setKnown] = useState<string[]>([]);
   const [userAdded, setUserAdded] = useState<Array<{ company: string; keywords: string[] }>>([]);
   const [summary, setSummary] = useState<Record<string, number> | null>(null);
-  const [exportUrl, setExportUrl] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -72,7 +72,6 @@ export function VendorTools({ stamp }: Props) {
     fetchFeedbackSummary(stamp)
       .then(setSummary)
       .catch(() => setSummary(null));
-    void unifiedFeedbackExportUrl(stamp).then(setExportUrl);
     fetchHarvestSources()
       .then((res) => {
         setPresets(res.presets);
@@ -263,14 +262,16 @@ export function VendorTools({ stamp }: Props) {
         </div>
       </div>
 
-      {exportUrl && (
-        <div className="toolbar" style={{ marginBottom: "1rem" }}>
-          <a className="primary-btn" href={exportUrl} download style={{ textDecoration: "none" }}>
-            Export all feedback (CSV)
-          </a>
-          <span className="count-muted">Backend_Enhancement_Export — investigation + duplicates + vendors</span>
-        </div>
-      )}
+      <div className="toolbar" style={{ marginBottom: "1rem" }}>
+        <button
+          type="button"
+          className="primary-btn"
+          onClick={() => void unifiedFeedbackExportDownload(stamp)}
+        >
+          Export all feedback (CSV)
+        </button>
+        <span className="count-muted">Backend_Enhancement_Export — investigation + duplicates + vendors</span>
+      </div>
 
       {stamp && gaps.length > 0 && (
         <section style={{ marginBottom: "1.5rem" }}>
@@ -398,14 +399,13 @@ export function VendorTools({ stamp }: Props) {
             <h3 style={{ fontSize: "0.95rem", margin: 0 }}>
               Research inbox ({newCandidates.length} new, not in engine yet)
             </h3>
-            <a
+            <button
+              type="button"
               className="keeper-btn"
-              href="/api/vendors/harvest/export?include_known=false&status=pending"
-              download
-              style={{ textDecoration: "none" }}
+              onClick={() => void vendorResearchExportDownload(false)}
             >
               Export inbox (CSV)
-            </a>
+            </button>
             <button
               type="button"
               className="primary-btn"

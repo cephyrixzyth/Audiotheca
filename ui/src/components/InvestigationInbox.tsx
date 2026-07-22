@@ -7,7 +7,7 @@ import {
   fetchInvestigation,
   fetchInvestigationFeedback,
   fetchInvestigationGroups,
-  investigationFeedbackExportUrl,
+  investigationFeedbackExportDownload,
   type InvestigationGroup,
   type InvestigationFeedbackState,
 } from "../api/client";
@@ -75,7 +75,6 @@ export function InvestigationInbox({ stamp }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<InvestigationFeedbackState | null>(null);
-  const [exportUrl, setExportUrl] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [newBucket, setNewBucket] = useState("");
   const [selectedGroup, setSelectedGroup] = useState<string>("");
@@ -87,7 +86,6 @@ export function InvestigationInbox({ stamp }: Props) {
     fetchInvestigationFeedback(stamp)
       .then(setFeedback)
       .catch(() => setFeedback(null));
-    void investigationFeedbackExportUrl(stamp).then(setExportUrl);
   }, [stamp]);
 
   useEffect(() => {
@@ -148,7 +146,6 @@ export function InvestigationInbox({ stamp }: Props) {
       keywords: extra?.keywords,
     });
     setFeedback(res.state);
-    setExportUrl(await investigationFeedbackExportUrl(stamp));
     setMsg(`Saved: ${action} for ${row.item_name}`);
   }
 
@@ -166,7 +163,6 @@ export function InvestigationInbox({ stamp }: Props) {
       keywords: extra?.keywords,
     });
     setFeedback(res.state);
-    setExportUrl(await investigationFeedbackExportUrl(stamp));
     setMsg(`Bulk ${action}: ${res.count} paths`);
   }
 
@@ -286,11 +282,14 @@ export function InvestigationInbox({ stamp }: Props) {
         >
           Add vendor
         </button>
-        {exportUrl && (
-          <a className="text-btn" href={exportUrl} download title="Download corrections CSV for engine tuning">
-            Export feedback CSV
-          </a>
-        )}
+        <button
+          type="button"
+          className="text-btn"
+          title="Download corrections CSV for engine tuning"
+          onClick={() => void investigationFeedbackExportDownload(stamp)}
+        >
+          Export feedback CSV
+        </button>
       </div>
 
       {bucket && BUCKET_HINTS[bucket] && (

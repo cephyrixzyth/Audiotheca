@@ -115,9 +115,9 @@ This document defines **what to build in each UI module** so your manual review 
 
 ## Module 2 — Vendor database (cross-cutting)
 
-**Current state:** `vendor_db.py` — ~700 vendors, edit by hand. No UI.
+**Current state (1.0.12):** `vendor_db.py` plus **Vendors** UI (`VendorTools`) for add/test/harvest/gaps. Overrides land in feedback JSON and are applied on the next scan.
 
-### Features to build
+### Features
 
 | Feature | UI | Export |
 |---------|-----|--------|
@@ -126,10 +126,11 @@ This document defines **what to build in each UI module** so your manual review 
 | **Alias map** | "NI" → "Native Instruments" | PE/name normalization |
 | **Blocklist keyword** | Prevent false vendor match | `keyword_blocklist` |
 | **Test match** | Type folder name → see which tier hits | Debug without full scan |
+| **Harvest / gaps** | Research inbox + gap list | CSV export via ticketed download |
 
 ### Export for backend
 
-`Vendor_DB_Patch_{stamp}.json` — you review, then merge into `vendor_db.py` or auto-apply if overrides file exists.
+`Vendor_DB_Patch_{stamp}.json` — review, then merge into `vendor_db.py` or auto-apply if overrides file exists.
 
 ---
 
@@ -164,16 +165,16 @@ Engine: `classify_investigation()` checks `path_assignments` first, then custom 
 
 ## Module 4 — Restructure
 
-**Current state:** Read-only plan preview. Live moves happen in CLI with section approval.
+**Current state (1.0.12):** Restructure plan preview plus live execute from the UI (section/item approval) with `ExecuteResultsPanel` and transaction ledger.
 
-### Features to build
+### Features
 
 | Feature | UI control | Backend effect |
 |---------|------------|----------------|
 | **Override destination** | Edit planned path per row | `restructure_overrides.json` |
 | **Reject route** | "Should stay in place" | Path blocklist for moves |
 | **Force section** | Move to `a/` vs `s/` | Section override |
-| **Approve section** | Bulk approve from UI | Replace CLI section prompts (Stage 1+) |
+| **Approve section** | Bulk approve from UI | Replaces CLI section prompts |
 | **Mark READY false positive** | Item flagged NEEDS REVIEW wrongly | Investigation feedback link |
 
 ### Export
@@ -182,19 +183,16 @@ Engine: `classify_investigation()` checks `path_assignments` first, then custom 
 
 ---
 
-## Module 5 — Duplicates (partially built ✓)
+## Module 5 — Duplicates (built ✓)
 
-**Current state:** Keeper pick, bad match, stage deletes, manual dupe report, feedback CSV.
+**Current state (1.0.12):** Keeper pick, bad match, stage deletes, manual dupe report, feedback CSV, execute results panel, fingerprint blocklist hints.
 
-### Still to build
+### Residual polish
 
 | Feature | Priority |
 |---------|----------|
-| Fix library root inference (`Z:\_software\_audio` not `Z:\`) | **P0 bug** |
-| Show execute results per path in UI | P1 |
-| Wire `approved.json` into engine live execute | P1 |
-| Bulk keeper = engine recommendation | P2 |
-| Fingerprint blocklist from rejections | P2 |
+| Bulk keeper = engine recommendation shortcuts | P2 |
+| Stronger reference-extra UX for large libraries | P2 |
 
 ---
 

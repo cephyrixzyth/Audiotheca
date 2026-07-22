@@ -11,7 +11,11 @@ Engine remains **10.0.0**.
 ### API architecture & security
 
 - **Domain routers** — `api/server.py` slimmed to app wiring; routes live under `api/routers/` (auth, runs, jobs, browse, vendors, system, tools, environment, security) with shared deps in `api/deps.py`
-- **Short-lived access tickets** — `POST /api/auth/ticket` issues 5-minute tickets; UI uses `?ticket=` for WebSocket progress, media preview, and file downloads instead of embedding the long-lived bearer token in URLs (legacy `?token=` still accepted)
+- **Short-lived access tickets** — `POST /api/auth/ticket` issues path-scoped tickets; UI uses `?ticket=` for WebSocket progress, media preview, and file downloads (legacy `?token=` still accepted)
+  - Downloads: **on click**, **single-use**
+  - Media: reusable until TTL and **resource-bound** to the library file path
+- **Docker/LAN sessions** — `POST /api/auth/session` + nginx `AUDIOTHECA_PROXY_SECRET` sets an **opaque HttpOnly** cookie (not the API token); token bootstrap disabled by default in compose
+- **Path allowlist** — library paths collapse `.` / `..` and block symlink-ancestor escapes
 - **`AUDIOTHECA_TICKET_TTL_S`** — optional env override (30 s–1 h)
 
 ### Feedback & execute hardening
@@ -43,7 +47,7 @@ Engine remains **10.0.0**.
 
 ### Documentation
 
-- All user-facing guides bumped to **1.0.12**; `SECURITY.md` documents access tickets; `TESTING.md` covers Vitest/Playwright
+- All user-facing guides bumped to **1.0.12**; `SECURITY.md` / `CONFIGURATION.md` document sessions, proxy secret, scoped tickets, and path allowlisting; `TESTING.md` covers Vitest/Playwright and auth regression tests
 
 ## Web UI & API 1.0.6 – 1.0.11 (installer & desktop)
 
