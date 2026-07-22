@@ -54,7 +54,7 @@ Tickets expire after **300 seconds** by default (`AUDIOTHECA_TICKET_TTL_S` env, 
 
 - Default bind: `127.0.0.1:8787` — not reachable from other machines.
 - Do **not** bind to `0.0.0.0` without adding reverse-proxy auth and TLS.
-- Unraid compose does **not** publish the API port by default; use the UI proxy and a fixed `AUDIOTHECA_API_TOKEN`.
+- Unraid compose does **not** publish the API port by default; use the UI proxy, a fixed `AUDIOTHECA_API_TOKEN`, and matching `AUDIOTHECA_PROXY_SECRET`.
 
 ## Library root allowlist
 
@@ -64,6 +64,7 @@ Paths used for scans, explorer (`/api/browse`), cache invalidation, rescans, and
 2. `dedupe_reports/.library_roots.json`, or
 3. Default: `ROOT_DIR` from `audiotheca/config.py`
 
+Validation **collapses `.` / `..`** before the allowlist check (so `library/nope/../../outside` cannot escape), and rejects destinations whose nearest existing ancestor is a symlink out of the root.
 ## Live filesystem operations
 
 Endpoints that move/rename/stage files require:
