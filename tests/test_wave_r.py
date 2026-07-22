@@ -64,13 +64,23 @@ def test_plugin_validate_api(client):
     assert res.status_code == 200
 
 
-def test_session_collapse_api(client, tmp_path):
-    res = client.get(f"/api/scan-extensions/session-collapse?path={tmp_path}")
+def test_session_collapse_api(client, tmp_path, monkeypatch):
+    from api import security
+
+    library = tmp_path / "library"
+    library.mkdir()
+    monkeypatch.setattr(security, "library_roots", lambda: [library])
+    res = client.get(f"/api/scan-extensions/session-collapse?path={library}")
     assert res.status_code == 200
 
 
-def test_archive_nest_api(client, tmp_path):
-    res = client.get(f"/api/scan-extensions/archive-nest?path={tmp_path}")
+def test_archive_nest_api(client, tmp_path, monkeypatch):
+    from api import security
+
+    library = tmp_path / "library"
+    library.mkdir()
+    monkeypatch.setattr(security, "library_roots", lambda: [library])
+    res = client.get(f"/api/scan-extensions/archive-nest?path={library}")
     assert res.status_code == 200
 
 

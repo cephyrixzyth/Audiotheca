@@ -17,7 +17,9 @@ The API uses a **Bearer token** stored at:
 `dedupe_reports/.api_token`
 
 - Auto-generated on first API start (unless `AUDIOTHECA_API_TOKEN` is set in the environment).
-- The UI bootstraps the token via `GET /api/auth/token` (localhost only, no auth required).
+- The UI bootstraps the token via `GET /api/auth/token` (**localhost only** by default; no auth required).
+- Docker / Unraid installs should set `AUDIOTHECA_API_TOKEN` and bake the same value into the UI as `VITE_API_TOKEN`, with `AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP=1`.
+- `AUDIOTHECA_TRUST_INTERNAL_NETWORK=1` and `AUDIOTHECA_ALLOW_REMOTE_TOKEN_BOOTSTRAP=1` are explicit opt-ins — do not enable them on LAN without reverse-proxy auth.
 - All other `/api/*` routes require `Authorization: Bearer <token>` unless a valid short-lived ticket is supplied (see below).
 
 **Do not commit `.api_token` to git** (it is gitignored).
@@ -43,6 +45,7 @@ Tickets expire after **300 seconds** by default (`AUDIOTHECA_TICKET_TTL_S` env, 
 
 - Default bind: `127.0.0.1:8787` — not reachable from other machines.
 - Do **not** bind to `0.0.0.0` without adding reverse-proxy auth and TLS.
+- Unraid compose does **not** publish the API port by default; use the UI proxy and a fixed `AUDIOTHECA_API_TOKEN`.
 
 ## Library root allowlist
 

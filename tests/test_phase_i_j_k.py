@@ -135,17 +135,27 @@ def test_daw_side_install_dry_run(client, tmp_path, monkeypatch):
     assert body.get("dry_run") is True or body.get("ok") is not None
 
 
-def test_rolling_hash_api(client, tmp_path):
-    f = tmp_path / "t.bin"
+def test_rolling_hash_api(client, tmp_path, monkeypatch):
+    from api import security
+
+    library = tmp_path / "library"
+    library.mkdir()
+    f = library / "t.bin"
     f.write_bytes(b"api-hash-test")
+    monkeypatch.setattr(security, "library_roots", lambda: [library])
     res = client.post("/api/tools/rolling-hash", json={"path": str(f)})
     assert res.status_code == 200
     assert res.json().get("ok") is True
 
 
-def test_parallel_walk_api(client, tmp_path):
-    (tmp_path / "x.txt").write_text("x", encoding="utf-8")
-    res = client.post("/api/tools/parallel-walk", json={"root": str(tmp_path)})
+def test_parallel_walk_api(client, tmp_path, monkeypatch):
+    from api import security
+
+    library = tmp_path / "library"
+    library.mkdir()
+    (library / "x.txt").write_text("x", encoding="utf-8")
+    monkeypatch.setattr(security, "library_roots", lambda: [library])
+    res = client.post("/api/tools/parallel-walk", json={"root": str(library)})
     assert res.status_code == 200
     assert res.json().get("count") == 1
 

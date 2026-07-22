@@ -145,6 +145,10 @@ def get_api_token() -> str:
     TOKEN_PATH.parent.mkdir(parents=True, exist_ok=True)
     token = secrets.token_urlsafe(32)
     TOKEN_PATH.write_text(token, encoding="utf-8")
+    try:
+        os.chmod(TOKEN_PATH, 0o600)
+    except OSError:
+        pass
     audit("api_token_created", path=str(TOKEN_PATH))
     return token
 
@@ -163,10 +167,19 @@ def is_localhost(request: Request) -> bool:
 
 
 def can_bootstrap_token(request: Request) -> bool:
+    """Allow unauthenticated token bootstrap only from trusted clients.
+
+    Localhost is always allowed (desktop / Vite / Tauri). Remote bootstrap requires
+    an explicit env opt-in. Docker LAN installs should set AUDIOTHECA_API_TOKEN and
+    bake it into the UI via VITE_API_TOKEN instead of trusting private networks.
+    """
+    if os.environ.get("AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP") == "1":
+        return False
     if is_localhost(request):
         return True
     if os.environ.get("AUDIOTHECA_ALLOW_REMOTE_TOKEN_BOOTSTRAP") == "1":
         return True
+    # Opt-in only — do not enable by default in published Docker compose.
     if os.environ.get("AUDIOTHECA_TRUST_INTERNAL_NETWORK") == "1":
         host = _client_host(request)
         try:
@@ -210,12 +223,19 @@ def canonical_path(path: Path) -> Path:
         return path.expanduser()
 
 
-def is_path_under(child: Path, parent: Path) -> bool:
+def is_canonical_path_under(child: Path, parent: Path) -> bool:
+    """True only when the resolved (symlink-followed) child is under parent."""
     try:
         canonical_path(child).relative_to(canonical_path(parent))
         return True
     except (OSError, ValueError):
-        return is_logical_path_under(child, parent)
+        return False
+
+
+def is_path_under(child: Path, parent: Path) -> bool:
+    if is_canonical_path_under(child, parent):
+        return True
+    return is_logical_path_under(child, parent)
 
 
 def library_roots() -> list[Path]:
@@ -244,10 +264,22 @@ def _validate_library_path(raw: str, *, must_exist: bool = False, label: str = "
     raw_path = Path(str(raw)).expanduser()
     path = canonical_path(raw_path)
     roots = library_roots()
-    allowed = any(
-        is_path_under(path, root) or is_logical_path_under(raw_path, root)
-        for root in roots
-    )
+    try:
+        exists_or_link = raw_path.exists() or raw_path.is_symlink()
+    except OSError:
+        exists_or_link = False
+    if exists_or_link:
+        # Existing paths / symlinks must be canonically under a root (no symlink escape).
+        allowed = any(is_canonical_path_under(path, root) for root in roots)
+    else:
+        # Non-existent paths may be Windows-style logical paths on a non-Windows host.
+        # Compare both the resolved and raw forms; logical_path_parts normalizes '\'.
+        allowed = any(
+            is_canonical_path_under(path, root)
+            or is_logical_path_under(path, root)
+            or is_logical_path_under(raw_path, root)
+            for root in roots
+        )
     if not allowed:
         audit("library_path_denied", path=str(path), label=label)
         raise ValueError(f"{label} must be under a configured library root")

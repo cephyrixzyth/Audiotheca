@@ -37,6 +37,7 @@ from progress import PhaseProgress, tqdm_bar
 from vendor_db import VENDOR_DATABASE
 
 from audiotheca.config import *  # noqa: F403
+from audiotheca.binary_arch import inspect_binary, merge_arch_flags
 from audiotheca.helpers import _archive_stem, _limit_walk, _squash, _walk_depth
 from audiotheca.optional_deps import HAS_PEFILE, pefile
 from audiotheca.platform_routing import off_lane, os_status_label, platform_flags
@@ -112,6 +113,10 @@ class ScanMixin:
             "top_files": [],
             "largest_files": [],
             "truncations": [],
+            "arch_x86": False,
+            "arch_x64": False,
+            "arch_arm64": False,
+            "legacy_32bit": False,
         }
         largest_heap: list[tuple[int, str, str]] = []
 
@@ -299,6 +304,8 @@ class ScanMixin:
                 continue
         if nested_indexes:
             info["nested_archive_index"] = nested_indexes
+        for _size, pe_path in info["pe_candidates"][:6]:
+            merge_arch_flags(info, inspect_binary(Path(pe_path)))
         return info
 
     @staticmethod

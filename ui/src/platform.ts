@@ -90,8 +90,10 @@ export async function getApiBase(): Promise<string> {
 }
 
 export async function getWsBase(): Promise<string> {
-  if (!isTauri() && !import.meta.env.DEV) {
-    return `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}`;
+  if (!isTauri()) {
+    // Browser / Vite: same host as the page (dev proxy or nginx reverse-proxy).
+    const proto = window.location.protocol === "https:" ? "wss" : "ws";
+    return `${proto}://${window.location.host}`;
   }
   const base = await getApiBase();
   const url = new URL(base);

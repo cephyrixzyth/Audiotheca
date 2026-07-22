@@ -299,6 +299,9 @@ def _known_vendor_set() -> set[str]:
 
 
 def fetch_page(url: str, *, timeout: float = 30.0) -> tuple[str, int]:
+    from runtime_policy import require_outbound
+
+    require_outbound("vendor harvest")
     started = time.monotonic()
     req = Request(url, headers={"User-Agent": USER_AGENT, "Accept": "text/html,application/xhtml+xml"})
     with urlopen(req, timeout=timeout) as resp:

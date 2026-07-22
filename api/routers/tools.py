@@ -196,7 +196,7 @@ def refresh_version_manifest(body: dict = Body(...)) -> dict[str, object]:
 def scan_extension_bwf(path: str = Query(..., description="Absolute path to a WAV file")) -> dict[str, object]:
     from bwf_metadata import parse_wav_metadata
 
-    target = Path(path)
+    target = Path(str(security.assert_library_path(path, must_exist=True, label="path")))
     if not target.is_file():
         raise HTTPException(status_code=404, detail="WAV file not found")
     return parse_wav_metadata(target)
@@ -205,7 +205,7 @@ def scan_extension_bwf(path: str = Query(..., description="Absolute path to a WA
 def scan_extension_multitrack(path: str = Query(..., description="Folder containing audio stems")) -> dict[str, object]:
     from multitrack_group import group_multitracks
 
-    folder = Path(path)
+    folder = Path(str(security.assert_library_path(path, must_exist=True, label="path")))
     if not folder.is_dir():
         raise HTTPException(status_code=404, detail="Folder not found")
     groups = group_multitracks(folder)
@@ -218,7 +218,7 @@ def scan_extension_archive_index(
 ) -> dict[str, object]:
     from archive_index import index_archive
 
-    target = Path(path)
+    target = Path(str(security.assert_library_path(path, must_exist=True, label="path")))
     if not target.is_file():
         raise HTTPException(status_code=404, detail="Archive not found")
     return index_archive(target, limit=limit)
@@ -227,7 +227,7 @@ def scan_extension_archive_index(
 def scan_extension_session(path: str = Query(..., description="DAW session file or folder")) -> dict[str, object]:
     from session_parse import parse_session, summarize_session_folder
 
-    target = Path(path)
+    target = Path(str(security.assert_library_path(path, must_exist=True, label="path")))
     if target.is_dir():
         return summarize_session_folder(target)
     if not target.is_file():
@@ -241,7 +241,7 @@ def scan_extension_archive_nest(
 ) -> dict[str, object]:
     from archive_nest import index_nested_archives, scan_folder_for_archives
 
-    target = Path(path)
+    target = Path(str(security.assert_library_path(path, must_exist=True, label="path")))
     if target.is_dir():
         return scan_folder_for_archives(target, limit=limit)
     if not target.is_file():
@@ -661,7 +661,8 @@ def tools_rolling_hash(body: dict = Body(default_factory=dict)) -> dict[str, obj
     path = body.get("path")
     if not path:
         raise HTTPException(status_code=400, detail="path required")
-    return rolling_hash_file(str(path))
+    target = str(security.assert_library_path(str(path), must_exist=True, label="path"))
+    return rolling_hash_file(target)
 
 @router.post("/api/tools/parallel-walk")
 def tools_parallel_walk(body: dict = Body(default_factory=dict)) -> dict[str, object]:
@@ -670,13 +671,14 @@ def tools_parallel_walk(body: dict = Body(default_factory=dict)) -> dict[str, ob
     root = body.get("root")
     if not root:
         raise HTTPException(status_code=400, detail="root required")
-    return parallel_walk(str(root), max_depth=int(body.get("max_depth") or 8))
+    target = str(security.assert_library_path(str(root), must_exist=True, label="root"))
+    return parallel_walk(target, max_depth=int(body.get("max_depth") or 8))
 
 @router.get("/api/scan-extensions/hash")
 def scan_extension_hash(path: str = Query(..., description="File to hash")) -> dict[str, object]:
     from hash_ext import hash_file
 
-    target = Path(path)
+    target = Path(str(security.assert_library_path(path, must_exist=True, label="path")))
     if not target.is_file():
         raise HTTPException(status_code=404, detail="File not found")
     return hash_file(target)
@@ -685,7 +687,7 @@ def scan_extension_hash(path: str = Query(..., description="File to hash")) -> d
 def scan_extension_archive_crc(path: str = Query(..., description="Archive to diagnose")) -> dict[str, object]:
     from archive_crc import diagnose_archive
 
-    target = Path(path)
+    target = Path(str(security.assert_library_path(path, must_exist=True, label="path")))
     if not target.is_file():
         raise HTTPException(status_code=404, detail="Archive not found")
     return diagnose_archive(target)
@@ -694,7 +696,7 @@ def scan_extension_archive_crc(path: str = Query(..., description="Archive to di
 def scan_extension_session_collapse(path: str = Query(..., description="Folder with stems + sessions")) -> dict[str, object]:
     from multitrack_group import collapse_session_objects
 
-    folder = Path(path)
+    folder = Path(str(security.assert_library_path(path, must_exist=True, label="path")))
     if not folder.is_dir():
         raise HTTPException(status_code=404, detail="Folder not found")
     return collapse_session_objects(folder)

@@ -114,7 +114,7 @@ Skippable phases (faster dry runs):
 - `quarantine`, `duplicates`, `restructure_live`, `purge`
 - `archive_peek`, `scene_peek`, `ai_lookup`
 
-**Processing flow** presets in the Scan tab map to these (default: **Fast identify**).
+**Processing flow** presets in the Scan tab map to these (default: **Almost full**).
 
 Targeted rescans pass `target_paths` + optional `invalidate_cache_paths` (see Skipped files / Space recovery tabs).
 

@@ -115,21 +115,31 @@ def test_dual_metrics_api(client):
     assert "host" in body
 
 
-def test_session_api(client, tmp_path):
-    ptx = tmp_path / "s.ptx"
+def test_session_api(client, tmp_path, monkeypatch):
+    from api import security
+
+    library = tmp_path / "library"
+    library.mkdir()
+    monkeypatch.setattr(security, "library_roots", lambda: [library])
+    ptx = library / "s.ptx"
     ptx.write_text('TrackName="Vox"', encoding="utf-8")
     res = client.get("/api/scan-extensions/session", params={"path": str(ptx)})
     assert res.status_code == 200
     assert res.json()["format"] == "protools"
 
 
-def test_reference_engine_api(client, tmp_path):
-    ref = tmp_path / "ref"
-    scan = tmp_path / "scan"
+def test_reference_engine_api(client, tmp_path, monkeypatch):
+    from api import security
+
+    library = tmp_path / "library"
+    library.mkdir()
+    ref = library / "ref"
+    scan = library / "scan"
     ref.mkdir()
     scan.mkdir()
     (ref / "a.wav").write_bytes(b"x" * 100)
     (scan / "b.wav").write_bytes(b"x" * 100)
+    monkeypatch.setattr(security, "library_roots", lambda: [library])
     res = client.post(
         "/api/reference-dedupe/engine-scan",
         json={"reference_roots": [str(ref)], "scan_roots": [str(scan)]},

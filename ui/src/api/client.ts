@@ -27,6 +27,11 @@ let cachedToken: string | null = null;
 
 async function ensureApiToken(): Promise<string> {
   if (cachedToken) return cachedToken;
+  const baked = (import.meta.env.VITE_API_TOKEN as string | undefined)?.trim();
+  if (baked) {
+    cachedToken = baked;
+    return cachedToken;
+  }
   const res = await fetch(await apiUrl("/auth/token"));
   if (!res.ok) {
     throw new Error("Failed to obtain API token — is the API running on 127.0.0.1:8787?");
@@ -194,7 +199,8 @@ export function correctInvestigation(
 }
 
 export async function investigationFeedbackExportUrl(stamp: string): Promise<string> {
-  return `${await apiUrl(`/runs/${stamp}/investigation/export`)}`;
+  const ticket = await issueAccessTicket();
+  return `${await apiUrl(`/runs/${stamp}/investigation/export`)}?ticket=${encodeURIComponent(ticket)}`;
 }
 
 export function fetchInvestigation(
@@ -525,7 +531,8 @@ export function executeDuplicateStaging(
 }
 
 export async function downloadDecisionsUrl(stamp: string): Promise<string> {
-  return `${await apiUrl(`/runs/${stamp}/decisions/download`)}`;
+  const ticket = await issueAccessTicket();
+  return `${await apiUrl(`/runs/${stamp}/decisions/download`)}?ticket=${encodeURIComponent(ticket)}`;
 }
 
 export async function feedbackExportUrl(
@@ -537,6 +544,8 @@ export async function feedbackExportUrl(
   if (stamp) qs.set("stamp", stamp);
   qs.set("format", format);
   qs.set("module", module);
+  const ticket = await issueAccessTicket();
+  qs.set("ticket", ticket);
   return `${await apiUrl(`/feedback/export?${qs}`)}`;
 }
 
@@ -663,8 +672,14 @@ export function rejectHarvestCandidates(
   return postJson("/vendors/harvest/reject", { harvest_ids: harvestIds });
 }
 
-export function vendorResearchExportUrl(includeKnown = false): string {
-  return `/api/vendors/harvest/export?include_known=${includeKnown ? "true" : "false"}&status=pending`;
+export async function vendorResearchExportUrl(includeKnown = false): Promise<string> {
+  const ticket = await issueAccessTicket();
+  const qs = new URLSearchParams({
+    include_known: includeKnown ? "true" : "false",
+    status: "pending",
+    ticket,
+  });
+  return `${await apiUrl(`/vendors/harvest/export?${qs}`)}`;
 }
 
 export function fetchJobs(): Promise<JobSnapshot[]> {

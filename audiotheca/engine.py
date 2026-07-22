@@ -404,7 +404,7 @@ class DeduplicationEngine(
     # ------------------------------------------------------------------
 
     def run(self) -> str:
-        """Run the engine. Returns 'stopped' if user stopped, else 'ok'."""
+        """Run the engine. Returns 'ok', 'stopped', or 'error'."""
         print("\n" + "=" * 60)
         print(f" AUDIO DEDUPLICATION ENGINE v{ENGINE_VERSION} ".center(60, "="))
         print("=" * 60)
@@ -429,11 +429,12 @@ class DeduplicationEngine(
         if not self.root_dir.exists():
             print("[X] ERROR: Cannot reach network share.")
             self.logger.critical("Cannot reach network share: %s", self.root_dir)
-            return
+            return "error"
 
         if not self.dry_run and not os.access(self.root_dir, os.W_OK):
             print("[X] ERROR: Drive is read-only.")
-            return
+            self.logger.critical("Drive is read-only: %s", self.root_dir)
+            return "error"
 
         self.logger.info("Engine v%s started | DRY_RUN=%s | ROOT=%s", ENGINE_VERSION, self.dry_run, self.root_dir)
 
@@ -455,6 +456,7 @@ class DeduplicationEngine(
                 ["Root Bin", "Item Name", "Extracted Fingerprint", "Version Key", "Type", "Detected Vendor", "ID Method", "Tonex"]
             )
 
+        run_failed = False
         try:
             self._run_phases(csv_writer, inv_writer)
         except PhaseStopRequested as exc:
@@ -464,7 +466,9 @@ class DeduplicationEngine(
         except KeyboardInterrupt:
             print("\n[!] Interrupted — writing partial reports.")
             self.logger.warning("Run interrupted by user.")
+            self._stopped_by_user = True
         except Exception as exc:
+            run_failed = True
             print(f"\n[X] Run aborted: {exc} — writing partial reports.")
             self.logger.critical("Run aborted: %s", exc, exc_info=True)
         finally:
@@ -477,7 +481,11 @@ class DeduplicationEngine(
             inv_hints_path = export_investigation_hints()
             self.logger.info("Engine hints refreshed: %s, %s", hints_path, inv_hints_path)
             self._print_summary(report_paths)
-        return "stopped" if self._stopped_by_user else "ok"
+        if self._stopped_by_user:
+            return "stopped"
+        if run_failed:
+            return "error"
+        return "ok"
 
     def _run_phases(self, csv_writer, inv_writer) -> None:
         if not self.dry_run:
@@ -999,7 +1007,14 @@ class DeduplicationEngine(
                 )
                 self._inc("duplicates_confirmed")
                 if not self.dry_run:
-                    self.safe_move(item["path"], self.delete_candidates_dir / item["original_name"])
+                    dst = self.delete_candidates_dir / item["original_name"]
+                    if dst.exists():
+                        stem = item["original_name"]
+                        suffix = 1
+                        while dst.exists():
+                            dst = self.delete_candidates_dir / f"{stem}_{suffix}"
+                            suffix += 1
+                    self.safe_move(item["path"], dst)
 
         restructure_progress = PhaseProgress("Phase 3 - Restructure plan", len(all_items), "item")
         delete_paths = {entry["path"] for entry in items_to_delete}

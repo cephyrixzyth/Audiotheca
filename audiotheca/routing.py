@@ -279,26 +279,62 @@ class RoutingMixin:
         return dest_path, relative_dest
 
     def move_and_merge(self, src: str | Path, dst: str | Path) -> bool:
+        from audiotheca.transaction_ledger import guarded_move, new_batch_id
+
         src_path = Path(src)
         dst_path = Path(dst)
 
         if self.dry_run:
             return True
 
+        batch_id = getattr(self, "_move_batch_id", None) or new_batch_id()
+        self._move_batch_id = batch_id
+
         try:
             if not dst_path.exists():
-                shutil.move(str(src_path), str(dst_path))
-                return True
+                ok, err = guarded_move(
+                    src_path,
+                    dst_path,
+                    batch_id=batch_id,
+                    op="move_and_merge",
+                    dry_run=False,
+                )
+                if not ok:
+                    self.logger.error("move_and_merge failed %s -> %s: %s", src_path, dst_path, err)
+                    self._inc("errors")
+                return ok
+
+            # Preflight collisions so we do not partially merge then fail.
+            for item in src_path.iterdir():
+                target_item = dst_path / item.name
+                if item.is_file() and target_item.exists():
+                    self.logger.warning("Merge collision: %s already exists in %s", item.name, dst_path)
+                    return False
 
             ok = True
-            for item in src_path.iterdir():
+            for item in list(src_path.iterdir()):
                 source_item = src_path / item.name
                 target_item = dst_path / item.name
                 if source_item.is_dir():
                     if not self.move_and_merge(source_item, target_item):
                         ok = False
                 elif not target_item.exists():
-                    shutil.move(str(source_item), str(target_item))
+                    moved, err = guarded_move(
+                        source_item,
+                        target_item,
+                        batch_id=batch_id,
+                        op="move_and_merge_child",
+                        dry_run=False,
+                    )
+                    if not moved:
+                        self.logger.error(
+                            "move_and_merge child failed %s -> %s: %s",
+                            source_item,
+                            target_item,
+                            err,
+                        )
+                        self._inc("errors")
+                        ok = False
                 else:
                     self.logger.warning("Merge collision: %s already exists in %s", item.name, dst_path)
                     ok = False
@@ -316,16 +352,31 @@ class RoutingMixin:
             return False
 
     def safe_move(self, src: Path, dst: Path) -> bool:
+        from audiotheca.transaction_ledger import guarded_move, new_batch_id
+
         if self.dry_run:
             return True
-        try:
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            shutil.move(str(src), str(dst))
-            return True
-        except (OSError, PermissionError, shutil.Error) as exc:
-            self.logger.error("safe_move failed %s -> %s: %s", src, dst, exc)
+        batch_id = getattr(self, "_move_batch_id", None) or new_batch_id()
+        self._move_batch_id = batch_id
+        final_dst = Path(dst)
+        if final_dst.exists():
+            stem = final_dst.name
+            parent = final_dst.parent
+            suffix = 1
+            while final_dst.exists():
+                final_dst = parent / f"{stem}_{suffix}"
+                suffix += 1
+        ok, err = guarded_move(
+            Path(src),
+            final_dst,
+            batch_id=batch_id,
+            op="safe_move",
+            dry_run=False,
+        )
+        if not ok:
+            self.logger.error("safe_move failed %s -> %s: %s", src, final_dst, err)
             self._inc("errors")
-            return False
+        return ok
 
     def write_sidecar_metadata(self, folder_path: Path, original_data: dict) -> None:
         if self.dry_run or folder_path.is_file():

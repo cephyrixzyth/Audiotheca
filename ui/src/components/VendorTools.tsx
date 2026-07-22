@@ -12,6 +12,7 @@ import {
   runVendorHarvest,
   testVendorKeyword,
   unifiedFeedbackExportUrl,
+  vendorResearchExportUrl,
   type HarvestCandidate,
   type HarvestSourcePreset,
   type VendorGap,
@@ -31,6 +32,7 @@ export function VendorTools({ stamp }: Props) {
   const [userAdded, setUserAdded] = useState<Array<{ company: string; keywords: string[] }>>([]);
   const [summary, setSummary] = useState<Record<string, number> | null>(null);
   const [exportUrl, setExportUrl] = useState("");
+  const [harvestExportUrl, setHarvestExportUrl] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,6 +75,7 @@ export function VendorTools({ stamp }: Props) {
       .then(setSummary)
       .catch(() => setSummary(null));
     void unifiedFeedbackExportUrl(stamp).then(setExportUrl);
+    void vendorResearchExportUrl(false).then(setHarvestExportUrl);
     fetchHarvestSources()
       .then((res) => {
         setPresets(res.presets);
@@ -398,14 +401,16 @@ export function VendorTools({ stamp }: Props) {
             <h3 style={{ fontSize: "0.95rem", margin: 0 }}>
               Research inbox ({newCandidates.length} new, not in engine yet)
             </h3>
-            <a
-              className="keeper-btn"
-              href="/api/vendors/harvest/export?include_known=false&status=pending"
-              download
-              style={{ textDecoration: "none" }}
-            >
-              Export inbox (CSV)
-            </a>
+            {harvestExportUrl && (
+              <a
+                className="keeper-btn"
+                href={harvestExportUrl}
+                download
+                style={{ textDecoration: "none" }}
+              >
+                Export inbox (CSV)
+              </a>
+            )}
             <button
               type="button"
               className="primary-btn"

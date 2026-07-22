@@ -31,7 +31,7 @@ def test_job_progress_stalled(client, monkeypatch):
         ],
     )
     jm._jobs[job_id] = job
-    monkeypatch.setattr("api.server.job_manager", jm)
+    monkeypatch.setattr("api.routers.jobs.job_manager", jm)
 
     res = client.get(f"/api/jobs/{job_id}/progress")
     assert res.status_code == 200
@@ -53,7 +53,7 @@ def test_job_progress_not_stalled_when_recent(client, monkeypatch):
         events=[{"type": "phase_progress", "ts": recent_ts, "phase": "Phase 1a", "done": 1, "total": 10}],
     )
     jm._jobs[job_id] = job
-    monkeypatch.setattr("api.server.job_manager", jm)
+    monkeypatch.setattr("api.routers.jobs.job_manager", jm)
 
     res = client.get(f"/api/jobs/{job_id}/progress")
     assert res.status_code == 200
@@ -73,7 +73,7 @@ def test_job_progress_not_stalled_when_done(client, monkeypatch):
         events=[{"type": "phase_progress", "ts": old_ts, "phase": "Phase 1a", "done": 10, "total": 10}],
     )
     jm._jobs[job_id] = job
-    monkeypatch.setattr("api.server.job_manager", jm)
+    monkeypatch.setattr("api.routers.jobs.job_manager", jm)
 
     res = client.get(f"/api/jobs/{job_id}/progress")
     assert res.status_code == 200

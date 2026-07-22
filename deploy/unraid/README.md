@@ -124,20 +124,29 @@ See `.env.example`. Key variables:
 
 ## Security
 
-- API binds `0.0.0.0` inside the Docker network only; expose UI port to LAN, not API, when possible.
-- Token bootstrap trusts the UI nginx container on the internal Docker network.
-- For reverse proxy (Nginx Proxy Manager / SWAG): proxy to `ui:80`, enable WebSocket upgrade for scan progress.
-- Set `AUDIOTHECA_API_TOKEN` in `.env` for a stable token across rebuilds.
+- API binds `0.0.0.0` inside the Docker network only and is **not published** to the host by default.
+- Expose the UI port to LAN (nginx proxies `/api/`). Do not publish API port `8787` unless debugging.
+- Set a strong `AUDIOTHECA_API_TOKEN` in `.env`. Compose bakes the same value into the UI as `VITE_API_TOKEN`.
+- Token bootstrap (`GET /api/auth/token`) is disabled in the default compose (`AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP=1`).
+- For reverse proxy (Nginx Proxy Manager / SWAG): proxy to `ui:80`, enable WebSocket upgrade for scan progress, and prefer proxy auth.
 
 ## Smoke test
 
 ```bash
-curl -sf http://127.0.0.1:4211/api/health | jq .
+# UI (includes proxied /api/)
 curl -sf http://127.0.0.1:4210/ | head
-curl -sf http://127.0.0.1:4210/api/security/library-roots | jq .
+curl -sf -H "Authorization: Bearer $AUDIOTHECA_API_TOKEN" \
+  http://127.0.0.1:4210/api/security/library-roots | jq .
 ```
 
 Start a dry-run scan from the **Scan** tab; progress streams over WebSocket at `/api/jobs/{id}/events`.
+
+To debug the API on the host, temporarily add under the `api` service:
+
+```yaml
+ports:
+  - "${API_PORT:-4211}:8787"
+```
 
 ## Run tests in the API image
 
