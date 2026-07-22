@@ -47,7 +47,7 @@ python -c "import pefile, rapidfuzz, tqdm, fastapi; print('deps OK')"
 python -m pytest tests/ -q
 ```
 
-Expect **516+ tests passing** (3 skipped). Failures often mean missing packages or wrong Python version.
+Expect **569+ tests passing** (4 skipped without local Run_Summary fixtures). Failures often mean missing packages or wrong Python version.
 
 ---
 
@@ -169,6 +169,7 @@ npm run test:e2e          # Playwright — scan flow smoke (needs API on 8787 + 
 ```
 
 Playwright config: `ui/playwright.config.ts`. E2E spec: `ui/e2e/scan-flow.spec.ts`.
+CI runs Vitest (`npm test`) plus the production UI build; Playwright remains a local/manual smoke.
 
 For CI-style runs, start the API in one terminal (`python -m api.server`) before `npm run test:e2e`.
 
