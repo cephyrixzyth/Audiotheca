@@ -249,6 +249,13 @@ def test_media_ticket_requires_resource(client):
         ).status_code
         == 400
     )
+    assert (
+        client.post(
+            "/api/auth/ticket",
+            json={"scope": "/api/media", "single_use": False},
+        ).status_code
+        == 400
+    )
     ok = client.post(
         "/api/auth/ticket",
         json={
@@ -258,6 +265,23 @@ def test_media_ticket_requires_resource(client):
         },
     )
     assert ok.status_code == 200
+
+
+def test_invalid_bearer_does_not_skip_cookie_csrf(api_token, monkeypatch):
+    monkeypatch.delenv("AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP", raising=False)
+    monkeypatch.setattr(security, "is_localhost", lambda _request: True)
+    client = TestClient(app)
+    assert client.post("/api/auth/session").status_code == 200
+    denied = client.post(
+        "/api/auth/ticket",
+        json={"scope": "/api/feedback/export"},
+        headers={
+            "Authorization": "Bearer totally-wrong",
+            "Origin": "http://evil.example:9999",
+            "Host": "localhost:8787",
+        },
+    )
+    assert denied.status_code == 403
 
 
 def test_verify_access_ticket_path_helpers():

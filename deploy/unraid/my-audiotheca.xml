@@ -17,21 +17,22 @@
   <Description>
     Audiotheca library scan and organization for Unraid.[br][br]
     [b]Web UI[/b] — port 4210 (nginx, proxies /api internally)[br]
-    [b]API[/b] — optional direct access on port 4211[br][br]
+    [b]API[/b] — leave unpublished; UI nginx proxies /api (set strong tokens below)[br][br]
     [b]Appdata[/b] (/data) — reports, scan cache, API token, feedback JSON[br]
     [b]Library[/b] (/library) — local array path to _software/_audio (read-only recommended)[br][br]
     [b]Setup[/b][br]
     1. Copy repo to Unraid (or git clone)[br]
     2. [code]bash deploy/unraid/build-image.sh[/code][br]
     3. [code]bash deploy/unraid/install-template.sh[/code][br]
-    4. Docker → Add Container → Template: Audiotheca → Apply[br]
+    4. Docker → Add Container → Template: Audiotheca → set API token + proxy secret → Apply[br]
   </Description>
   <Config Name="Appdata" Target="/data" Default="/mnt/user/appdata/audiotheca" Mode="rw" Description="Reports, scan cache, API token, feedback (AUDIOTHECA_HOME)" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/audiotheca</Config>
   <Config Name="Library" Target="/library" Default="/mnt/user/infernal-data-streams/_software/_audio" Mode="ro" Description="Local audio library on array — not an SMB path from another PC" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/infernal-data-streams/_software/_audio</Config>
   <Config Name="WebUI" Target="80" Default="4210" Mode="tcp" Description="Browser UI (nginx)" Type="Port" Display="always" Required="true" Mask="false">4210</Config>
-  <Config Name="API" Target="8787" Default="4211" Mode="tcp" Description="Direct API access (optional; UI proxy is usually enough)" Type="Port" Display="advanced" Required="false" Mask="false">4211</Config>
   <Config Name="AUDIOTHECA_LIBRARY_ROOT" Target="AUDIOTHECA_LIBRARY_ROOT" Default="/library" Mode="" Description="Container library root (match Library path mount)" Type="Variable" Display="advanced-hide" Required="false" Mask="false">/library</Config>
   <Config Name="AUDIOTHECA_LIBRARY_ROOTS" Target="AUDIOTHECA_LIBRARY_ROOTS" Default="/library" Mode="" Description="Comma-separated path allowlist" Type="Variable" Display="advanced-hide" Required="false" Mask="false">/library</Config>
   <Config Name="AUDIOTHECA_HOME" Target="AUDIOTHECA_HOME" Default="/data" Mode="" Description="Workspace for reports and cache" Type="Variable" Display="advanced-hide" Required="false" Mask="false">/data</Config>
-  <Config Name="AUDIOTHECA_API_TOKEN" Target="AUDIOTHECA_API_TOKEN" Default="" Mode="" Description="Optional fixed API token (auto-generated in appdata if empty)" Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="AUDIOTHECA_API_TOKEN" Target="AUDIOTHECA_API_TOKEN" Default="" Mode="" Description="Required fixed API token (long random string)" Type="Variable" Display="always" Required="true" Mask="true"/>
+  <Config Name="AUDIOTHECA_PROXY_SECRET" Target="AUDIOTHECA_PROXY_SECRET" Default="" Mode="" Description="Shared secret for nginx→API session minting (required; different from API token)" Type="Variable" Display="always" Required="true" Mask="true"/>
+  <Config Name="AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP" Target="AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP" Default="1" Mode="" Description="Keep 1 for LAN — sessions via proxy secret only" Type="Variable" Display="advanced" Required="false" Mask="false">1</Config>
 </Container>

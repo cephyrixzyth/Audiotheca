@@ -88,16 +88,24 @@ async function issueAccessTicket(options?: {
   singleUse?: boolean;
   resource?: string;
 }): Promise<string> {
-  const res = await fetch(await apiUrl("/auth/ticket"), {
-    method: "POST",
-    credentials: "include",
-    headers: await authHeaders({ "Content-Type": "application/json" }),
-    body: JSON.stringify({
-      scope: options?.scope || "",
-      single_use: Boolean(options?.singleUse),
-      resource: options?.resource || "",
-    }),
-  });
+  const issue = async (): Promise<Response> =>
+    fetch(await apiUrl("/auth/ticket"), {
+      method: "POST",
+      credentials: "include",
+      headers: await authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({
+        scope: options?.scope || "",
+        single_use: Boolean(options?.singleUse),
+        resource: options?.resource || "",
+      }),
+    });
+
+  let res = await issue();
+  if (res.status === 401) {
+    clearAuthLatch();
+    await ensureAuth();
+    res = await issue();
+  }
   if (!res.ok) {
     const detail = await res.text();
     throw new Error(detail || "Failed to issue access ticket");

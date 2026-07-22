@@ -114,9 +114,10 @@ def issue_access_ticket(
     """Create a short-lived ticket, path-scoped and optionally resource-bound / single-use."""
     scope_text = validate_ticket_scope(scope)
     resource_text = str(resource or "").strip()
-    if scope_text == "/api/media/stream" or scope_text.startswith("/api/media/stream/"):
+    # Any /api/media… scope can authorize /api/media/stream via nesting — require bind.
+    if scope_text == "/api/media" or scope_text.startswith("/api/media/"):
         if not resource_text:
-            raise ValueError("Media stream tickets require a resource path")
+            raise ValueError("Media tickets require a resource path")
     ttl = float(ttl_s if ttl_s is not None else _TICKET_TTL_S)
     ttl = max(30.0, min(ttl, 3600.0))
     now = time.monotonic()
@@ -287,7 +288,9 @@ def cookie_csrf_ok(request: Request) -> bool:
         return True
     auth = request.headers.get("authorization", "")
     if auth.lower().startswith("bearer "):
-        return True
+        # Only a *valid* bearer skips the cookie CSRF check.
+        if verify_token(auth[7:].strip()):
+            return True
     if not request.cookies.get(SESSION_COOKIE):
         return True
     host = (request.headers.get("host") or "").lower()
