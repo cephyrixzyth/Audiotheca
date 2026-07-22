@@ -27,6 +27,11 @@ let cachedToken: string | null = null;
 let sessionReady = false;
 let authInFlight: Promise<void> | null = null;
 
+function clearAuthLatch(): void {
+  sessionReady = false;
+  cachedToken = null;
+}
+
 async function ensureAuth(): Promise<void> {
   if (sessionReady || cachedToken) return;
   if (authInFlight) return authInFlight;
@@ -63,6 +68,20 @@ async function ensureAuth(): Promise<void> {
   return authInFlight;
 }
 
+async function fetchWithAuth(path: string, init?: RequestInit, retried = false): Promise<Response> {
+  const res = await fetch(await apiUrl(path), {
+    ...init,
+    credentials: "include",
+    headers: await authHeaders(init?.headers),
+  });
+  if (res.status === 401 && !retried) {
+    clearAuthLatch();
+    await ensureAuth();
+    return fetchWithAuth(path, init, true);
+  }
+  return res;
+}
+
 /** Short-lived ticket for query-string surfaces (WS / media / downloads). */
 async function issueAccessTicket(options?: {
   scope?: string;
@@ -97,10 +116,7 @@ async function authHeaders(extra?: HeadersInit): Promise<HeadersInit> {
 }
 
 async function getJson<T>(path: string): Promise<T> {
-  const res = await fetch(await apiUrl(path), {
-    credentials: "include",
-    headers: await authHeaders(),
-  });
+  const res = await fetchWithAuth(path);
   if (!res.ok) {
     const detail = await res.text();
     throw new Error(detail || res.statusText);
@@ -109,10 +125,9 @@ async function getJson<T>(path: string): Promise<T> {
 }
 
 async function putJson<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(await apiUrl(path), {
+  const res = await fetchWithAuth(path, {
     method: "PUT",
-    credentials: "include",
-    headers: await authHeaders({ "Content-Type": "application/json" }),
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -123,10 +138,9 @@ async function putJson<T>(path: string, body: unknown): Promise<T> {
 }
 
 async function postJson<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(await apiUrl(path), {
+  const res = await fetchWithAuth(path, {
     method: "POST",
-    credentials: "include",
-    headers: await authHeaders({ "Content-Type": "application/json" }),
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
   if (!res.ok) {

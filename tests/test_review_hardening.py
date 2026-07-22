@@ -41,6 +41,38 @@ def test_symlink_ancestor_nonexistent_child_rejected(tmp_path, monkeypatch):
         security.ensure_library_path(str(link / "newfile.txt"))
 
 
+def test_dotdot_escape_via_missing_intermediate_rejected(tmp_path, monkeypatch):
+    """library/nope/../../outside must not resolve past the library root."""
+    library = tmp_path / "library"
+    library.mkdir()
+    outside = tmp_path / "secret.txt"
+    outside.write_text("secret", encoding="utf-8")
+    monkeypatch.setattr(security, "library_roots", lambda: [library])
+
+    crafted = library / "nope" / ".." / ".." / outside.name
+    with pytest.raises(ValueError, match="library root"):
+        security.ensure_library_path(str(crafted))
+
+
+def test_dotdot_collapse_stays_inside_library(tmp_path, monkeypatch):
+    library = tmp_path / "library"
+    library.mkdir()
+    nested = library / "a"
+    nested.mkdir()
+    target = library / "ok.txt"
+    target.write_text("ok", encoding="utf-8")
+    monkeypatch.setattr(security, "library_roots", lambda: [library])
+
+    collapsed = security.ensure_library_path(str(nested / ".." / "ok.txt"), must_exist=True)
+    assert collapsed == security.canonical_path(target)
+
+
+def test_windows_dotdot_escape_rejected_logically(monkeypatch):
+    monkeypatch.setattr(security, "library_roots", lambda: [Path(r"Z:\lib")])
+    with pytest.raises(ValueError, match="library root"):
+        security.ensure_library_path(r"Z:\lib\nope\..\..\Windows\System32")
+
+
 def test_canonical_path_under_library_still_allowed(tmp_path, monkeypatch):
     library = tmp_path / "library"
     library.mkdir()

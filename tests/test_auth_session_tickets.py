@@ -219,6 +219,47 @@ def test_csrf_blocks_cross_origin_cookie_mutation(api_token, monkeypatch):
     assert allowed.status_code == 200
 
 
+def test_csrf_failure_does_not_consume_single_use_ticket(client, monkeypatch):
+    monkeypatch.delenv("AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP", raising=False)
+    monkeypatch.setattr(security, "is_localhost", lambda _request: True)
+    session_client = TestClient(app)
+    assert session_client.post("/api/auth/session").status_code == 200
+
+    issued = client.post(
+        "/api/auth/ticket",
+        json={"scope": "/api/feedback/export", "single_use": True},
+    ).json()
+    ticket = issued["ticket"]
+
+    denied = session_client.post(
+        "/api/feedback/export",
+        params={"ticket": ticket},
+        headers={"Origin": "http://evil.example:9999", "Host": "testserver"},
+    )
+    # POST may 405 on export; CSRF must fire first as 403 and leave ticket intact.
+    assert denied.status_code == 403
+    assert ticket in security._tickets
+
+
+def test_media_ticket_requires_resource(client):
+    assert (
+        client.post(
+            "/api/auth/ticket",
+            json={"scope": "/api/media/stream", "single_use": False},
+        ).status_code
+        == 400
+    )
+    ok = client.post(
+        "/api/auth/ticket",
+        json={
+            "scope": "/api/media/stream",
+            "single_use": False,
+            "resource": r"Z:\lib\a.wav",
+        },
+    )
+    assert ok.status_code == 200
+
+
 def test_verify_access_ticket_path_helpers():
     security._tickets.clear()
     meta = security.issue_access_ticket(scope="/api/jobs/abc/events", single_use=False)

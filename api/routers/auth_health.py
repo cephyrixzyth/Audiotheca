@@ -27,6 +27,11 @@ def establish_session(request: Request, response: Response) -> dict[str, object]
     """
     if not security.can_establish_session(request):
         raise HTTPException(status_code=403, detail="Session bootstrap not allowed for this client")
+    security.rate_limiter.check(
+        f"session:{security._client_host(request) or 'unknown'}",
+        limit=30,
+        window_s=60.0,
+    )
     session_id = security.create_session()
     secure = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
     max_age = int(max(300.0, security._SESSION_TTL_S))

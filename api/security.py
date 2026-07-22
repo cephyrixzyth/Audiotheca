@@ -18,7 +18,12 @@ from urllib.parse import urlparse
 
 from fastapi import HTTPException, Request
 
-from api.path_logic import is_logical_path_under, logical_path_from_parts, logical_path_parts
+from api.path_logic import (
+    collapse_logical_path,
+    is_logical_path_under,
+    logical_path_from_parts,
+    logical_path_parts,
+)
 from api.paths import report_dir, workspace_root
 from audiotheca.config import ROOT_DIR as DEFAULT_LIBRARY_ROOT
 
@@ -109,6 +114,9 @@ def issue_access_ticket(
     """Create a short-lived ticket, path-scoped and optionally resource-bound / single-use."""
     scope_text = validate_ticket_scope(scope)
     resource_text = str(resource or "").strip()
+    if scope_text == "/api/media/stream" or scope_text.startswith("/api/media/stream/"):
+        if not resource_text:
+            raise ValueError("Media stream tickets require a resource path")
     ttl = float(ttl_s if ttl_s is not None else _TICKET_TTL_S)
     ttl = max(30.0, min(ttl, 3600.0))
     now = time.monotonic()
@@ -214,12 +222,13 @@ def resolve_session(session_id: str | None) -> bool:
         return True
 
 
-def extract_bearer_token(request: Request) -> str | None:
+def extract_bearer_token(request: Request, *, consume_tickets: bool = True) -> str | None:
     """Resolve auth credentials for HTTP requests.
 
     When ``?ticket=`` is present it is always verified (and single-use tickets are
-    consumed) even if a session cookie or Bearer header is also valid — otherwise
-    browser downloads with cookies would never retire single-use tickets.
+    consumed when ``consume_tickets`` is true) even if a session cookie or Bearer
+    header is also valid — otherwise browser downloads with cookies would never
+    retire single-use tickets.
     """
     ticket = request.query_params.get("ticket")
     ticket_ok = False
@@ -228,6 +237,7 @@ def extract_bearer_token(request: Request) -> str | None:
             ticket,
             path=request.url.path,
             resource=request.query_params.get("path"),
+            consume=True if consume_tickets else False,
         )
 
     auth = request.headers.get("authorization", "")
@@ -495,30 +505,37 @@ def _validate_library_path(raw: str, *, must_exist: bool = False, label: str = "
     if not raw or not str(raw).strip():
         raise ValueError(f"{label} is required")
     raw_path = Path(str(raw)).expanduser()
-    path = canonical_path(raw_path)
+    # Collapse . / .. before any ancestor walk so library/nope/../../etc is rejected.
+    try:
+        collapsed = collapse_logical_path(raw_path)
+    except ValueError as exc:
+        audit("library_path_denied", path=str(raw_path), label=label, reason="dotdot_escape")
+        raise ValueError(f"{label} must be under a configured library root") from exc
+
+    path = canonical_path(collapsed)
     roots = library_roots()
     try:
-        exists_or_link = raw_path.exists() or raw_path.is_symlink()
+        exists_or_link = collapsed.exists() or collapsed.is_symlink()
     except OSError:
         exists_or_link = False
     if exists_or_link:
         # Existing paths / symlinks must be canonically under a root (no symlink escape).
         allowed = any(is_canonical_path_under(path, root) for root in roots)
     else:
-        # Non-existent destinations: block symlink-ancestor escapes first.
-        # resolve() follows existing symlink parents, so a path like
-        # library/escape_symlink/new.txt can canonicalize outside the root.
-        nearest = _nearest_existing_ancestor(raw_path)
+        # Non-existent destinations: block symlink-ancestor escapes, and require the
+        # collapsed path itself to remain under a configured root (no .. escape).
+        nearest = _nearest_existing_ancestor(collapsed)
+        collapsed_under_root = any(
+            is_canonical_path_under(path, root)
+            or is_logical_path_under(collapsed, root)
+            or is_logical_path_under(path, root)
+            for root in roots
+        )
         if nearest is not None:
-            allowed = any(is_canonical_path_under(nearest, root) for root in roots)
+            nearest_ok = any(is_canonical_path_under(nearest, root) for root in roots)
+            allowed = nearest_ok and collapsed_under_root
         else:
-            # No existing ancestor (typical Windows drive paths on Linux hosts).
-            allowed = any(
-                is_canonical_path_under(path, root)
-                or is_logical_path_under(path, root)
-                or is_logical_path_under(raw_path, root)
-                for root in roots
-            )
+            allowed = collapsed_under_root
     if not allowed:
         audit("library_path_denied", path=str(path), label=label)
         raise ValueError(f"{label} must be under a configured library root")

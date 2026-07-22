@@ -90,13 +90,17 @@ class AuthMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         if request.method == "OPTIONS" or path in security.PUBLIC_HTTP_PATHS:
             return await call_next(request)
-        token = security.extract_bearer_token(request)
+        # Peek credentials first so CSRF failures do not burn single-use tickets.
+        token = security.extract_bearer_token(request, consume_tickets=False)
         if not security.verify_token(token):
             security.audit("auth_failed", path=path, client=security._client_host(request))
             return JSONResponse(status_code=401, content={"detail": "Invalid or missing API token"})
         if not security.cookie_csrf_ok(request):
             security.audit("csrf_rejected", path=path, client=security._client_host(request))
             return JSONResponse(status_code=403, content={"detail": "CSRF check failed"})
+        # Auth + CSRF passed — consume single-use tickets now.
+        security.extract_bearer_token(request, consume_tickets=True)
+        request.state.api_token = security.get_api_token()
         if path.startswith("/api/runs/") and not path.startswith("/api/runs/compare"):
             match = _RUN_STAMP_SEGMENT.match(path)
             if match and match.group(1) != "compare":

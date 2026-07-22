@@ -24,7 +24,6 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
   const [peaks, setPeaks] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
   const [playing, setPlaying] = useState(false);
-  const [streamUrl, setStreamUrl] = useState<string | null>(null);
   const [assetBpm, setAssetBpm] = useState<number | undefined>();
   const [assetKey, setAssetKey] = useState<string | undefined>();
   const [assetLufs, setAssetLufs] = useState<number | undefined>();
@@ -60,9 +59,8 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
     setTrimEnd(session.trimEnd);
   }, [session.trimStart, session.trimEnd]);
 
-  // Drop cached ticketed URL when the selected file changes.
+  // Drop playback element when the selected file changes.
   useEffect(() => {
-    setStreamUrl(null);
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current = null;
@@ -84,9 +82,12 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
   }, [assetBpm, assetKey, session]);
 
   const play = useCallback(async () => {
-    const url = streamUrl ?? (await mediaStreamUrl(path));
-    setStreamUrl(url);
+    // Always mint a fresh ticketed URL — tickets expire with TTL.
+    const url = await mediaStreamUrl(path);
     const audio = audioRef.current ?? new Audio(url);
+    if (audio.src !== url) {
+      audio.src = url;
+    }
     audioRef.current = audio;
     applyMix(audio);
     audio.onloadedmetadata = () => {
@@ -104,7 +105,7 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
     audio.onpause = () => setPlaying(false);
     await audio.play();
     setPlaying(true);
-  }, [applyMix, path, streamUrl, trimEnd, trimStart]);
+  }, [applyMix, path, trimEnd, trimStart]);
 
   const stop = useCallback(() => {
     audioRef.current?.pause();

@@ -128,7 +128,7 @@ async def start_job(request: Request, body: dict = Body(default_factory=dict)) -
             str(security.assert_library_path(str(item), label="reference_root"))
             for item in scan_options["reference_roots"]
         ]
-    token = security.extract_bearer_token(request) or ""
+    token = getattr(request.state, "api_token", None) or security.get_api_token()
     try:
         job = await job_manager.start(
             dry_run=dry_run,

@@ -295,7 +295,7 @@ async def bulk_whitelist_all_underscore(stamp: str, request: Request, body: dict
     scan_options = underscore_actions.rescan_options_for(paths, full_library=True)
     root_raw = body.get("root")
     root = str(security.assert_library_path(root_raw, label="root")) if root_raw else None
-    token = security.extract_bearer_token(request) or ""
+    token = getattr(request.state, "api_token", None) or security.get_api_token()
     try:
         job = await job_manager.start(
             dry_run=security.parse_dry_run(body.get("dry_run"), default=True),
@@ -323,7 +323,7 @@ async def rescan_underscore_paths(stamp: str, request: Request, body: dict = Bod
     scan_options = underscore_actions.rescan_options_for(paths, full_library=full_library)
     root_raw = body.get("root")
     root = str(security.assert_library_path(root_raw, label="root")) if root_raw else None
-    token = security.extract_bearer_token(request) or ""
+    token = getattr(request.state, "api_token", None) or security.get_api_token()
     try:
         job = await job_manager.start(
             dry_run=security.parse_dry_run(body.get("dry_run"), default=True),
@@ -476,7 +476,7 @@ async def rescan_skipped_paths(stamp: str, request: Request, body: dict = Body(.
     )
     root_raw = body.get("root")
     root = str(security.assert_library_path(root_raw, label="root")) if root_raw else None
-    token = security.extract_bearer_token(request) or ""
+    token = getattr(request.state, "api_token", None) or security.get_api_token()
     try:
         job = await job_manager.start(
             dry_run=security.parse_dry_run(body.get("dry_run"), default=True),
