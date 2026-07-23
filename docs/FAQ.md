@@ -190,7 +190,9 @@ Dry runs work. Live runs fail at startup with "Drive is read-only."
 
 ### Can it dedupe by audio content (WAV/FLAC)?
 
-Not currently. It uses metadata fingerprinting and sparse file hashing. Audio fingerprinting (AcoustID/Chromaprint) is a possible future addition.
+### Does Audiotheca use AcoustID / Chromaprint?
+
+**Chromaprint / `fpcalc` support ships** for acoustic fingerprinting (see Environment / audio fingerprint helpers). Full **AcoustID / MusicBrainz online lookup** is optional follow-up work (Phase M5 in [ROADMAP_REMAINING.md](ROADMAP_REMAINING.md)). Early FAQ text that said “future only” is outdated for the local fingerprint path.
 
 ### Can it rename files to UCS standard?
 

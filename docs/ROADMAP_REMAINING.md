@@ -1,8 +1,8 @@
 # Audiotheca — Remaining Roadmap (phases E–L)
 
-**As of 2026-07-10** · Engine **10.0.0** · Web UI **1.0.12** · Release **[v1.0.12](https://github.com/chrisjrovira/Audiotheca/releases/tag/v1.0.12)**
+As of **2026-07-23** · Engine **10.0.0** · Web UI **1.0.12** · GitHub `main` tip includes review-hardening merge.
 
-Phases **0–5** and spec waves **A–R** are complete ([PHASED_ROADMAP.md](PHASED_ROADMAP.md), [SPEC_CATALOG.md](SPEC_CATALOG.md)). Phases **E–L** below are complete as of v1.0.12. The **1.0.12 review upgrade** (API routers, access tickets, path keys, UI tests) is also complete.
+Phases **0–5** and spec waves **A–R** are complete ([PHASED_ROADMAP.md](PHASED_ROADMAP.md), [SPEC_CATALOG.md](SPEC_CATALOG.md)). Phases **E–L** below are complete as of v1.0.12. The **1.0.12 review upgrade** and follow-on **auth/path hardening** are on `main`. **Phase M** (external sources build-out) is the open backlog — see [SOURCES.md](SOURCES.md).
 
 ---
 
@@ -114,8 +114,36 @@ E (polish) → F (execute UI) → G (reference engine) → H (SQLite) → I (eng
 
 ---
 
+## Phase M — External sources build-out
+
+New work from [SOURCES.md](SOURCES.md) candidates (not yet implemented). Keep Audiotheca a **local operator** tool — do not pivot into marketplace browsers.
+
+| # | Item | Source inspiration | Priority | Status |
+|---|------|--------------------|----------|--------|
+| M1 | Acoustic **near-dupe** lane (similarity + cross-format same content) | Sononym | High | ☐ |
+| M2 | Explorer **instant path search** + stronger dual-pane / Spot-to-preview | BaseHead Free, Everything, Directory Opus | High | ☐ |
+| M3 | Analysis pass via **Essentia** (or librosa) + **mutagen** tag I/O; align LUFS with BS.1770/R128 | Essentia, mutagen, ITU/EBU | High | ☐ |
+| M4 | Fuzzy **installer/pack** similarity (ssdeep/TLSH) beside PE+size blocking | ssdeep, TLSH | Medium | ☐ |
+| M5 | **RF64/MBWF** support + AcoustID/MusicBrainz lookup where Chromaprint already exists; fix FAQ drift | RF64, AcoustID | Medium | ☐ |
+| M6 | Auto-tag / facet UX (type, BPM, key, path) without cloud marketplace | ADSR Sample Manager | Medium | ☐ |
+| M7 | Optional **licensed vs orphaned** bucket using vendor install manifests | Native Access / PA / iLok-style | Low | ☐ |
+| M8 | Elevate KVR + vi-control into documented research pipeline | harvest / SearXNG | Low | ☐ |
+| M9 | Security depth: YARA/capa-style PE capability hints | YARA, capa, DIE | Low | ☐ |
+
+**Exit:** M1–M3 land with tests + SOURCES.md rows moved to **Considered**; FAQ AcoustID/Soundminer drift closed.
+
+### Suggested Phase M order
+
+```
+M3 (analysis foundation) → M1 (near-dupe) → M2 (Explorer UX) → M5 (standards) → M4/M6 → M7–M9
+```
+
+---
+
 ## Related
 
+- [Sources inventory](SOURCES.md)
 - [Architecture & UI Roadmap](ARCHITECTURE_AND_UI_ROADMAP.md)
 - [Backend Enhancement Roadmap](BACKEND_ENHANCEMENT_ROADMAP.md)
 - [Phased Roadmap (complete)](PHASED_ROADMAP.md)
+- [Spec catalog](SPEC_CATALOG.md)

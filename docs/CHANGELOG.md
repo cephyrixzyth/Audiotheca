@@ -8,6 +8,11 @@ Git tag **v1.0.7** was published with a broken Windows NSIS pre-install hook (si
 
 Engine remains **10.0.0**.
 
+### Follow-on (post-1.0.12 hardening, on `main`)
+
+- Opaque HttpOnly sessions + proxy secret; scoped single-use download tickets; path `..` collapse; Unraid template/docs sync
+- **Sources inventory** — [SOURCES.md](SOURCES.md) + **Phase M** backlog in [ROADMAP_REMAINING.md](ROADMAP_REMAINING.md) (Sononym / BaseHead / Essentia / ssdeep / RF64 candidates)
+
 ### API architecture & security
 
 - **Domain routers** — `api/server.py` slimmed to app wiring; routes live under `api/routers/` (auth, runs, jobs, browse, vendors, system, tools, environment, security) with shared deps in `api/deps.py`

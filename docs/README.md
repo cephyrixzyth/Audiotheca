@@ -19,7 +19,8 @@ Engine **10.0.0** · Web UI **1.0.12**
 | Fix problems | [DEBUG_RUNBOOK.md](DEBUG_RUNBOOK.md) · [FAQ.md](FAQ.md) |
 | API security, sessions, tickets & path allowlist | [SECURITY.md](SECURITY.md) |
 | Build desktop installer | [TAURI_BUILD.md](TAURI_BUILD.md) |
-| Architecture & roadmap | [ARCHITECTURE_AND_UI_ROADMAP.md](ARCHITECTURE_AND_UI_ROADMAP.md) |
+| Architecture & roadmap | [ARCHITECTURE_AND_UI_ROADMAP.md](ARCHITECTURE_AND_UI_ROADMAP.md) · [ROADMAP_REMAINING.md](ROADMAP_REMAINING.md) |
+| External sources (considered + candidates) | [SOURCES.md](SOURCES.md) |
 | **94-code spec catalog** | [SPEC_CATALOG.md](SPEC_CATALOG.md) |
 | Add doc screenshots/videos | [assets/README.md](assets/README.md) · [assets/ASSETS.md](assets/ASSETS.md) |
 | Deploy on Unraid Docker | [../deploy/unraid/README.md](../deploy/unraid/README.md) |
