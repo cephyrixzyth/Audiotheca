@@ -6,6 +6,10 @@ pefile>=2024.8.26     # PE binary CompanyName extraction (Windows plugins/instal
 rapidfuzz>=3.14.0     # Fuzzy name similarity for duplicate detection
 tqdm>=4.68.0          # Progress bar during parallel scan
 psutil>=7.2.0         # CPU/RAM metrics in scan UI (optional but recommended)
+mutagen>=1.47.0       # WAV/FLAC/AIFF/MP3 tag I/O (Phase M3)
+numpy>=1.26.0         # PCM load for BS.1770 metering
+pyloudnorm>=0.1.1     # ITU-R BS.1770 / EBU R128 integrated loudness (Phase M3)
+# Optional analysis: librosa (BPM), essentia (full feature extract) — soft-imported when present
 
 # UI API (local report viewer) — optional until you run the web UI
 fastapi>=0.139.0

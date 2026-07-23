@@ -146,7 +146,90 @@ def analyze_silence_bounds(
         return {"ok": False, "error": str(exc), "path": str(path), "applied": False}
 
 
-def measure_integrated_loudness_db(path: Path) -> dict[str, Any]:
+def _load_wav_float_pcm(path: Path) -> tuple[Any, dict[str, Any]] | tuple[None, dict[str, Any]]:
+    """Load WAV as float32 PCM shaped (samples, channels) for BS.1770 meters."""
+    info = read_wav_info(path)
+    if not info.get("ok"):
+        return None, info
+    try:
+        import numpy as np
+    except ImportError:
+        return None, {**info, "error": "numpy unavailable"}
+
+    try:
+        with wave.open(str(path), "rb") as wf:
+            channels = wf.getnchannels()
+            sample_width = wf.getsampwidth()
+            rate = wf.getframerate()
+            frames = wf.getnframes()
+            # Cap analysis length (~3 minutes) to keep preview analyze responsive.
+            max_frames = min(frames, rate * 180 if rate else frames)
+            raw = wf.readframes(max_frames)
+    except (wave.Error, OSError) as exc:
+        return None, {"ok": False, "error": str(exc), "path": str(path)}
+
+    if sample_width == 1:
+        samples = np.frombuffer(raw, dtype=np.uint8).astype(np.float64)
+        samples = (samples - 128.0) / 128.0
+    elif sample_width == 2:
+        samples = np.frombuffer(raw, dtype="<i2").astype(np.float64) / 32768.0
+    elif sample_width == 3:
+        # 24-bit packed — decode manually
+        count = len(raw) // 3
+        ints = np.zeros(count, dtype=np.int32)
+        for i in range(count):
+            b0, b1, b2 = raw[i * 3], raw[i * 3 + 1], raw[i * 3 + 2]
+            val = b0 | (b1 << 8) | (b2 << 16)
+            if val & 0x800000:
+                val -= 0x1000000
+            ints[i] = val
+        samples = ints.astype(np.float64) / 8388608.0
+    elif sample_width == 4:
+        samples = np.frombuffer(raw, dtype="<i4").astype(np.float64) / 2147483648.0
+    else:
+        return None, {**info, "error": f"unsupported sample width: {sample_width}"}
+
+    if channels > 1:
+        usable = (len(samples) // channels) * channels
+        samples = samples[:usable].reshape(-1, channels)
+    else:
+        samples = samples.reshape(-1, 1)
+
+    return samples, {**info, "analyzed_frames": int(samples.shape[0]), "sample_rate": rate}
+
+
+def _measure_lufs_bs1770(path: Path) -> dict[str, Any] | None:
+    """ITU-R BS.1770 integrated loudness via pyloudnorm when installed."""
+    try:
+        import pyloudnorm as pyln  # type: ignore[import-untyped]
+    except ImportError:
+        return None
+
+    data, info = _load_wav_float_pcm(path)
+    if data is None or not info.get("ok"):
+        return None
+    rate = int(info.get("sample_rate") or 0)
+    if rate <= 0 or data.size == 0:
+        return None
+    # pyloudnorm needs enough audio for one gating block (~0.4s).
+    if data.shape[0] < max(8, int(rate * 0.4)):
+        return None
+    try:
+        meter = pyln.Meter(rate)  # BS.1770-4 K-weighting
+        measured = float(meter.integrated_loudness(data))
+    except Exception:  # noqa: BLE001 — short/silent clips raise ValueError
+        return None
+    if not math.isfinite(measured):
+        return None
+    return {
+        **info,
+        "measured_lufs": round(measured, 2),
+        "engine": "pyloudnorm_bs1770",
+        "standard": "ITU-R BS.1770-4",
+    }
+
+
+def _measure_lufs_rms_proxy(path: Path) -> dict[str, Any]:
     """Approximate integrated loudness (LUFS proxy) via full-file RMS in dBFS."""
     info = read_wav_info(path)
     if not info.get("ok"):
@@ -155,7 +238,6 @@ def measure_integrated_loudness_db(path: Path) -> dict[str, Any]:
         with wave.open(str(path), "rb") as wf:
             sample_width = wf.getsampwidth()
             chunk_frames = 8192
-            total_frames = wf.getnframes()
             energy = 0.0
             samples_count = 0
             while True:
@@ -173,7 +255,21 @@ def measure_integrated_loudness_db(path: Path) -> dict[str, Any]:
                 measured = 20.0 * math.log10(math.sqrt(energy / samples_count))
             # Rough dBFS → LUFS offset for preview normalization
             measured_lufs = round(measured - 0.691, 2)
-            return {**info, "measured_dbfs": round(measured, 2), "measured_lufs": measured_lufs}
+            return {
+                **info,
+                "measured_dbfs": round(measured, 2),
+                "measured_lufs": measured_lufs,
+                "engine": "rms_proxy",
+                "standard": "proxy",
+            }
     except (wave.Error, OSError) as exc:
         return {"ok": False, "error": str(exc), "path": str(path)}
+
+
+def measure_integrated_loudness_db(path: Path) -> dict[str, Any]:
+    """Integrated loudness: prefer ITU-R BS.1770 (pyloudnorm), else RMS proxy."""
+    bs1770 = _measure_lufs_bs1770(path)
+    if bs1770 is not None:
+        return bs1770
+    return _measure_lufs_rms_proxy(path)
 

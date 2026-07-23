@@ -10,6 +10,7 @@ import {
   fetchReferenceExtras,
   feedbackExportDownload,
   rejectDuplicateGroup,
+  runAcousticNearDupes,
   saveDecisions,
   type DuplicateRejection,
   type DuplicateExecuteResponse,
@@ -70,6 +71,19 @@ export function DuplicateReview({ stamp }: Props) {
   const [executeSummary, setExecuteSummary] = useState<{ staged: number; failed: number } | null>(
     null,
   );
+  const [nearBusy, setNearBusy] = useState(false);
+  const [nearMsg, setNearMsg] = useState<string | null>(null);
+  const [nearGroups, setNearGroups] = useState<
+    Array<{
+      kind: string;
+      similarity: number;
+      paths: string[];
+      count: number;
+      cross_format?: boolean;
+      exts?: string[];
+      mode?: string;
+    }>
+  >([]);
 
   const rejectedKeys = new Set(rejections.map((row) => row.dedup_key));
 
@@ -235,6 +249,33 @@ export function DuplicateReview({ stamp }: Props) {
     setActionMsg("Manual duplicate finding recorded for backend refinement");
   }
 
+  async function handleAcousticNearDupes() {
+    const paths = Array.from(
+      new Set(
+        groups.flatMap((group) => group.members.map((member) => member.full_path)).filter(Boolean),
+      ),
+    ).slice(0, 500);
+    if (paths.length < 2) {
+      setNearMsg("Need at least two member paths from loaded duplicate groups");
+      setNearGroups([]);
+      return;
+    }
+    setNearBusy(true);
+    setNearMsg(null);
+    try {
+      const res = await runAcousticNearDupes(paths, 0.85);
+      setNearGroups(res.groups ?? []);
+      setNearMsg(
+        `Acoustic near-dupes: ${res.group_count} group(s) from ${res.fingerprinted}/${res.scanned} fingerprinted`,
+      );
+    } catch (err) {
+      setNearGroups([]);
+      setNearMsg(err instanceof Error ? err.message : String(err));
+    } finally {
+      setNearBusy(false);
+    }
+  }
+
   const visibleGroups = hideRejected
     ? groups.filter((group) => !rejectedKeys.has(group.dedup_key))
     : groups;
@@ -318,6 +359,15 @@ export function DuplicateReview({ stamp }: Props) {
         <button
           type="button"
           className="text-btn"
+          disabled={nearBusy || groups.length === 0}
+          title="Chromaprint / heuristic near-dupe pass across loaded group members (cross-format)"
+          onClick={() => void handleAcousticNearDupes()}
+        >
+          {nearBusy ? "Near-dupes…" : "Acoustic near-dupes"}
+        </button>
+        <button
+          type="button"
+          className="text-btn"
           onClick={() => void feedbackExportDownload(stamp)}
         >
           Export feedback CSV
@@ -335,6 +385,36 @@ export function DuplicateReview({ stamp }: Props) {
 
       {saveMsg && <div className="banner dry">{saveMsg}</div>}
       {actionMsg && <div className="banner review">{actionMsg}</div>}
+      {nearMsg && <div className="banner dry">{nearMsg}</div>}
+
+      {nearGroups.length > 0 && (
+        <section className="near-dupe-lane" aria-label="Acoustic near-duplicates">
+          <h3>Acoustic near-duplicates</h3>
+          <p className="count-muted">
+            Chromaprint exact/near matches across formats (Sononym-style lane). Heuristic fallback when
+            fpcalc is unavailable.
+          </p>
+          {nearGroups.map((group, index) => (
+            <article key={`${group.kind}-${index}-${group.paths[0]}`} className="dupe-card">
+              <header>
+                <h3>
+                  {group.kind} · {(group.similarity * 100).toFixed(0)}%
+                </h3>
+                <span className="badge bucket">{group.mode ?? "acoustic"}</span>
+                {group.cross_format ? <span className="badge ready">cross-format</span> : null}
+                {group.exts?.length ? (
+                  <span className="count-muted">{group.exts.join(", ")}</span>
+                ) : null}
+              </header>
+              {group.paths.map((path) => (
+                <div key={path} className="member-row">
+                  <PathLink path={path} />
+                </div>
+              ))}
+            </article>
+          ))}
+        </section>
+      )}
 
       {executeResults.length > 0 && (
         <ExecuteResultsPanel

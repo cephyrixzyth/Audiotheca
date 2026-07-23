@@ -44,7 +44,9 @@ Candidate sources below are filtered for that threat model.
 | **BWF** (`bext` / `axml`) + **iXML** | WAV metadata extract | `bwf_metadata.py`, AUD-PIP |
 | **EBU Tech 3285** | Fixed-width `bext` | `bwf_metadata.py` |
 | **UCS** ([universalcategorysystem.com](https://universalcategorysystem.com/)) | Filename / category hints | `ucs_map.py`, Phase I5 |
-| LUFS / BPM / key badges | Specs LUFS-NORM, BPM-DET, K-DET (mostly heuristics) | SPEC_CATALOG, preview UI |
+| LUFS / BPM / key badges | Specs LUFS-NORM, BPM-DET, K-DET; BS.1770 via pyloudnorm when installed | SPEC_CATALOG, preview UI, `audio_wave.py` |
+| **[Sononym](https://www.sononym.net/)** | Acoustic near-dupe / cross-format similarity lane | `acoustic_near_dupe.py`, Duplicates UI |
+| **[BaseHead](https://baseheadinc.com/)** / Everything / Directory Opus | Explorer path search + Spot preview | `GET /api/browse/search`, `FileExplorer.tsx` |
 
 ### Libraries & helpers
 
@@ -53,6 +55,7 @@ Candidate sources below are filtered for that threat model.
 | pefile, rapidfuzz, tqdm, psutil | Scan / identify / telemetry |
 | FastAPI, uvicorn, pydantic | API |
 | Chromaprint / `fpcalc` / pyacoustid | Acoustic fingerprint path |
+| mutagen, numpy, pyloudnorm | Tag I/O + ITU-R BS.1770 loudness (Phase M3) |
 | React, Vite, TypeScript, Vitest, Playwright, Tauri 2 | UI / desktop |
 | JUCE | DAW sidecar scaffold |
 | [klauspost/dedup](https://github.com/klauspost/dedup), [jpillora/dedup](https://github.com/jpillora/dedup) | Rust rolling-hash / parallel-walk inspirations |
@@ -81,11 +84,10 @@ Highest-value sources **missing** from docs and Phase E–L. Map to Phase M belo
 
 | Source | Why it matters | Audiotheca fit |
 |--------|----------------|----------------|
-| **[BaseHead](https://baseheadinc.com/)** (Free + Ultra) | Real SFX library manager: search, spot-to-DAW, metadata repair at scale | Explorer search, Spot/preview, bulk metadata fix |
-| **[Sononym](https://www.sononym.net/)** | Similarity search + near-dupe across WAV/AIFF; ML categories; local-first | Acoustic near-match lane in Duplicates / Investigation |
-| **[ADSR Sample Manager](https://www.adsrsounds.com/product/software/adsr-sample-manager/)** | Path-based library (no import), auto-tag, BPM/key sync preview | “Point at folders → search” UX; tag facets |
+| **[ADSR Sample Manager](https://www.adsrsounds.com/product/software/adsr-sample-manager/)** | Path-based library (no import), auto-tag, BPM/key sync preview | Tag facets / auto-tag UX (M6) |
 | AudioFinder / Soundly | Index + audition workflows | Preview strip polish; library facets |
-| **Everything** (Voidtools) / **Directory Opus** | Instant path find; dual-pane power-user ops | Explorer search & dual-pane beyond VS Code metaphor |
+
+**Shipped from this table (moved to Considered):** BaseHead / Everything / Directory Opus path search + Spot (M2); Sononym near-dupe (M1).
 
 **Skip for now:** Splice, Loopcloud, marketplace clients — wrong model (cloud storefront, not local operator).
 
@@ -93,11 +95,12 @@ Highest-value sources **missing** from docs and Phase E–L. Map to Phase M belo
 
 | Source | Why it matters | Audiotheca fit |
 |--------|----------------|----------------|
-| **[Essentia](https://essentia.upf.edu/)** | Production audio features + Chromaprint wrapper | Replace brittle LUFS/BPM/key heuristics |
-| **librosa** / aubio / madmom | Tempo, onset, spectral features | Near-dupe ranking features |
-| **mutagen** / tinytag / soundfile | Tag & PCM I/O | Robust WAV/FLAC/AIFF metadata without custom parsers |
+| **[Essentia](https://essentia.upf.edu/)** | Production audio features + Chromaprint wrapper | Optional deeper feature extract (beyond mutagen/pyloudnorm/librosa soft path) |
+| **librosa** / aubio / madmom | Tempo, onset, spectral features | Soft-imported BPM when installed; near-dupe ranking features |
 | **ssdeep** / **TLSH** / CDC | Fuzzy *file* similarity | Installer/pack near-dupes PE+size blocking miss |
 | YARA / capa / Detect It Easy | PE/malware capability signatures | Security tab depth beyond ClamAV |
+
+**Shipped from this table:** mutagen tag I/O + pyloudnorm BS.1770 LUFS (M3); Chromaprint near-dupe lane already under Libraries.
 
 ### C — Standards & catalogs
 
@@ -121,11 +124,13 @@ Highest-value sources **missing** from docs and Phase E–L. Map to Phase M belo
 
 ## Priority shortlist (study order)
 
-1. **Sononym** — near-dupe + similarity UI → Duplicates / Investigation acoustic lane  
-2. **BaseHead Free** — search / DAW handoff → Explorer + Spot polish  
-3. **Essentia + mutagen** — real analysis pass replacing heuristic badges  
-4. **ssdeep / TLSH** — installer/pack fuzzy matches  
-5. **RF64 + BS.1770** — AUD-PIP standards completeness  
+1. **ssdeep / TLSH** — installer/pack fuzzy matches (M4)  
+2. **RF64 + AcoustID lookup** — AUD-PIP standards completeness (M5)  
+3. **ADSR-style tag facets** — auto-tag UX without marketplace (M6)  
+4. **Essentia** (optional) — deeper features beyond mutagen/pyloudnorm  
+5. Licensed-vs-orphaned / KVR pipeline / YARA (M7–M9)
+
+**Done:** Sononym near-dupe (M1), BaseHead/Everything Explorer search + Spot (M2), mutagen + BS.1770 LUFS (M3).
 
 ---
 
@@ -135,7 +140,7 @@ Highest-value sources **missing** from docs and Phase E–L. Map to Phase M belo
 |-------|--------|
 | AcoustID / Chromaprint | FAQ still says “future”; path already ships |
 | Soundminer | “Not yet” vs shipped SM field subset |
-| LUFS | Feature exists; ITU/EBU barely named |
+| LUFS | Feature exists; prefer pyloudnorm BS.1770 engine; RMS proxy still named |
 
 ---
 

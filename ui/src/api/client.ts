@@ -1234,6 +1234,23 @@ export async function browseTreeChildren(path: string = ""): Promise<{
   return getJson(`/browse/tree${qs}`);
 }
 
+export async function browseSearch(
+  query: string,
+  root: string = "",
+  limit = 200,
+): Promise<{
+  query: string;
+  root: string | null;
+  scanned: number;
+  count: number;
+  truncated: boolean;
+  entries: BrowseEntry[];
+}> {
+  const qs = new URLSearchParams({ q: query, limit: String(limit) });
+  if (root) qs.set("root", root);
+  return getJson(`/browse/search?${qs.toString()}`);
+}
+
 export async function listArchiveContents(path: string, limit = 200): Promise<{
   path: string;
   archive_tool_available: boolean;
@@ -1361,6 +1378,30 @@ export function fetchVendorHints(path: string): Promise<Record<string, unknown>>
 
 export function runAcousticDedupe(paths: string[]): Promise<Record<string, unknown>> {
   return postJson("/audio/acoustic-dedupe", { paths });
+}
+
+export function runAcousticNearDupes(
+  paths: string[],
+  threshold = 0.85,
+): Promise<{
+  scanned: number;
+  fingerprinted: number;
+  threshold: number;
+  group_count: number;
+  groups: Array<{
+    kind: string;
+    similarity: number;
+    paths: string[];
+    count: number;
+    cross_format?: boolean;
+    exts?: string[];
+    mode?: string;
+    backend?: string;
+  }>;
+  errors?: Array<{ path: string; error?: string }>;
+  mode: string;
+}> {
+  return postJson("/audio/near-dupes", { paths, threshold });
 }
 
 export function planWebSpiderLookup(query: string, preset?: string): Promise<Record<string, unknown>> {

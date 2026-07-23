@@ -11,7 +11,13 @@ Engine remains **10.0.0**.
 ### Follow-on (post-1.0.12 hardening, on `main`)
 
 - Opaque HttpOnly sessions + proxy secret; scoped single-use download tickets; path `..` collapse; Unraid template/docs sync
-- **Sources inventory** — [SOURCES.md](SOURCES.md) + **Phase M** backlog in [ROADMAP_REMAINING.md](ROADMAP_REMAINING.md) (Sononym / BaseHead / Essentia / ssdeep / RF64 candidates)
+- **Sources inventory** — [SOURCES.md](SOURCES.md) + **Phase M** backlog in [ROADMAP_REMAINING.md](ROADMAP_REMAINING.md)
+
+### Phase M1–M3 (sources build-out)
+
+- **M3** — mutagen tag I/O; LUFS prefers **pyloudnorm** ITU-R BS.1770-4 (RMS proxy fallback); optional librosa BPM; analyze badges expose engine/source
+- **M1** — `POST /api/audio/near-dupes` Chromaprint near-dupe lane + Duplicates UI button (heuristic fallback)
+- **M2** — Explorer instant folder filter, `GET /api/browse/search`, Spot preview strip on selection
 
 ### API architecture & security
 

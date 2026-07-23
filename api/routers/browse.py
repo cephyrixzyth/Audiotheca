@@ -94,6 +94,16 @@ def browse_tree(
 
     return list_tree_children(path, limit=limit)
 
+@router.get("/api/browse/search")
+def browse_search(
+    q: str = Query(..., min_length=2, description="Path/name substring"),
+    root: str = Query(default="", description="Optional library subtree root"),
+    limit: int = Query(default=200, le=1000),
+) -> dict[str, object]:
+    from api.browse_api import search_library_paths
+
+    return search_library_paths(q, root=root, limit=limit)
+
 @router.get("/api/archive/list")
 def archive_list_contents(
     path: str = Query(...),
@@ -158,6 +168,22 @@ def audio_acoustic_dedupe(body: dict = Body(default_factory=dict)) -> dict[str, 
         raise HTTPException(status_code=400, detail="paths list required")
     paths = [str(security.assert_library_path(str(p), label="path")) for p in paths_raw]
     return mask_payload(find_acoustic_duplicates(paths))
+
+@router.post("/api/audio/near-dupes")
+def audio_near_dupes(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    """Chromaprint near-duplicate groups (Sononym-style cross-format lane)."""
+    from audiotheca.acoustic_near_dupe import find_near_duplicates
+    from path_mask import mask_payload
+
+    paths_raw = body.get("paths") or []
+    if not isinstance(paths_raw, list) or not paths_raw:
+        raise HTTPException(status_code=400, detail="paths list required")
+    if len(paths_raw) > 500:
+        raise HTTPException(status_code=400, detail="paths limited to 500")
+    threshold = float(body.get("threshold") or 0.85)
+    threshold = max(0.5, min(1.0, threshold))
+    paths = [str(security.assert_library_path(str(p), label="path")) for p in paths_raw]
+    return mask_payload(find_near_duplicates(paths, threshold=threshold))
 
 @router.post("/api/explorer/drop")
 def explorer_drop(body: dict = Body(default_factory=dict)) -> dict[str, object]:

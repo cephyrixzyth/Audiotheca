@@ -1,4 +1,4 @@
-# Audiotheca — Remaining Roadmap (phases E–L)
+# Audiotheca — Remaining Roadmap (phases E–M)
 
 As of **2026-07-23** · Engine **10.0.0** · Web UI **1.0.12** · GitHub `main` tip includes review-hardening merge.
 
@@ -120,9 +120,9 @@ New work from [SOURCES.md](SOURCES.md) candidates (not yet implemented). Keep Au
 
 | # | Item | Source inspiration | Priority | Status |
 |---|------|--------------------|----------|--------|
-| M1 | Acoustic **near-dupe** lane (similarity + cross-format same content) | Sononym | High | ☐ |
-| M2 | Explorer **instant path search** + stronger dual-pane / Spot-to-preview | BaseHead Free, Everything, Directory Opus | High | ☐ |
-| M3 | Analysis pass via **Essentia** (or librosa) + **mutagen** tag I/O; align LUFS with BS.1770/R128 | Essentia, mutagen, ITU/EBU | High | ☐ |
+| M1 | Acoustic **near-dupe** lane (similarity + cross-format same content) | Sononym | High | ☑ (`acoustic_near_dupe.py`, `POST /api/audio/near-dupes`, Duplicates UI) |
+| M2 | Explorer **instant path search** + stronger dual-pane / Spot-to-preview | BaseHead Free, Everything, Directory Opus | High | ☑ (`GET /api/browse/search`, Explorer filter + Spot strip) |
+| M3 | Analysis pass via **Essentia** (or librosa) + **mutagen** tag I/O; align LUFS with BS.1770/R128 | Essentia, mutagen, ITU/EBU | High | ☑ (mutagen + pyloudnorm BS.1770; optional librosa BPM) |
 | M4 | Fuzzy **installer/pack** similarity (ssdeep/TLSH) beside PE+size blocking | ssdeep, TLSH | Medium | ☐ |
 | M5 | **RF64/MBWF** support + AcoustID/MusicBrainz lookup where Chromaprint already exists; fix FAQ drift | RF64, AcoustID | Medium | ☐ |
 | M6 | Auto-tag / facet UX (type, BPM, key, path) without cloud marketplace | ADSR Sample Manager | Medium | ☐ |
@@ -130,7 +130,7 @@ New work from [SOURCES.md](SOURCES.md) candidates (not yet implemented). Keep Au
 | M8 | Elevate KVR + vi-control into documented research pipeline | harvest / SearXNG | Low | ☐ |
 | M9 | Security depth: YARA/capa-style PE capability hints | YARA, capa, DIE | Low | ☐ |
 
-**Exit:** M1–M3 land with tests + SOURCES.md rows moved to **Considered**; FAQ AcoustID/Soundminer drift closed.
+**Exit:** M1–M3 land with tests + SOURCES.md rows moved to **Considered**; FAQ AcoustID/Soundminer drift closed. **M1–M3 shipped** (2026-07-23); M4–M9 remain.
 
 ### Suggested Phase M order
 

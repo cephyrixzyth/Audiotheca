@@ -2468,6 +2468,61 @@ tr.inv-vendor-set {
 .file-explorer-toolbar {
   display: flex;
   gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.explorer-search-field {
+  flex: 1;
+  min-width: 10rem;
+}
+
+.explorer-search-field input {
+  width: 100%;
+  font: inherit;
+  padding: 0.25rem 0.45rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: inherit;
+}
+
+.file-explorer-table tr.selected {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.explorer-spot-preview {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.explorer-spot-meta {
+  display: flex;
+  gap: 0.75rem;
+  align-items: baseline;
+  font-size: 0.82rem;
+}
+
+.explorer-spot-meta strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .file-explorer-table {

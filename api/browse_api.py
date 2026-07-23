@@ -193,3 +193,81 @@ def list_tree_children(path: str = "", *, limit: int = 500) -> dict[str, object]
         "parent": data.get("parent"),
         "children": children[:limit],
     }
+
+
+def search_library_paths(
+    query: str,
+    *,
+    root: str = "",
+    limit: int = 200,
+    max_scan: int = 20_000,
+) -> dict[str, object]:
+    """Instant path/name search under a library root (Everything-style)."""
+    q = query.strip().lower()
+    if len(q) < 2:
+        raise HTTPException(status_code=400, detail="query must be at least 2 characters")
+
+    roots = security.library_roots()
+    if root.strip():
+        start = security.assert_library_path(root, must_exist=True, label="root")
+        if not start.is_dir():
+            raise HTTPException(status_code=400, detail="root must be a directory")
+        search_roots = [start]
+    else:
+        search_roots = list(roots)
+
+    matches: list[dict[str, object]] = []
+    scanned = 0
+    for base in search_roots:
+        if scanned >= max_scan or len(matches) >= limit:
+            break
+        try:
+            for dirpath, dirnames, filenames in os.walk(base):
+                dirnames[:] = [d for d in dirnames if d not in IGNORE_DIR_NAMES]
+                # Match folders
+                for name in list(dirnames):
+                    scanned += 1
+                    if scanned > max_scan or len(matches) >= limit:
+                        break
+                    if q in name.lower():
+                        full = Path(dirpath) / name
+                        matches.append(
+                            {
+                                "name": name,
+                                "path": str(full),
+                                "is_dir": True,
+                                "size": None,
+                            }
+                        )
+                for name in filenames:
+                    scanned += 1
+                    if scanned > max_scan or len(matches) >= limit:
+                        break
+                    if q not in name.lower() and q not in str(Path(dirpath) / name).lower().replace("\\", "/"):
+                        continue
+                    full = Path(dirpath) / name
+                    try:
+                        size = full.stat().st_size
+                    except OSError:
+                        size = None
+                    matches.append(
+                        {
+                            "name": name,
+                            "path": str(full),
+                            "is_dir": False,
+                            "size": size,
+                        }
+                    )
+                if scanned >= max_scan or len(matches) >= limit:
+                    break
+        except OSError:
+            continue
+
+    return {
+        "query": query.strip(),
+        "root": root.strip() or None,
+        "scanned": scanned,
+        "count": len(matches),
+        "truncated": scanned >= max_scan or len(matches) >= limit,
+        "entries": matches[:limit],
+    }
