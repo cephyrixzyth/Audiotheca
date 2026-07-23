@@ -66,11 +66,14 @@ def _scan_wav_chunks(path: Path) -> dict[str, str]:
     chunks: dict[str, str] = {}
     bext_fields: dict[str, str] = {}
     with path.open("rb") as handle:
-        if handle.read(4) != b"RIFF":
+        magic = handle.read(4)
+        if magic not in {b"RIFF", b"RF64"}:
             return chunks
         handle.read(4)
         if handle.read(4) != b"WAVE":
             return chunks
+        if magic == b"RF64":
+            chunks["_container"] = "RF64"
         while True:
             item = _read_chunk(handle)
             if item is None:
@@ -79,7 +82,10 @@ def _scan_wav_chunks(path: Path) -> dict[str, str]:
             if isinstance(payload, int):
                 continue
             label = chunk_id.decode("ascii", "replace").strip("\x00")
-            if label == "bext":
+            if label == "ds64":
+                chunks["ds64"] = payload.hex() if len(payload) < 256 else f"ds64:{len(payload)}b"
+                chunks["_rf64"] = "1"
+            elif label == "bext":
                 bext_fields = _parse_bext_binary(payload)
                 try:
                     chunks[label] = payload.decode("utf-8", errors="replace")
@@ -145,5 +151,6 @@ def parse_wav_metadata(path: Path) -> dict[str, Any]:
         "vendor_hints": list(dict.fromkeys(vendor_hints)),
         "bext": bext_meta,
         "chunks": sorted(k for k in chunks.keys() if not k.startswith("_")),
+        "container": "RF64" if chunks.get("_rf64") or chunks.get("_container") == "RF64" else "RIFF",
         "error": None,
     }

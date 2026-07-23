@@ -19,6 +19,7 @@ PRESETS: dict[str, str] = {
     "ucs": "Universal Category System UCS sound library folder naming {arg}",
     "scene": "{arg} audio software release scene group R2R",
     "vi-control": "site:vi-control.net {arg} kontakt library path organization",
+    "kvr": "site:kvraudio.com {arg} plugin sample library vendor",
 }
 
 

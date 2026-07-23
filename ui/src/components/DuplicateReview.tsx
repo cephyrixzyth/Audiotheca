@@ -11,6 +11,7 @@ import {
   feedbackExportDownload,
   rejectDuplicateGroup,
   runAcousticNearDupes,
+  runFuzzyPackDupes,
   saveDecisions,
   type DuplicateRejection,
   type DuplicateExecuteResponse,
@@ -276,6 +277,39 @@ export function DuplicateReview({ stamp }: Props) {
     }
   }
 
+  async function handleFuzzyPackDupes() {
+    const paths = Array.from(
+      new Set(
+        groups.flatMap((group) => group.members.map((member) => member.full_path)).filter(Boolean),
+      ),
+    ).slice(0, 200);
+    if (paths.length < 2) {
+      setNearMsg("Need at least two member paths for fuzzy pack compare");
+      setNearGroups([]);
+      return;
+    }
+    setNearBusy(true);
+    setNearMsg(null);
+    try {
+      const res = await runFuzzyPackDupes(paths, 70);
+      const mapped = (res.groups ?? []).map((group) => ({
+        kind: "fuzzy",
+        similarity: Number(group.fuzzy_score ?? 70) / 100,
+        paths: (group.paths as string[]) ?? [],
+        count: Number(group.count ?? (group.paths as string[] | undefined)?.length ?? 0),
+        mode: String(group.fuzzy_engine ?? "fuzzy"),
+        cross_format: false,
+      }));
+      setNearGroups(mapped);
+      setNearMsg(`Fuzzy pack dupes: ${res.group_count} group(s) from ${res.scanned} files`);
+    } catch (err) {
+      setNearGroups([]);
+      setNearMsg(err instanceof Error ? err.message : String(err));
+    } finally {
+      setNearBusy(false);
+    }
+  }
+
   const visibleGroups = hideRejected
     ? groups.filter((group) => !rejectedKeys.has(group.dedup_key))
     : groups;
@@ -364,6 +398,15 @@ export function DuplicateReview({ stamp }: Props) {
           onClick={() => void handleAcousticNearDupes()}
         >
           {nearBusy ? "Near-dupes…" : "Acoustic near-dupes"}
+        </button>
+        <button
+          type="button"
+          className="text-btn"
+          disabled={nearBusy || groups.length === 0}
+          title="ssdeep/TLSH/rolling fuzzy similarity for installer/pack near-dupes"
+          onClick={() => void handleFuzzyPackDupes()}
+        >
+          {nearBusy ? "Fuzzy…" : "Fuzzy pack dupes"}
         </button>
         <button
           type="button"

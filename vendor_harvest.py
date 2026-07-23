@@ -67,6 +67,18 @@ MIXING_ENGINEER_SEED_URLS = [
     "https://www.soundonsound.com/techniques",
 ]
 
+VI_CONTROL_SEED_URLS = [
+    "https://vi-control.net/community/",
+    "https://vi-control.net/community/forums/sample-library-discussion.27/",
+    "https://vi-control.net/community/forums/kontakt.29/",
+]
+
+KVR_SEED_URLS = [
+    "https://www.kvraudio.com/forum/viewforum.php?f=1",
+    "https://www.kvraudio.com/forum/viewforum.php?f=15",
+    "https://www.kvraudio.com/forum/viewtopic.php?t=353321",
+]
+
 HARVEST_SOURCE_PRESETS: list[dict[str, object]] = [
     {
         "id": "user_seeds",
@@ -74,6 +86,20 @@ HARVEST_SOURCE_PRESETS: list[dict[str, object]] = [
         "urls": DEFAULT_SEED_URLS,
         "default_category": "User_Added",
         "notes": "Research inbox only — pick names to add to your vendor base.",
+    },
+    {
+        "id": "kvr",
+        "label": "KVR Audio forums",
+        "urls": KVR_SEED_URLS,
+        "default_category": "KVR_Research",
+        "notes": "Plugin/sample vendor names from KVR threads → approve into vendor_overrides.",
+    },
+    {
+        "id": "vi_control",
+        "label": "vi-control (Kontakt / sample libraries)",
+        "urls": VI_CONTROL_SEED_URLS,
+        "default_category": "VI_Control_Research",
+        "notes": "Library/vendor naming from vi-control.net — research only until approved.",
     },
     {
         "id": "stems_bootleg",
@@ -463,6 +489,16 @@ def _extract_from_collector(
             if company:
                 add_candidate(company, kws, conf, "kvr thread title")
 
+    elif "vi-control.net" in host:
+        for text, href in parsed.links[:120]:
+            company, kws, conf = _parse_title_vendor(text)
+            if company:
+                add_candidate(company, kws, conf, "vi-control thread/link")
+        if parsed.title:
+            company, kws, conf = _parse_title_vendor(parsed.title)
+            if company:
+                add_candidate(company, kws, conf, "vi-control title")
+
     elif "gearspace.com" in host or "gearslutz.com" in host:
         for text, _href in parsed.links[:100]:
             company, kws, conf = _parse_title_vendor(text)
@@ -486,6 +522,8 @@ def _source_label(url: str) -> str:
     host = urlparse(url).netloc.lower()
     if "kvraudio" in host:
         return "KVR Audio"
+    if "vi-control" in host:
+        return "vi-control"
     if "reddit" in host:
         path = urlparse(url).path.strip("/").split("/")
         return f"Reddit r/{path[1]}" if len(path) >= 2 and path[0] == "r" else "Reddit"

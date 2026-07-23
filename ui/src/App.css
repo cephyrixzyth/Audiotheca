@@ -2513,6 +2513,20 @@ tr.inv-vendor-set {
   white-space: nowrap;
 }
 
+.explorer-facet-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.35rem 0 0.5rem;
+}
+
+.pe-cap-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+  max-width: 12rem;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;

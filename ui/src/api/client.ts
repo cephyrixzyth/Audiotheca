@@ -1404,6 +1404,74 @@ export function runAcousticNearDupes(
   return postJson("/audio/near-dupes", { paths, threshold });
 }
 
+export function runFuzzyPackDupes(
+  paths: string[],
+  threshold = 70,
+): Promise<{
+  scanned: number;
+  group_count: number;
+  groups: Array<Record<string, unknown>>;
+  threshold: number;
+  mode: string;
+}> {
+  return postJson("/tools/fuzzy-hash", { paths, threshold });
+}
+
+export function lookupAcoustId(body: {
+  path?: string;
+  fingerprint?: string;
+  duration?: number;
+}): Promise<Record<string, unknown>> {
+  return postJson("/audio/acoustid-lookup", body);
+}
+
+export function fetchBrowseFacets(
+  root: string,
+  limit = 200,
+): Promise<{
+  ok: boolean;
+  root: string;
+  count: number;
+  entries: Array<{
+    path: string;
+    name: string;
+    type: string;
+    bpm?: number | null;
+    key?: string | null;
+    tags: string[];
+  }>;
+  facets: {
+    type: Array<{ value: string; count: number }>;
+    bpm: Array<{ value: string; count: number }>;
+    key: Array<{ value: string; count: number }>;
+  };
+}> {
+  const qs = new URLSearchParams({ root, limit: String(limit) });
+  return getJson(`/browse/facets?${qs.toString()}`);
+}
+
+export function reconcileLicenses(body?: {
+  paths?: string[];
+  manifests?: string[];
+}): Promise<{
+  ok: boolean;
+  licensed_count: number;
+  orphaned_count: number;
+  licensed: Array<Record<string, unknown>>;
+  orphaned: Array<Record<string, unknown>>;
+  manifest: Record<string, unknown>;
+}> {
+  return postJson("/installations/license-reconcile", body ?? {});
+}
+
+export function fetchPeHints(path: string): Promise<Record<string, unknown>> {
+  return postJson("/security/pe-hints", { path });
+}
+
+export function planVendorResearch(query: string, preset = "kvr"): Promise<Record<string, unknown>> {
+  return postJson("/vendors/research", { query, preset });
+}
+
 export function planWebSpiderLookup(query: string, preset?: string): Promise<Record<string, unknown>> {
   return postJson("/ai/web-spider/plan", { query, preset });
 }

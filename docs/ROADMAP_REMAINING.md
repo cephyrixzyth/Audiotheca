@@ -123,14 +123,14 @@ New work from [SOURCES.md](SOURCES.md) candidates (not yet implemented). Keep Au
 | M1 | Acoustic **near-dupe** lane (similarity + cross-format same content) | Sononym | High | ☑ (`acoustic_near_dupe.py`, `POST /api/audio/near-dupes`, Duplicates UI) |
 | M2 | Explorer **instant path search** + stronger dual-pane / Spot-to-preview | BaseHead Free, Everything, Directory Opus | High | ☑ (`GET /api/browse/search`, Explorer filter + Spot strip) |
 | M3 | Analysis pass via **Essentia** (or librosa) + **mutagen** tag I/O; align LUFS with BS.1770/R128 | Essentia, mutagen, ITU/EBU | High | ☑ (mutagen + pyloudnorm BS.1770; optional librosa BPM) |
-| M4 | Fuzzy **installer/pack** similarity (ssdeep/TLSH) beside PE+size blocking | ssdeep, TLSH | Medium | ☐ |
-| M5 | **RF64/MBWF** support + AcoustID/MusicBrainz lookup where Chromaprint already exists; fix FAQ drift | RF64, AcoustID | Medium | ☐ |
-| M6 | Auto-tag / facet UX (type, BPM, key, path) without cloud marketplace | ADSR Sample Manager | Medium | ☐ |
-| M7 | Optional **licensed vs orphaned** bucket using vendor install manifests | Native Access / PA / iLok-style | Low | ☐ |
-| M8 | Elevate KVR + vi-control into documented research pipeline | harvest / SearXNG | Low | ☐ |
-| M9 | Security depth: YARA/capa-style PE capability hints | YARA, capa, DIE | Low | ☐ |
+| M4 | Fuzzy **installer/pack** similarity (ssdeep/TLSH) beside PE+size blocking | ssdeep, TLSH | Medium | ☑ (`fuzzy_file_hash.py`, `POST /api/tools/fuzzy-hash`, Duplicates UI) |
+| M5 | **RF64/MBWF** support + AcoustID/MusicBrainz lookup where Chromaprint already exists; fix FAQ drift | RF64, AcoustID | Medium | ☑ (`rf64.py`, `acoustid_lookup.py`, `POST /api/audio/acoustid-lookup`) |
+| M6 | Auto-tag / facet UX (type, BPM, key, path) without cloud marketplace | ADSR Sample Manager | Medium | ☑ (`sample_facets.py`, `GET /api/browse/facets`, Explorer facets) |
+| M7 | Optional **licensed vs orphaned** bucket using vendor install manifests | Native Access / PA / iLok-style | Low | ☑ (`license_oracle.py`, buckets, Install Lifecycle reconcile) |
+| M8 | Elevate KVR + vi-control into documented research pipeline | harvest / SearXNG | Low | ☑ (presets + `docs/VENDOR_RESEARCH.md` + `POST /api/vendors/research`) |
+| M9 | Security depth: YARA/capa-style PE capability hints | YARA, capa, DIE | Low | ☑ (`pe_capabilities.py`, scan findings + `POST /api/security/pe-hints`) |
 
-**Exit:** M1–M3 land with tests + SOURCES.md rows moved to **Considered**; FAQ AcoustID/Soundminer drift closed. **M1–M3 shipped** (2026-07-23); M4–M9 remain.
+**Exit:** M1–M9 landed with tests + SOURCES updates. **Phase M complete** (2026-07-23).
 
 ### Suggested Phase M order
 

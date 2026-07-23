@@ -19,6 +19,15 @@ Engine remains **10.0.0**.
 - **M1** — `POST /api/audio/near-dupes` Chromaprint near-dupe lane + Duplicates UI button (heuristic fallback)
 - **M2** — Explorer instant folder filter, `GET /api/browse/search`, Spot preview strip on selection
 
+### Phase M4–M9
+
+- **M4** — fuzzy pack/installer similarity (`ssdeep`/`TLSH` soft + rolling fallback); `POST /api/tools/fuzzy-hash`
+- **M5** — RF64/ds64 container parse; optional AcoustID lookup (`ACOUSTID_CLIENT_KEY`)
+- **M6** — sample facets (type/BPM/key/path); Explorer facet strip; `GET /api/browse/facets`
+- **M7** — license reconcile vs Native Access / PA / iLok-style local manifests; `_licensed` / `_orphaned_install` buckets
+- **M8** — KVR + vi-control harvest/SearX presets + [VENDOR_RESEARCH.md](VENDOR_RESEARCH.md)
+- **M9** — PE capability hints (pefile capa-lite) on security scan + `POST /api/security/pe-hints`
+
 ### API architecture & security
 
 - **Domain routers** — `api/server.py` slimmed to app wiring; routes live under `api/routers/` (auth, runs, jobs, browse, vendors, system, tools, environment, security) with shared deps in `api/deps.py`

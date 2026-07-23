@@ -3,6 +3,7 @@ import {
   checkInstallationVersion,
   fetchInstallationPresets,
   fetchInstallations,
+  reconcileLicenses,
   refreshVersionManifest,
   saveInstallationPreset,
   syncVersionManifestCatalog,
@@ -63,6 +64,7 @@ export function InstallLifecyclePanel() {
   const [presets, setPresets] = useState<Array<{ name: string; snapshot: Record<string, unknown> }>>([]);
   const [presetName, setPresetName] = useState("Gold-Master");
   const [catalogUrl, setCatalogUrl] = useState("");
+  const [licenseSummary, setLicenseSummary] = useState<string | null>(null);
 
   const reload = useCallback(() => {
     fetchInstallations()
@@ -253,10 +255,30 @@ export function InstallLifecyclePanel() {
     }
   }
 
+  async function handleLicenseReconcile() {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await reconcileLicenses({});
+      const sources = Array.isArray(result.manifest?.sources)
+        ? (result.manifest.sources as string[]).join(", ")
+        : "none found";
+      setLicenseSummary(
+        `Licensed ${result.licensed_count} · Orphaned ${result.orphaned_count} · manifests: ${sources || "none found"}`,
+      );
+      setMsg("License reconcile complete — orphaned installs lack local entitlement manifests");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "License reconcile failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="install-lifecycle">
       {error && <div className="error">{error}</div>}
       {msg && <div className="banner dry">{msg}</div>}
+      {licenseSummary && <p className="count-muted">{licenseSummary}</p>}
 
       <div className="install-gold-master">
         <h4>Deployment presets (gold master)</h4>
@@ -317,6 +339,15 @@ export function InstallLifecyclePanel() {
         </button>
         <button type="button" className="text-btn" disabled={busy} onClick={() => void handleRefreshManifest()}>
           Refresh manifest
+        </button>
+        <button
+          type="button"
+          className="text-btn"
+          disabled={busy}
+          title="Compare installs to local Native Access / Plugin Alliance / iLok-style manifests"
+          onClick={() => void handleLicenseReconcile()}
+        >
+          License reconcile
         </button>
         {draft.update_status && (
           <span className={`env-badge ${statusBadgeClass(draft.update_status)}`}>

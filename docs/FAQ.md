@@ -192,7 +192,7 @@ Dry runs work. Live runs fail at startup with "Drive is read-only."
 
 ### Does Audiotheca use AcoustID / Chromaprint?
 
-**Chromaprint / `fpcalc` support ships** for acoustic fingerprinting (see Environment / audio fingerprint helpers). Full **AcoustID / MusicBrainz online lookup** is optional follow-up work (Phase M5 in [ROADMAP_REMAINING.md](ROADMAP_REMAINING.md)). Early FAQ text that said “future only” is outdated for the local fingerprint path.
+**Chromaprint / `fpcalc` support ships** for local acoustic fingerprinting (Environment panel / `audio_fingerprint.py`). **AcoustID / MusicBrainz online lookup** is available via `POST /api/audio/acoustid-lookup` when outbound is allowed and `ACOUSTID_CLIENT_KEY` is set (skipped in air-gap). RF64/MBWF containers are detected for BWF metadata and WAV info.
 
 ### Can it rename files to UCS standard?
 

@@ -31,9 +31,12 @@ def read_wav_info(path: Path) -> dict[str, Any]:
                 "channels": channels,
                 "sample_width": sample_width,
                 "duration_s": round(duration_s, 4),
+                "container": "RIFF",
             }
-    except (wave.Error, OSError) as exc:
-        return {"ok": False, "error": str(exc), "path": str(path)}
+    except (wave.Error, OSError):
+        from audiotheca.rf64 import read_wav_info_rf64_aware
+
+        return read_wav_info_rf64_aware(path)
 
 
 def _frame_rms_db(raw: bytes, sample_width: int) -> float:

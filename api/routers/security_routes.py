@@ -169,3 +169,14 @@ def security_memory_scan(body: dict = Body(default_factory=dict)) -> dict[str, o
     if pid is None:
         raise HTTPException(status_code=400, detail="pid required")
     return scan_process(int(pid))
+
+@router.post("/api/security/pe-hints")
+def security_pe_hints(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from audiotheca.pe_capabilities import assess_pe_capabilities
+    from path_mask import mask_payload
+
+    path = body.get("path")
+    if not path:
+        raise HTTPException(status_code=400, detail="path required")
+    target = security.assert_library_path(str(path), must_exist=True, label="path")
+    return mask_payload(assess_pe_capabilities(target))

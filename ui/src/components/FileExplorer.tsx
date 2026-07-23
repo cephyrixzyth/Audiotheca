@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   browseDirectoryEnriched,
   browseSearch,
+  fetchBrowseFacets,
   listArchiveContents,
   openInExplorer,
   type BrowseEntry,
@@ -107,6 +108,9 @@ function ExplorerPane({
   const [libraryHits, setLibraryHits] = useState<BrowseEntry[] | null>(null);
   const [librarySearching, setLibrarySearching] = useState(false);
   const [librarySearchError, setLibrarySearchError] = useState<string | null>(null);
+  const [facetType, setFacetType] = useState<string>("");
+  const [facetOptions, setFacetOptions] = useState<Array<{ value: string; count: number }>>([]);
+  const [facetBusy, setFacetBusy] = useState(false);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadSeq = useRef(0);
 
@@ -121,12 +125,38 @@ function ExplorerPane({
 
   const filteredEntries = useMemo(() => {
     const q = pathQuery.trim().toLowerCase();
-    if (!q || libraryHits) return entries;
-    return entries.filter(
-      (entry) =>
-        entry.name.toLowerCase().includes(q) || entry.path.toLowerCase().replace(/\\/g, "/").includes(q),
-    );
-  }, [entries, pathQuery, libraryHits]);
+    let rows = libraryHits ?? entries;
+    if (!libraryHits && q) {
+      rows = entries.filter(
+        (entry) =>
+          entry.name.toLowerCase().includes(q) || entry.path.toLowerCase().replace(/\\/g, "/").includes(q),
+      );
+    }
+    if (facetType) {
+      const token = facetType.toLowerCase();
+      rows = rows.filter(
+        (entry) => entry.is_dir || entry.name.toLowerCase().includes(token) || entry.path.toLowerCase().includes(token),
+      );
+    }
+    return rows;
+  }, [entries, pathQuery, libraryHits, facetType]);
+
+  async function loadFacets() {
+    if (!currentPath) {
+      setLibrarySearchError("Open a folder before loading facets");
+      return;
+    }
+    setFacetBusy(true);
+    setLibrarySearchError(null);
+    try {
+      const data = await fetchBrowseFacets(currentPath, 200);
+      setFacetOptions(data.facets?.type ?? []);
+    } catch (err) {
+      setLibrarySearchError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setFacetBusy(false);
+    }
+  }
 
   async function runLibrarySearch() {
     const q = pathQuery.trim();
@@ -337,7 +367,39 @@ function ExplorerPane({
                 Clear
               </button>
             )}
+            <button
+              type="button"
+              className="text-btn"
+              disabled={facetBusy || !currentPath}
+              title="Derive type/BPM/key facets for this folder"
+              onClick={() => void loadFacets()}
+            >
+              {facetBusy ? "Facets…" : "Facets"}
+            </button>
           </div>
+
+          {facetOptions.length > 0 && (
+            <div className="explorer-facet-strip" aria-label="Sample type facets">
+              <button
+                type="button"
+                className={`bucket-chip ${!facetType ? "active" : ""}`.trim()}
+                onClick={() => setFacetType("")}
+              >
+                All types
+              </button>
+              {facetOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className={`bucket-chip ${facetType === opt.value ? "active" : ""}`.trim()}
+                  onClick={() => setFacetType(opt.value === facetType ? "" : opt.value)}
+                  title={`${opt.count} files`}
+                >
+                  {opt.value} ({opt.count})
+                </button>
+              ))}
+            </div>
+          )}
 
           {loading && <p className="count-muted">Loading…</p>}
           {error && <div className="error">{error}</div>}

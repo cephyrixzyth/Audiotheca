@@ -124,13 +124,14 @@ Highest-value sources **missing** from docs and Phase E–L. Map to Phase M belo
 
 ## Priority shortlist (study order)
 
-1. **ssdeep / TLSH** — installer/pack fuzzy matches (M4)  
-2. **RF64 + AcoustID lookup** — AUD-PIP standards completeness (M5)  
-3. **ADSR-style tag facets** — auto-tag UX without marketplace (M6)  
-4. **Essentia** (optional) — deeper features beyond mutagen/pyloudnorm  
-5. Licensed-vs-orphaned / KVR pipeline / YARA (M7–M9)
+Phase **M1–M9 complete**. Optional deepeners:
 
-**Done:** Sononym near-dupe (M1), BaseHead/Everything Explorer search + Spot (M2), mutagen + BS.1770 LUFS (M3).
+1. Native **ssdeep/TLSH** wheels in Docker images (rolling fallback already ships)  
+2. Full **Essentia** feature extract when system packages allow  
+3. Richer Native Access / iLok XML parsers beyond JSON manifests  
+4. Optional **yara-python** rule packs beside pefile capability hints  
+
+**Done:** Sononym near-dupe (M1), Explorer search/Spot (M2), mutagen+BS.1770 (M3), fuzzy packs (M4), RF64+AcoustID (M5), facets (M6), license buckets (M7), KVR/vi-control pipeline (M8), PE capa hints (M9).
 
 ---
 
