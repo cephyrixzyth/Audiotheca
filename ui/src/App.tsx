@@ -1,4 +1,5 @@
 ﻿import { useCallback, useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import "./App.css";
 import { fetchRun, fetchRuns, fetchJobs, fetchHealth, fetchLibraryRoots } from "./api/client";
 import { ArchivePeek } from "./components/ArchivePeek";
@@ -22,6 +23,8 @@ import { ProcessBanner } from "./components/ProcessBanner";
 import { NavTabs, REVIEW_TAB_IDS } from "./components/NavTabs";
 import { ThemeSwitcher } from "./components/ThemeSwitcher";
 import { VendorTools } from "./components/VendorTools";
+import { UiKitGallery } from "./components/UiKitGallery";
+import { pathForTab, tabForPath } from "./routes";
 import { FileExplorerProvider } from "./contexts/FileExplorerContext";
 import { useLibraryRoot } from "./hooks/useLibraryRoot";
 import { useDesktopCloseHandler } from "./hooks/useDesktopCloseHandler";
@@ -38,7 +41,11 @@ export default function App() {
   const [runs, setRuns] = useState<RunListItem[]>([]);
   const [stamp, setStamp] = useState("");
   const [summary, setSummary] = useState<RunSummary | null>(null);
-  const [tab, setTab] = useState<TabId>("dashboard");
+  const location = useLocation();
+  const navigate = useNavigate();
+  const tab = tabForPath(location.pathname);
+  const showUiKit = location.pathname === "/ui-kit";
+  const setTab = useCallback((id: TabId) => navigate(pathForTab(id)), [navigate]);
   const [error, setError] = useState<string | null>(null);
   const [scanActive, setScanActive] = useState(false);
   const [engineVersion, setEngineVersion] = useState<string | null>(null);
@@ -47,6 +54,12 @@ export default function App() {
   const libraryRoot = useLibraryRoot();
   const explorerSubtree = SUBTREE_TABS.includes(tab) ? libraryRoot : null;
   const desktopClose = useDesktopCloseHandler();
+
+  useEffect(() => {
+    if (location.pathname === "/") {
+      navigate(pathForTab("dashboard"), { replace: true });
+    }
+  }, [location.pathname, navigate]);
 
   useEffect(() => {
     fetchHealth()
@@ -139,7 +152,8 @@ export default function App() {
 
             <main className="main">
               <ProcessBanner />
-              {tab !== "scan" && (
+              {showUiKit && <UiKitGallery />}
+              {tab !== "scan" && !showUiKit && (
                 <div className="toolbar compact-toolbar">
                   <label className="field-label-inline">
                     Run
@@ -169,7 +183,7 @@ export default function App() {
                 </div>
               )}
 
-              {tab === "dashboard" && (
+              {tab === "dashboard" && !showUiKit && (
                 <Dashboard summary={summary} runs={runs} onNavigate={setTab} />
               )}
               {tab === "investigation" &&
