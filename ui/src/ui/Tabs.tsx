@@ -1,0 +1,40 @@
+import type { ReactNode } from "react";
+import * as RadixTabs from "@radix-ui/react-tabs";
+import styles from "./Tabs.module.css";
+
+export interface TabItem {
+  value: string;
+  label: ReactNode;
+  content: ReactNode;
+}
+
+export interface TabsProps {
+  items: TabItem[];
+  value?: string;
+  defaultValue?: string;
+  onValueChange?: (value: string) => void;
+  "aria-label"?: string;
+}
+
+export function Tabs({ items, value, defaultValue, onValueChange, ...aria }: TabsProps) {
+  return (
+    <RadixTabs.Root
+      value={value}
+      defaultValue={defaultValue ?? items[0]?.value}
+      onValueChange={onValueChange}
+    >
+      <RadixTabs.List className={styles.list} aria-label={aria["aria-label"]}>
+        {items.map((item) => (
+          <RadixTabs.Trigger key={item.value} value={item.value} className={styles.trigger}>
+            {item.label}
+          </RadixTabs.Trigger>
+        ))}
+      </RadixTabs.List>
+      {items.map((item) => (
+        <RadixTabs.Content key={item.value} value={item.value}>
+          {item.content}
+        </RadixTabs.Content>
+      ))}
+    </RadixTabs.Root>
+  );
+}

@@ -1,0 +1,60 @@
+/*
+ * Audiotheca UI-kit design tokens.
+ *
+ * A thin, namespaced (`--ui-*`) scale layered on top of the existing theme
+ * tokens defined in src/index.css. Primitives consume these aliases so the
+ * whole kit re-themes automatically with all built-in and custom themes
+ * (the ThemeContext only rewrites the base `--bg`, `--accent`, ... variables).
+ *
+ * Nothing here overrides an existing variable; it only adds spacing, radius,
+ * type-scale, elevation and semantic surface aliases.
+ */
+:root {
+  /* Semantic surface + line aliases (map onto theme tokens) */
+  --ui-surface: var(--bg-panel);
+  --ui-surface-elevated: var(--bg-elevated);
+  --ui-surface-hover: var(--bg-hover);
+  --ui-line: var(--border);
+  --ui-line-strong: var(--border-bright);
+  --ui-fg: var(--text);
+  --ui-fg-muted: var(--text-muted);
+  --ui-fg-dim: var(--text-dim);
+
+  /* Radius scale */
+  --ui-radius-sm: 4px;
+  --ui-radius-md: 6px;
+  --ui-radius-lg: 10px;
+  --ui-radius-pill: 999px;
+
+  /* Spacing scale (rem) */
+  --ui-space-1: 0.25rem;
+  --ui-space-2: 0.5rem;
+  --ui-space-3: 0.75rem;
+  --ui-space-4: 1rem;
+  --ui-space-5: 1.5rem;
+  --ui-space-6: 2rem;
+
+  /* Type scale (rem) */
+  --ui-fs-xs: 0.72rem;
+  --ui-fs-sm: 0.78rem;
+  --ui-fs-md: 0.85rem;
+  --ui-fs-lg: 1rem;
+  --ui-fs-xl: 1.35rem;
+
+  /* Elevation */
+  --ui-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --ui-shadow-2: 0 8px 28px rgba(0, 0, 0, 0.45);
+
+  /* Motion */
+  --ui-transition: 120ms ease;
+
+  /* Focus ring (matches src/index.css :focus-visible) */
+  --ui-focus-ring: 2px solid var(--accent);
+  --ui-focus-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ui-transition: 0ms;
+  }
+}
