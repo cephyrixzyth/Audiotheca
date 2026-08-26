@@ -1,4 +1,5 @@
 import type { TabId } from "../types";
+import { Button } from "../ui";
 
 const MESSAGES: Partial<Record<TabId, { title: string; body: string }>> = {
   dashboard: {
@@ -55,11 +56,10 @@ export function TabEmptyState({ tab, onStartScan }: Props) {
       <h3>{msg.title}</h3>
       <p className="count-muted">{msg.body}</p>
       {onStartScan && (
-        <button type="button" className="primary-btn" onClick={onStartScan}>
+        <Button variant="primary" onClick={onStartScan}>
           Open Scan tab
-        </button>
+        </Button>
       )}
     </div>
   );
-
 }
