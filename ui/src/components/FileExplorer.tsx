@@ -5,11 +5,13 @@ import {
   fetchBrowseFacets,
   fetchPeHints,
   listArchiveContents,
+  lookupAcoustId,
   openInExplorer,
   type BrowseEntry,
 } from "../api/client";
 import { useExplorerPathDrag } from "../contexts/FileExplorerContext";
-import { Badge, Button, VirtualTable, type VirtualRowAttrs } from "../ui";
+import { Badge, Button, DropdownMenu, VirtualTable, type DropdownItem, type VirtualRowAttrs } from "../ui";
+import { formatAcoustIdResult } from "../utils/acoustId";
 import { isPeBinaryFile } from "../utils/peName";
 import { AudioPreviewStrip, isAuditionableFile } from "./AudioPreviewStrip";
 import { FileExplorerTree } from "./FileExplorerTree";
@@ -186,6 +188,7 @@ function ExplorerPane({
   const [facetBusy, setFacetBusy] = useState(false);
   const [peHint, setPeHint] = useState<PeHintPayload | null>(null);
   const [peHintBusy, setPeHintBusy] = useState(false);
+  const [acoustIdMsg, setAcoustIdMsg] = useState<string | null>(null);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadSeq = useRef(0);
 
@@ -280,6 +283,7 @@ function ExplorerPane({
         setFacetBuckets({ type: [], bpm: [], key: [] });
         setPeHint(null);
         setPeHintBusy(false);
+        setAcoustIdMsg(null);
       try {
         const data = await browseDirectoryEnriched(path, stamp ?? "");
         if (seq !== loadSeq.current) return;
@@ -308,12 +312,8 @@ function ExplorerPane({
     function dismiss() {
       setContextMenu(null);
     }
-    window.addEventListener("click", dismiss);
     window.addEventListener("scroll", dismiss, true);
-    return () => {
-      window.removeEventListener("click", dismiss);
-      window.removeEventListener("scroll", dismiss, true);
-    };
+    return () => window.removeEventListener("scroll", dismiss, true);
   }, [contextMenu]);
 
   async function openEntry(entry: BrowseEntry) {
@@ -367,7 +367,69 @@ function ExplorerPane({
     }
   }
 
+  async function handleAcoustId(path: string) {
+    setContextMenu(null);
+    setAcoustIdMsg("AcoustID…");
+    try {
+      const res = await lookupAcoustId({ path });
+      setAcoustIdMsg(formatAcoustIdResult(res));
+    } catch (err) {
+      setAcoustIdMsg(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   const crumbs = useMemo(() => pathSegments(currentPath), [currentPath]);
+
+  const contextItems: DropdownItem[] = contextMenu
+    ? [
+        {
+          id: "open",
+          label: contextMenu.entry.is_dir
+            ? "Browse"
+            : isArchiveName(contextMenu.entry.name)
+              ? "List archive"
+              : "Open",
+          onSelect: () => void openEntry(contextMenu.entry),
+        },
+        {
+          id: "reveal",
+          label: "Reveal in OS",
+          onSelect: () => void openInExplorer(contextMenu.entry.path),
+        },
+        {
+          id: "copy",
+          label: "Copy path",
+          onSelect: () => void copyPath(contextMenu.entry.path),
+        },
+        ...(!contextMenu.entry.is_dir && isPeBinaryFile(contextMenu.entry.name)
+          ? [
+              {
+                id: "pe-hints",
+                label: "PE capability hints",
+                onSelect: () => void handlePeHints(contextMenu.entry.path),
+              },
+            ]
+          : []),
+        ...(!contextMenu.entry.is_dir && isAuditionableFile(contextMenu.entry.name)
+          ? [
+              {
+                id: "acoustid",
+                label: "AcoustID lookup",
+                onSelect: () => void handleAcoustId(contextMenu.entry.path),
+              },
+            ]
+          : []),
+        ...(isArchiveName(contextMenu.entry.name) && peerPath && onRequestDiff
+          ? [
+              {
+                id: "diff",
+                label: "Diff vs other pane",
+                onSelect: () => onRequestDiff(contextMenu.entry.path, peerPath),
+              },
+            ]
+          : []),
+      ]
+    : [];
 
   return (
     <div className="file-explorer-pane" data-pane={paneId}>
@@ -595,57 +657,29 @@ function ExplorerPane({
             </div>
           )}
           <PeHintBanner result={peHint} busy={peHintBusy} />
+          {acoustIdMsg ? <p className="count-muted">{acoustIdMsg}</p> : null}
         </div>
       </div>
 
       {contextMenu && (
-        <menu
-          className="explorer-context-menu"
-          style={{ top: contextMenu.y, left: contextMenu.x }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <li>
-            <button type="button" onClick={() => void openEntry(contextMenu.entry)}>
-              {contextMenu.entry.is_dir ? "Browse" : isArchiveName(contextMenu.entry.name) ? "List archive" : "Open"}
-            </button>
-          </li>
-          <li>
+        <DropdownMenu
+          open
+          onOpenChange={(next) => {
+            if (!next) setContextMenu(null);
+          }}
+          align="start"
+          ariaLabel="File actions"
+          trigger={
             <button
               type="button"
-              onClick={() => {
-                void openInExplorer(contextMenu.entry.path);
-                setContextMenu(null);
-              }}
-            >
-              Reveal in OS
-            </button>
-          </li>
-          <li>
-            <button type="button" onClick={() => void copyPath(contextMenu.entry.path)}>
-              Copy path
-            </button>
-          </li>
-          {!contextMenu.entry.is_dir && isPeBinaryFile(contextMenu.entry.name) && (
-            <li>
-              <button type="button" onClick={() => void handlePeHints(contextMenu.entry.path)}>
-                PE capability hints
-              </button>
-            </li>
-          )}
-          {isArchiveName(contextMenu.entry.name) && peerPath && onRequestDiff && (
-            <li>
-              <button
-                type="button"
-                onClick={() => {
-                  onRequestDiff(contextMenu.entry.path, peerPath);
-                  setContextMenu(null);
-                }}
-              >
-                Diff vs other pane
-              </button>
-            </li>
-          )}
-        </menu>
+              className="explorer-context-anchor"
+              style={{ top: contextMenu.y, left: contextMenu.x }}
+              aria-hidden
+              tabIndex={-1}
+            />
+          }
+          items={contextItems}
+        />
       )}
     </div>
   );

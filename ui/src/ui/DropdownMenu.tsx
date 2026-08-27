@@ -34,7 +34,10 @@ export interface DropdownMenuProps {
   items: DropdownItem[];
   footer?: ReactNode;
   align?: "start" | "center" | "end";
+  side?: "top" | "right" | "bottom" | "left";
   ariaLabel?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function DropdownMenu({
@@ -42,15 +45,19 @@ export function DropdownMenu({
   items,
   footer,
   align = "end",
+  side = "bottom",
   ariaLabel,
+  open,
+  onOpenChange,
 }: DropdownMenuProps) {
   return (
-    <RadixDropdown.Root>
+    <RadixDropdown.Root open={open} onOpenChange={onOpenChange}>
       <RadixDropdown.Trigger asChild>{trigger}</RadixDropdown.Trigger>
       <RadixDropdown.Portal>
         <RadixDropdown.Content
           className={styles.content}
           align={align}
+          side={side}
           sideOffset={6}
           collisionPadding={8}
           aria-label={ariaLabel}

@@ -18,7 +18,7 @@ Git tag **v1.0.7** was published with a broken Windows NSIS pre-install hook (si
 
 ### Phase M UI wiring
 
-- **AcoustID** — Spot preview (non-compact) can look up MusicBrainz/AcoustID for the selected file
+- **AcoustID** — Spot preview (non-compact) and explorer context menu can look up MusicBrainz/AcoustID for the selected file
 - **Near-dupe lane** — Duplicates titles acoustic vs fuzzy pack results correctly
 - **Explorer facets** — type, BPM, and key chips; Search / Clear / Facets use the Button primitive
 - **Vendor research** — Plan research (KVR / vi-control / vendor) surfaces the documented pipeline
@@ -30,7 +30,7 @@ Git tag **v1.0.7** was published with a broken Windows NSIS pre-install hook (si
 - **Orchestration** — Environment panel surfaces SIG-CAP, DRV-COOLDWN, TAG-PROP (dry-run), and STRG-TIER
 - **Explorer breadcrumbs** — Roots / path crumbs use the Button primitive
 - **Scene execute keys** — live-execute test looks up `executed_renames` with normalized path keys (Windows slash/case)
-- **DropdownMenu** — Radix menu primitive; theme switcher and row ⋮ actions (Investigation, Duplicates, Security) use it
+- **DropdownMenu** — Radix menu primitive; theme switcher, row ⋮ actions, and Library explorer right-click menu
 - **Symlink tests** — skip on Windows when creating a junction/symlink is not permitted
 
 ### Phase M — external sources (M1–M9)

@@ -2576,33 +2576,15 @@ tr.inv-vendor-set {
   white-space: nowrap;
 }
 
-.explorer-context-menu {
+.explorer-context-anchor {
   position: fixed;
-  z-index: 1100;
+  width: 0;
+  height: 0;
+  padding: 0;
   margin: 0;
-  padding: 0.25rem 0;
-  list-style: none;
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
-  min-width: 9rem;
-}
-
-.explorer-context-menu button {
-  display: block;
-  width: 100%;
-  border: none;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  padding: 0.35rem 0.75rem;
-  cursor: pointer;
-}
-
-.explorer-context-menu button:hover {
-  background: var(--bg-hover);
+  border: 0;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 .library-explorer-btn {
