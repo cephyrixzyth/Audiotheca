@@ -127,7 +127,7 @@ Primary nav: **Dashboard** · **Scan** · **Review** ▾ · **Library** · **Sys
 | --- | --- |
 | **Space recovery** | Coexistence summary, **underscore vendor whitelist**, disk reclaim links |
 | **Security** | Malware heuristics, PE capability hints, quarantine/shred, SHA-256 hash lookup, MEM-SCAN |
-| **Environment** | Dependency health, repairs, **theme studio**, install registry + **License reconcile**, mount watcher, **cloud/S3 telemetry**, **orchestration tools**, **94-code spec catalog**, virtual paths, preview session |
+| **Environment** | Dependency health, repairs, **theme studio**, install registry + **License reconcile**, mount watcher, **cloud/S3 telemetry**, **orchestration tools** (including SIG-CAP, DRV-COOLDWN, TAG-PROP dry-run, STRG-TIER), **94-code spec catalog**, virtual paths, preview session |
 | **Vendors** | Vendor gaps, bulk add keywords, KVR / vi-control harvest + research pipeline, unified export |
 
 Most tabs support **drag-to-reorder sections** (Dashboard, Scan, and others); preferences persist in browser localStorage.

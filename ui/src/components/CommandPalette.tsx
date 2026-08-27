@@ -90,7 +90,7 @@ export function CommandPalette() {
     const environmentTab = list.find((c) => c.id === "tab-environment");
     if (environmentTab) {
       environmentTab.keywords =
-        "environment installs license reconcile native access ilok plugin alliance themes";
+        "environment installs license reconcile native access ilok plugin alliance themes orchestration net-safe sig-cap cooldown tag-prop storage tier";
     }
     list.push({
       id: "act-library",
@@ -118,6 +118,13 @@ export function CommandPalette() {
       label: "License reconcile",
       hint: "Environment",
       keywords: "native access ilok plugin alliance licensed orphaned install",
+      run: () => goTab("environment"),
+    });
+    list.push({
+      id: "act-orchestration",
+      label: "Orchestration tools",
+      hint: "Environment",
+      keywords: "net-safe cln-sweep sig-cap drv-cooldwn tag-prop strg-tier cue-log dist-scan path-rloc",
       run: () => goTab("environment"),
     });
     list.push({

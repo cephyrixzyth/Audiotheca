@@ -364,7 +364,7 @@ export function EnvironmentPanel() {
     {
       id: "orchestration-tools",
       title: "Orchestration tools",
-      subtitle: "CLN-SWEEP, XFER-BNDL, PATH-RLOC, CUE-LOG, NET-SAFE, DIST-SCAN",
+      subtitle: "CLN-SWEEP, XFER-BNDL, PATH-RLOC, CUE-LOG, NET-SAFE, DIST-SCAN, SIG-CAP, DRV-COOLDWN, TAG-PROP, STRG-TIER",
       fullWidth: true,
       minBodyHeight: 220,
       content: <OrchestrationToolsPanel />,

@@ -214,6 +214,7 @@ Themes editor — 18 built-in palettes; buttons and accents follow the active th
 
 Installation registry API (v1.0.1+): custom tags, notes, dependencies, gold-master presets at /api/installations.
 License reconcile compares installs to local Native Access / Plugin Alliance / iLok-style manifests.
+Orchestration tools include NET-SAFE, SIG-CAP input discovery, DRV-COOLDWN queue, TAG-PROP dry-run, and STRG-TIER.
 
 Docker / NAS: deploy/unraid/ stack; GHCR images ghcr.io/chrisjrovira/audiotheca on release tags.`,
         media: { screenshot: "/help/environment-themes.png" },
