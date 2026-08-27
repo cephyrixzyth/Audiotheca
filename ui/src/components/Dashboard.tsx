@@ -23,6 +23,7 @@ import type {
 } from "../types";
 import { formatCompact, formatDiskFree, formatGb, formatPct } from "../utils/format";
 import { formatEngineVersion } from "../utils/scanDisplay";
+import { Badge, Button } from "../ui";
 import { ReorderableSections } from "./ReorderableSections";
 import { EnvironmentSummaryWidget } from "./EnvironmentPanel";
 import { InstallationSummaryWidget } from "./InstallLifecyclePanel";
@@ -484,14 +485,13 @@ function DashboardRun({
               />
               <StatTile label="Feedback skipped" value={formatCompact(summary.feedback_skipped ?? 0)} />
             </div>
-            <button
-              type="button"
-              className="primary-btn"
+            <Button
+              variant="primary"
               style={{ marginTop: "0.75rem" }}
               onClick={() => onNavigate?.("skipped")}
             >
               Open skipped files hub
-            </button>
+            </Button>
           </>
         ),
       },
@@ -531,9 +531,9 @@ function DashboardRun({
             </div>
             <div className="job-row">
               <span className="count-muted">Status</span>
-              <span className={`badge ${activeJob.status === "running" ? "ready" : "review"}`}>
+              <Badge tone={activeJob.status === "running" ? "ready" : "review"}>
                 {activeJob.status}
-              </span>
+              </Badge>
             </div>
             {activeJob.current_phase && (
               <div className="job-row">
@@ -541,16 +541,16 @@ function DashboardRun({
                 <span className="job-phase">{activeJob.current_phase}</span>
               </div>
             )}
-            <button type="button" className="primary-btn" onClick={() => onNavigate?.("scan")}>
+            <Button variant="primary" onClick={() => onNavigate?.("scan")}>
               Open scan controls
-            </button>
+            </Button>
           </div>
         ) : (
           <div className="job-card idle">
             <p>No scan running</p>
-            <button type="button" className="primary-btn" onClick={() => onNavigate?.("scan")}>
+            <Button variant="primary" onClick={() => onNavigate?.("scan")}>
               Start dry-run scan
-            </button>
+            </Button>
           </div>
         ),
       },
@@ -610,14 +610,14 @@ function DashboardRun({
                 <ul className="finding-list">
                   {executeHistory.items.map((item) => (
                     <li key={`${item.created}:${item.path}`} className="finding-row">
-                      <span className="badge bucket">{item.module}</span>
+                      <Badge tone="accent">{item.module}</Badge>
                       <span className="finding-detail" title={item.path}>
                         {basename(item.path)}
                         {item.destination ? ` → ${basename(item.destination)}` : ""}
                       </span>
-                      <span className={`badge ${item.ok ? "ready" : "review"}`}>
+                      <Badge tone={item.ok ? "ready" : "review"}>
                         {item.dry_run ? "dry" : item.status === "committed" ? "live" : item.status}
-                      </span>
+                      </Badge>
                     </li>
                   ))}
                 </ul>
@@ -710,9 +710,9 @@ function DashboardRun({
                     <td>{formatCompact(run.scanned)}</td>
                     <td>{formatCompact(run.investigation)}</td>
                     <td>
-                      <span className={`badge ${run.dry_run === false ? "high" : "ready"}`}>
+                      <Badge tone={run.dry_run === false ? "high" : "ready"}>
                         {run.dry_run === false ? "LIVE" : "dry"}
-                      </span>
+                      </Badge>
                     </td>
                   </tr>
                 ))}
@@ -762,7 +762,7 @@ function DashboardRun({
               <ul className="finding-list">
                 {findings.slice(0, 6).map((finding, idx) => (
                   <li key={idx} className={`finding-row sev-${finding.severity.toLowerCase()}`}>
-                    <span className="badge bucket">{finding.check}</span>
+                    <Badge tone="accent">{finding.check}</Badge>
                     <span className="finding-detail" title={finding.suggestion}>
                       {finding.detail}
                     </span>
@@ -814,11 +814,11 @@ function DashboardRun({
           </span>
         </div>
         <div className="dash-run-meta">
-          {routeReadyPct != null && <span className="badge ready">{routeReadyPct}% route-ready</span>}
+          {routeReadyPct != null && <Badge tone="ready">{routeReadyPct}% route-ready</Badge>}
           {summary.dry_run ? (
-            <span className="badge bucket">no filesystem changes</span>
+            <Badge tone="accent">no filesystem changes</Badge>
           ) : (
-            <span className="badge high">live changes</span>
+            <Badge tone="high">live changes</Badge>
           )}
         </div>
       </div>
