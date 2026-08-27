@@ -31,6 +31,35 @@ function formatSize(size: number | null | undefined): string {
   return `${(size / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
+function FacetStrip({
+  label,
+  options,
+  selected,
+  onSelect,
+}: {
+  label: string;
+  options: Array<{ value: string; count: number }>;
+  selected: string;
+  onSelect: (value: string) => void;
+}) {
+  if (!options.length) return null;
+  return (
+    <div className="explorer-facet-strip" aria-label={label}>
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          className={`bucket-chip ${selected === opt.value ? "active" : ""}`.trim()}
+          onClick={() => onSelect(opt.value === selected ? "" : opt.value)}
+          title={`${opt.count} files`}
+        >
+          {opt.value} ({opt.count})
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function saveLastPath(path: string): void {
   try {
     sessionStorage.setItem(LAST_PATH_KEY, path);
@@ -110,7 +139,11 @@ function ExplorerPane({
   const [librarySearching, setLibrarySearching] = useState(false);
   const [librarySearchError, setLibrarySearchError] = useState<string | null>(null);
   const [facetType, setFacetType] = useState<string>("");
-  const [facetOptions, setFacetOptions] = useState<Array<{ value: string; count: number }>>([]);
+  const [facetBuckets, setFacetBuckets] = useState<{
+    type: Array<{ value: string; count: number }>;
+    bpm: Array<{ value: string; count: number }>;
+    key: Array<{ value: string; count: number }>;
+  }>({ type: [], bpm: [], key: [] });
   const [facetBusy, setFacetBusy] = useState(false);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadSeq = useRef(0);
@@ -151,7 +184,11 @@ function ExplorerPane({
     setLibrarySearchError(null);
     try {
       const data = await fetchBrowseFacets(currentPath, 200);
-      setFacetOptions(data.facets?.type ?? []);
+      setFacetBuckets({
+        type: data.facets?.type ?? [],
+        bpm: data.facets?.bpm ?? [],
+        key: data.facets?.key ?? [],
+      });
     } catch (err) {
       setLibrarySearchError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -195,9 +232,11 @@ function ExplorerPane({
       setError(null);
       setArchiveEntries(null);
       setArchiveError(null);
-      setLibraryHits(null);
-      setLibrarySearchError(null);
-      setSelectedEntry(null);
+        setLibraryHits(null);
+        setLibrarySearchError(null);
+        setSelectedEntry(null);
+        setFacetType("");
+        setFacetBuckets({ type: [], bpm: [], key: [] });
       try {
         const data = await browseDirectoryEnriched(path, stamp ?? "");
         if (seq !== loadSeq.current) return;
@@ -345,19 +384,19 @@ function ExplorerPane({
                 }}
               />
             </label>
-            <button
-              type="button"
-              className="text-btn"
+            <Button
+              variant="ghost"
+              size="sm"
               disabled={librarySearching || pathQuery.trim().length < 2}
               title="Recursive path search under this root"
               onClick={() => void runLibrarySearch()}
             >
               {librarySearching ? "Searching…" : "Search"}
-            </button>
+            </Button>
             {(libraryHits || pathQuery) && (
-              <button
-                type="button"
-                className="text-btn"
+              <Button
+                variant="ghost"
+                size="sm"
                 title="Clear search filter"
                 onClick={() => {
                   setPathQuery("");
@@ -366,39 +405,46 @@ function ExplorerPane({
                 }}
               >
                 Clear
-              </button>
+              </Button>
             )}
-            <button
-              type="button"
-              className="text-btn"
+            <Button
+              variant="ghost"
+              size="sm"
               disabled={facetBusy || !currentPath}
               title="Derive type/BPM/key facets for this folder"
               onClick={() => void loadFacets()}
             >
               {facetBusy ? "Facets…" : "Facets"}
-            </button>
+            </Button>
           </div>
 
-          {facetOptions.length > 0 && (
-            <div className="explorer-facet-strip" aria-label="Sample type facets">
+          {(facetBuckets.type.length > 0 || facetBuckets.bpm.length > 0 || facetBuckets.key.length > 0) && (
+            <div className="explorer-facet-groups">
               <button
                 type="button"
                 className={`bucket-chip ${!facetType ? "active" : ""}`.trim()}
                 onClick={() => setFacetType("")}
               >
-                All types
+                All facets
               </button>
-              {facetOptions.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  className={`bucket-chip ${facetType === opt.value ? "active" : ""}`.trim()}
-                  onClick={() => setFacetType(opt.value === facetType ? "" : opt.value)}
-                  title={`${opt.count} files`}
-                >
-                  {opt.value} ({opt.count})
-                </button>
-              ))}
+              <FacetStrip
+                label="Sample type facets"
+                options={facetBuckets.type}
+                selected={facetType}
+                onSelect={setFacetType}
+              />
+              <FacetStrip
+                label="BPM facets"
+                options={facetBuckets.bpm}
+                selected={facetType}
+                onSelect={setFacetType}
+              />
+              <FacetStrip
+                label="Key facets"
+                options={facetBuckets.key}
+                selected={facetType}
+                onSelect={setFacetType}
+              />
             </div>
           )}
 

@@ -123,7 +123,8 @@ Open Library from the top bar to browse paths while triaging.`,
         title: "Duplicates",
         body: `Review suspected duplicate products grouped by dedup key. Pick keepers, stage discards, export keeper CSV.
 Confidence chips: HIGH / MEDIUM. Group kinds include same_product and nested variants.
-Acoustic near-dupes (Chromaprint / heuristic) and fuzzy pack dupes (ssdeep/TLSH) are extra lanes on this screen — they do not replace engine groups.`,
+Acoustic near-dupes (Chromaprint / heuristic) and fuzzy pack dupes (ssdeep/TLSH) are extra lanes on this screen — they do not replace engine groups.
+Spot preview (Library explorer) can run an optional AcoustID lookup when ACOUSTID_CLIENT_KEY is set.`,
         media: { screenshot: "/help/duplicates-review.png" },
       },
       {

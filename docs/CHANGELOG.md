@@ -16,6 +16,15 @@ Git tag **v1.0.7** was published with a broken Windows NSIS pre-install hook (si
 - **Tabs primitive** — Skipped-files views, Investigation prefix/list, and Security audit/ledger use the shared Radix tab list
 - **Self-hosted fonts** — bundled IBM Plex (`@fontsource`); no Google Fonts CDN
 
+### Phase M UI wiring
+
+- **AcoustID** — Spot preview (non-compact) can look up MusicBrainz/AcoustID for the selected file
+- **Near-dupe lane** — Duplicates titles acoustic vs fuzzy pack results correctly
+- **Explorer facets** — type, BPM, and key chips; Search / Clear / Facets use the Button primitive
+- **Vendor research** — Plan research (KVR / vi-control / vendor) surfaces the documented pipeline
+- **License reconcile** — lists orphaned installs, not only counts
+- **Config** — `ACOUSTID_CLIENT_KEY` / `AUDIOTHECA_AIR_GAP` documented in `.env.example`
+
 ### Phase M — external sources (M1–M9)
 
 - **M3** — mutagen tag I/O; LUFS prefers **pyloudnorm** ITU-R BS.1770-4 (RMS proxy fallback); optional librosa BPM; analyze badges expose engine/source

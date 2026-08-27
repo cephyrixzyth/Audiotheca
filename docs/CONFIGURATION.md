@@ -70,6 +70,9 @@ Alternative allowlist file: `dedupe_reports/.library_roots.json` (see API securi
 | `AUDIOTHECA_METRICS_HISTORY` | Rolling telemetry samples for sparklines (default `60`) |
 | `AUDIOTHECA_AI_LOOKUP_PROVIDER` | `openai_compatible` for live AI lookup |
 | `AUDIOTHECA_AI_OPENAI_API_KEY` | API key when using OpenAI-compatible provider |
+| `ACOUSTID_CLIENT_KEY` | Optional AcoustID/MusicBrainz client key (`POST /api/audio/acoustid-lookup`; skipped if unset) |
+| `AUDIOTHECA_ACOUSTID_CLIENT` | Alternate name for the AcoustID client key |
+| `AUDIOTHECA_AIR_GAP` | Set `1` to disable outbound lookups (AcoustID, AI, harvest) |
 
 ---
 

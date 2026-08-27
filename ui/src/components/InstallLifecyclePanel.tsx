@@ -66,6 +66,9 @@ export function InstallLifecyclePanel() {
   const [presetName, setPresetName] = useState("Gold-Master");
   const [catalogUrl, setCatalogUrl] = useState("");
   const [licenseSummary, setLicenseSummary] = useState<string | null>(null);
+  const [orphanedInstalls, setOrphanedInstalls] = useState<
+    Array<{ display_name?: string; product_key?: string; install_path?: unknown }>
+  >([]);
 
   const reload = useCallback(() => {
     fetchInstallations()
@@ -267,6 +270,7 @@ export function InstallLifecyclePanel() {
       setLicenseSummary(
         `Licensed ${result.licensed_count} · Orphaned ${result.orphaned_count} · manifests: ${sources || "none found"}`,
       );
+      setOrphanedInstalls(Array.isArray(result.orphaned) ? result.orphaned.slice(0, 20) : []);
       setMsg("License reconcile complete — orphaned installs lack local entitlement manifests");
     } catch (err) {
       setError(err instanceof Error ? err.message : "License reconcile failed");
@@ -280,6 +284,16 @@ export function InstallLifecyclePanel() {
       {error && <div className="error">{error}</div>}
       {msg && <div className="banner dry">{msg}</div>}
       {licenseSummary && <p className="count-muted">{licenseSummary}</p>}
+      {orphanedInstalls.length > 0 && (
+        <ul className="count-muted" style={{ marginBottom: "0.75rem" }}>
+          {orphanedInstalls.map((row, index) => (
+            <li key={String(row.install_path ?? row.product_key ?? index)}>
+              {String(row.display_name || row.product_key || "unknown")}
+              {row.install_path ? ` — ${String(row.install_path)}` : ""}
+            </li>
+          ))}
+        </ul>
+      )}
 
       <div className="install-gold-master">
         <h4>Deployment presets (gold master)</h4>
