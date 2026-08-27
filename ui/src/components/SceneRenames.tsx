@@ -10,7 +10,7 @@ import {
   type SceneExecuteResponse,
 } from "../api/client";
 import type { SceneRenameItem } from "../types";
-import { Badge, Button } from "../ui";
+import { Badge, Button, VirtualTable } from "../ui";
 import { listHasPath, lookupByPath, pathKey } from "../utils/pathKey";
 import { useContextSidebar } from "./ContextSidebar";
 import { PathLink } from "./PathLink";
@@ -207,8 +207,11 @@ export function SceneRenames({ stamp }: Props) {
         />
       )}
 
-      <table className="data-table">
-        <thead>
+      <VirtualTable
+        items={visibleItems}
+        colCount={5}
+        estimateSize={80}
+        header={
           <tr>
             <th>Scene ID</th>
             <th>Proposed name</th>
@@ -216,70 +219,68 @@ export function SceneRenames({ stamp }: Props) {
             <th>Source</th>
             <th>Actions</th>
           </tr>
-        </thead>
-        <tbody>
-          {visibleItems.map((row) => {
-            const isApproved = listHasPath(approved, row.source_path);
-            const isRejected = lookupByPath(rejected, row.source_path) != null;
-            const displayName = lookupByPath(overrides, row.source_path) ?? row.proposed_name;
-            return (
-              <tr key={pathKey(row.source_path)} className={isRejected ? "rejected-row" : undefined}>
-                <td>
-                  <code>{row.scene_id}</code>
-                  {isApproved && <Badge tone="ready">approved</Badge>}
-                  {isRejected && <Badge tone="accent">rejected</Badge>}
-                </td>
-                <td>
-                  <strong>{displayName}</strong>
-                  <PathLink path={row.destination_path} />
-                </td>
-                <td>
-                  <Badge tone="accent" title={row.multipart_diagnosis || undefined}>
-                    {row.multipart_diagnosis_label || row.multipart_diagnosis || "—"}
-                  </Badge>
-                </td>
-                <td>
-                  <PathLink path={row.source_path} />
-                </td>
-                <td>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    title="Include this rename in the next dry-run or live execute"
-                    onClick={() => void handleApprove(row)}
-                  >
-                    Approve
-                  </Button>{" "}
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    title="Edit the proposed product folder name"
-                    onClick={() => void handleOverride(row)}
-                  >
-                    Edit name
-                  </Button>{" "}
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    title="Skip this rename — engine will not propose it again"
-                    onClick={() => void handleReject(row)}
-                  >
-                    Reject
-                  </Button>{" "}
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    title="Mark multipart set as missing part 01 — defers rename"
-                    onClick={() => void handleMissingPart01(row)}
-                  >
-                    Missing part01
-                  </Button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+        }
+        renderRow={(row, _index, rowAttrs) => {
+          const isApproved = listHasPath(approved, row.source_path);
+          const isRejected = lookupByPath(rejected, row.source_path) != null;
+          const displayName = lookupByPath(overrides, row.source_path) ?? row.proposed_name;
+          return (
+            <tr key={pathKey(row.source_path)} className={isRejected ? "rejected-row" : undefined} {...rowAttrs}>
+              <td>
+                <code>{row.scene_id}</code>
+                {isApproved && <Badge tone="ready">approved</Badge>}
+                {isRejected && <Badge tone="accent">rejected</Badge>}
+              </td>
+              <td>
+                <strong>{displayName}</strong>
+                <PathLink path={row.destination_path} />
+              </td>
+              <td>
+                <Badge tone="accent" title={row.multipart_diagnosis || undefined}>
+                  {row.multipart_diagnosis_label || row.multipart_diagnosis || "—"}
+                </Badge>
+              </td>
+              <td>
+                <PathLink path={row.source_path} />
+              </td>
+              <td>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  title="Include this rename in the next dry-run or live execute"
+                  onClick={() => void handleApprove(row)}
+                >
+                  Approve
+                </Button>{" "}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  title="Edit the proposed product folder name"
+                  onClick={() => void handleOverride(row)}
+                >
+                  Edit name
+                </Button>{" "}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  title="Skip this rename — engine will not propose it again"
+                  onClick={() => void handleReject(row)}
+                >
+                  Reject
+                </Button>{" "}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  title="Mark multipart set as missing part 01 — defers rename"
+                  onClick={() => void handleMissingPart01(row)}
+                >
+                  Missing part01
+                </Button>
+              </td>
+            </tr>
+          );
+        }}
+      />
     </div>
   );
 }

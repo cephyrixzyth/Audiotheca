@@ -132,6 +132,8 @@ Primary nav: **Dashboard** · **Scan** · **Review** ▾ · **Library** · **Sys
 
 Most tabs support **drag-to-reorder sections** (Dashboard, Scan, and others); preferences persist in browser localStorage.
 
+**URLs:** every tab is a hash route (`#/scan`, `#/review/investigation`, `#/system/environment`, …). Browser back/forward works. The selected run lives in `?run=<stamp>` so a link can open a specific scan. Press **⌘K** / **Ctrl+K** (or **Search** in the top bar) to jump to any tab, spec code, or the library explorer.
+
 **File explorer:** open **Library** from the top bar, or click **Browse** on any path link. **Audio preview** on WAV/MP3/FLAC rows; **DropZone** when dragging files onto the explorer. Use **Pop out wide panel** for full-width review; dual-pane compare on two folders.
 
 **Themes:** use the ◐ selector in the top bar, or **Environment → Theme studio** for custom palettes. Buttons and accents follow the active theme (no hardcoded green).

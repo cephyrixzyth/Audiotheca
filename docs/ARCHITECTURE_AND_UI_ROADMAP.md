@@ -4,6 +4,8 @@ How Audiotheca evolved from a CLI script into a desktop product. **v10.0.0** shi
 
 **Shipped (UI 1.0.12 / engine 10.0):** Everything in 1.0.5 plus API **domain routers** (`api/routers/`), short-lived **access tickets**, logical **path keys** across feedback stores, stamp-scoped scene/archive overrides, dedupe **VERSION_COEXIST**, Vitest + Playwright smoke tests, and Tauri startup hardening (no aggressive port killing).
 
+**Unreleased UI (post-1.0.12):** token-driven **Radix primitives**, **HashRouter** deep-links for every tab, **⌘K** command palette, `?run=` persistence, and **virtualized** review tables. See [Changelog](CHANGELOG.md).
+
 **Roadmap complete:** SQLite job store, archive diff wizard, reference dedupe, feedback exports, and spec waves A–R are implemented. Optional future work: native chromaprint, live Gluetun routing, full JUCE DAW plugin build.
 
 See the [main README](../README.md) for current tab list and [Feature Guide](FEATURE_GUIDE.md) for phase details.

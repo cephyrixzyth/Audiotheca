@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchAuditLog, fetchRuntimePolicy, fetchTransactionLedger } from "../api/client";
+import { Tabs } from "../ui";
 
 export function AuditLogPanel() {
   const [audit, setAudit] = useState<Array<Record<string, unknown>>>([]);
@@ -28,14 +29,15 @@ export function AuditLogPanel() {
           {policy.outbound_allowed ? "allowed" : "blocked"}
         </p>
       )}
-      <div className="log-toolbar">
-        <button type="button" className={`log-level-btn ${tab === "audit" ? "active" : ""}`} onClick={() => setTab("audit")}>
-          Security audit
-        </button>
-        <button type="button" className={`log-level-btn ${tab === "ledger" ? "active" : ""}`} onClick={() => setTab("ledger")}>
-          Transaction ledger
-        </button>
-      </div>
+      <Tabs
+        aria-label="Audit log views"
+        value={tab}
+        onValueChange={(next) => setTab(next as "audit" | "ledger")}
+        items={[
+          { value: "audit", label: "Security audit" },
+          { value: "ledger", label: "Transaction ledger" },
+        ]}
+      />
       <div className="log-lines log-lines-fixed audit-log-lines">
         {rows.length === 0 ? (
           <div className="log-line log-detail">No entries yet.</div>

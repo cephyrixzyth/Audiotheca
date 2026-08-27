@@ -1,4 +1,4 @@
-import { Badge } from "../ui";
+import { Badge, VirtualTable } from "../ui";
 import { PathLink } from "./PathLink";
 
 export type ExecuteResultRow = {
@@ -52,40 +52,40 @@ export function ExecuteResultsPanel({
           {failCount ? ` · ${failCount} failed` : ""}
         </span>
       </header>
-      <div className="execute-results-table-wrap">
-        <table className="data-table compact execute-results-table">
-          <thead>
-            <tr>
-              <th>Path</th>
-              <th>Action</th>
-              <th>Status</th>
-              <th>Detail</th>
-            </tr>
-          </thead>
-          <tbody>
-            {results.map((row) => (
-              <tr key={`${row.path}:${row.action}`} className={row.ok ? "" : "row-failed"}>
-                <td>
-                  <PathLink path={row.path} />
-                </td>
-                <td>{row.action}</td>
-                <td>
-                  <Badge tone={row.ok ? "ready" : "review"}>
-                    {statusLabel(row.ok, dryRun, okDryRunLabel, okLiveLabel)}
-                  </Badge>
-                </td>
-                <td className="execute-results-detail">
-                  {row.error ? (
-                    <span className="error-text">{row.error}</span>
-                  ) : (
-                    row.detail ?? "—"
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <VirtualTable
+        items={results}
+        colCount={4}
+        estimateSize={40}
+        tableClassName="data-table compact execute-results-table"
+        header={
+          <tr>
+            <th>Path</th>
+            <th>Action</th>
+            <th>Status</th>
+            <th>Detail</th>
+          </tr>
+        }
+        renderRow={(row, _index, rowAttrs) => (
+          <tr key={`${row.path}:${row.action}`} className={row.ok ? "" : "row-failed"} {...rowAttrs}>
+            <td>
+              <PathLink path={row.path} />
+            </td>
+            <td>{row.action}</td>
+            <td>
+              <Badge tone={row.ok ? "ready" : "review"}>
+                {statusLabel(row.ok, dryRun, okDryRunLabel, okLiveLabel)}
+              </Badge>
+            </td>
+            <td className="execute-results-detail">
+              {row.error ? (
+                <span className="error-text">{row.error}</span>
+              ) : (
+                row.detail ?? "—"
+              )}
+            </td>
+          </tr>
+        )}
+      />
     </section>
   );
 }

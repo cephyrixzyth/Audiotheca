@@ -17,7 +17,7 @@ import {
   type HarvestSourcePreset,
   type VendorGap,
 } from "../api/client";
-import { Badge, Button, Kpi } from "../ui";
+import { Badge, Button, Kpi, VirtualTable } from "../ui";
 
 interface Props {
   stamp?: string;
@@ -264,36 +264,36 @@ export function VendorTools({ stamp }: Props) {
               Select all ({gaps.length})
             </Button>
           </div>
-          <div className="table-wrap" style={{ maxHeight: "360px", overflow: "auto", marginTop: "0.5rem" }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th />
-                  <th>Prefix</th>
-                  <th>Suggested company</th>
-                  <th>Items</th>
-                  <th>Keywords</th>
-                </tr>
-              </thead>
-              <tbody>
-                {gaps.map((row) => (
-                  <tr key={row.prefix}>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={gapSelected.has(row.prefix)}
-                        onChange={() => toggleGap(row.prefix)}
-                      />
-                    </td>
-                    <td>{row.prefix}</td>
-                    <td>{row.suggested_company}</td>
-                    <td>{row.count}</td>
-                    <td className="count-muted">{row.keywords.slice(0, 3).join(", ")}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <VirtualTable
+            items={gaps}
+            colCount={5}
+            estimateSize={40}
+            maxHeight={360}
+            header={
+              <tr>
+                <th />
+                <th>Prefix</th>
+                <th>Suggested company</th>
+                <th>Items</th>
+                <th>Keywords</th>
+              </tr>
+            }
+            renderRow={(row, _index, rowAttrs) => (
+              <tr key={row.prefix} {...rowAttrs}>
+                <td>
+                  <input
+                    type="checkbox"
+                    checked={gapSelected.has(row.prefix)}
+                    onChange={() => toggleGap(row.prefix)}
+                  />
+                </td>
+                <td>{row.prefix}</td>
+                <td>{row.suggested_company}</td>
+                <td>{row.count}</td>
+                <td className="count-muted">{row.keywords.slice(0, 3).join(", ")}</td>
+              </tr>
+            )}
+          />
         </section>
       )}
 
@@ -387,45 +387,45 @@ export function VendorTools({ stamp }: Props) {
               Reject selected
             </Button>
           </div>
-          <div className="table-wrap" style={{ maxHeight: "320px", overflow: "auto" }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th />
-                  <th>Company</th>
-                  <th>Keywords</th>
-                  <th>Category</th>
-                  <th>Source</th>
-                  <th>Conf.</th>
-                </tr>
-              </thead>
-              <tbody>
-                {candidates.map((row) => (
-                  <tr key={row.harvest_id} className={row.already_known ? "muted-row" : ""}>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={selected.has(row.harvest_id)}
-                        onChange={() => toggleSelect(row.harvest_id)}
-                      />
-                    </td>
-                    <td>
-                      {row.company}
-                      {row.already_known && (
-                        <Badge tone="neutral" style={{ marginLeft: "0.35rem" }}>
-                          known
-                        </Badge>
-                      )}
-                    </td>
-                    <td className="count-muted">{row.keywords.slice(0, 4).join(", ")}</td>
-                    <td>{row.category}</td>
-                    <td className="count-muted">{row.source_label}</td>
-                    <td>{row.confidence}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <VirtualTable
+            items={candidates}
+            colCount={6}
+            estimateSize={40}
+            maxHeight={320}
+            header={
+              <tr>
+                <th />
+                <th>Company</th>
+                <th>Keywords</th>
+                <th>Category</th>
+                <th>Source</th>
+                <th>Conf.</th>
+              </tr>
+            }
+            renderRow={(row, _index, rowAttrs) => (
+              <tr key={row.harvest_id} className={row.already_known ? "muted-row" : ""} {...rowAttrs}>
+                <td>
+                  <input
+                    type="checkbox"
+                    checked={selected.has(row.harvest_id)}
+                    onChange={() => toggleSelect(row.harvest_id)}
+                  />
+                </td>
+                <td>
+                  {row.company}
+                  {row.already_known && (
+                    <Badge tone="neutral" style={{ marginLeft: "0.35rem" }}>
+                      known
+                    </Badge>
+                  )}
+                </td>
+                <td className="count-muted">{row.keywords.slice(0, 4).join(", ")}</td>
+                <td>{row.category}</td>
+                <td className="count-muted">{row.source_label}</td>
+                <td>{row.confidence}</td>
+              </tr>
+            )}
+          />
         </section>
       )}
 

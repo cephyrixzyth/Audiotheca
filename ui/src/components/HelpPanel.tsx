@@ -73,6 +73,8 @@ Always start with dry-run. Live moves require confirm_live and STAGE LIVE in Sca
         title: "UI layout & themes",
         body: `18 built-in themes via the header theme picker — buttons and accents follow the active palette (no stuck green).
 
+Press ⌘K / Ctrl+K (or Search in the top bar) to jump to any tab, library path, spec code, or the UI kit. Every tab has a shareable hash URL (#/scan, #/review/duplicates, …). The selected run is in ?run= so it survives reloads and tab switches.
+
 Drag panel headers or ⠿ handles to reorder widgets. Group related panels with matching group ids; save/load named layouts from the preset bar on Dashboard and Scan.
 
 Dashboard works before your first scan — host metrics and Environment appear with empty KPI placeholders until a run exists.
@@ -165,7 +167,8 @@ Review multipart diagnosis before staging live renames.`,
         id: "scan-audit",
         title: "Scan audit",
         body: `Per-item scan status, ID method, confidence, and flags. Quick corrections without leaving the run.
-After a scan completes, Audiotheca may open this tab automatically.`,
+After a scan completes, Audiotheca may open this tab automatically.
+Large audits virtualize the table so scrolling stays smooth.`,
         media: { screenshot: "/help/scan-audit.png" },
       },
       {

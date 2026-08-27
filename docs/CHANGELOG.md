@@ -4,6 +4,18 @@
 
 Git tag **v1.0.7** was published with a broken Windows NSIS pre-install hook (sidecar processes not terminated before file copy). Installers from that tag may report locked files. Use **v1.0.8+** or **v1.0.12**. The remote tag is retained for history; do not delete without maintainer coordination.
 
+## Unreleased
+
+### UI design system & routing
+
+- **Radix primitives** — shared token-driven `Button`, `Badge`, `Card`, `Kpi`, `StatTile`, `Gauge`, `Dialog`, `Tooltip`, `Tabs`, and `VirtualTable` under `ui/src/ui/`; screens re-skinned without changing IA or data flow
+- **Hash routes** — every tab/sub-tab is deep-linkable (`#/dashboard`, `#/review/duplicates`, …); browser back/forward works; `/` redirects to Dashboard
+- **Selected run in the URL** — `?run=<stamp>` survives reloads, back/forward, and tab switches; defaults to the latest run
+- **Command palette** — ⌘K / Ctrl+K (or top-bar **Search**) jumps to tabs, library explorer, spec codes, and the UI-kit gallery (`#/ui-kit`)
+- **Virtualized tables** — Scan audit, Investigation, Skipped files, Restructure, Scene renames, Archives, Vendors, Security findings, Space recovery, execute results, and Library explorer window large result sets (small lists render unchanged)
+- **Tabs primitive** — Skipped-files views, Investigation prefix/list, and Security audit/ledger use the shared Radix tab list
+- **Self-hosted fonts** — bundled IBM Plex (`@fontsource`); no Google Fonts CDN
+
 ## Web UI & API 1.0.12
 
 Engine remains **10.0.0**.

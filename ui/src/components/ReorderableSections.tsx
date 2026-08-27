@@ -4,6 +4,7 @@ import { useSectionSpan } from "../hooks/useSectionSpan";
 import { useLayoutPresets } from "../hooks/useLayoutPresets";
 import { useGroupTitles } from "../hooks/useGroupTitles";
 import { canvasStyle, useCanvasLayout } from "../hooks/useCanvasLayout";
+import { Button } from "../ui";
 
 function bindHeaderPointerDrag(
   sectionId: string,
@@ -940,12 +941,12 @@ export function ReorderableSections({
           </span>
         </div>
         <div className="reorderable-hint-actions">
-          <button type="button" className="text-btn" title="Insert invisible vertical space" onClick={() => insertSpacerAfter(null)}>
+          <Button variant="ghost" size="sm" title="Insert invisible vertical space" onClick={() => insertSpacerAfter(null)}>
             + Space
-          </button>
-          <button type="button" className="text-btn" title="Restore default layout" onClick={resetOrder}>
+          </Button>
+          <Button variant="ghost" size="sm" title="Restore default layout" onClick={resetOrder}>
             Reset layout
-          </button>
+          </Button>
         </div>
       </div>
       <div className="layout-preset-bar">
@@ -956,12 +957,12 @@ export function ReorderableSections({
           value={presetName}
           onChange={(e) => setPresetName(e.target.value)}
         />
-        <button type="button" className="text-btn" onClick={handleSavePreset} disabled={!presetName.trim()}>
+        <Button variant="ghost" size="sm" onClick={handleSavePreset} disabled={!presetName.trim()}>
           Save layout
-        </button>
-        <button
-          type="button"
-          className="text-btn"
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
           title="Export all layout presets as JSON (BPRNT-SAVE)"
           onClick={() => {
             const text = exportBlueprint();
@@ -970,7 +971,7 @@ export function ReorderableSections({
           }}
         >
           Export JSON
-        </button>
+        </Button>
         <input
           type="text"
           className="field-input layout-preset-name"
@@ -978,9 +979,9 @@ export function ReorderableSections({
           value={importText}
           onChange={(e) => setImportText(e.target.value)}
         />
-        <button
-          type="button"
-          className="text-btn"
+        <Button
+          variant="ghost"
+          size="sm"
           disabled={!importText.trim()}
           onClick={() => {
             try {
@@ -993,7 +994,7 @@ export function ReorderableSections({
           }}
         >
           Import JSON
-        </button>
+        </Button>
         {presetNames.length > 0 && (
           <select
             className="field-input layout-preset-select"

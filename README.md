@@ -62,7 +62,7 @@ Web UI **1.0.12** ships the full **94-code architecture spec catalog** (waves A�
 | **Security** | Malware heuristics, ClamAV deep scan, quarantine/shred, SHA-256 hash lookup, MEM-SCAN, CTX-PROF elevation gate |
 | **Environment** | Toolchain health & repairs, **theme studio**, mount watcher, **cloud cache / S3** telemetry, **orchestration tools**, **spec catalog** registry, virtual paths, preview session (tempo/pitch/mix) |
 | **System ops** | Space recovery (underscore whitelist, hardlink/bloat plans), Vendors (gaps, harvest, keywords) |
-| **Layout** | Reorderable panels, named layout presets, 18 built-in themes, dashboard before first scan |
+| **Layout** | Reorderable panels, named layout presets, 18 built-in themes, dashboard before first scan, **⌘K** command palette, hash deep-links, `?run=` persistence |
 
 Primary navigation is grouped: **Dashboard** · **Scan** · **Review** · **Library** · **System** · **Help** (not a flat 14-tab row).
 
@@ -220,6 +220,10 @@ Dashboard · Scan · Review ▾ · Library · System ▾ · Help
 
 **Cross-cutting UI features (engine 10 / UI 1.0.12):**
 
+- **Hash routes** — every tab/sub-tab is a shareable URL (`#/dashboard`, `#/review/duplicates`, …); back/forward works.
+- **Command palette** — ⌘K / Ctrl+K or top-bar **Search**; jumps to tabs, library explorer, and all 94 spec codes.
+- **Selected run** — `?run=<stamp>` in the URL; survives reloads and tab switches.
+- **Virtualized tables** — review, scan-audit, skipped, archives, vendors, security, space recovery, execute results, and the library explorer window large result sets.
 - **In-app file explorer** — top-bar **Library**, or **Browse** on path links; list folders or archive contents without extracting.
 - **Audio preview (AUTO-AUD)** — hover/select WAV/MP3/FLAC in the explorer; waveform, LUFS/BPM/key badges; tempo sync and pitch from **Environment → Preview session**.
 - **DropZone (DRP-ZONE)** — drag files onto the explorer to route paths through the API.

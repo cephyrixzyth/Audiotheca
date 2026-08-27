@@ -6,7 +6,7 @@ import {
   type BrowseEntry,
 } from "../api/client";
 import { useExplorerPathDrag } from "../contexts/FileExplorerContext";
-import { Button } from "../ui";
+import { Button, VirtualTable, type VirtualRowAttrs } from "../ui";
 import { AudioPreviewStrip, isAuditionableFile } from "./AudioPreviewStrip";
 import { FileExplorerTree } from "./FileExplorerTree";
 import { ArchiveDiffWizard } from "./ArchiveDiffWizard";
@@ -271,31 +271,34 @@ function ExplorerPane({
           )}
 
           {!loading && !archiveEntries && (
-            <table className="data-table file-explorer-table">
-              <thead>
+            <VirtualTable
+              items={entries}
+              colCount={4}
+              estimateSize={40}
+              tableClassName="data-table file-explorer-table"
+              header={
                 <tr>
                   <th>Name</th>
                   <th>Type</th>
                   <th>Size</th>
                   <th>Audit</th>
                 </tr>
-              </thead>
-              <tbody>
-                {entries.map((entry) => (
-                  <ExplorerRow
-                    key={entry.path}
-                    entry={entry}
-                    autoAudition={hoverAuditionPath === entry.path && isAuditionableFile(entry.name)}
-                    onHover={(active) => setHoverAuditionDebounced(active ? entry.path : null)}
-                    onOpen={() => void openEntry(entry)}
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      setContextMenu({ x: e.clientX, y: e.clientY, entry });
-                    }}
-                  />
-                ))}
-              </tbody>
-            </table>
+              }
+              renderRow={(entry, _index, rowAttrs) => (
+                <ExplorerRow
+                  key={entry.path}
+                  entry={entry}
+                  rowAttrs={rowAttrs}
+                  autoAudition={hoverAuditionPath === entry.path && isAuditionableFile(entry.name)}
+                  onHover={(active) => setHoverAuditionDebounced(active ? entry.path : null)}
+                  onOpen={() => void openEntry(entry)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setContextMenu({ x: e.clientX, y: e.clientY, entry });
+                  }}
+                />
+              )}
+            />
           )}
         </div>
       </div>
@@ -352,12 +355,14 @@ function ExplorerRow({
   onContextMenu,
   onHover,
   autoAudition = false,
+  rowAttrs,
 }: {
   entry: BrowseEntry;
   onOpen: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
   onHover?: (active: boolean) => void;
   autoAudition?: boolean;
+  rowAttrs?: VirtualRowAttrs;
 }) {
   const drag = useExplorerPathDrag(entry.path);
   const auditLabel = [entry.vendor, entry.status, entry.investigation_bucket].filter(Boolean).join(" · ");
@@ -371,6 +376,7 @@ function ExplorerRow({
       onMouseLeave={() => onHover?.(false)}
       draggable={drag.draggable}
       onDragStart={drag.onDragStart}
+      {...rowAttrs}
     >
       <td>
         <div className="explorer-name-cell">

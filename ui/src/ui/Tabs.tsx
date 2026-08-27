@@ -5,7 +5,9 @@ import styles from "./Tabs.module.css";
 export interface TabItem {
   value: string;
   label: ReactNode;
-  content: ReactNode;
+  /** Omit to use the list as a switcher; parent renders the active pane. */
+  content?: ReactNode;
+  title?: string;
 }
 
 export interface TabsProps {
@@ -17,6 +19,7 @@ export interface TabsProps {
 }
 
 export function Tabs({ items, value, defaultValue, onValueChange, ...aria }: TabsProps) {
+  const panes = items.filter((item) => item.content != null);
   return (
     <RadixTabs.Root
       value={value}
@@ -25,12 +28,17 @@ export function Tabs({ items, value, defaultValue, onValueChange, ...aria }: Tab
     >
       <RadixTabs.List className={styles.list} aria-label={aria["aria-label"]}>
         {items.map((item) => (
-          <RadixTabs.Trigger key={item.value} value={item.value} className={styles.trigger}>
+          <RadixTabs.Trigger
+            key={item.value}
+            value={item.value}
+            className={styles.trigger}
+            title={item.title}
+          >
             {item.label}
           </RadixTabs.Trigger>
         ))}
       </RadixTabs.List>
-      {items.map((item) => (
+      {panes.map((item) => (
         <RadixTabs.Content key={item.value} value={item.value}>
           {item.content}
         </RadixTabs.Content>

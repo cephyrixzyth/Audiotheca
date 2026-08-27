@@ -11,7 +11,7 @@ import {
   spaceRecoveryReportDownload,
 } from "../api/client";
 import type { CoexistenceItem, JobSnapshot } from "../types";
-import { Button, Kpi } from "../ui";
+import { Button, Kpi, VirtualTable } from "../ui";
 import { PathLink } from "./PathLink";
 
 interface Props {
@@ -279,54 +279,48 @@ export function SpaceRecovery({ stamp }: Props) {
             Whitelist selected &amp; full dry scan ({selected.size})
           </Button>
         </div>
-        <div className="table-wrap">
-          <table className="data-table compact">
-            <thead>
-              <tr>
-                <th />
-                <th>Folder</th>
-                <th>Section</th>
-                <th>Source</th>
-                <th>Status</th>
-                <th>Path</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {underscore.map((row) => (
-                <tr key={row.path} className={row.whitelisted ? "row-ok" : ""}>
-                  <td>
-                    <input
-                      type="checkbox"
-                      checked={selected.has(row.path)}
-                      onChange={() => toggleSelect(row.path)}
-                      aria-label={`Select ${row.name}`}
-                    />
-                  </td>
-                  <td>{row.name}</td>
-                  <td>{row.section}</td>
-                  <td>{row.source}</td>
-                  <td>{row.whitelisted ? "Whitelisted" : "Skipped"}</td>
-                  <td>
-                    <PathLink path={row.path} />
-                  </td>
-                  <td>
-                    <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleWhitelist(row)}>
-                      {row.whitelisted ? "Remove" : "Whitelist"}
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-              {underscore.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="empty-cell">
-                    No `_`-prefixed vendor folders found for this run.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <VirtualTable
+          items={underscore}
+          colCount={7}
+          estimateSize={40}
+          tableClassName="data-table compact"
+          emptyMessage="No `_`-prefixed vendor folders found for this run."
+          header={
+            <tr>
+              <th />
+              <th>Folder</th>
+              <th>Section</th>
+              <th>Source</th>
+              <th>Status</th>
+              <th>Path</th>
+              <th />
+            </tr>
+          }
+          renderRow={(row, _index, rowAttrs) => (
+            <tr key={row.path} className={row.whitelisted ? "row-ok" : ""} {...rowAttrs}>
+              <td>
+                <input
+                  type="checkbox"
+                  checked={selected.has(row.path)}
+                  onChange={() => toggleSelect(row.path)}
+                  aria-label={`Select ${row.name}`}
+                />
+              </td>
+              <td>{row.name}</td>
+              <td>{row.section}</td>
+              <td>{row.source}</td>
+              <td>{row.whitelisted ? "Whitelisted" : "Skipped"}</td>
+              <td>
+                <PathLink path={row.path} />
+              </td>
+              <td>
+                <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleWhitelist(row)}>
+                  {row.whitelisted ? "Remove" : "Whitelist"}
+                </Button>
+              </td>
+            </tr>
+          )}
+        />
       </section>
 
       <section>
@@ -344,43 +338,37 @@ export function SpaceRecovery({ stamp }: Props) {
         <p className="count-muted">
           Showing {coexistence.length} of {coexistenceTotal.toLocaleString()}
         </p>
-        <div className="table-wrap">
-          <table className="data-table compact">
-            <thead>
-              <tr>
-                <th>Item</th>
-                <th>Section</th>
-                <th>Archive / installer</th>
-                <th>Extracted</th>
-                <th>Suggested action</th>
-                <th>Path</th>
-              </tr>
-            </thead>
-            <tbody>
-              {coexistence.map((row) => (
-                <tr key={`${row.item_path}-${row.archive_or_installer}`}>
-                  <td>{row.item_name}</td>
-                  <td>{row.section}</td>
-                  <td>{row.archive_or_installer.split(/[/\\]/).pop()}</td>
-                  <td>{row.extracted_folder || "—"}</td>
-                  <td className="truncate" title={row.suggested_action}>
-                    {row.suggested_action}
-                  </td>
-                  <td>
-                    <PathLink path={row.item_path} />
-                  </td>
-                </tr>
-              ))}
-              {coexistence.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="empty-cell">
-                    No rows for this filter.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <VirtualTable
+          items={coexistence}
+          colCount={6}
+          estimateSize={40}
+          tableClassName="data-table compact"
+          emptyMessage="No rows for this filter."
+          header={
+            <tr>
+              <th>Item</th>
+              <th>Section</th>
+              <th>Archive / installer</th>
+              <th>Extracted</th>
+              <th>Suggested action</th>
+              <th>Path</th>
+            </tr>
+          }
+          renderRow={(row, _index, rowAttrs) => (
+            <tr key={`${row.item_path}-${row.archive_or_installer}`} {...rowAttrs}>
+              <td>{row.item_name}</td>
+              <td>{row.section}</td>
+              <td>{row.archive_or_installer.split(/[/\\]/).pop()}</td>
+              <td>{row.extracted_folder || "—"}</td>
+              <td className="truncate" title={row.suggested_action}>
+                {row.suggested_action}
+              </td>
+              <td>
+                <PathLink path={row.item_path} />
+              </td>
+            </tr>
+          )}
+        />
       </section>
     </div>
   );

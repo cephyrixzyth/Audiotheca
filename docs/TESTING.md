@@ -143,8 +143,8 @@ Use this order on **your** library (dry-run only until you trust results).
 | Step | Action | Pass criteria |
 |------|--------|---------------|
 | 1 | `python -m pytest tests/ -q` | All tests green |
-| 1b | `cd ui && npm test` | Vitest unit tests green (`pathKey.test.ts`) |
-| 1c | `cd ui && npm run test:e2e` | Playwright scan-flow smoke passes (API must be running) |
+| 1b | `cd ui && npm test` | Vitest unit tests green (`routes`, `run` param, button variants, stat viz, `pathKey`) |
+| 1c | `cd ui && npm run test:e2e` | Playwright nav-smoke + scan-flow (API must be running) |
 | 2 | Temp-folder dry run (above) | `Run_Summary_*.txt` appears |
 | 3 | Full dry run on real library | Engine completes; 0 unexpected failures in log |
 | 4 | Open UI → **Dashboard** | Latest run listed; gauges load |
@@ -165,11 +165,11 @@ From `ui/` after `npm install`:
 
 ```powershell
 cd ui
-npm test                  # Vitest — path key helpers (fast, no browser)
-npm run test:e2e          # Playwright — scan flow smoke (needs API on 8787 + dev server)
+npm test                  # Vitest — routes, run param, primitives, path keys (fast, no browser)
+npm run test:e2e          # Playwright — nav smoke + scan flow (needs API on 8787 + dev server)
 ```
 
-Playwright config: `ui/playwright.config.ts`. E2E spec: `ui/e2e/scan-flow.spec.ts`.
+Playwright config: `ui/playwright.config.ts`. E2E specs: `ui/e2e/nav-smoke.spec.ts` (routes, command palette, `?run=`), `ui/e2e/scan-flow.spec.ts`.
 CI runs Vitest (`npm test`) plus the production UI build; Playwright remains a local/manual smoke.
 
 For CI-style runs, start the API in one terminal (`python -m api.server`) before `npm run test:e2e`.

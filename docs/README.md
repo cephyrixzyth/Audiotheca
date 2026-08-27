@@ -41,7 +41,7 @@ Engine **10.0.0** · Web UI **1.0.12**
 
 ## Web UI tabs (reference)
 
-Primary nav: **Dashboard** · **Scan** · **Review** ▾ · **Library** · **System** ▾ · **Help** (last).
+Primary nav: **Dashboard** · **Scan** · **Review** ▾ · **Library** · **System** ▾ · **Help** (last). Hash URLs (`#/scan`, `#/review/duplicates`, …) and **⌘K** / **Ctrl+K** command palette.
 
 **Review:** Investigation · Duplicates · Restructure · Archives · Scene renames · Scan audit · Skipped files
 
