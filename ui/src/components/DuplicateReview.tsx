@@ -16,6 +16,8 @@ import {
   type ManualDuplicateFinding,
 } from "../api/client";
 import type { DuplicateGroup } from "../types";
+import { Badge, Button } from "../ui";
+import type { BadgeTone } from "../ui";
 import { useLibraryRoot } from "../hooks/useLibraryRoot";
 import { PathLink } from "./PathLink";
 import { useContextSidebar } from "./ContextSidebar";
@@ -41,6 +43,16 @@ const REJECT_LABELS: Record<string, string> = {
 function dedupKeyFingerprint(dedupKey: string): string {
   const pipe = dedupKey.indexOf("|");
   return pipe >= 0 ? dedupKey.slice(pipe + 1) : dedupKey;
+}
+
+const CONFIDENCE_TONE: Record<string, BadgeTone> = {
+  high: "high",
+  medium: "medium",
+  low: "review",
+};
+
+function confidenceTone(confidence: string): BadgeTone {
+  return CONFIDENCE_TONE[confidence.toLowerCase()] ?? "neutral";
 }
 
 export function DuplicateReview({ stamp }: Props) {
@@ -280,56 +292,44 @@ export function DuplicateReview({ stamp }: Props) {
             ? "Loading…"
             : `${total} groups · ${decidedCount} keepers · ${rejections.length} rejected · ${manualFindings.length} manual`}
         </span>
-        <button
-          type="button"
-          className="primary-btn"
+        <Button
+          variant="primary"
           disabled={decidedCount === 0}
           title="Persist keeper choices to approved.json for staging"
           onClick={() => void handleSave()}
         >
           Save decisions
-        </button>
-        <button
-          type="button"
-          className="keeper-btn"
+        </Button>
+        <Button
+          variant="secondary"
           disabled={decidedCount === 0}
           title="Simulate moving non-keeper copies to _delete-canidates"
           onClick={() => void handlePreviewDeletes()}
         >
           Preview deletes
-        </button>
-        <button
-          type="button"
-          className="danger-btn"
+        </Button>
+        <Button
+          variant="danger"
           disabled={decidedCount === 0}
           title="Move non-keeper duplicates to _delete-canidates on disk"
           onClick={() => void handleStageDeletes()}
         >
           Stage deletes
-        </button>
-        <button
-          type="button"
-          className="text-btn"
+        </Button>
+        <Button
+          variant="ghost"
           title="Report a duplicate pair the engine missed — feeds next-scan tuning"
           onClick={() => setShowManual((v) => !v)}
         >
           Report manual dupe
-        </button>
-        <button
-          type="button"
-          className="text-btn"
-          onClick={() => void feedbackExportDownload(stamp)}
-        >
+        </Button>
+        <Button variant="ghost" onClick={() => void feedbackExportDownload(stamp)}>
           Export feedback CSV
-        </button>
+        </Button>
         {savedCount > 0 && (
-          <button
-            type="button"
-            className="text-btn"
-            onClick={() => void downloadDecisionsDownload(stamp)}
-          >
+          <Button variant="ghost" onClick={() => void downloadDecisionsDownload(stamp)}>
             approved.json
-          </button>
+          </Button>
         )}
       </div>
 
@@ -364,9 +364,9 @@ export function DuplicateReview({ stamp }: Props) {
             Note
             <input value={manualNote} onChange={(e) => setManualNote(e.target.value)} placeholder="Why these are dupes" />
           </label>
-          <button type="button" className="primary-btn" onClick={() => void handleManualSubmit()}>
+          <Button variant="primary" onClick={() => void handleManualSubmit()}>
             Submit finding
-          </button>
+          </Button>
         </div>
       )}
 
@@ -387,17 +387,13 @@ export function DuplicateReview({ stamp }: Props) {
           >
             <header>
               <h3>{group.dedup_key}</h3>
-              <span className={`badge ${group.confidence.toLowerCase()}`}>
-                {group.confidence}
-              </span>
-              <span className="badge bucket">{group.group_kind}</span>
+              <Badge tone={confidenceTone(group.confidence)}>{group.confidence}</Badge>
+              <Badge tone="accent">{group.group_kind}</Badge>
               {group.content_check && (
                 <span className="count-muted">hash: {group.content_check}</span>
               )}
-              {keepers[group.dedup_key] && (
-                <span className="badge ready">keeper set</span>
-              )}
-              {rejected && <span className="badge review">bad match</span>}
+              {keepers[group.dedup_key] && <Badge tone="ready">keeper set</Badge>}
+              {rejected && <Badge tone="review">bad match</Badge>}
               <HoverMenu
                 actions={rejectReasons.map((reason) => ({
                   id: reason,
@@ -419,14 +415,15 @@ export function DuplicateReview({ stamp }: Props) {
                   key={member.full_path}
                   className={`member-row ${isKeeper ? "keeper-selected" : ""}`}
                 >
-                  <button
-                    type="button"
-                    className={`keeper-btn ${isKeeper ? "active" : ""}`}
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    active={isKeeper}
                     onClick={() => pickKeeper(group.dedup_key, member.full_path)}
                     title="Mark as keeper"
                   >
                     {isKeeper ? "KEEP" : "keep?"}
-                  </button>
+                  </Button>
                   <div>
                     <div>
                       <strong>{member.item_name}</strong>{" "}
