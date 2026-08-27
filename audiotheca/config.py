@@ -72,6 +72,8 @@ INVESTIGATION_BUCKETS: dict[str, str] = {
     "_generic_name": "Name too generic after fingerprint stripping",
     "_preset_or_snippet": "Small preset/patch pack without identifiable product context",
     "_sample_pack": "Loop/drum/sample kit part folder — link to parent pack, not a standalone product",
+    "_licensed": "Present in a local vendor install / entitlement manifest",
+    "_orphaned_install": "Installed locally but missing from license manifests",
 }
 
 # Section bin name fragments that indicate sample/loop libraries

@@ -257,6 +257,7 @@ See [Quick User Guide](USER_GUIDE.md) for launch commands and troubleshooting.
 
 ## What Audiotheca is not
 
-- Not AcoustID / audio-waveform dedupe
+- Not a cloud marketplace or Soundminer replacement
+- Acoustic near-dupes (Chromaprint) and optional AcoustID lookup are opt-in — default dedupe is still metadata fingerprint + sparse hash
 - Not a real-time watcher
 - Not a replacement for Soundminer UCS tooling (yet)

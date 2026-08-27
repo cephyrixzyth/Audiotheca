@@ -16,9 +16,26 @@ Git tag **v1.0.7** was published with a broken Windows NSIS pre-install hook (si
 - **Tabs primitive** — Skipped-files views, Investigation prefix/list, and Security audit/ledger use the shared Radix tab list
 - **Self-hosted fonts** — bundled IBM Plex (`@fontsource`); no Google Fonts CDN
 
+### Phase M — external sources (M1–M9)
+
+- **M3** — mutagen tag I/O; LUFS prefers **pyloudnorm** ITU-R BS.1770-4 (RMS proxy fallback); optional librosa BPM; analyze badges expose engine/source
+- **M1** — `POST /api/audio/near-dupes` Chromaprint near-dupe lane + Duplicates UI button (heuristic fallback)
+- **M2** — Explorer instant folder filter, `GET /api/browse/search`, Spot preview strip on selection
+- **M4** — fuzzy pack/installer similarity (`ssdeep`/`TLSH` soft + rolling fallback); `POST /api/tools/fuzzy-hash`
+- **M5** — RF64/ds64 container parse; optional AcoustID lookup (`ACOUSTID_CLIENT_KEY`)
+- **M6** — sample facets (type/BPM/key/path); Explorer facet strip; `GET /api/browse/facets`
+- **M7** — license reconcile vs Native Access / PA / iLok-style local manifests; `_licensed` / `_orphaned_install` buckets
+- **M8** — KVR + vi-control harvest/SearX presets + [VENDOR_RESEARCH.md](VENDOR_RESEARCH.md)
+- **M9** — PE capability hints (pefile capa-lite) on security scan + `POST /api/security/pe-hints`
+
 ## Web UI & API 1.0.12
 
 Engine remains **10.0.0**.
+
+### Follow-on (post-1.0.12 hardening, on `main`)
+
+- Opaque HttpOnly sessions + proxy secret; scoped single-use download tickets; path `..` collapse; Unraid template/docs sync
+- **Sources inventory** — [SOURCES.md](SOURCES.md) + **Phase M** in [ROADMAP_REMAINING.md](ROADMAP_REMAINING.md)
 
 ### API architecture & security
 

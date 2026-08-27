@@ -558,6 +558,8 @@ export interface MalwareFinding {
   reasons: string[];
   sha256: string;
   lookup?: Record<string, string>;
+  capabilities?: Array<{ id: string; severity: string; description: string; engine?: string }>;
+  capability_severity?: string;
   clamav?: { status: string; engine?: string | null; detail?: string };
   /** @deprecated Legacy scan reports may include defender instead of clamav */
   defender?: { status: string; detail?: string };

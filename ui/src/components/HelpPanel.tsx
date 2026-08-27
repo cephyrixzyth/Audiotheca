@@ -89,6 +89,7 @@ Library: top bar opens the explorer; sidebar has Browse roots, Pop out wide pane
 
 • Investigation — browse candidate folders while assigning vendors; Pop out for wide path review.
 • Duplicates — open keeper vs discard paths side by side; dual-pane compare on two folders.
+• Filter the current folder instantly; library-wide search and type/BPM/key facets sit above the listing. Click a WAV/FLAC to Spot-preview in the strip below.
 • Restructure — preview source vs planned destination trees before staging live moves.
 • Archives — list .zip/.rar contents inline; Diff vs extracted folder from the explorer toolbar.
 • Scan audit / Skipped — jump from a row to the on-disk path without leaving the run context.
@@ -121,7 +122,8 @@ Open Library from the top bar to browse paths while triaging.`,
         id: "duplicates",
         title: "Duplicates",
         body: `Review suspected duplicate products grouped by dedup key. Pick keepers, stage discards, export keeper CSV.
-Confidence chips: HIGH / MEDIUM. Group kinds include same_product and nested variants.`,
+Confidence chips: HIGH / MEDIUM. Group kinds include same_product and nested variants.
+Acoustic near-dupes (Chromaprint / heuristic) and fuzzy pack dupes (ssdeep/TLSH) are extra lanes on this screen — they do not replace engine groups.`,
         media: { screenshot: "/help/duplicates-review.png" },
       },
       {
@@ -198,6 +200,7 @@ Review planned space savings before live execute.`,
         id: "security",
         title: "Security",
         body: `Malware heuristics, underscore whitelist, hash lookup, and quarantine before live deletes.
+PE capability hints (capa-lite) appear on findings when the file is a Windows binary.
 Run security scan after investigation when unknown vendors remain.`,
         media: { screenshot: "/help/security-malware.png" },
       },
@@ -209,6 +212,7 @@ Run security scan after investigation when unknown vendors remain.`,
 Themes editor — 18 built-in palettes; buttons and accents follow the active theme.
 
 Installation registry API (v1.0.1+): custom tags, notes, dependencies, gold-master presets at /api/installations.
+License reconcile compares installs to local Native Access / Plugin Alliance / iLok-style manifests.
 
 Docker / NAS: deploy/unraid/ stack; GHCR images ghcr.io/chrisjrovira/audiotheca on release tags.`,
         media: { screenshot: "/help/environment-themes.png" },
@@ -217,6 +221,7 @@ Docker / NAS: deploy/unraid/ stack; GHCR images ghcr.io/chrisjrovira/audiotheca 
         id: "vendors",
         title: "Vendors",
         body: `Add vendor keywords, harvest gaps from investigation, export feedback JSON for the next engine run.
+KVR and vi-control harvest/SearX presets feed the documented research pipeline (Vendors → research).
 Pair with Investigation tab for unknown-vendor triage.`,
         media: {
           screenshot: "/help/investigation-inbox.png",

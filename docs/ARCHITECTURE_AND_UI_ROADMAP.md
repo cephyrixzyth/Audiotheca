@@ -144,6 +144,8 @@ CREATED → SCANNING → RECONCILING → PLANNING → AWAITING_APPROVAL → EXEC
 | [soundaudit](https://pypi.org/project/soundaudit/) | Separate **scan** from **analyze** passes; hash tiers |
 | [MusicDeduplicator](https://github.com/JameZUK/MusicDeduplicator) | Metadata block first, fingerprint confirm second |
 
+**Next sources (not yet implemented):** BaseHead, Sononym, ADSR Sample Manager, Essentia, mutagen, ssdeep/TLSH, RF64, BS.1770 — full inventory in [SOURCES.md](SOURCES.md); backlog in [ROADMAP_REMAINING.md Phase M](ROADMAP_REMAINING.md#phase-m--external-sources-build-out).
+
 ---
 
 ## Phase 2 — Desktop UI (8–12 weeks)
@@ -224,7 +226,7 @@ Never auto-delete both — same safety model as today.
 | Size-bucket blocking | dedupe.io | High |
 | Parent link for `_likely_component` | Custom | High |
 | Full hash &lt; 200 MB | soundaudit, klauspost/dedup | Medium |
-| Audio fingerprint WAV/FLAC | MusicDeduplicator / AcoustID | Medium |
+| Audio fingerprint WAV/FLAC | MusicDeduplicator / AcoustID | Medium — **shipped** (Phase M Chromaprint near-dupes + optional AcoustID) |
 | UCS category hints | [Universal Category System](https://universalcategorysystem.com/) | Medium |
 | Soundminer-style metadata fields | Soundminer | Low |
 | Incremental scan (skip unchanged sections) | soundaudit | Medium |
