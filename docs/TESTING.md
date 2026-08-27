@@ -43,12 +43,12 @@ pip install -r requirements.txt
 Verify:
 
 ```powershell
-python -c "import pefile, rapidfuzz, tqdm, fastapi; print('deps OK')"
+python -c "import pefile, rapidfuzz, tqdm, fastapi, mutagen, pyloudnorm; print('deps OK')"
 python -m pytest tests/ -q
 ```
 
-Expect **591+ tests passing** (4 skipped without local Run_Summary fixtures). Failures often mean missing packages or wrong Python version.
-Auth/session/ticket regressions live in `tests/test_auth_session_tickets.py` and path-hardening cases in `tests/test_review_hardening.py`.
+Expect **617+ tests passing** (Phase M coverage in `tests/test_phase_m.py` and `tests/test_phase_m49.py`; a few skipped without local Run_Summary fixtures). Failures often mean missing packages or wrong Python version.
+Auth/session/ticket regressions live in `tests/test_auth_session_tickets.py` and path-hardening cases in `tests/test_review_hardening.py`. AcoustID lookup tests skip without `ACOUSTID_CLIENT_KEY`.
 
 ---
 

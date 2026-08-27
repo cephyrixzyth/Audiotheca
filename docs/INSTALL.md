@@ -109,8 +109,10 @@ pip install -r requirements.txt
 
 | Package | Purpose |
 | --- | --- |
-| `pefile` | PE `CompanyName` vendor ID |
+| `pefile` | PE `CompanyName` vendor ID + capability hints |
 | `rapidfuzz` | Fuzzy duplicate name matching |
+| `mutagen` | WAV/FLAC/AIFF/MP3 tag I/O (Phase M3) |
+| `numpy` / `pyloudnorm` | ITU-R BS.1770 integrated loudness (RMS proxy if missing) |
 | `tqdm` | Scan progress bar with ETA |
 | `psutil` | CPU/RAM metrics in Dashboard (optional) |
 | `fastapi` / `uvicorn` | Local API for web UI |
@@ -131,7 +133,7 @@ pip install -r requirements.txt
 Verify:
 
 ```powershell
-python -c "import pefile; import rapidfuzz; import tqdm; print('OK')"
+python -c "import pefile; import rapidfuzz; import tqdm; import mutagen; import pyloudnorm; print('OK')"
 where.exe 7z
 python -c "from archive_peek import find_7z; print(find_7z())"
 python -m pytest tests/ -q

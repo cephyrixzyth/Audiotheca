@@ -106,7 +106,7 @@ Primary nav: **Dashboard** · **Scan** · **Review** ▾ · **Library** · **Sys
 | --- | --- |
 | **Dashboard** | Works before first scan — host metrics, environment health, quick links; pick run for route-ready gauges and compare runs |
 | **Scan** | Start dry-run; **Processing flow** presets; live WebSocket progress; **AI lookup** panel |
-| **Library** | Shared explorer — browse roots, **Pop out**, dual-pane compare, **audio preview**, **DropZone** |
+| **Library** | Shared explorer — browse roots, **Pop out**, dual-pane compare, folder filter / library search, type·BPM·key facets, **audio preview**, **DropZone** |
 | **Help** | Built-in guides with screenshots and GIFs |
 
 ### Review sub-tabs
@@ -114,7 +114,7 @@ Primary nav: **Dashboard** · **Scan** · **Review** ▾ · **Library** · **Sys
 | Tab | What you do |
 | --- | --- |
 | **Investigation** | Filter buckets, bulk correct, group by prefix, export feedback; **Investigation lookup** (WEB-SPDR, TAG-GEN, NFO-PARSE) |
-| **Duplicates** | Pick keeper, reject bad groups, preview/stage deletes, manual dupes |
+| **Duplicates** | Pick keeper, reject bad groups, preview/stage deletes, manual dupes; **Acoustic near-dupes** (Chromaprint) and **Fuzzy pack dupes** (ssdeep/TLSH) as extra lanes |
 | **Restructure** | Preview routes; execute approved sections (live, confirmed) |
 | **Archives** | Archive peek verdicts; redundant archive size summary; **Diff** wizard |
 | **Scene renames** | Hash folder → product name proposals |
@@ -126,15 +126,15 @@ Primary nav: **Dashboard** · **Scan** · **Review** ▾ · **Library** · **Sys
 | Tab | What you do |
 | --- | --- |
 | **Space recovery** | Coexistence summary, **underscore vendor whitelist**, disk reclaim links |
-| **Security** | Malware heuristics, quarantine/shred, SHA-256 hash lookup, MEM-SCAN |
-| **Environment** | Dependency health, repairs, **theme studio**, mount watcher, **cloud/S3 telemetry**, **orchestration tools**, **94-code spec catalog**, virtual paths, preview session |
-| **Vendors** | Vendor gaps, bulk add keywords, web harvest inbox, unified export |
+| **Security** | Malware heuristics, PE capability hints, quarantine/shred, SHA-256 hash lookup, MEM-SCAN |
+| **Environment** | Dependency health, repairs, **theme studio**, install registry + **License reconcile**, mount watcher, **cloud/S3 telemetry**, **orchestration tools**, **94-code spec catalog**, virtual paths, preview session |
+| **Vendors** | Vendor gaps, bulk add keywords, KVR / vi-control harvest + research pipeline, unified export |
 
 Most tabs support **drag-to-reorder sections** (Dashboard, Scan, and others); preferences persist in browser localStorage.
 
 **URLs:** every tab is a hash route (`#/scan`, `#/review/investigation`, `#/system/environment`, …). Browser back/forward works. The selected run lives in `?run=<stamp>` so a link can open a specific scan. Press **⌘K** / **Ctrl+K** (or **Search** in the top bar) to jump to any tab, spec code, or the library explorer.
 
-**File explorer:** open **Library** from the top bar, or click **Browse** on any path link. **Audio preview** on WAV/MP3/FLAC rows; **DropZone** when dragging files onto the explorer. Use **Pop out wide panel** for full-width review; dual-pane compare on two folders.
+**File explorer:** open **Library** from the top bar, or click **Browse** on any path link. Type to filter the current folder, or run a library-wide search; type/BPM/key **facets** sit above the listing. Click a WAV/FLAC for **Spot preview**. **Audio preview** on WAV/MP3/FLAC rows; **DropZone** when dragging files onto the explorer. Use **Pop out wide panel** for full-width review; dual-pane compare on two folders.
 
 **Themes:** use the ◐ selector in the top bar, or **Environment → Theme studio** for custom palettes. Buttons and accents follow the active theme (no hardcoded green).
 

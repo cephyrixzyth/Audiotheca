@@ -144,7 +144,7 @@ CREATED → SCANNING → RECONCILING → PLANNING → AWAITING_APPROVAL → EXEC
 | [soundaudit](https://pypi.org/project/soundaudit/) | Separate **scan** from **analyze** passes; hash tiers |
 | [MusicDeduplicator](https://github.com/JameZUK/MusicDeduplicator) | Metadata block first, fingerprint confirm second |
 
-**Next sources (not yet implemented):** BaseHead, Sononym, ADSR Sample Manager, Essentia, mutagen, ssdeep/TLSH, RF64, BS.1770 — full inventory in [SOURCES.md](SOURCES.md); backlog in [ROADMAP_REMAINING.md Phase M](ROADMAP_REMAINING.md#phase-m--external-sources-build-out).
+**Phase M shipped** (Sononym near-dupes, explorer search/Spot, mutagen + pyloudnorm BS.1770, fuzzy packs, RF64, optional AcoustID). Remaining deepeners (Essentia, native ssdeep/TLSH wheels, yara-python) live in [SOURCES.md](SOURCES.md).
 
 ---
 

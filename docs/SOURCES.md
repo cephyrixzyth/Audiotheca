@@ -1,8 +1,8 @@
 # Audiotheca — External Sources
 
 Inventory of products, libraries, standards, and tools that shape Audiotheca.
-**Considered** = already cited or shipped against. **Candidates** = not yet in
-roadmaps/docs but useful for the next build-out (Phase M).
+**Considered** = already cited or shipped against. **Candidates** = remaining
+deepeners after Phase M (not a new product pivot).
 
 Engine **10.0.0** · Web UI **1.0.12** · Related: [Architecture roadmap](ARCHITECTURE_AND_UI_ROADMAP.md) · [Remaining roadmap](ROADMAP_REMAINING.md)
 
@@ -45,6 +45,8 @@ Candidate sources below are filtered for that threat model.
 | **EBU Tech 3285** | Fixed-width `bext` | `bwf_metadata.py` |
 | **UCS** ([universalcategorysystem.com](https://universalcategorysystem.com/)) | Filename / category hints | `ucs_map.py`, Phase I5 |
 | LUFS / BPM / key badges | Specs LUFS-NORM, BPM-DET, K-DET; BS.1770 via pyloudnorm when installed | SPEC_CATALOG, preview UI, `audio_wave.py` |
+| **RF64 / MBWF** | WAV/BWF > 4 GB | `rf64.py`, BWF metadata |
+| **AcoustID / MusicBrainz** | Optional fingerprint → catalog lookup | `acoustid_lookup.py` (`ACOUSTID_CLIENT_KEY`) |
 | **[Sononym](https://www.sononym.net/)** | Acoustic near-dupe / cross-format similarity lane | `acoustic_near_dupe.py`, Duplicates UI |
 | **[BaseHead](https://baseheadinc.com/)** / Everything / Directory Opus | Explorer path search + Spot preview | `GET /api/browse/search`, `FileExplorer.tsx` |
 
@@ -56,6 +58,8 @@ Candidate sources below are filtered for that threat model.
 | FastAPI, uvicorn, pydantic | API |
 | Chromaprint / `fpcalc` / pyacoustid | Acoustic fingerprint path |
 | mutagen, numpy, pyloudnorm | Tag I/O + ITU-R BS.1770 loudness (Phase M3) |
+| ssdeep / TLSH (soft) + rolling fallback | Fuzzy installer/pack similarity (`fuzzy_file_hash.py`) |
+| pefile capa-lite | PE capability hints on security findings |
 | React, Vite, TypeScript, Vitest, Playwright, Tauri 2 | UI / desktop |
 | JUCE | DAW sidecar scaffold |
 | [klauspost/dedup](https://github.com/klauspost/dedup), [jpillora/dedup](https://github.com/jpillora/dedup) | Rust rolling-hash / parallel-walk inspirations |
@@ -73,52 +77,42 @@ Candidate sources below are filtered for that threat model.
 | winget / Scoop | Install helpers |
 | OpenAI-compatible API | Optional AI lookup |
 | KVR Audio, vi-control.net | Vendor research presets (harvest / SearXNG) |
+| Native Access / Plugin Alliance / iLok-style JSON manifests | Licensed vs orphaned install buckets (`license_oracle.py`) |
 
 ---
 
-## Candidates (not yet in roadmaps)
+## Candidates (remaining deepeners)
 
-Highest-value sources **missing** from docs and Phase E–L. Map to Phase M below.
+Phase M is complete. Rows below are **optional deepeners**, not a new product phase. Skip cloud marketplace clients (Splice, Loopcloud).
 
 ### A — Product / UX peers
 
 | Source | Why it matters | Audiotheca fit |
 |--------|----------------|----------------|
-| **[ADSR Sample Manager](https://www.adsrsounds.com/product/software/adsr-sample-manager/)** | Path-based library (no import), auto-tag, BPM/key sync preview | Tag facets / auto-tag UX (M6) |
-| AudioFinder / Soundly | Index + audition workflows | Preview strip polish; library facets |
-
-**Shipped from this table (moved to Considered):** BaseHead / Everything / Directory Opus path search + Spot (M2); Sononym near-dupe (M1).
-
-**Skip for now:** Splice, Loopcloud, marketplace clients — wrong model (cloud storefront, not local operator).
+| **[ADSR Sample Manager](https://www.adsrsounds.com/product/software/adsr-sample-manager/)** | Path-based library, auto-tag, BPM/key sync preview | Richer auto-tag beyond current type/BPM/key facets (M6 shipped) |
+| AudioFinder / Soundly | Index + audition workflows | Preview-strip polish |
 
 ### B — Analysis libraries
 
 | Source | Why it matters | Audiotheca fit |
 |--------|----------------|----------------|
-| **[Essentia](https://essentia.upf.edu/)** | Production audio features + Chromaprint wrapper | Optional deeper feature extract (beyond mutagen/pyloudnorm/librosa soft path) |
-| **librosa** / aubio / madmom | Tempo, onset, spectral features | Soft-imported BPM when installed; near-dupe ranking features |
-| **ssdeep** / **TLSH** / CDC | Fuzzy *file* similarity | Installer/pack near-dupes PE+size blocking miss |
-| YARA / capa / Detect It Easy | PE/malware capability signatures | Security tab depth beyond ClamAV |
-
-**Shipped from this table:** mutagen tag I/O + pyloudnorm BS.1770 LUFS (M3); Chromaprint near-dupe lane already under Libraries.
+| **[Essentia](https://essentia.upf.edu/)** | Production audio features + Chromaprint wrapper | Optional deeper extract beyond mutagen/pyloudnorm/librosa |
+| Native **ssdeep** / **TLSH** wheels | Faster fuzzy *file* similarity | Docker/image packaging; rolling fallback already ships (M4) |
+| **yara-python** / capa / Detect It Easy | PE/malware rule packs | Beside pefile capability hints (M9) |
 
 ### C — Standards & catalogs
 
 | Source | Why it matters | Audiotheca fit |
 |--------|----------------|----------------|
-| **RF64 / MBWF** | WAV/BWF &gt; 4 GB | AUD-PIP completeness |
-| **ITU-R BS.1770** / **EBU R128** | Loudness standards | Cite + align LUFS-NORM |
-| **MusicBrainz / AcoustID API** | Fingerprint → catalog metadata | Close FAQ “future” gap for commercial music (not SFX) |
 | XMP / ID3v2 / CAF | Broader sidecar / Apple formats | Sidecar coverage |
 | VST3 / CLAP / AAX layout norms | Bundle vs folder conventions | Coexistence / vendor routing rules |
-| Native Access / Plugin Alliance / iLok-style manifests | Install-state oracles | “Licensed vs orphaned” investigation buckets |
+| Native Access / iLok **XML** (beyond JSON) | Richer install-state oracles | License reconcile already reads JSON manifests (M7) |
 
-### D — Pipelines & research ops
+### D — Pipelines
 
 | Source | Why it matters | Audiotheca fit |
 |--------|----------------|----------------|
-| **beets** / **Picard** | Proven fingerprint + tag normalize pipelines | Workflow for music-side packs |
-| KVR + vi-control (elevate) | Already hardcoded; weakly documented | Formal research source + gap→vendor pipeline |
+| **beets** / **Picard** | Fingerprint + tag normalize pipelines | Music-side pack workflow |
 
 ---
 
@@ -126,27 +120,27 @@ Highest-value sources **missing** from docs and Phase E–L. Map to Phase M belo
 
 Phase **M1–M9 complete**. Optional deepeners:
 
-1. Native **ssdeep/TLSH** wheels in Docker images (rolling fallback already ships)  
-2. Full **Essentia** feature extract when system packages allow  
-3. Richer Native Access / iLok XML parsers beyond JSON manifests  
-4. Optional **yara-python** rule packs beside pefile capability hints  
+1. Native **ssdeep/TLSH** wheels in Docker images (rolling fallback already ships)
+2. Full **Essentia** feature extract when system packages allow
+3. Richer Native Access / iLok XML parsers beyond JSON manifests
+4. Optional **yara-python** rule packs beside pefile capability hints
 
 **Done:** Sononym near-dupe (M1), Explorer search/Spot (M2), mutagen+BS.1770 (M3), fuzzy packs (M4), RF64+AcoustID (M5), facets (M6), license buckets (M7), KVR/vi-control pipeline (M8), PE capa hints (M9).
 
 ---
 
-## Doc drift to fix when touching these areas
+## Doc drift (closed 2026-08-27)
 
-| Topic | Issue |
-|-------|--------|
-| AcoustID / Chromaprint | FAQ still says “future”; path already ships |
-| Soundminer | “Not yet” vs shipped SM field subset |
-| LUFS | Feature exists; prefer pyloudnorm BS.1770 engine; RMS proxy still named |
+| Topic | Resolution |
+|-------|------------|
+| AcoustID / Chromaprint | FAQ documents Chromaprint near-dupes + optional AcoustID lookup |
+| Soundminer | FAQ: no plugin; SM-style sidecar subset ships (`sm_metadata.py`) |
+| LUFS | FAQ: pyloudnorm BS.1770 preferred; RMS proxy named when fallback |
 
 ---
 
 ## How to use this doc
 
-- Adding a feature inspired by an external product? Link it here under **Considered** and cite in the PR.  
-- New candidate? Add a row under **Candidates** with Audiotheca fit — do not expand into cloud marketplace scope without an explicit product decision.  
-- Implementation backlog: [ROADMAP_REMAINING.md — Phase M](ROADMAP_REMAINING.md#phase-m--external-sources-build-out).
+- Adding a feature inspired by an external product? Link it here under **Considered** and cite in the PR.
+- New candidate? Add a row under **Candidates** with Audiotheca fit — do not expand into cloud marketplace scope without an explicit product decision.
+- Implementation backlog: [ROADMAP_REMAINING.md — Phase M](ROADMAP_REMAINING.md#phase-m--external-sources-build-out) (complete) and deepeners above.
