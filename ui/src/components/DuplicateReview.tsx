@@ -10,6 +10,8 @@ import {
   fetchReferenceExtras,
   feedbackExportDownload,
   rejectDuplicateGroup,
+  runAcousticNearDupes,
+  runFuzzyPackDupes,
   saveDecisions,
   type DuplicateRejection,
   type DuplicateExecuteResponse,
@@ -82,6 +84,19 @@ export function DuplicateReview({ stamp }: Props) {
   const [executeSummary, setExecuteSummary] = useState<{ staged: number; failed: number } | null>(
     null,
   );
+  const [nearBusy, setNearBusy] = useState(false);
+  const [nearMsg, setNearMsg] = useState<string | null>(null);
+  const [nearGroups, setNearGroups] = useState<
+    Array<{
+      kind: string;
+      similarity: number;
+      paths: string[];
+      count: number;
+      cross_format?: boolean;
+      exts?: string[];
+      mode?: string;
+    }>
+  >([]);
 
   const rejectedKeys = new Set(rejections.map((row) => row.dedup_key));
 
@@ -247,6 +262,66 @@ export function DuplicateReview({ stamp }: Props) {
     setActionMsg("Manual duplicate finding recorded for backend refinement");
   }
 
+  async function handleAcousticNearDupes() {
+    const paths = Array.from(
+      new Set(
+        groups.flatMap((group) => group.members.map((member) => member.full_path)).filter(Boolean),
+      ),
+    ).slice(0, 500);
+    if (paths.length < 2) {
+      setNearMsg("Need at least two member paths from loaded duplicate groups");
+      setNearGroups([]);
+      return;
+    }
+    setNearBusy(true);
+    setNearMsg(null);
+    try {
+      const res = await runAcousticNearDupes(paths, 0.85);
+      setNearGroups(res.groups ?? []);
+      setNearMsg(
+        `Acoustic near-dupes: ${res.group_count} group(s) from ${res.fingerprinted}/${res.scanned} fingerprinted`,
+      );
+    } catch (err) {
+      setNearGroups([]);
+      setNearMsg(err instanceof Error ? err.message : String(err));
+    } finally {
+      setNearBusy(false);
+    }
+  }
+
+  async function handleFuzzyPackDupes() {
+    const paths = Array.from(
+      new Set(
+        groups.flatMap((group) => group.members.map((member) => member.full_path)).filter(Boolean),
+      ),
+    ).slice(0, 200);
+    if (paths.length < 2) {
+      setNearMsg("Need at least two member paths for fuzzy pack compare");
+      setNearGroups([]);
+      return;
+    }
+    setNearBusy(true);
+    setNearMsg(null);
+    try {
+      const res = await runFuzzyPackDupes(paths, 70);
+      const mapped = (res.groups ?? []).map((group) => ({
+        kind: "fuzzy",
+        similarity: Number(group.fuzzy_score ?? 70) / 100,
+        paths: (group.paths as string[]) ?? [],
+        count: Number(group.count ?? (group.paths as string[] | undefined)?.length ?? 0),
+        mode: String(group.fuzzy_engine ?? "fuzzy"),
+        cross_format: false,
+      }));
+      setNearGroups(mapped);
+      setNearMsg(`Fuzzy pack dupes: ${res.group_count} group(s) from ${res.scanned} files`);
+    } catch (err) {
+      setNearGroups([]);
+      setNearMsg(err instanceof Error ? err.message : String(err));
+    } finally {
+      setNearBusy(false);
+    }
+  }
+
   const visibleGroups = hideRejected
     ? groups.filter((group) => !rejectedKeys.has(group.dedup_key))
     : groups;
@@ -323,6 +398,22 @@ export function DuplicateReview({ stamp }: Props) {
         >
           Report manual dupe
         </Button>
+        <Button
+          variant="ghost"
+          disabled={nearBusy || groups.length === 0}
+          title="Chromaprint / heuristic near-dupe pass across loaded group members (cross-format)"
+          onClick={() => void handleAcousticNearDupes()}
+        >
+          {nearBusy ? "Near-dupes…" : "Acoustic near-dupes"}
+        </Button>
+        <Button
+          variant="ghost"
+          disabled={nearBusy || groups.length === 0}
+          title="ssdeep/TLSH/rolling fuzzy similarity for installer/pack near-dupes"
+          onClick={() => void handleFuzzyPackDupes()}
+        >
+          {nearBusy ? "Fuzzy…" : "Fuzzy pack dupes"}
+        </Button>
         <Button variant="ghost" onClick={() => void feedbackExportDownload(stamp)}>
           Export feedback CSV
         </Button>
@@ -335,6 +426,36 @@ export function DuplicateReview({ stamp }: Props) {
 
       {saveMsg && <div className="banner dry">{saveMsg}</div>}
       {actionMsg && <div className="banner review">{actionMsg}</div>}
+      {nearMsg && <div className="banner dry">{nearMsg}</div>}
+
+      {nearGroups.length > 0 && (
+        <section className="near-dupe-lane" aria-label="Acoustic near-duplicates">
+          <h3>Acoustic near-duplicates</h3>
+          <p className="count-muted">
+            Chromaprint exact/near matches across formats (Sononym-style lane). Heuristic fallback when
+            fpcalc is unavailable.
+          </p>
+          {nearGroups.map((group, index) => (
+            <article key={`${group.kind}-${index}-${group.paths[0]}`} className="dupe-card">
+              <header>
+                <h3>
+                  {group.kind} · {(group.similarity * 100).toFixed(0)}%
+                </h3>
+                <Badge>{group.mode ?? "acoustic"}</Badge>
+                {group.cross_format ? <Badge tone="ready">cross-format</Badge> : null}
+                {group.exts?.length ? (
+                  <span className="count-muted">{group.exts.join(", ")}</span>
+                ) : null}
+              </header>
+              {group.paths.map((path) => (
+                <div key={path} className="member-row">
+                  <PathLink path={path} />
+                </div>
+              ))}
+            </article>
+          ))}
+        </section>
+      )}
 
       {executeResults.length > 0 && (
         <ExecuteResultsPanel

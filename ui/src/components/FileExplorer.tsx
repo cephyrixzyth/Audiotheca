@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   browseDirectoryEnriched,
+  browseSearch,
+  fetchBrowseFacets,
   listArchiveContents,
   openInExplorer,
   type BrowseEntry,
@@ -102,6 +104,14 @@ function ExplorerPane({
   const [archiveError, setArchiveError] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
   const [hoverAuditionPath, setHoverAuditionPath] = useState<string | null>(null);
+  const [selectedEntry, setSelectedEntry] = useState<BrowseEntry | null>(null);
+  const [pathQuery, setPathQuery] = useState("");
+  const [libraryHits, setLibraryHits] = useState<BrowseEntry[] | null>(null);
+  const [librarySearching, setLibrarySearching] = useState(false);
+  const [librarySearchError, setLibrarySearchError] = useState<string | null>(null);
+  const [facetType, setFacetType] = useState<string>("");
+  const [facetOptions, setFacetOptions] = useState<Array<{ value: string; count: number }>>([]);
+  const [facetBusy, setFacetBusy] = useState(false);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadSeq = useRef(0);
 
@@ -113,6 +123,62 @@ function ExplorerPane({
     }
     hoverTimer.current = setTimeout(() => setHoverAuditionPath(path), 280);
   }, []);
+
+  const filteredEntries = useMemo(() => {
+    const q = pathQuery.trim().toLowerCase();
+    let rows = libraryHits ?? entries;
+    if (!libraryHits && q) {
+      rows = entries.filter(
+        (entry) =>
+          entry.name.toLowerCase().includes(q) || entry.path.toLowerCase().replace(/\\/g, "/").includes(q),
+      );
+    }
+    if (facetType) {
+      const token = facetType.toLowerCase();
+      rows = rows.filter(
+        (entry) => entry.is_dir || entry.name.toLowerCase().includes(token) || entry.path.toLowerCase().includes(token),
+      );
+    }
+    return rows;
+  }, [entries, pathQuery, libraryHits, facetType]);
+
+  async function loadFacets() {
+    if (!currentPath) {
+      setLibrarySearchError("Open a folder before loading facets");
+      return;
+    }
+    setFacetBusy(true);
+    setLibrarySearchError(null);
+    try {
+      const data = await fetchBrowseFacets(currentPath, 200);
+      setFacetOptions(data.facets?.type ?? []);
+    } catch (err) {
+      setLibrarySearchError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setFacetBusy(false);
+    }
+  }
+
+  async function runLibrarySearch() {
+    const q = pathQuery.trim();
+    if (q.length < 2) {
+      setLibrarySearchError("Type at least 2 characters to search the library");
+      return;
+    }
+    setLibrarySearching(true);
+    setLibrarySearchError(null);
+    try {
+      const searchRoot = subtreeRoot?.trim() || currentPath || "";
+      const data = await browseSearch(q, searchRoot, 200);
+      setLibraryHits(data.entries);
+      if (!data.entries.length) setLibrarySearchError("No path matches");
+    } catch (err) {
+      setLibraryHits([]);
+      setLibrarySearchError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLibrarySearching(false);
+    }
+  }
 
   useEffect(() => () => {
     if (hoverTimer.current) clearTimeout(hoverTimer.current);
@@ -129,6 +195,9 @@ function ExplorerPane({
       setError(null);
       setArchiveEntries(null);
       setArchiveError(null);
+      setLibraryHits(null);
+      setLibrarySearchError(null);
+      setSelectedEntry(null);
       try {
         const data = await browseDirectoryEnriched(path, stamp ?? "");
         if (seq !== loadSeq.current) return;
@@ -251,11 +320,102 @@ function ExplorerPane({
                 Back to folder
               </Button>
             )}
+            <label className="explorer-search-field">
+              <span className="visually-hidden">Search paths</span>
+              <input
+                type="search"
+                value={pathQuery}
+                placeholder="Filter folder · Search library…"
+                title="Type to filter this folder instantly. Press Enter or Search for recursive library search."
+                onChange={(e) => {
+                  setPathQuery(e.target.value);
+                  setLibraryHits(null);
+                  setLibrarySearchError(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void runLibrarySearch();
+                  }
+                  if (e.key === "Escape") {
+                    setPathQuery("");
+                    setLibraryHits(null);
+                    setLibrarySearchError(null);
+                  }
+                }}
+              />
+            </label>
+            <button
+              type="button"
+              className="text-btn"
+              disabled={librarySearching || pathQuery.trim().length < 2}
+              title="Recursive path search under this root"
+              onClick={() => void runLibrarySearch()}
+            >
+              {librarySearching ? "Searching…" : "Search"}
+            </button>
+            {(libraryHits || pathQuery) && (
+              <button
+                type="button"
+                className="text-btn"
+                title="Clear search filter"
+                onClick={() => {
+                  setPathQuery("");
+                  setLibraryHits(null);
+                  setLibrarySearchError(null);
+                }}
+              >
+                Clear
+              </button>
+            )}
+            <button
+              type="button"
+              className="text-btn"
+              disabled={facetBusy || !currentPath}
+              title="Derive type/BPM/key facets for this folder"
+              onClick={() => void loadFacets()}
+            >
+              {facetBusy ? "Facets…" : "Facets"}
+            </button>
           </div>
+
+          {facetOptions.length > 0 && (
+            <div className="explorer-facet-strip" aria-label="Sample type facets">
+              <button
+                type="button"
+                className={`bucket-chip ${!facetType ? "active" : ""}`.trim()}
+                onClick={() => setFacetType("")}
+              >
+                All types
+              </button>
+              {facetOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className={`bucket-chip ${facetType === opt.value ? "active" : ""}`.trim()}
+                  onClick={() => setFacetType(opt.value === facetType ? "" : opt.value)}
+                  title={`${opt.count} files`}
+                >
+                  {opt.value} ({opt.count})
+                </button>
+              ))}
+            </div>
+          )}
 
           {loading && <p className="count-muted">Loading…</p>}
           {error && <div className="error">{error}</div>}
           {archiveError && <div className="error">{archiveError}</div>}
+          {librarySearchError && <p className="count-muted">{librarySearchError}</p>}
+          {libraryHits && (
+            <p className="count-muted">
+              Library search: {libraryHits.length} hit{libraryHits.length === 1 ? "" : "s"}
+            </p>
+          )}
+          {!libraryHits && pathQuery.trim() && !loading && !archiveEntries && (
+            <p className="count-muted">
+              Folder filter: {filteredEntries.length}/{entries.length}
+            </p>
+          )}
 
           {!loading && archiveEntries && (
             <div className="file-explorer-list">
@@ -272,7 +432,7 @@ function ExplorerPane({
 
           {!loading && !archiveEntries && (
             <VirtualTable
-              items={entries}
+              items={filteredEntries}
               colCount={4}
               estimateSize={40}
               tableClassName="data-table file-explorer-table"
@@ -289,16 +449,29 @@ function ExplorerPane({
                   key={entry.path}
                   entry={entry}
                   rowAttrs={rowAttrs}
+                  selected={selectedEntry?.path === entry.path}
                   autoAudition={hoverAuditionPath === entry.path && isAuditionableFile(entry.name)}
                   onHover={(active) => setHoverAuditionDebounced(active ? entry.path : null)}
+                  onSelect={() => setSelectedEntry(entry)}
                   onOpen={() => void openEntry(entry)}
                   onContextMenu={(e) => {
                     e.preventDefault();
+                    setSelectedEntry(entry);
                     setContextMenu({ x: e.clientX, y: e.clientY, entry });
                   }}
                 />
               )}
             />
+          )}
+
+          {selectedEntry && !selectedEntry.is_dir && isAuditionableFile(selectedEntry.name) && (
+            <div className="explorer-spot-preview" aria-label="Spot preview">
+              <div className="explorer-spot-meta">
+                <strong title={selectedEntry.path}>{selectedEntry.name}</strong>
+                <span className="count-muted">{formatSize(selectedEntry.size)}</span>
+              </div>
+              <AudioPreviewStrip path={selectedEntry.path} name={selectedEntry.name} autoPlay={false} />
+            </div>
           )}
         </div>
       </div>
@@ -352,15 +525,19 @@ function ExplorerPane({
 function ExplorerRow({
   entry,
   onOpen,
+  onSelect,
   onContextMenu,
   onHover,
+  selected = false,
   autoAudition = false,
   rowAttrs,
 }: {
   entry: BrowseEntry;
   onOpen: () => void;
+  onSelect: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
   onHover?: (active: boolean) => void;
+  selected?: boolean;
   autoAudition?: boolean;
   rowAttrs?: VirtualRowAttrs;
 }) {
@@ -369,7 +546,8 @@ function ExplorerRow({
 
   return (
     <tr
-      className={entry.is_dir ? "dir-row" : ""}
+      className={[entry.is_dir ? "dir-row" : "", selected ? "selected" : ""].filter(Boolean).join(" ")}
+      onClick={onSelect}
       onDoubleClick={onOpen}
       onContextMenu={onContextMenu}
       onMouseEnter={() => onHover?.(true)}
@@ -388,9 +566,13 @@ function ExplorerRow({
                 ? "Open this folder"
                 : isArchiveName(entry.name)
                   ? "List archive contents without extracting"
-                  : "Drag to Scan path fields"
+                  : "Click to Spot-preview · drag to Scan path fields"
             }
-            onClick={onOpen}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelect();
+              if (entry.is_dir || isArchiveName(entry.name)) onOpen();
+            }}
           >
             {entry.name}
           </button>

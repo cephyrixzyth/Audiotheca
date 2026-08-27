@@ -273,6 +273,23 @@ def sync_installation_manifest(body: dict = Body(default_factory=dict)) -> dict[
         raise HTTPException(status_code=502, detail=str(result.get("error") or "sync failed"))
     return result
 
+@router.post("/api/installations/license-reconcile")
+def installations_license_reconcile(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    """Reconcile installs against local Native Access / PA / iLok-style manifests."""
+    from audiotheca.license_oracle import reconcile_installs
+    from path_mask import mask_payload
+
+    scan_paths = body.get("paths") or []
+    if not isinstance(scan_paths, list):
+        raise HTTPException(status_code=400, detail="paths must be a list")
+    paths = [str(security.assert_library_path(str(p), label="path")) for p in scan_paths]
+    extra = body.get("manifests") or []
+    if extra and not isinstance(extra, list):
+        raise HTTPException(status_code=400, detail="manifests must be a list")
+    return mask_payload(
+        reconcile_installs(scan_paths=paths, extra_manifests=[str(m) for m in extra])
+    )
+
 @router.post("/api/transactions/rollback")
 async def rollback_transaction_batch(body: dict = Body(...)) -> dict[str, object]:
     from audiotheca.transaction_ledger import rollback_batch
@@ -503,6 +520,22 @@ def tools_installer_inspect(body: dict = Body(default_factory=dict)) -> dict[str
         "error": result.get("error"),
         "raw": result,
     }
+
+@router.post("/api/tools/fuzzy-hash")
+def tools_fuzzy_hash(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    from audiotheca.fuzzy_file_hash import find_fuzzy_duplicates, fuzzy_hash
+    from path_mask import mask_payload
+
+    path = body.get("path")
+    paths = body.get("paths")
+    if path:
+        target = security.assert_library_path(str(path), must_exist=True, label="path")
+        return mask_payload(fuzzy_hash(target))
+    if isinstance(paths, list) and paths:
+        resolved = [str(security.assert_library_path(str(p), label="path")) for p in paths]
+        threshold = int(body.get("threshold") or 70)
+        return mask_payload(find_fuzzy_duplicates(resolved, threshold=max(1, min(100, threshold))))
+    raise HTTPException(status_code=400, detail="path or paths required")
 
 @router.post("/api/tools/plugin/validate")
 def tools_plugin_validate(body: dict = Body(default_factory=dict)) -> dict[str, object]:

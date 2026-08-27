@@ -94,6 +94,29 @@ def browse_tree(
 
     return list_tree_children(path, limit=limit)
 
+@router.get("/api/browse/search")
+def browse_search(
+    q: str = Query(..., min_length=2, description="Path/name substring"),
+    root: str = Query(default="", description="Optional library subtree root"),
+    limit: int = Query(default=200, le=1000),
+) -> dict[str, object]:
+    from api.browse_api import search_library_paths
+
+    return search_library_paths(q, root=root, limit=limit)
+
+@router.get("/api/browse/facets")
+def browse_facets(
+    root: str = Query(..., description="Library folder to facet"),
+    limit: int = Query(default=200, le=1000),
+    analyze: bool = Query(default=False, description="Run full WAV analyze (slower)"),
+) -> dict[str, object]:
+    from audiotheca.sample_facets import collect_facets
+
+    target = security.assert_library_path(root, must_exist=True, label="root")
+    if not target.is_dir():
+        raise HTTPException(status_code=400, detail="root must be a directory")
+    return collect_facets(target, limit=limit, analyze=analyze)
+
 @router.get("/api/archive/list")
 def archive_list_contents(
     path: str = Query(...),
@@ -158,6 +181,43 @@ def audio_acoustic_dedupe(body: dict = Body(default_factory=dict)) -> dict[str, 
         raise HTTPException(status_code=400, detail="paths list required")
     paths = [str(security.assert_library_path(str(p), label="path")) for p in paths_raw]
     return mask_payload(find_acoustic_duplicates(paths))
+
+@router.post("/api/audio/near-dupes")
+def audio_near_dupes(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    """Chromaprint near-duplicate groups (Sononym-style cross-format lane)."""
+    from audiotheca.acoustic_near_dupe import find_near_duplicates
+    from path_mask import mask_payload
+
+    paths_raw = body.get("paths") or []
+    if not isinstance(paths_raw, list) or not paths_raw:
+        raise HTTPException(status_code=400, detail="paths list required")
+    if len(paths_raw) > 500:
+        raise HTTPException(status_code=400, detail="paths limited to 500")
+    threshold = float(body.get("threshold") or 0.85)
+    threshold = max(0.5, min(1.0, threshold))
+    paths = [str(security.assert_library_path(str(p), label="path")) for p in paths_raw]
+    return mask_payload(find_near_duplicates(paths, threshold=threshold))
+
+@router.post("/api/audio/acoustid-lookup")
+def audio_acoustid_lookup(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    """Optional AcoustID / MusicBrainz lookup for a Chromaprint fingerprint or file path."""
+    from audiotheca.acoustid_lookup import lookup_fingerprint
+    from audiotheca.audio_fingerprint import fingerprint_file
+    from path_mask import mask_payload
+
+    fingerprint = str(body.get("fingerprint") or "").strip()
+    duration = body.get("duration")
+    path_raw = body.get("path")
+    if path_raw and not fingerprint:
+        target = security.assert_library_path(str(path_raw), must_exist=True, label="path")
+        fp = fingerprint_file(target)
+        if not fp.get("ok"):
+            raise HTTPException(status_code=400, detail=fp.get("error") or "fingerprint failed")
+        fingerprint = str(fp.get("fingerprint") or "")
+        duration = fp.get("duration")
+    if not fingerprint:
+        raise HTTPException(status_code=400, detail="fingerprint or path required")
+    return mask_payload(lookup_fingerprint(fingerprint, duration if duration is not None else None))
 
 @router.post("/api/explorer/drop")
 def explorer_drop(body: dict = Body(default_factory=dict)) -> dict[str, object]:

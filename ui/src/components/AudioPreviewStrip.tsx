@@ -28,6 +28,9 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
   const [assetBpm, setAssetBpm] = useState<number | undefined>();
   const [assetKey, setAssetKey] = useState<string | undefined>();
   const [assetLufs, setAssetLufs] = useState<number | undefined>();
+  const [loudnessEngine, setLoudnessEngine] = useState<string | undefined>();
+  const [bpmSource, setBpmSource] = useState<string | undefined>();
+  const [keySource, setKeySource] = useState<string | undefined>();
   const [trimStart, setTrimStart] = useState(session.trimStart);
   const [trimEnd, setTrimEnd] = useState(session.trimEnd);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -43,14 +46,23 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
       .finally(() => setLoading(false));
     void fetchAudioAnalyze(path)
       .then((data) => {
-        const bpm = data.bpm as { bpm?: number } | undefined;
-        const key = data.key as { key?: string } | undefined;
-        const loudness = data.loudness as { measured_lufs?: number } | undefined;
-        const lufsNorm = data.lufs_norm as { measured_lufs?: number; target_lufs?: number } | undefined;
+        const bpm = data.bpm as { bpm?: number; source?: string } | undefined;
+        const key = data.key as { key?: string; source?: string } | undefined;
+        const loudness = data.loudness as { measured_lufs?: number; engine?: string } | undefined;
+        const lufsNorm = data.lufs_norm as { measured_lufs?: number; target_lufs?: number; engine?: string } | undefined;
         setAssetBpm(typeof bpm?.bpm === "number" ? bpm.bpm : undefined);
         setAssetKey(typeof key?.key === "string" ? key.key : undefined);
+        setBpmSource(typeof bpm?.source === "string" ? bpm.source : undefined);
+        setKeySource(typeof key?.source === "string" ? key.source : undefined);
         const lufs = loudness?.measured_lufs ?? lufsNorm?.measured_lufs;
         setAssetLufs(typeof lufs === "number" ? Math.round(lufs * 10) / 10 : undefined);
+        setLoudnessEngine(
+          typeof loudness?.engine === "string"
+            ? loudness.engine
+            : typeof lufsNorm?.engine === "string"
+              ? lufsNorm.engine
+              : undefined,
+        );
       })
       .catch(() => undefined);
   }, [path, isWav]);
@@ -181,16 +193,40 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
       )}
       {isWav && (
         <span className="audio-preview-badges">
-          {assetLufs != null ? <Badge tone="ready">{assetLufs} LUFS</Badge> : null}
-          {assetBpm ? <Badge tone="accent">{assetBpm} BPM</Badge> : null}
-          {assetKey ? <Badge tone="review">{assetKey}</Badge> : null}
+          {assetLufs != null ? (
+            <Badge tone="ready" title={loudnessEngine ? `Loudness engine: ${loudnessEngine}` : "Integrated loudness"}>
+              {assetLufs} LUFS
+            </Badge>
+          ) : null}
+          {assetBpm ? (
+            <Badge tone="accent" title={bpmSource ? `BPM source: ${bpmSource}` : "BPM"}>
+              {assetBpm} BPM
+            </Badge>
+          ) : null}
+          {assetKey ? (
+            <Badge tone="review" title={keySource ? `Key source: ${keySource}` : "Key"}>
+              {assetKey}
+            </Badge>
+          ) : null}
         </span>
       )}
       {!compact && (
         <span className="count-muted audio-preview-meta">
-          {assetLufs != null ? <Badge tone="ready">{assetLufs} LUFS</Badge> : null}
-          {assetBpm ? <Badge tone="accent">{assetBpm} BPM</Badge> : null}
-          {assetKey ? <Badge tone="review">{assetKey}</Badge> : null}
+          {assetLufs != null ? (
+            <Badge tone="ready" title={loudnessEngine ? `Loudness engine: ${loudnessEngine}` : "Integrated loudness"}>
+              {assetLufs} LUFS
+            </Badge>
+          ) : null}
+          {assetBpm ? (
+            <Badge tone="accent" title={bpmSource ? `BPM source: ${bpmSource}` : "BPM"}>
+              {assetBpm} BPM
+            </Badge>
+          ) : null}
+          {assetKey ? (
+            <Badge tone="review" title={keySource ? `Key source: ${keySource}` : "Key"}>
+              {assetKey}
+            </Badge>
+          ) : null}
           {session.tempoSync && assetBpm ? ` ${assetBpm}→${session.projectBpm}bpm` : null}
           {session.pitchShiftSemitones !== 0 ? ` ${session.pitchShiftSemitones}st` : null}
           {session.mixChannel !== "stereo" ? ` ${session.mixChannel}` : null}

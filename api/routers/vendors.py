@@ -199,3 +199,37 @@ def vendor_harvest_export(
 ) -> FileResponse:
     path = vh.export_candidates_csv(include_known=include_known, status=status)
     return FileResponse(path, filename=path.name, media_type="text/csv")
+
+@router.post("/api/vendors/research")
+def vendor_research_pipeline(body: dict = Body(default_factory=dict)) -> dict[str, object]:
+    """Documented KVR / vi-control research pipeline: gaps → SearX plan → harvest preset."""
+    from searx_client import PRESETS
+    from web_spdr import plan_lookup
+
+    query = str(body.get("query") or "").strip()
+    preset = str(body.get("preset") or "kvr").strip()
+    if preset not in {"kvr", "vi-control", "vendor"}:
+        raise HTTPException(status_code=400, detail="preset must be kvr, vi-control, or vendor")
+    harvest_preset = "kvr" if preset == "kvr" else "vi_control" if preset == "vi-control" else "user_seeds"
+    plan = plan_lookup(query or "sample library vendor", preset=preset) if query else {
+        "ok": True,
+        "query": "",
+        "preset": preset,
+        "planned": True,
+    }
+    sources = [p for p in vh.list_source_presets() if p.get("id") in {harvest_preset, "kvr", "vi_control"}]
+    return {
+        "ok": True,
+        "pipeline": [
+            "1. Review vendor gaps for the stamp (Vendor Tools → gaps)",
+            "2. Run SearXNG with kvr / vi-control preset (WEB-SPDR)",
+            "3. Harvest matching preset (KVR or vi-control)",
+            "4. Approve candidates into vendor_overrides",
+        ],
+        "searx_preset": preset,
+        "searx_template": PRESETS.get(preset),
+        "harvest_preset": harvest_preset,
+        "harvest_sources": sources,
+        "web_spider_plan": plan,
+        "docs": "docs/VENDOR_RESEARCH.md",
+    }

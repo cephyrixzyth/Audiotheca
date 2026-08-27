@@ -190,7 +190,11 @@ Dry runs work. Live runs fail at startup with "Drive is read-only."
 
 ### Can it dedupe by audio content (WAV/FLAC)?
 
-Not currently. It uses metadata fingerprinting and sparse file hashing. Audio fingerprinting (AcoustID/Chromaprint) is a possible future addition.
+Yes, as an **opt-in lane** — not the default hash/metadata dedupe. On Duplicates, **Acoustic near-dupes** runs Chromaprint (`fpcalc`) across loaded group members, with a heuristic fallback when fpcalc is missing. **Fuzzy pack dupes** compares installer/pack files (ssdeep/TLSH, or a rolling fallback). Neither replaces the engine’s fingerprint + sparse-hash groups.
+
+### Does Audiotheca use AcoustID / Chromaprint?
+
+**Chromaprint / `fpcalc` support ships** for local acoustic fingerprinting (Environment panel / `audio_fingerprint.py`, plus the Duplicates near-dupe lane). **AcoustID / MusicBrainz online lookup** is available via `POST /api/audio/acoustid-lookup` when outbound is allowed and `ACOUSTID_CLIENT_KEY` is set (skipped in air-gap). RF64/MBWF containers are detected for BWF metadata and WAV info.
 
 ### Can it rename files to UCS standard?
 

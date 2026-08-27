@@ -39,6 +39,7 @@ PRESETS: dict[str, str] = {
     "space-recovery": "hardlink deduplicate audio library reclaim disk space bloat {arg}",
     "ucs": "Universal Category System UCS sound library folder naming {arg}",
     "vi-control": "site:vi-control.net {arg} kontakt library path organization",
+    "kvr": "site:kvraudio.com {arg} plugin sample library vendor",
 }
 
 

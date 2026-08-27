@@ -302,6 +302,12 @@ export function VendorTools({ stamp }: Props) {
         <em>suggestions only</em> in <code>vendor_harvest_candidates.json</code>. Nothing touches the scan
         engine or <code>vendor_db.py</code> until you click <strong>Add selected to vendor base</strong> (writes{" "}
         <code>vendor_overrides.json</code> for the next scan). Export CSV to review offline first.
+        <br />
+        <span className="count-muted">
+          Pipeline: gaps → SearXNG preset <code>kvr</code> / <code>vi-control</code> → harvest presets{" "}
+          <strong>KVR Audio</strong> / <strong>vi-control</strong> → approve. See{" "}
+          <code>docs/VENDOR_RESEARCH.md</code>.
+        </span>
       </div>
 
       <section style={{ marginBottom: "1.5rem" }}>
