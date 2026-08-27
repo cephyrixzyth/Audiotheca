@@ -16,6 +16,7 @@ import {
   validateStagingRoot,
 } from "../api/client";
 import type { EnvironmentDependency, EnvironmentPayload } from "../types";
+import { Button } from "../ui";
 import { ReorderableSections } from "./ReorderableSections";
 import { ThemeStudioPanel } from "./ThemeStudioPanel";
 import { InstallLifecyclePanel } from "./InstallLifecyclePanel";
@@ -276,27 +277,26 @@ export function EnvironmentPanel() {
             <input type="text" className="field-input" value={execPath} onChange={(e) => setExecPath(e.target.value)} />
           </label>
           <div className="env-actions">
-            <button type="button" className="text-btn" onClick={() => void handleExecPolicyCheck()}>
+            <Button variant="ghost" onClick={() => void handleExecPolicyCheck()}>
               Check launch policy
-            </button>
-            <button type="button" className="text-btn" onClick={() => void handleAntiPhonePreview()}>
+            </Button>
+            <Button variant="ghost" onClick={() => void handleAntiPhonePreview()}>
               ANTI-PHONE preview
-            </button>
-            <button type="button" className="text-btn" disabled={!hostsPreview} onClick={() => void handleCopyHosts()}>
+            </Button>
+            <Button variant="ghost" disabled={!hostsPreview} onClick={() => void handleCopyHosts()}>
               Copy hosts block
-            </button>
-            <button type="button" className="text-btn" onClick={() => void handleExportYaml()}>
+            </Button>
+            <Button variant="ghost" onClick={() => void handleExportYaml()}>
               Export ENV-YAML
-            </button>
-            <button
-              type="button"
-              className="text-btn"
+            </Button>
+            <Button
+              variant="ghost"
               onClick={() =>
                 void registerNodeSyncPeer({ peer_id: `peer-${Date.now()}`, host: "127.0.0.1" }).then(setNodeSync)
               }
             >
               Register local peer
-            </button>
+            </Button>
           </div>
           {hostsPreview && (
             <textarea className="field-input env-manifest-editor" rows={6} readOnly value={hostsPreview} spellCheck={false} />
@@ -305,9 +305,9 @@ export function EnvironmentPanel() {
             <span className="context-label">Staging root (STG-ISOL)</span>
             <input type="text" className="field-input" value={stagingPath} onChange={(e) => setStagingPath(e.target.value)} />
           </label>
-          <button type="button" className="keeper-btn" disabled={!stagingPath.trim()} onClick={() => void handleStagingValidate()}>
+          <Button variant="secondary" disabled={!stagingPath.trim()} onClick={() => void handleStagingValidate()}>
             Validate staging root
-          </button>
+          </Button>
           <label className="context-field">
             <span className="context-label">Peer manifest JSON (NODE-SYNC compare)</span>
             <textarea
@@ -318,9 +318,9 @@ export function EnvironmentPanel() {
               spellCheck={false}
             />
           </label>
-          <button type="button" className="text-btn" onClick={() => void handlePeerCompare()}>
+          <Button variant="ghost" onClick={() => void handlePeerCompare()}>
             Compare peer manifest
-          </button>
+          </Button>
           {peerCompareResult && (
             <pre className="env-install-log">{JSON.stringify(peerCompareResult, null, 2)}</pre>
           )}
@@ -459,50 +459,45 @@ export function EnvironmentPanel() {
           <div className="env-actions" style={{ marginTop: "0.75rem" }}>
             {hasInstallableGaps && (
               <>
-                <button type="button" className="text-btn" disabled={!!busy} onClick={() => void handleInstall(false)}>
+                <Button variant="ghost" disabled={!!busy} onClick={() => void handleInstall(false)}>
                   Preview install
-                </button>
+                </Button>
                 {confirmLive === "install" ? (
                   <>
-                    <button type="button" className="primary-btn" disabled={!!busy} onClick={() => void handleInstall(true)}>
+                    <Button variant="primary" disabled={!!busy} onClick={() => void handleInstall(true)}>
                       Confirm install
-                    </button>
-                    <button type="button" className="text-btn" onClick={() => setConfirmLive(null)}>
+                    </Button>
+                    <Button variant="ghost" onClick={() => setConfirmLive(null)}>
                       Cancel
-                    </button>
+                    </Button>
                   </>
                 ) : (
-                  <button
-                    type="button"
-                    className="primary-btn"
-                    disabled={!!busy}
-                    onClick={() => setConfirmLive("install")}
-                  >
+                  <Button variant="primary" disabled={!!busy} onClick={() => setConfirmLive("install")}>
                     Install missing dependencies
-                  </button>
+                  </Button>
                 )}
               </>
             )}
-            <button type="button" className="text-btn" disabled={!!busy} onClick={() => void handleRepairAll(false)}>
+            <Button variant="ghost" disabled={!!busy} onClick={() => void handleRepairAll(false)}>
               Preview repair-all
-            </button>
+            </Button>
             {confirmLive === "repair-all" ? (
               <>
-                <button type="button" className="primary-btn" disabled={!!busy} onClick={() => void handleRepairAll(true)}>
+                <Button variant="primary" disabled={!!busy} onClick={() => void handleRepairAll(true)}>
                   Confirm live repair-all
-                </button>
-                <button type="button" className="text-btn" onClick={() => setConfirmLive(null)}>
+                </Button>
+                <Button variant="ghost" onClick={() => setConfirmLive(null)}>
                   Cancel
-                </button>
+                </Button>
               </>
             ) : (
-              <button type="button" className="primary-btn" disabled={!!busy} onClick={() => setConfirmLive("repair-all")}>
+              <Button variant="primary" disabled={!!busy} onClick={() => setConfirmLive("repair-all")}>
                 Repair all (live)
-              </button>
+              </Button>
             )}
-            <button type="button" className="text-btn" onClick={reload}>
+            <Button variant="ghost" onClick={reload}>
               Refresh
-            </button>
+            </Button>
           </div>
           {installLog.length > 0 && <pre className="env-install-log">{installLog.join("\n")}</pre>}
           {hasInstallableGaps && (
@@ -564,22 +559,22 @@ export function EnvironmentPanel() {
                   <td>
                     {dep.repair_action && dep.status !== "ok" && (
                       <div className="env-row-actions">
-                        <button
-                          type="button"
-                          className="text-btn"
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           disabled={busy === dep.id}
                           onClick={() => void handleRepair(dep, true)}
                         >
                           Preview
-                        </button>
-                        <button
-                          type="button"
-                          className="primary-btn"
+                        </Button>
+                        <Button
+                          variant="primary"
+                          size="sm"
                           disabled={busy === dep.id}
                           onClick={() => void handleRepair(dep, false)}
                         >
                           Repair
-                        </button>
+                        </Button>
                       </div>
                     )}
                   </td>
@@ -600,12 +595,12 @@ export function EnvironmentPanel() {
             Export saves roots, tool preferences, and a health snapshot. Import applies library roots and FPCALC_PATH.
           </p>
           <div className="env-actions">
-            <button type="button" className="text-btn" onClick={() => void handleExport()}>
+            <Button variant="ghost" onClick={() => void handleExport()}>
               Export JSON
-            </button>
-            <button type="button" className="primary-btn" onClick={() => void handleImport()}>
+            </Button>
+            <Button variant="primary" onClick={() => void handleImport()}>
               Import JSON
-            </button>
+            </Button>
           </div>
           <textarea
             className="field-input env-manifest-editor"
@@ -692,9 +687,9 @@ export function EnvironmentSummaryWidget({ onNavigate }: { onNavigate?: () => vo
         {onNavigate && (
           <>
             {" · "}
-            <button type="button" className="linkish-btn" onClick={onNavigate}>
+            <Button variant="ghost" size="sm" onClick={onNavigate}>
               Open Environment tab
-            </button>
+            </Button>
           </>
         )}
       </div>
