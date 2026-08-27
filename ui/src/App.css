@@ -2379,6 +2379,12 @@ tr.inv-vendor-set {
   margin: 0 0.1rem;
 }
 
+.file-explorer-breadcrumbs .breadcrumb-link,
+.file-explorer-breadcrumbs button {
+  font-size: inherit;
+  padding: 0.12rem 0.4rem;
+}
+
 .file-explorer-body {
   display: flex;
   gap: 0.5rem;

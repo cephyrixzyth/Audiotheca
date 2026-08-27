@@ -26,6 +26,10 @@ Git tag **v1.0.7** was published with a broken Windows NSIS pre-install hook (si
 - **Config** — `ACOUSTID_CLIENT_KEY` / `AUDIOTHECA_AIR_GAP` documented in `.env.example`
 - **Analyze** — preview badges (BPM/key/tags) run for FLAC/MP3/AIFF/OGG/M4A; waveform and LUFS stay WAV-only
 - **PE hints** — Library explorer context menu and selected-binary **PE hints** call `POST /api/security/pe-hints`
+- **BWF / SFX-MAP** — Spot preview shows vendor hints from analyze (`bwf` / `sfx_map`)
+- **Orchestration** — Environment panel surfaces SIG-CAP, DRV-COOLDWN, TAG-PROP (dry-run), and STRG-TIER
+- **Explorer breadcrumbs** — Roots / path crumbs use the Button primitive
+- **Scene execute keys** — live-execute test looks up `executed_renames` with normalized path keys (Windows slash/case)
 
 ### Phase M — external sources (M1–M9)
 

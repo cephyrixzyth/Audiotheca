@@ -31,6 +31,7 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
   const [loudnessEngine, setLoudnessEngine] = useState<string | undefined>();
   const [bpmSource, setBpmSource] = useState<string | undefined>();
   const [keySource, setKeySource] = useState<string | undefined>();
+  const [vendorHints, setVendorHints] = useState<string[]>([]);
   const [acoustIdBusy, setAcoustIdBusy] = useState(false);
   const [acoustIdMsg, setAcoustIdMsg] = useState<string | null>(null);
   const [trimStart, setTrimStart] = useState(session.trimStart);
@@ -46,6 +47,7 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
     setLoudnessEngine(undefined);
     setBpmSource(undefined);
     setKeySource(undefined);
+    setVendorHints([]);
     if (isWav) {
       setLoading(true);
       void fetchAudioWaveform(path, 32)
@@ -76,6 +78,12 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
               ? lufsNorm.engine
               : undefined,
         );
+        const bwf = data.bwf as { vendor_hints?: string[] } | undefined;
+        const sfx = data.sfx_map as { vendor_hints?: string[] } | undefined;
+        const hints = [...(bwf?.vendor_hints ?? []), ...(sfx?.vendor_hints ?? [])].filter(
+          (hint): hint is string => typeof hint === "string" && hint.length > 0,
+        );
+        setVendorHints([...new Set(hints)]);
       })
       .catch(() => undefined);
   }, [path, isWav]);
@@ -275,6 +283,11 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
               {assetKey}
             </Badge>
           ) : null}
+          {vendorHints.slice(0, 2).map((hint) => (
+            <Badge key={hint} tone="accent" title="SFX-MAP BWF library hint">
+              {hint}
+            </Badge>
+          ))}
           {session.tempoSync && assetBpm ? ` ${assetBpm}→${session.projectBpm}bpm` : null}
           {session.pitchShiftSemitones !== 0 ? ` ${session.pitchShiftSemitones}st` : null}
           {session.mixChannel !== "stereo" ? ` ${session.mixChannel}` : null}

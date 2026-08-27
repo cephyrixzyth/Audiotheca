@@ -150,7 +150,7 @@ def test_scene_execute_live_removes_plan_row(client, tmp_path, monkeypatch):
 
     remaining = report_loader.load_scene_renames(stamp)
     assert remaining == []
-    assert str(src) in scene.load_store().executed_renames
+    assert scene.normalize_path(str(src)) in scene.load_store().executed_renames
 
 
 def test_scene_execute_api_returns_result_rows(client, tmp_path, monkeypatch):

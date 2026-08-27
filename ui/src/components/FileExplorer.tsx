@@ -372,20 +372,21 @@ function ExplorerPane({
   return (
     <div className="file-explorer-pane" data-pane={paneId}>
       <nav className="file-explorer-breadcrumbs" aria-label="Current path">
-        <button type="button" className="text-btn" title="Library roots" onClick={() => void loadDir("")}>
+        <Button variant="ghost" size="sm" title="Library roots" onClick={() => void loadDir("")}>
           Roots
-        </button>
+        </Button>
         {crumbs.map((crumb, index) => (
           <span key={`${crumb.path}:${index}`} className="breadcrumb-segment">
             <span className="breadcrumb-sep">/</span>
-            <button
-              type="button"
-              className="text-btn breadcrumb-link"
+            <Button
+              variant="ghost"
+              size="sm"
+              className="breadcrumb-link"
               title={crumb.path}
               onClick={() => void loadDir(crumb.path)}
             >
               {crumb.label}
-            </button>
+            </Button>
           </span>
         ))}
       </nav>
