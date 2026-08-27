@@ -62,6 +62,7 @@ MIME_BY_EXT = {
     ".ogg": "audio/ogg",
     ".aif": "audio/aiff",
     ".aiff": "audio/aiff",
+    ".m4a": "audio/mp4",
 }
 
 @router.get("/api/browse")
@@ -108,7 +109,7 @@ def browse_search(
 def browse_facets(
     root: str = Query(..., description="Library folder to facet"),
     limit: int = Query(default=200, le=1000),
-    analyze: bool = Query(default=False, description="Run full WAV analyze (slower)"),
+    analyze: bool = Query(default=False, description="Run full audio analyze (slower)"),
 ) -> dict[str, object]:
     from audiotheca.sample_facets import collect_facets
 
@@ -156,7 +157,7 @@ def audio_waveform(
     return mask_payload(waveform_cache_key(target, bins=bins, refresh=refresh))
 
 @router.get("/api/audio/analyze")
-def audio_analyze(path: str = Query(..., description="WAV file to analyze")) -> dict[str, object]:
+def audio_analyze(path: str = Query(..., description="Auditionable audio file to analyze")) -> dict[str, object]:
     from audio_analyze import analyze_audio_file
     from path_mask import mask_payload
 

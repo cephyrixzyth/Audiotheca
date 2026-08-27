@@ -82,7 +82,7 @@ def facet_for_path(path: str | Path, *, analyze: bool = False) -> dict[str, Any]
             sources["key"] = str(detected_key.get("source") or "filename")
 
     loudness = None
-    if analyze and target.suffix.lower() in {".wav", ".wave"} and target.is_file():
+    if analyze and target.suffix.lower() in AUDIO_EXTS and target.is_file():
         try:
             result = analyze_audio_file(target)
             loudness = (result.get("loudness") or {}).get("measured_lufs")

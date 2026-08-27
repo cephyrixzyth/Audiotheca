@@ -2487,6 +2487,11 @@ tr.inv-vendor-set {
   max-width: 12rem;
 }
 
+.explorer-pe-hint .pe-cap-cell {
+  max-width: none;
+  margin-top: 0.35rem;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;

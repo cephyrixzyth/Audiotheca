@@ -172,7 +172,7 @@ Every tab is a hash route (`#/dashboard`, `#/review/scan-audit`, …). **⌘K** 
 | Scan audit | Per-item identification table |
 | Skipped files | Coverage gaps, cache, coexistence, rescan |
 | Space recovery | Underscore whitelist, coexistence queue |
-| Security | Malware heuristics, PE capability hints, quarantine, hash lookup |
+| Security | Malware heuristics, PE capability hints (scan + explorer), quarantine, hash lookup |
 | Environment | Toolchain probe, repairs, theme editor, license reconcile |
 | Vendors | Gaps, harvest, user keywords |
 | Help | Built-in guides *(last tab)* |

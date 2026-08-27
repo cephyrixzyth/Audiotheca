@@ -201,7 +201,7 @@ Review planned space savings before live execute.`,
         id: "security",
         title: "Security",
         body: `Malware heuristics, underscore whitelist, hash lookup, and quarantine before live deletes.
-PE capability hints (capa-lite) appear on findings when the file is a Windows binary.
+PE capability hints (capa-lite) appear on findings when the file is a Windows binary, and from Library explorer (context menu or **PE hints** on a selected .exe/.dll).
 Run security scan after investigation when unknown vendors remain.`,
         media: { screenshot: "/help/security-malware.png" },
       },

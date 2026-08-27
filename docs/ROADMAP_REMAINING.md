@@ -128,7 +128,7 @@ Shipped from [SOURCES.md](SOURCES.md) candidates. Keep Audiotheca a **local oper
 | M6 | Auto-tag / facet UX (type, BPM, key, path) without cloud marketplace | ADSR Sample Manager | Medium | ☑ (`sample_facets.py`, `GET /api/browse/facets`, Explorer facets) |
 | M7 | Optional **licensed vs orphaned** bucket using vendor install manifests | Native Access / PA / iLok-style | Low | ☑ (`license_oracle.py`, buckets, Install Lifecycle reconcile) |
 | M8 | Elevate KVR + vi-control into documented research pipeline | harvest / SearXNG | Low | ☑ (presets + `docs/VENDOR_RESEARCH.md` + `POST /api/vendors/research`) |
-| M9 | Security depth: YARA/capa-style PE capability hints | YARA, capa, DIE | Low | ☑ (`pe_capabilities.py`, scan findings + `POST /api/security/pe-hints`) |
+| M9 | Security depth: YARA/capa-style PE capability hints | YARA, capa, DIE | Low | ☑ (`pe_capabilities.py`, scan findings + explorer + `POST /api/security/pe-hints`) |
 
 **Exit:** M1–M9 landed with tests + SOURCES updates. **Phase M complete** (2026-07-23).
 
