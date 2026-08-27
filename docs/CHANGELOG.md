@@ -8,7 +8,7 @@ Git tag **v1.0.7** was published with a broken Windows NSIS pre-install hook (si
 
 ### UI design system & routing
 
-- **Radix primitives** — shared token-driven `Button`, `Badge`, `Card`, `Kpi`, `StatTile`, `Gauge`, `Dialog`, `Tooltip`, `Tabs`, and `VirtualTable` under `ui/src/ui/`; screens re-skinned without changing IA or data flow
+- **Radix primitives** — shared token-driven `Button`, `Badge`, `Card`, `Kpi`, `StatTile`, `Gauge`, `Dialog`, `Tooltip`, `Tabs`, `DropdownMenu`, and `VirtualTable` under `ui/src/ui/`; screens re-skinned without changing IA or data flow
 - **Hash routes** — every tab/sub-tab is deep-linkable (`#/dashboard`, `#/review/duplicates`, …); browser back/forward works; `/` redirects to Dashboard
 - **Selected run in the URL** — `?run=<stamp>` survives reloads, back/forward, and tab switches; defaults to the latest run
 - **Command palette** — ⌘K / Ctrl+K (or top-bar **Search**) jumps to tabs, library explorer, spec codes, and the UI-kit gallery (`#/ui-kit`)
@@ -30,6 +30,8 @@ Git tag **v1.0.7** was published with a broken Windows NSIS pre-install hook (si
 - **Orchestration** — Environment panel surfaces SIG-CAP, DRV-COOLDWN, TAG-PROP (dry-run), and STRG-TIER
 - **Explorer breadcrumbs** — Roots / path crumbs use the Button primitive
 - **Scene execute keys** — live-execute test looks up `executed_renames` with normalized path keys (Windows slash/case)
+- **DropdownMenu** — Radix menu primitive; theme switcher and row ⋮ actions (Investigation, Duplicates, Security) use it
+- **Symlink tests** — skip on Windows when creating a junction/symlink is not permitted
 
 ### Phase M — external sources (M1–M9)
 

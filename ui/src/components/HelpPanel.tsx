@@ -71,7 +71,7 @@ Always start with dry-run. Live moves require confirm_live and STAGE LIVE in Sca
       {
         id: "layout",
         title: "UI layout & themes",
-        body: `18 built-in themes via the header theme picker — buttons and accents follow the active palette (no stuck green).
+        body: `18 built-in themes via the header theme picker (Radix dropdown) — buttons and accents follow the active palette (no stuck green).
 
 Press ⌘K / Ctrl+K (or Search in the top bar) to jump to any tab, library path, spec code, or the UI kit. Every tab has a shareable hash URL (#/scan, #/review/duplicates, …). The selected run is in ?run= so it survives reloads and tab switches.
 
