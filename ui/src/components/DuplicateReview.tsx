@@ -29,6 +29,7 @@ import {
   duplicateExecuteRows,
   type ExecuteResultRow,
 } from "./ExecuteResultsPanel";
+import { nearLaneHint, nearLaneTitle, type NearLane } from "../utils/nearLane";
 
 interface Props {
   stamp: string;
@@ -86,6 +87,7 @@ export function DuplicateReview({ stamp }: Props) {
   );
   const [nearBusy, setNearBusy] = useState(false);
   const [nearMsg, setNearMsg] = useState<string | null>(null);
+  const [nearLane, setNearLane] = useState<NearLane>("acoustic");
   const [nearGroups, setNearGroups] = useState<
     Array<{
       kind: string;
@@ -275,6 +277,7 @@ export function DuplicateReview({ stamp }: Props) {
     }
     setNearBusy(true);
     setNearMsg(null);
+    setNearLane("acoustic");
     try {
       const res = await runAcousticNearDupes(paths, 0.85);
       setNearGroups(res.groups ?? []);
@@ -302,6 +305,7 @@ export function DuplicateReview({ stamp }: Props) {
     }
     setNearBusy(true);
     setNearMsg(null);
+    setNearLane("fuzzy");
     try {
       const res = await runFuzzyPackDupes(paths, 70);
       const mapped = (res.groups ?? []).map((group) => ({
@@ -429,12 +433,9 @@ export function DuplicateReview({ stamp }: Props) {
       {nearMsg && <div className="banner dry">{nearMsg}</div>}
 
       {nearGroups.length > 0 && (
-        <section className="near-dupe-lane" aria-label="Acoustic near-duplicates">
-          <h3>Acoustic near-duplicates</h3>
-          <p className="count-muted">
-            Chromaprint exact/near matches across formats (Sononym-style lane). Heuristic fallback when
-            fpcalc is unavailable.
-          </p>
+        <section className="near-dupe-lane" aria-label={nearLaneTitle(nearLane)}>
+          <h3>{nearLaneTitle(nearLane)}</h3>
+          <p className="count-muted">{nearLaneHint(nearLane)}</p>
           {nearGroups.map((group, index) => (
             <article key={`${group.kind}-${index}-${group.paths[0]}`} className="dupe-card">
               <header>

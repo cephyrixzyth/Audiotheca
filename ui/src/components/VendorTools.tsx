@@ -8,6 +8,7 @@ import {
   fetchHarvestSources,
   fetchVendorGaps,
   fetchVendors,
+  planVendorResearch,
   rejectHarvestCandidates,
   runVendorHarvest,
   testVendorKeyword,
@@ -46,6 +47,10 @@ export function VendorTools({ stamp }: Props) {
   const [lastRun, setLastRun] = useState<Record<string, unknown> | null>(null);
   const [gaps, setGaps] = useState<VendorGap[]>([]);
   const [gapSelected, setGapSelected] = useState<Set<string>>(new Set());
+  const [researchQuery, setResearchQuery] = useState("");
+  const [researchPreset, setResearchPreset] = useState<"kvr" | "vi-control" | "vendor">("kvr");
+  const [researchBusy, setResearchBusy] = useState(false);
+  const [researchPlan, setResearchPlan] = useState<Record<string, unknown> | null>(null);
 
   const reloadGaps = useCallback(() => {
     if (!stamp) return;
@@ -160,6 +165,20 @@ export function VendorTools({ stamp }: Props) {
       setError(err instanceof Error ? err.message : "Harvest failed");
     } finally {
       setHarvesting(false);
+    }
+  }
+
+  async function handleResearchPlan() {
+    setResearchBusy(true);
+    setError(null);
+    try {
+      const res = await planVendorResearch(researchQuery.trim(), researchPreset);
+      setResearchPlan(res);
+      setMsg("Research pipeline planned — harvest with the matching preset below");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Research plan failed");
+    } finally {
+      setResearchBusy(false);
     }
   }
 
@@ -333,6 +352,48 @@ export function VendorTools({ stamp }: Props) {
           </label>
         </div>
 
+        <div className="toolbar" style={{ flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.75rem" }}>
+          <label>
+            Research query
+            <input
+              className="field-input"
+              value={researchQuery}
+              onChange={(e) => setResearchQuery(e.target.value)}
+              placeholder="kontakt library"
+            />
+          </label>
+          <label>
+            SearX preset
+            <select
+              value={researchPreset}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === "kvr" || value === "vi-control" || value === "vendor") {
+                  setResearchPreset(value);
+                }
+              }}
+            >
+              <option value="kvr">kvr</option>
+              <option value="vi-control">vi-control</option>
+              <option value="vendor">vendor</option>
+            </select>
+          </label>
+          <Button
+            variant="secondary"
+            disabled={researchBusy}
+            title="Plan the documented KVR / vi-control pipeline (does not scrape yet)"
+            onClick={() => void handleResearchPlan()}
+          >
+            {researchBusy ? "Planning…" : "Plan research"}
+          </Button>
+        </div>
+        {researchPlan && Array.isArray(researchPlan.pipeline) && (
+          <ol className="count-muted" style={{ marginBottom: "0.75rem" }}>
+            {(researchPlan.pipeline as string[]).map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ol>
+        )}
         <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.75rem" }}>
           {presets.map((preset) => (
             <Button

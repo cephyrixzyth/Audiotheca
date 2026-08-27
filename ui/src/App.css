@@ -2474,6 +2474,12 @@ tr.inv-vendor-set {
   margin: 0.35rem 0 0.5rem;
 }
 
+.explorer-facet-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
 .pe-cap-cell {
   display: flex;
   flex-wrap: wrap;
@@ -3709,6 +3715,13 @@ tr.inv-vendor-set {
 .audio-preview-meta {
   font-size: 0.68rem;
   white-space: nowrap;
+}
+
+.audio-preview-acoustid {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
 }
 
 .telemetry-dual {

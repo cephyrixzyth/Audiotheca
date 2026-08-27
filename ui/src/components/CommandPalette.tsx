@@ -128,6 +128,20 @@ export function CommandPalette() {
       run: () => goTab("security"),
     });
     list.push({
+      id: "act-acoustid",
+      label: "AcoustID lookup",
+      hint: "Library",
+      keywords: "acoustid musicbrainz fingerprint chromaprint lookup",
+      run: () => openAtRoots(),
+    });
+    list.push({
+      id: "act-vendor-research",
+      label: "Vendor research plan",
+      hint: "Vendors",
+      keywords: "kvr vi-control research harvest searx vendor",
+      run: () => goTab("vendors"),
+    });
+    list.push({
       id: "act-uikit",
       label: "UI kit gallery",
       hint: "Open",

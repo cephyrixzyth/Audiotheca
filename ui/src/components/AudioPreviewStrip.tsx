@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fetchAudioAnalyze, fetchAudioWaveform, mediaStreamUrl } from "../api/client";
+import { fetchAudioAnalyze, fetchAudioWaveform, lookupAcoustId, mediaStreamUrl } from "../api/client";
 import {
   playbackRateForBpm,
   usePreviewSession,
 } from "../hooks/usePreviewSession";
-import { Badge } from "../ui";
+import { Badge, Button } from "../ui";
 
 const AUDIO_EXT = /\.(wav|wave|mp3|flac|ogg|aif|aiff)$/i;
 
@@ -31,6 +31,8 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
   const [loudnessEngine, setLoudnessEngine] = useState<string | undefined>();
   const [bpmSource, setBpmSource] = useState<string | undefined>();
   const [keySource, setKeySource] = useState<string | undefined>();
+  const [acoustIdBusy, setAcoustIdBusy] = useState(false);
+  const [acoustIdMsg, setAcoustIdMsg] = useState<string | null>(null);
   const [trimStart, setTrimStart] = useState(session.trimStart);
   const [trimEnd, setTrimEnd] = useState(session.trimEnd);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -79,6 +81,8 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
       audioRef.current = null;
     }
     setPlaying(false);
+    setAcoustIdMsg(null);
+    setAcoustIdBusy(false);
   }, [path]);
 
   const applyMix = useCallback((audio: HTMLAudioElement) => {
@@ -125,6 +129,38 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
     if (audioRef.current) audioRef.current.currentTime = 0;
     setPlaying(false);
   }, []);
+
+  async function handleAcoustIdLookup() {
+    setAcoustIdBusy(true);
+    setAcoustIdMsg(null);
+    try {
+      const res = await lookupAcoustId({ path });
+      if (res.skipped) {
+        setAcoustIdMsg(typeof res.error === "string" ? res.error : "AcoustID lookup skipped");
+        return;
+      }
+      if (res.ok === false) {
+        setAcoustIdMsg(typeof res.error === "string" ? res.error : "AcoustID lookup failed");
+        return;
+      }
+      const results = Array.isArray(res.results) ? res.results : [];
+      const first = results[0] as
+        | { score?: number; recordings?: Array<{ title?: string; artists?: string[] }> }
+        | undefined;
+      const recording = first?.recordings?.[0];
+      if (!recording?.title) {
+        setAcoustIdMsg("No AcoustID match");
+        return;
+      }
+      const artists = (recording.artists ?? []).filter(Boolean).join(", ");
+      const score = typeof first?.score === "number" ? ` (${Math.round(first.score * 100)}%)` : "";
+      setAcoustIdMsg(`${artists ? `${artists} — ` : ""}${recording.title}${score}`);
+    } catch (err) {
+      setAcoustIdMsg(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAcoustIdBusy(false);
+    }
+  }
 
   useEffect(() => {
     if (autoPlay && !playing && !session.autoAuditionMuted) {
@@ -230,6 +266,20 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
           {session.tempoSync && assetBpm ? ` ${assetBpm}→${session.projectBpm}bpm` : null}
           {session.pitchShiftSemitones !== 0 ? ` ${session.pitchShiftSemitones}st` : null}
           {session.mixChannel !== "stereo" ? ` ${session.mixChannel}` : null}
+        </span>
+      )}
+      {!compact && (
+        <span className="audio-preview-acoustid">
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={acoustIdBusy}
+            title="Optional MusicBrainz/AcoustID lookup (needs ACOUSTID_CLIENT_KEY; skipped in air-gap)"
+            onClick={() => void handleAcoustIdLookup()}
+          >
+            {acoustIdBusy ? "AcoustID…" : "AcoustID"}
+          </Button>
+          {acoustIdMsg ? <span className="count-muted">{acoustIdMsg}</span> : null}
         </span>
       )}
     </div>
