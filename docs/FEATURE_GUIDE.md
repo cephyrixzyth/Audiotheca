@@ -156,6 +156,8 @@ FastAPI on `http://127.0.0.1:8787` serves dry-run reports and runs scan jobs. Ro
 
 #### Tabs
 
+Every tab is a hash route (`#/dashboard`, `#/review/scan-audit`, …). **⌘K** / **Ctrl+K** opens the command palette. The selected run is `?run=<stamp>`. Large data tables virtualize past ~80 rows.
+
 | Tab | Purpose |
 | --- | --- |
 | Dashboard | Run stats, gauges, run compare, reorderable panels |

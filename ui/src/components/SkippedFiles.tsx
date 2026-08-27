@@ -27,7 +27,7 @@ import type {
   SkipPhaseImpact,
   SkippedItem,
 } from "../types";
-import { Button } from "../ui";
+import { Button, Tabs, VirtualTable } from "../ui";
 import { PathLink } from "./PathLink";
 import { useContextSidebar } from "./ContextSidebar";
 
@@ -205,18 +205,16 @@ export function SkippedFiles({ stamp, runs }: Props) {
         depth limits. Select rows to force rescan or queue for investigation.
       </div>
 
-      <div className="toolbar" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
-        {subTabs.map((t) => (
-          <Button
-            key={t.id}
-            variant={view === t.id ? "primary" : "secondary"}
-            title={t.title ?? t.label}
-            onClick={() => setView(t.id)}
-          >
-            {t.label}
-          </Button>
-        ))}
-      </div>
+      <Tabs
+        aria-label="Skipped file views"
+        value={view}
+        onValueChange={(next) => setView(next as SubView)}
+        items={subTabs.map((t) => ({
+          value: t.id,
+          label: t.label,
+          title: t.title,
+        }))}
+      />
 
       {view !== "compare" && (
         <div className="toolbar">
@@ -281,8 +279,10 @@ export function SkippedFiles({ stamp, runs }: Props) {
       {!loading && view === "hub" && (
         <>
           <p className="count-muted">{skippedTotal.toLocaleString()} items</p>
-          <table className="data-table">
-            <thead>
+          <VirtualTable
+            items={skipped}
+            colCount={6}
+            header={
               <tr>
                 <th />
                 <th>Reason</th>
@@ -291,36 +291,36 @@ export function SkippedFiles({ stamp, runs }: Props) {
                 <th>Path</th>
                 <th>Detail</th>
               </tr>
-            </thead>
-            <tbody>
-              {skipped.map((row) => (
-                <tr key={`${row.reason}-${row.path}-${row.item_name}`}>
-                  <td>
-                    {row.path && (
-                      <input
-                        type="checkbox"
-                        checked={selected.has(row.path)}
-                        onChange={() => toggleSelect(row.path)}
-                      />
-                    )}
-                  </td>
-                  <td>
-                    <code>{REASON_LABELS[row.reason] ?? row.reason}</code>
-                  </td>
-                  <td>{row.section}</td>
-                  <td>{row.item_name}</td>
-                  <td>{row.path ? <PathLink path={row.path} /> : "—"}</td>
-                  <td className="count-muted">{row.detail}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+            }
+            renderRow={(row, _index, rowAttrs) => (
+              <tr key={`${row.reason}-${row.path}-${row.item_name}`} {...rowAttrs}>
+                <td>
+                  {row.path && (
+                    <input
+                      type="checkbox"
+                      checked={selected.has(row.path)}
+                      onChange={() => toggleSelect(row.path)}
+                    />
+                  )}
+                </td>
+                <td>
+                  <code>{REASON_LABELS[row.reason] ?? row.reason}</code>
+                </td>
+                <td>{row.section}</td>
+                <td>{row.item_name}</td>
+                <td>{row.path ? <PathLink path={row.path} /> : "—"}</td>
+                <td className="count-muted">{row.detail}</td>
+              </tr>
+            )}
+          />
         </>
       )}
 
       {!loading && view === "failures" && (
-        <table className="data-table">
-          <thead>
+        <VirtualTable
+          items={failures}
+          colCount={5}
+          header={
             <tr>
               <th />
               <th>Section</th>
@@ -328,28 +328,28 @@ export function SkippedFiles({ stamp, runs }: Props) {
               <th>Path</th>
               <th>Error</th>
             </tr>
-          </thead>
-          <tbody>
-            {failures.map((row) => (
-              <tr key={row.path}>
-                <td>
-                  <input type="checkbox" checked={selected.has(row.path)} onChange={() => toggleSelect(row.path)} />
-                </td>
-                <td>{row.section}</td>
-                <td>{row.item_name}</td>
-                <td>
-                  <PathLink path={row.path} />
-                </td>
-                <td className="count-muted">{row.error}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+          }
+          renderRow={(row, _index, rowAttrs) => (
+            <tr key={row.path} {...rowAttrs}>
+              <td>
+                <input type="checkbox" checked={selected.has(row.path)} onChange={() => toggleSelect(row.path)} />
+              </td>
+              <td>{row.section}</td>
+              <td>{row.item_name}</td>
+              <td>
+                <PathLink path={row.path} />
+              </td>
+              <td className="count-muted">{row.error}</td>
+            </tr>
+          )}
+        />
       )}
 
       {!loading && view === "coverage" && (
-        <table className="data-table">
-          <thead>
+        <VirtualTable
+          items={gaps}
+          colCount={6}
+          header={
             <tr>
               <th />
               <th>Reason</th>
@@ -358,58 +358,58 @@ export function SkippedFiles({ stamp, runs }: Props) {
               <th>Path</th>
               <th>Detail</th>
             </tr>
-          </thead>
-          <tbody>
-            {gaps.map((row) => (
-              <tr key={row.path}>
-                <td>
-                  <input type="checkbox" checked={selected.has(row.path)} onChange={() => toggleSelect(row.path)} />
-                </td>
-                <td>
-                  <code>{row.reason}</code>
-                </td>
-                <td>{row.section}</td>
-                <td>{row.name}</td>
-                <td>
-                  <PathLink path={row.path} />
-                </td>
-                <td className="count-muted">{row.detail}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+          }
+          renderRow={(row, _index, rowAttrs) => (
+            <tr key={row.path} {...rowAttrs}>
+              <td>
+                <input type="checkbox" checked={selected.has(row.path)} onChange={() => toggleSelect(row.path)} />
+              </td>
+              <td>
+                <code>{row.reason}</code>
+              </td>
+              <td>{row.section}</td>
+              <td>{row.name}</td>
+              <td>
+                <PathLink path={row.path} />
+              </td>
+              <td className="count-muted">{row.detail}</td>
+            </tr>
+          )}
+        />
       )}
 
       {!loading && view === "cache" && (
-        <table className="data-table">
-          <thead>
+        <VirtualTable
+          items={cacheHits}
+          colCount={4}
+          header={
             <tr>
               <th />
               <th>Section</th>
               <th>Name</th>
               <th>Path</th>
             </tr>
-          </thead>
-          <tbody>
-            {cacheHits.map((row) => (
-              <tr key={row.path}>
-                <td>
-                  <input type="checkbox" checked={selected.has(row.path)} onChange={() => toggleSelect(row.path)} />
-                </td>
-                <td>{row.section}</td>
-                <td>{row.name}</td>
-                <td>
-                  <PathLink path={row.path} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+          }
+          renderRow={(row, _index, rowAttrs) => (
+            <tr key={row.path} {...rowAttrs}>
+              <td>
+                <input type="checkbox" checked={selected.has(row.path)} onChange={() => toggleSelect(row.path)} />
+              </td>
+              <td>{row.section}</td>
+              <td>{row.name}</td>
+              <td>
+                <PathLink path={row.path} />
+              </td>
+            </tr>
+          )}
+        />
       )}
 
       {!loading && view === "nested" && (
-        <table className="data-table">
-          <thead>
+        <VirtualTable
+          items={nested}
+          colCount={5}
+          header={
             <tr>
               <th>Section</th>
               <th>Item</th>
@@ -417,28 +417,28 @@ export function SkippedFiles({ stamp, runs }: Props) {
               <th>Nested path</th>
               <th>Fix</th>
             </tr>
-          </thead>
-          <tbody>
-            {nested.map((row) => (
-              <tr key={row.nested_path}>
-                <td>{row.section}</td>
-                <td>{row.item_name}</td>
-                <td>
-                  <code>{row.issue_type}</code>
-                </td>
-                <td>
-                  <PathLink path={row.nested_path} />
-                </td>
-                <td className="count-muted">{row.suggested_fix}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+          }
+          renderRow={(row, _index, rowAttrs) => (
+            <tr key={row.nested_path} {...rowAttrs}>
+              <td>{row.section}</td>
+              <td>{row.item_name}</td>
+              <td>
+                <code>{row.issue_type}</code>
+              </td>
+              <td>
+                <PathLink path={row.nested_path} />
+              </td>
+              <td className="count-muted">{row.suggested_fix}</td>
+            </tr>
+          )}
+        />
       )}
 
       {!loading && view === "coexistence" && (
-        <table className="data-table">
-          <thead>
+        <VirtualTable
+          items={coexistence}
+          colCount={6}
+          header={
             <tr>
               <th>Section</th>
               <th>Item</th>
@@ -447,27 +447,27 @@ export function SkippedFiles({ stamp, runs }: Props) {
               <th>Folder</th>
               <th>Similarity</th>
             </tr>
-          </thead>
-          <tbody>
-            {coexistence.map((row) => (
-              <tr key={`${row.item_path}-${row.archive_or_installer}`}>
-                <td>{row.section}</td>
-                <td>{row.item_name}</td>
-                <td>
-                  <code>{row.issue_type}</code>
-                </td>
-                <td>{row.archive_or_installer}</td>
-                <td>{row.extracted_folder}</td>
-                <td>{row.name_similarity_pct != null ? `${row.name_similarity_pct}%` : "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+          }
+          renderRow={(row, _index, rowAttrs) => (
+            <tr key={`${row.item_path}-${row.archive_or_installer}`} {...rowAttrs}>
+              <td>{row.section}</td>
+              <td>{row.item_name}</td>
+              <td>
+                <code>{row.issue_type}</code>
+              </td>
+              <td>{row.archive_or_installer}</td>
+              <td>{row.extracted_folder}</td>
+              <td>{row.name_similarity_pct != null ? `${row.name_similarity_pct}%` : "—"}</td>
+            </tr>
+          )}
+        />
       )}
 
       {!loading && view === "inventory" && (
-        <table className="data-table">
-          <thead>
+        <VirtualTable
+          items={inventory}
+          colCount={6}
+          header={
             <tr>
               <th>Bin</th>
               <th>Item</th>
@@ -476,25 +476,25 @@ export function SkippedFiles({ stamp, runs }: Props) {
               <th>Fingerprint</th>
               <th>Type</th>
             </tr>
-          </thead>
-          <tbody>
-            {inventory.map((row) => (
-              <tr key={`${row.root_bin}-${row.item_name}`}>
-                <td>{row.root_bin}</td>
-                <td>{row.item_name}</td>
-                <td>{row.vendor}</td>
-                <td>{row.id_method}</td>
-                <td>{row.fingerprint}</td>
-                <td>{row.item_type}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+          }
+          renderRow={(row, _index, rowAttrs) => (
+            <tr key={`${row.root_bin}-${row.item_name}`} {...rowAttrs}>
+              <td>{row.root_bin}</td>
+              <td>{row.item_name}</td>
+              <td>{row.vendor}</td>
+              <td>{row.id_method}</td>
+              <td>{row.fingerprint}</td>
+              <td>{row.item_type}</td>
+            </tr>
+          )}
+        />
       )}
 
       {!loading && view === "truncations" && (
-        <table className="data-table">
-          <thead>
+        <VirtualTable
+          items={truncations}
+          colCount={6}
+          header={
             <tr>
               <th>Section</th>
               <th>Item</th>
@@ -503,24 +503,22 @@ export function SkippedFiles({ stamp, runs }: Props) {
               <th>Depth / limit</th>
               <th>Detail</th>
             </tr>
-          </thead>
-          <tbody>
-            {truncations.map((row) => (
-              <tr key={`${row.item_path}-${row.truncated_path}`}>
-                <td>{row.section}</td>
-                <td>{row.item_name}</td>
-                <td>
-                  <code>{row.kind}</code>
-                </td>
-                <td>{row.truncated_path ? <PathLink path={row.truncated_path} /> : row.relative_path}</td>
-                <td>
-                  {row.depth}/{row.limit}
-                </td>
-                <td className="count-muted">{row.detail}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+          }
+          renderRow={(row, _index, rowAttrs) => (
+            <tr key={`${row.item_path}-${row.truncated_path}`} {...rowAttrs}>
+              <td>{row.section}</td>
+              <td>{row.item_name}</td>
+              <td>
+                <code>{row.kind}</code>
+              </td>
+              <td>{row.truncated_path ? <PathLink path={row.truncated_path} /> : row.relative_path}</td>
+              <td>
+                {row.depth}/{row.limit}
+              </td>
+              <td className="count-muted">{row.detail}</td>
+            </tr>
+          )}
+        />
       )}
 
       {view === "compare" && (

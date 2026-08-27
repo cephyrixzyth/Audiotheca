@@ -8,7 +8,7 @@ import {
   setArchiveKeeper,
 } from "../api/client";
 import type { ArchivePeekItem } from "../types";
-import { Badge, Button, Kpi } from "../ui";
+import { Badge, Button, Kpi, VirtualTable } from "../ui";
 import { useLibraryRoot } from "../hooks/useLibraryRoot";
 import { lookupByPath, pathKey } from "../utils/pathKey";
 import { ArchiveDiffWizard } from "./ArchiveDiffWizard";
@@ -273,8 +273,11 @@ export function ArchivePeek({ stamp }: Props) {
       )}
 
       {items.length > 0 && (
-        <table className="data-table">
-          <thead>
+        <VirtualTable
+          items={items}
+          colCount={6}
+          estimateSize={80}
+          header={
             <tr>
               <th>Verdict</th>
               <th>Item</th>
@@ -283,91 +286,89 @@ export function ArchivePeek({ stamp }: Props) {
               <th>Extracted folder</th>
               <th>Actions</th>
             </tr>
-          </thead>
-          <tbody>
-            {items.map((row) => {
-              const isRejected = lookupByPath(rejected, row.archive_path) != null;
-              const isConfirmed = lookupByPath(confirmed, row.archive_path) != null;
-              const keeper = lookupByPath(keepers, row.archive_path);
-              return (
-                <tr key={pathKey(row.archive_path)}>
-                  <td>
-                    <Badge
-                      tone={row.verdict === "MATCHES_EXTRACTED_FOLDER" ? "ready" : "accent"}
-                      title={row.verdict}
+          }
+          renderRow={(row, _index, rowAttrs) => {
+            const isRejected = lookupByPath(rejected, row.archive_path) != null;
+            const isConfirmed = lookupByPath(confirmed, row.archive_path) != null;
+            const keeper = lookupByPath(keepers, row.archive_path);
+            return (
+              <tr key={pathKey(row.archive_path)} {...rowAttrs}>
+                <td>
+                  <Badge
+                    tone={row.verdict === "MATCHES_EXTRACTED_FOLDER" ? "ready" : "accent"}
+                    title={row.verdict}
+                  >
+                    {verdictLabel(row.verdict)}
+                  </Badge>
+                  {isRejected && <Badge tone="accent">rejected</Badge>}
+                  {isConfirmed && <Badge tone="ready">confirmed</Badge>}
+                  {keeper && <Badge tone="accent">keep {keeper}</Badge>}
+                </td>
+                <td>
+                  <div>{row.item_name}</div>
+                  <PathLink path={row.item_path} secondaryPath={row.archive_path} dualPane />
+                </td>
+                <td>
+                  <div>{row.archive_name}</div>
+                  <PathLink path={row.archive_path} />
+                </td>
+                <td>{row.archive_size_mb != null ? `${row.archive_size_mb} MB` : "—"}</td>
+                <td>{row.extracted_folder}</td>
+                <td>
+                  {row.extracted_folder ? (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      title="Compare archive listing vs extracted folder side by side"
+                      onClick={() => setDiffRow(row)}
                     >
-                      {verdictLabel(row.verdict)}
-                    </Badge>
-                    {isRejected && <Badge tone="accent">rejected</Badge>}
-                    {isConfirmed && <Badge tone="ready">confirmed</Badge>}
-                    {keeper && <Badge tone="accent">keep {keeper}</Badge>}
-                  </td>
-                  <td>
-                    <div>{row.item_name}</div>
-                    <PathLink path={row.item_path} secondaryPath={row.archive_path} dualPane />
-                  </td>
-                  <td>
-                    <div>{row.archive_name}</div>
-                    <PathLink path={row.archive_path} />
-                  </td>
-                  <td>{row.archive_size_mb != null ? `${row.archive_size_mb} MB` : "—"}</td>
-                  <td>{row.extracted_folder}</td>
-                  <td>
-                    {row.extracted_folder ? (
+                      Diff
+                    </Button>
+                  ) : (
+                    <span className="count-muted">—</span>
+                  )}{" "}
+                  {row.verdict === "MATCHES_EXTRACTED_FOLDER" && !isRejected && (
+                    <>
                       <Button
                         variant="secondary"
                         size="sm"
-                        title="Compare archive listing vs extracted folder side by side"
-                        onClick={() => setDiffRow(row)}
+                        title="Mark this archive safe to delete — extracted folder is a match"
+                        onClick={() => void handleConfirm(row)}
                       >
-                        Diff
+                        Confirm delete
+                      </Button>{" "}
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        title="Archive is not redundant — engine will skip it on future scans"
+                        onClick={() => void handleReject(row)}
+                      >
+                        Not redundant
+                      </Button>{" "}
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        title="Keep the extracted folder and prefer deleting the archive later"
+                        onClick={() => void handleKeeper(row, "folder")}
+                      >
+                        Keep folder
+                      </Button>{" "}
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        title="Keep the archive file and treat the extracted folder as disposable"
+                        onClick={() => void handleKeeper(row, "archive")}
+                      >
+                        Keep archive
                       </Button>
-                    ) : (
-                      <span className="count-muted">—</span>
-                    )}{" "}
-                    {row.verdict === "MATCHES_EXTRACTED_FOLDER" && !isRejected && (
-                      <>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          title="Mark this archive safe to delete — extracted folder is a match"
-                          onClick={() => void handleConfirm(row)}
-                        >
-                          Confirm delete
-                        </Button>{" "}
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          title="Archive is not redundant — engine will skip it on future scans"
-                          onClick={() => void handleReject(row)}
-                        >
-                          Not redundant
-                        </Button>{" "}
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          title="Keep the extracted folder and prefer deleting the archive later"
-                          onClick={() => void handleKeeper(row, "folder")}
-                        >
-                          Keep folder
-                        </Button>{" "}
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          title="Keep the archive file and treat the extracted folder as disposable"
-                          onClick={() => void handleKeeper(row, "archive")}
-                        >
-                          Keep archive
-                        </Button>
-                      </>
-                    )}
-                    {isRejected && <span className="count-muted">Skipped next run</span>}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                    </>
+                  )}
+                  {isRejected && <span className="count-muted">Skipped next run</span>}
+                </td>
+              </tr>
+            );
+          }}
+        />
       )}
     </div>
   );

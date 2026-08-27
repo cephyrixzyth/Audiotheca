@@ -12,7 +12,7 @@ import {
   type InvestigationFeedbackState,
 } from "../api/client";
 import type { InvestigationItem } from "../types";
-import { Badge, Button } from "../ui";
+import { Badge, Button, Tabs, VirtualTable } from "../ui";
 import type { BadgeTone } from "../ui";
 import { pathKey } from "../utils/pathKey";
 import { useContextSidebar, useSidebarFilters } from "./ContextSidebar";
@@ -265,13 +265,23 @@ export function InvestigationInbox({ stamp }: Props) {
   return (
     <div>
       <div className="toolbar">
-        <label title="Grouped view for bulk vendor/parent fixes; list view for per-item work">
-          View
-          <select value={view} onChange={(e) => setView(e.target.value as "list" | "groups")}>
-            <option value="groups">By prefix (bulk)</option>
-            <option value="list">All items</option>
-          </select>
-        </label>
+        <Tabs
+          aria-label="Investigation view"
+          value={view}
+          onValueChange={(next) => setView(next as "list" | "groups")}
+          items={[
+            {
+              value: "groups",
+              label: "By prefix (bulk)",
+              title: "Grouped view for bulk vendor/parent fixes",
+            },
+            {
+              value: "list",
+              label: "All items",
+              title: "List view for per-item work",
+            },
+          ]}
+        />
         <span className="count-muted">
           {loading ? "Loading…" : `${total.toLocaleString()} ${view === "groups" ? "groups" : "items"}`}
           {feedback ? ` · ${feedback.corrections.length} corrections` : ""}
@@ -310,87 +320,92 @@ export function InvestigationInbox({ stamp }: Props) {
       )}
 
       {view === "groups" && groups.length > 0 && (
-        <div className="table-wrap">
-          <table className="data-table investigation-table">
-            <thead>
-              <tr>
-                <th>Prefix / group</th>
-                <th>Count</th>
-                <th>Bucket</th>
-                <th>ID</th>
-                <th>Samples</th>
-                <th>Bulk actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {groups.map((group) => (
-                <tr
-                  key={group.group_key}
-                  className={selectedGroup === group.group_key ? "inv-vendor-set" : ""}
-                  onClick={() => setSelectedGroup(group.group_key)}
+        <VirtualTable
+          items={groups}
+          colCount={6}
+          estimateSize={64}
+          tableClassName="data-table investigation-table"
+          header={
+            <tr>
+              <th>Prefix / group</th>
+              <th>Count</th>
+              <th>Bucket</th>
+              <th>ID</th>
+              <th>Samples</th>
+              <th>Bulk actions</th>
+            </tr>
+          }
+          renderRow={(group, _index, rowAttrs) => (
+            <tr
+              key={group.group_key}
+              className={selectedGroup === group.group_key ? "inv-vendor-set" : ""}
+              onClick={() => setSelectedGroup(group.group_key)}
+              {...rowAttrs}
+            >
+              <td>
+                <strong>{group.group_key}</strong>
+              </td>
+              <td>{group.count}</td>
+              <td>
+                <Badge tone="accent">{group.bucket}</Badge>
+              </td>
+              <td>
+                <Badge tone={methodTone(group.id_method, "")}>{group.id_method}</Badge>
+              </td>
+              <td className="count-muted">
+                {group.sample_items.slice(0, 2).join(" · ")}
+              </td>
+              <td className="inv-actions">
+                {group.bucket === "_unverified_vendor" && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    title="Add this prefix to vendor_overrides.json so future scans recognize the vendor"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void handleGroupAddVendorDb(group);
+                    }}
+                  >
+                    Add to DB
+                  </Button>
+                )}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  title="Set vendor name for every item in this prefix group"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void handleGroupSetVendor(group);
+                  }}
                 >
-                  <td>
-                    <strong>{group.group_key}</strong>
-                  </td>
-                  <td>{group.count}</td>
-                  <td>
-                    <Badge tone="accent">{group.bucket}</Badge>
-                  </td>
-                  <td>
-                    <Badge tone={methodTone(group.id_method, "")}>{group.id_method}</Badge>
-                  </td>
-                  <td className="count-muted">
-                    {group.sample_items.slice(0, 2).join(" · ")}
-                  </td>
-                  <td className="inv-actions">
-                    {group.bucket === "_unverified_vendor" && (
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        title="Add this prefix to vendor_overrides.json so future scans recognize the vendor"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void handleGroupAddVendorDb(group);
-                        }}
-                      >
-                        Add to DB
-                      </Button>
-                    )}
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      title="Set vendor name for every item in this prefix group"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void handleGroupSetVendor(group);
-                      }}
-                    >
-                      Set vendor
-                    </Button>
-                    {(group.bucket === "_sample_pack" || group.bucket === "_likely_component") && (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        title="Link all items in this group to a parent product folder"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void handleGroupLinkParent(group);
-                        }}
-                      >
-                        Link parent
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  Set vendor
+                </Button>
+                {(group.bucket === "_sample_pack" || group.bucket === "_likely_component") && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    title="Link all items in this group to a parent product folder"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void handleGroupLinkParent(group);
+                    }}
+                  >
+                    Link parent
+                  </Button>
+                )}
+              </td>
+            </tr>
+          )}
+        />
       )}
 
       {view === "list" && items.length > 0 && (
-        <table className="data-table investigation-table">
-          <thead>
+        <VirtualTable
+          items={items}
+          colCount={5}
+          estimateSize={88}
+          tableClassName="data-table investigation-table"
+          header={
             <tr>
               <th>Section</th>
               <th>Item</th>
@@ -398,98 +413,100 @@ export function InvestigationInbox({ stamp }: Props) {
               <th>ID</th>
               <th>Actions</th>
             </tr>
-          </thead>
-          <tbody>
-            {items.map((row) => {
-              const status = rowStatus(row);
-              const vendorOverride = vendorMap[row.current_path];
-              return (
-                <tr key={`${row.current_path}-${row.item_name}`} className={status ? `inv-${status}` : ""}>
-                  <td>
-                    <code>{row.section}</code>
-                  </td>
-                  <td>
-                    <div>{row.item_name}</div>
-                    <PathLink path={row.current_path} />
-                    <VendorHintBadges path={row.current_path} name={row.item_name} />
-                    {vendorOverride && (
-                      <div className="count-muted">vendor → {vendorOverride}</div>
-                    )}
-                    {parentMap[row.current_path] && (
-                      <div className="count-muted">parent → {parentMap[row.current_path]}</div>
-                    )}
-                  </td>
-                  <td>
-                    <Badge tone="accent">
-                      {bucketMap[row.current_path] ?? row.investigation_bucket}
-                    </Badge>
-                    {status === "resolved" && <Badge tone="ready">resolved</Badge>}
-                  </td>
-                  <td>
-                    <Badge tone={methodTone(row.id_method, row.id_confidence)}>
-                      {row.id_method}
-                    </Badge>
-                    <Badge
-                      tone={confidenceTierTone(row.id_confidence)}
-                      className="conf-cat-badge"
-                      title="CONF-CAT tier"
-                    >
-                      {row.id_confidence || "UNKNOWN"}
-                    </Badge>
-                    <div className="count-muted">{row.size_mb != null ? `${row.size_mb} MB` : ""}</div>
-                  </td>
-                  <td className="inv-actions row-actions-cell">
-                    <HoverMenu
-                      actions={[
-                        {
-                          id: "vendor",
-                          label: "Set vendor",
-                          onClick: () => void handleSetVendor(row),
-                        },
-                        {
-                          id: "parent",
-                          label: "Link parent",
-                          onClick: () => void handleLinkParent(row),
-                        },
-                        {
-                          id: "resolved",
-                          label: "Resolved",
-                          tone: "accent",
-                          onClick: () => void handleResolved(row),
-                        },
-                      ]}
-                    >
-                      <span className="row-actions-trigger" aria-label="Actions">
-                        ⋮
-                      </span>
-                    </HoverMenu>
-                    <select
-                      className="reject-select"
-                      defaultValue=""
-                      title="Move item to a different investigation bucket"
-                      onChange={(e) => {
-                        if (e.target.value === "__new__") {
-                          void handleNewBucket(row);
-                        } else if (e.target.value) {
-                          void handleReassign(row, e.target.value);
-                        }
-                        e.target.value = "";
-                      }}
-                    >
-                      <option value="">Reassign…</option>
-                      {bucketOptions.map((name) => (
-                        <option key={name} value={name}>
-                          {name}
-                        </option>
-                      ))}
-                      <option value="__new__">+ New bucket…</option>
-                    </select>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+          }
+          renderRow={(row, _index, rowAttrs) => {
+            const status = rowStatus(row);
+            const vendorOverride = vendorMap[row.current_path];
+            return (
+              <tr
+                key={`${row.current_path}-${row.item_name}`}
+                className={status ? `inv-${status}` : ""}
+                {...rowAttrs}
+              >
+                <td>
+                  <code>{row.section}</code>
+                </td>
+                <td>
+                  <div>{row.item_name}</div>
+                  <PathLink path={row.current_path} />
+                  <VendorHintBadges path={row.current_path} name={row.item_name} />
+                  {vendorOverride && (
+                    <div className="count-muted">vendor → {vendorOverride}</div>
+                  )}
+                  {parentMap[row.current_path] && (
+                    <div className="count-muted">parent → {parentMap[row.current_path]}</div>
+                  )}
+                </td>
+                <td>
+                  <Badge tone="accent">
+                    {bucketMap[row.current_path] ?? row.investigation_bucket}
+                  </Badge>
+                  {status === "resolved" && <Badge tone="ready">resolved</Badge>}
+                </td>
+                <td>
+                  <Badge tone={methodTone(row.id_method, row.id_confidence)}>
+                    {row.id_method}
+                  </Badge>
+                  <Badge
+                    tone={confidenceTierTone(row.id_confidence)}
+                    className="conf-cat-badge"
+                    title="CONF-CAT tier"
+                  >
+                    {row.id_confidence || "UNKNOWN"}
+                  </Badge>
+                  <div className="count-muted">{row.size_mb != null ? `${row.size_mb} MB` : ""}</div>
+                </td>
+                <td className="inv-actions row-actions-cell">
+                  <HoverMenu
+                    actions={[
+                      {
+                        id: "vendor",
+                        label: "Set vendor",
+                        onClick: () => void handleSetVendor(row),
+                      },
+                      {
+                        id: "parent",
+                        label: "Link parent",
+                        onClick: () => void handleLinkParent(row),
+                      },
+                      {
+                        id: "resolved",
+                        label: "Resolved",
+                        tone: "accent",
+                        onClick: () => void handleResolved(row),
+                      },
+                    ]}
+                  >
+                    <span className="row-actions-trigger" aria-label="Actions">
+                      ⋮
+                    </span>
+                  </HoverMenu>
+                  <select
+                    className="reject-select"
+                    defaultValue=""
+                    title="Move item to a different investigation bucket"
+                    onChange={(e) => {
+                      if (e.target.value === "__new__") {
+                        void handleNewBucket(row);
+                      } else if (e.target.value) {
+                        void handleReassign(row, e.target.value);
+                      }
+                      e.target.value = "";
+                    }}
+                  >
+                    <option value="">Reassign…</option>
+                    {bucketOptions.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                    <option value="__new__">+ New bucket…</option>
+                  </select>
+                </td>
+              </tr>
+            );
+          }}
+        />
       )}
     </div>
   );

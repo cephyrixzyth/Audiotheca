@@ -8,7 +8,7 @@ import {
   type RestructureExecuteResponse,
 } from "../api/client";
 import type { RestructureItem } from "../types";
-import { Badge, Button } from "../ui";
+import { Badge, Button, VirtualTable } from "../ui";
 import { useLibraryRoot } from "../hooks/useLibraryRoot";
 import { PathLink } from "./PathLink";
 import { useContextSidebar } from "./ContextSidebar";
@@ -202,8 +202,11 @@ export function RestructurePlan({ stamp }: Props) {
       )}
 
       {items.length > 0 && (
-        <table className="data-table">
-          <thead>
+        <VirtualTable
+          items={items}
+          colCount={7}
+          estimateSize={72}
+          header={
             <tr>
               <th>Section</th>
               <th>Item</th>
@@ -213,53 +216,51 @@ export function RestructurePlan({ stamp }: Props) {
               <th>Destination</th>
               <th>Actions</th>
             </tr>
-          </thead>
-          <tbody>
-            {items.map((row) => {
-              const override = destOverrides[row.current_path];
-              return (
-                <tr key={`${row.current_path}-${row.item_name}`}>
-                  <td>
-                    <code>{row.section}</code>
-                    {approvedSections.includes(row.section) && (
-                      <Badge tone="ready">approved</Badge>
-                    )}
-                  </td>
-                  <td>
-                    <div>{row.item_name}</div>
-                    <PathLink
-                      path={row.current_path}
-                      secondaryPath={override ?? row.planned_destination}
-                      dualPane
-                    />
-                  </td>
-                  <td>{row.vendor}</td>
-                  <td>
-                    {row.id_method}
-                    <div className="path">{row.id_confidence}</div>
-                  </td>
-                  <td>
-                    <Badge tone={row.status === "READY" ? "ready" : "review"}>{row.status}</Badge>
-                  </td>
-                  <td>
-                    <PathLink path={override ?? row.planned_destination} />
-                    {override && <div className="count-muted">override</div>}
-                  </td>
-                  <td>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      title="Override planned destination relative to library root (e.g. a/Vendor/Product)"
-                      onClick={() => void handleOverride(row)}
-                    >
-                      Edit dest
-                    </Button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+          }
+          renderRow={(row, _index, rowAttrs) => {
+            const override = destOverrides[row.current_path];
+            return (
+              <tr key={`${row.current_path}-${row.item_name}`} {...rowAttrs}>
+                <td>
+                  <code>{row.section}</code>
+                  {approvedSections.includes(row.section) && (
+                    <Badge tone="ready">approved</Badge>
+                  )}
+                </td>
+                <td>
+                  <div>{row.item_name}</div>
+                  <PathLink
+                    path={row.current_path}
+                    secondaryPath={override ?? row.planned_destination}
+                    dualPane
+                  />
+                </td>
+                <td>{row.vendor}</td>
+                <td>
+                  {row.id_method}
+                  <div className="path">{row.id_confidence}</div>
+                </td>
+                <td>
+                  <Badge tone={row.status === "READY" ? "ready" : "review"}>{row.status}</Badge>
+                </td>
+                <td>
+                  <PathLink path={override ?? row.planned_destination} />
+                  {override && <div className="count-muted">override</div>}
+                </td>
+                <td>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    title="Override planned destination relative to library root (e.g. a/Vendor/Product)"
+                    onClick={() => void handleOverride(row)}
+                  >
+                    Edit dest
+                  </Button>
+                </td>
+              </tr>
+            );
+          }}
+        />
       )}
     </div>
   );

@@ -265,7 +265,15 @@ Use the ◐ theme switcher in the top bar, or **Environment → Themes** to dupl
 
 ### Where is Help in the UI?
 
-The **Help** tab is the **last** tab in the top bar (after Vendors). It mirrors quick install/workflow notes; full docs live in [docs/README.md](README.md) and the [main README](../README.md).
+The **Help** tab is the **last** tab in the top bar (after Vendors), also at `#/help`. Press **⌘K** / **Ctrl+K** to search Help, other tabs, and spec codes. It mirrors quick install/workflow notes; full docs live in [docs/README.md](README.md) and the [main README](../README.md).
+
+### How do I deep-link a tab or a specific run?
+
+Hash routes: `#/dashboard`, `#/scan`, `#/review/investigation`, `#/system/environment`, and so on. Append `?run=YYYYMMDD_HHMM` to open that scan; the param is kept when you switch tabs. Root `#/` redirects to Dashboard.
+
+### How do I jump around the UI quickly?
+
+**⌘K** / **Ctrl+K**, or the **Search** button in the top bar. The palette fuzzy-searches every tab, the library explorer, the UI-kit gallery (`#/ui-kit`), and all 94 architecture spec codes.
 
 ---
 
