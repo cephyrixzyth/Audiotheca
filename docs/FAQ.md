@@ -202,7 +202,11 @@ Not yet. UCS taxonomy integration is on the roadmap for sample libraries.
 
 ### Does it integrate with Soundminer?
 
-No direct integration. Sidecar JSON metadata is compatible with manual Soundminer workflows.
+No DAW or Soundminer plugin integration. Scan items can emit a **Soundminer-style sidecar field subset** (`sm_metadata.py`, Phase I6) for manual import. UCS filename tooling is not a Soundminer replacement.
+
+### How is loudness (LUFS) measured?
+
+Integrated loudness prefers **pyloudnorm** (ITU-R BS.1770-4). If that package is missing, a named **RMS proxy** is used. Preview LUFS badges show the engine on hover.
 
 ---
 

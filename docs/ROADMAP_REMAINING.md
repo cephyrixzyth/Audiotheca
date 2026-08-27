@@ -116,7 +116,7 @@ E (polish) → F (execute UI) → G (reference engine) → H (SQLite) → I (eng
 
 ## Phase M — External sources build-out
 
-New work from [SOURCES.md](SOURCES.md) candidates (not yet implemented). Keep Audiotheca a **local operator** tool — do not pivot into marketplace browsers.
+Shipped from [SOURCES.md](SOURCES.md) candidates. Keep Audiotheca a **local operator** tool — do not pivot into marketplace browsers.
 
 | # | Item | Source inspiration | Priority | Status |
 |---|------|--------------------|----------|--------|

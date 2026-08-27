@@ -78,12 +78,54 @@ export function CommandPalette() {
       keywords: `${t.label} ${t.title}`,
       run: () => goTab(t.id),
     }));
+    const duplicatesTab = list.find((c) => c.id === "tab-duplicates");
+    if (duplicatesTab) {
+      duplicatesTab.keywords =
+        "duplicates keeper chromaprint sononym acoustic near dupe fingerprint fpcalc fuzzy pack ssdeep tlsh";
+    }
+    const securityTab = list.find((c) => c.id === "tab-security");
+    if (securityTab) {
+      securityTab.keywords = "security malware pe capa capabilities pefile quarantine shred";
+    }
+    const environmentTab = list.find((c) => c.id === "tab-environment");
+    if (environmentTab) {
+      environmentTab.keywords =
+        "environment installs license reconcile native access ilok plugin alliance themes";
+    }
     list.push({
       id: "act-library",
       label: "Library explorer",
       hint: "Open",
-      keywords: "library explorer browse files roots",
+      keywords: "library explorer browse files roots search facets spot preview bpm key",
       run: () => openAtRoots(),
+    });
+    list.push({
+      id: "act-near-dupes",
+      label: "Acoustic near-dupes",
+      hint: "Duplicates",
+      keywords: "chromaprint sononym acoustic near dupe fingerprint fpcalc",
+      run: () => goTab("duplicates"),
+    });
+    list.push({
+      id: "act-fuzzy-pack",
+      label: "Fuzzy pack dupes",
+      hint: "Duplicates",
+      keywords: "ssdeep tlsh fuzzy installer pack similarity",
+      run: () => goTab("duplicates"),
+    });
+    list.push({
+      id: "act-license-reconcile",
+      label: "License reconcile",
+      hint: "Environment",
+      keywords: "native access ilok plugin alliance licensed orphaned install",
+      run: () => goTab("environment"),
+    });
+    list.push({
+      id: "act-pe-caps",
+      label: "PE capability hints",
+      hint: "Security",
+      keywords: "pefile capa pe capabilities malware security",
+      run: () => goTab("security"),
     });
     list.push({
       id: "act-uikit",

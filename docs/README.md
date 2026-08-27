@@ -20,7 +20,7 @@ Engine **10.0.0** · Web UI **1.0.12**
 | API security, sessions, tickets & path allowlist | [SECURITY.md](SECURITY.md) |
 | Build desktop installer | [TAURI_BUILD.md](TAURI_BUILD.md) |
 | Architecture & roadmap | [ARCHITECTURE_AND_UI_ROADMAP.md](ARCHITECTURE_AND_UI_ROADMAP.md) · [ROADMAP_REMAINING.md](ROADMAP_REMAINING.md) |
-| External sources (considered + candidates) | [SOURCES.md](SOURCES.md) |
+| External sources (considered + remaining deepeners) | [SOURCES.md](SOURCES.md) |
 | Vendor research pipeline (KVR / vi-control) | [VENDOR_RESEARCH.md](VENDOR_RESEARCH.md) |
 | **94-code spec catalog** | [SPEC_CATALOG.md](SPEC_CATALOG.md) |
 | Add doc screenshots/videos | [assets/README.md](assets/README.md) · [assets/ASSETS.md](assets/ASSETS.md) |

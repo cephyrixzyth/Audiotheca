@@ -28,6 +28,10 @@ Git tag **v1.0.7** was published with a broken Windows NSIS pre-install hook (si
 - **M8** — KVR + vi-control harvest/SearX presets + [VENDOR_RESEARCH.md](VENDOR_RESEARCH.md)
 - **M9** — PE capability hints (pefile capa-lite) on security scan + `POST /api/security/pe-hints`
 
+### Phase M docs follow-through
+
+- Operator guides, SOURCES inventory, and command palette aligned to shipped M1–M9 (FAQ AcoustID/Chromaprint and Soundminer sidecar already match the code)
+
 ## Web UI & API 1.0.12
 
 Engine remains **10.0.0**.

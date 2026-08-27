@@ -120,6 +120,8 @@ When `SCENE_AUTO_RENAME = True` and `DRY_RUN = False`, folders ≥ `SCENE_RENAME
 
 Same vendor + fingerprint + name similarity ≥ 82%. HIGH groups get sparse hash on **correct nested largest file path**. LOW groups excluded from prompts.
 
+Opt-in extra lanes (do not replace engine groups): **Acoustic near-dupes** (`POST /api/audio/near-dupes`, Chromaprint / heuristic) and **Fuzzy pack dupes** (`POST /api/tools/fuzzy-hash`, ssdeep/TLSH or rolling fallback). Optional AcoustID/MusicBrainz lookup: `POST /api/audio/acoustid-lookup` when `ACOUSTID_CLIENT_KEY` is set.
+
 ### 7. Investigation buckets
 
 Under `_requiresinvestigation/` — see `Investigation_Breakdown_*.csv`.
@@ -163,15 +165,15 @@ Every tab is a hash route (`#/dashboard`, `#/review/scan-audit`, …). **⌘K** 
 | Dashboard | Run stats, gauges, run compare, reorderable panels |
 | Scan | Job trigger, processing flow presets, WebSocket progress, AI analyzer |
 | Investigation | Bucket triage, bulk correct, feedback export |
-| Duplicates | Keeper selection, staging, rejections |
+| Duplicates | Keeper selection, staging, rejections; acoustic near-dupes + fuzzy pack lanes |
 | Restructure | Route preview, live section execute |
 | Archives | Archive peek verdicts |
 | Scene renames | Hash rename plan |
 | Scan audit | Per-item identification table |
 | Skipped files | Coverage gaps, cache, coexistence, rescan |
 | Space recovery | Underscore whitelist, coexistence queue |
-| Security | Malware heuristics, quarantine, hash lookup |
-| Environment | Toolchain probe, repairs, theme editor |
+| Security | Malware heuristics, PE capability hints, quarantine, hash lookup |
+| Environment | Toolchain probe, repairs, theme editor, license reconcile |
 | Vendors | Gaps, harvest, user keywords |
 | Help | Built-in guides *(last tab)* |
 
@@ -181,7 +183,7 @@ Every tab is a hash route (`#/dashboard`, `#/review/scan-audit`, …). **⌘K** 
 | --- | --- |
 | `/api/runs/{stamp}/*` | Reports: investigation, duplicates, restructure, archives, … |
 | `/api/jobs` + WebSocket | Scan jobs + phase progress |
-| `/api/browse`, `/api/archive/list` | In-app file explorer + archive listing (10.0+) |
+| `/api/browse`, `/api/browse/search`, `/api/browse/facets`, `/api/archive/list` | In-app file explorer, library search, sample facets, archive listing (10.0+) |
 | `/api/ai-lookup/*` | AI lookup cache, query, confirm |
 | `/api/underscore-vendors` | Underscore whitelist CRUD |
 | `/api/runs/{stamp}/underscore/*` | Bulk whitelist + full rescan |
@@ -189,6 +191,8 @@ Every tab is a hash route (`#/dashboard`, `#/review/scan-audit`, …). **⌘K** 
 | `/api/decisions` | Duplicate keeper → `approved_{stamp}.json` |
 | `/api/explorer` | Open path in OS file manager (Windows) |
 | `/api/security/library-roots` | Configured library allowlist |
+| `/api/audio/near-dupes`, `/api/audio/acoustid-lookup`, `/api/tools/fuzzy-hash` | Chromaprint near-dupes, optional AcoustID, fuzzy pack hashes |
+| `/api/installations/license-reconcile`, `/api/security/pe-hints` | Licensed vs orphaned installs; PE capability hints |
 
 Launch: `.\start-ui.ps1` or `python -m api.server` + `cd ui && npm run dev`.
 
