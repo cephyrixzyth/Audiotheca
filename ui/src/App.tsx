@@ -24,7 +24,7 @@ import { NavTabs, REVIEW_TAB_IDS } from "./components/NavTabs";
 import { ThemeSwitcher } from "./components/ThemeSwitcher";
 import { VendorTools } from "./components/VendorTools";
 import { UiKitGallery } from "./components/UiKitGallery";
-import { pathForTab, tabForPath } from "./routes";
+import { pathForTab, readRunParam, setRunParam, tabForPath } from "./routes";
 import { FileExplorerProvider } from "./contexts/FileExplorerContext";
 import { useLibraryRoot } from "./hooks/useLibraryRoot";
 import { useDesktopCloseHandler } from "./hooks/useDesktopCloseHandler";
@@ -39,13 +39,26 @@ const SUBTREE_TABS: TabId[] = [
 
 export default function App() {
   const [runs, setRuns] = useState<RunListItem[]>([]);
-  const [stamp, setStamp] = useState("");
   const [summary, setSummary] = useState<RunSummary | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const tab = tabForPath(location.pathname);
   const showUiKit = location.pathname === "/ui-kit";
-  const setTab = useCallback((id: TabId) => navigate(pathForTab(id)), [navigate]);
+  // The selected run is deep-linkable via the `?run=` query param, so it
+  // survives reloads, back/forward, and can be shared as a URL.
+  const stamp = readRunParam(location.search);
+  const setTab = useCallback(
+    (id: TabId) => navigate({ pathname: pathForTab(id), search: location.search }),
+    [navigate, location.search],
+  );
+  const setStamp = useCallback(
+    (next: string) =>
+      navigate(
+        { pathname: location.pathname, search: setRunParam(location.search, next) },
+        { replace: true },
+      ),
+    [navigate, location.pathname, location.search],
+  );
   const [error, setError] = useState<string | null>(null);
   const [scanActive, setScanActive] = useState(false);
   const [engineVersion, setEngineVersion] = useState<string | null>(null);
@@ -97,7 +110,6 @@ export default function App() {
       fetchRuns()
         .then((list) => {
           setRuns(list);
-          setStamp((current) => current || list[0]?.stamp || "");
           setError(null);
         })
         .catch((err: Error) => {
@@ -115,6 +127,13 @@ export default function App() {
     reloadRuns();
   }, [reloadRuns]);
 
+  // Default the deep-linked run to the latest available when none is selected.
+  useEffect(() => {
+    if (!stamp && runs.length > 0) {
+      setStamp(runs[0].stamp);
+    }
+  }, [stamp, runs, setStamp]);
+
   useEffect(() => {
     if (!stamp) return;
     setError(null);
@@ -126,10 +145,12 @@ export default function App() {
   const onScanComplete = useCallback(
     (newStamp: string) => {
       reloadRuns();
-      setStamp(newStamp);
-      setTab("scan-audit");
+      navigate({
+        pathname: pathForTab("scan-audit"),
+        search: setRunParam(location.search, newStamp),
+      });
     },
-    [reloadRuns],
+    [reloadRuns, navigate, location.search],
   );
 
   return (

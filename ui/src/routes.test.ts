@@ -4,6 +4,8 @@ import {
   DEFAULT_TAB,
   TAB_TO_PATH,
   pathForTab,
+  readRunParam,
+  setRunParam,
   tabForPath,
 } from "./routes";
 import type { TabId } from "./types";
@@ -49,5 +51,28 @@ describe("routes", () => {
 
   it("exposes all paths for smoke coverage", () => {
     expect(ALL_TAB_PATHS).toHaveLength(ALL_TABS.length);
+  });
+});
+
+describe("run param", () => {
+  it("reads the run stamp from search", () => {
+    expect(readRunParam("?run=20260704_1600")).toBe("20260704_1600");
+    expect(readRunParam("")).toBe("");
+    expect(readRunParam("?x=1")).toBe("");
+  });
+
+  it("sets the run stamp preserving other params", () => {
+    expect(setRunParam("", "abc")).toBe("?run=abc");
+    expect(setRunParam("?x=1", "abc")).toContain("run=abc");
+    expect(setRunParam("?x=1", "abc")).toContain("x=1");
+  });
+
+  it("removes the run stamp when empty", () => {
+    expect(setRunParam("?run=abc", "")).toBe("");
+    expect(setRunParam("?run=abc&x=1", "")).toBe("?x=1");
+  });
+
+  it("round-trips through read/set", () => {
+    expect(readRunParam(setRunParam("", "stamp-1"))).toBe("stamp-1");
   });
 });

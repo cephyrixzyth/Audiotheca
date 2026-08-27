@@ -45,3 +45,20 @@ export function tabForPath(pathname: string): TabId {
 }
 
 export const ALL_TAB_PATHS: string[] = Object.values(TAB_TO_PATH);
+
+/** Read the selected run stamp from a router search string (e.g. "?run=..."). */
+export function readRunParam(search: string): string {
+  return new URLSearchParams(search).get("run") ?? "";
+}
+
+/**
+ * Return an updated search string with the `run` param set (or removed when
+ * empty), preserving any other params. Includes the leading "?" when non-empty.
+ */
+export function setRunParam(search: string, stamp: string): string {
+  const params = new URLSearchParams(search);
+  if (stamp) params.set("run", stamp);
+  else params.delete("run");
+  const next = params.toString();
+  return next ? `?${next}` : "";
+}
