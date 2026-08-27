@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchHarvestCandidates, fetchJobs } from "../api/client";
 import { useLibraryRoot } from "../hooks/useLibraryRoot";
 import type { JobSnapshot, RunListItem, TabId } from "../types";
+import { Badge, Button } from "../ui";
 import { ReorderableSections } from "./ReorderableSections";
 import { EnvironmentSummaryWidget } from "./EnvironmentPanel";
 import { InstallationSummaryWidget } from "./InstallLifecyclePanel";
@@ -74,13 +75,13 @@ export function DashboardHome({ runs, onNavigate }: Props) {
             </div>
             <div className="job-row">
               <span className="count-muted">Status</span>
-              <span className={`badge ${activeJob.status === "running" ? "ready" : "review"}`}>
+              <Badge tone={activeJob.status === "running" ? "ready" : "review"}>
                 {activeJob.status}
-              </span>
+              </Badge>
             </div>
-            <button type="button" className="primary-btn" onClick={() => onNavigate?.("scan")}>
+            <Button variant="primary" onClick={() => onNavigate?.("scan")}>
               Open scan controls
-            </button>
+            </Button>
           </div>
         ) : (
           <p className="count-muted">No active scan</p>

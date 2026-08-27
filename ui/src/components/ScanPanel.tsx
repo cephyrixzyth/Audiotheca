@@ -21,6 +21,7 @@ import {
   dedupeLogLines,
 } from "../utils/scanDisplay";
 import type { JobSnapshot, ProgressEvent, RunSummary, SystemMetrics } from "../types";
+import { Button } from "../ui";
 import { AiAnalyzer } from "./AiAnalyzer";
 import { FlowEditor } from "./FlowEditor";
 import { PhaseProgressBar, latestPhaseProgress, phasesFromEvents } from "./PhaseProgressBar";
@@ -724,15 +725,14 @@ export function ScanPanel({ onRunComplete }: Props) {
         content: (
           <>
             <div className="toolbar">
-              <button
-                type="button"
-                className="primary-btn"
+              <Button
+                variant="primary"
                 disabled={starting || isActive}
                 title="Queue a dry-run scan — no files moved; reports written to dedupe_reports"
                 onClick={() => void handleStart(false)}
               >
                 {starting && !liveConfirmOpen ? "Starting…" : "Start dry-run scan"}
-              </button>
+              </Button>
               <label className="checkbox-inline staging-day-toggle" title="Enable live staging with extra safety checkpoints">
                 <input type="checkbox" checked={stagingDay} onChange={(e) => setStagingDay(e.target.checked)} />
                 Staging day (live)
@@ -745,40 +745,37 @@ export function ScanPanel({ onRunComplete }: Props) {
                 Verbose step log
               </label>
               {stagingDay && (
-                <button
-                  type="button"
-                  className="danger-btn"
+                <Button
+                  variant="danger"
                   disabled={starting || isActive}
                   title="Filesystem changes — moves, quarantine, duplicate staging"
                   onClick={() => setLiveConfirmOpen(true)}
                 >
                   Start LIVE staging run
-                </button>
+                </Button>
               )}
               {isActive && (
                 <>
-                  <button
-                    type="button"
-                    className="keeper-btn"
+                  <Button
+                    variant="secondary"
                     disabled={pausePending || paused}
                     title="Finish the current phase, then wait for you to continue"
                     onClick={() => void handleControl("pause")}
                   >
                     {pausePending ? "Pause pending…" : "Pause at next checkpoint"}
-                  </button>
-                  <button
-                    type="button"
-                    className="danger-btn"
+                  </Button>
+                  <Button
+                    variant="danger"
                     disabled={stopPending}
                     title="Finish the current phase, then stop the scan job"
                     onClick={() => void handleControl("stop")}
                   >
                     {stopPending ? "Stop pending…" : "Stop at next checkpoint"}
-                  </button>
+                  </Button>
                   {(paused || showContinue) && (
-                    <button type="button" className="primary-btn" onClick={() => void handleControl("continue")}>
+                    <Button variant="primary" onClick={() => void handleControl("continue")}>
                       Continue scan
-                    </button>
+                    </Button>
                   )}
                 </>
               )}
@@ -825,17 +822,12 @@ export function ScanPanel({ onRunComplete }: Props) {
                   />
                 </label>
                 <div className="toolbar">
-                  <button
-                    type="button"
-                    className="danger-btn"
-                    disabled={starting}
-                    onClick={() => void handleStart(true)}
-                  >
+                  <Button variant="danger" disabled={starting} onClick={() => void handleStart(true)}>
                     {starting ? "Starting…" : "Execute LIVE run"}
-                  </button>
-                  <button type="button" className="text-btn" onClick={() => setLiveConfirmOpen(false)}>
+                  </Button>
+                  <Button variant="ghost" onClick={() => setLiveConfirmOpen(false)}>
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
@@ -1034,12 +1026,12 @@ export function ScanPanel({ onRunComplete }: Props) {
                 <input type="checkbox" checked={autoScroll} onChange={(e) => setAutoScroll(e.target.checked)} />
                 Auto-scroll
               </label>
-              <button type="button" className="text-btn" title="Copy visible log lines" onClick={handleCopyLog}>
+              <Button variant="ghost" size="sm" title="Copy visible log lines" onClick={handleCopyLog}>
                 {copied ? "Copied" : "Copy"}
-              </button>
-              <button type="button" className="text-btn" title="Download visible log lines as .txt" onClick={handleDownloadLog}>
+              </Button>
+              <Button variant="ghost" size="sm" title="Download visible log lines as .txt" onClick={handleDownloadLog}>
                 Download
-              </button>
+              </Button>
               <span className="count-muted">{logLines.length} lines</span>
             </div>
             <div className="log-lines log-lines-fixed" ref={logRef}>

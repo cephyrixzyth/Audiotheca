@@ -10,6 +10,7 @@ import {
   type SceneExecuteResponse,
 } from "../api/client";
 import type { SceneRenameItem } from "../types";
+import { Badge, Button } from "../ui";
 import { listHasPath, lookupByPath, pathKey } from "../utils/pathKey";
 import { useContextSidebar } from "./ContextSidebar";
 import { PathLink } from "./PathLink";
@@ -172,17 +173,15 @@ export function SceneRenames({ stamp }: Props) {
       </div>
 
       <div className="toolbar">
-        <button
-          type="button"
-          className="keeper-btn"
+        <Button
+          variant="secondary"
           title="Simulate approved scene folder renames without moving disk"
           onClick={() => void handleExecute(true)}
         >
           Dry-run approved
-        </button>
-        <button
-          type="button"
-          className="primary-btn"
+        </Button>
+        <Button
+          variant="primary"
           title="Rename approved scene-hash folders to product names on disk"
           onClick={() => {
             if (window.confirm("Apply approved scene renames on disk? This moves folders.")) {
@@ -192,7 +191,7 @@ export function SceneRenames({ stamp }: Props) {
           disabled={approved.length === 0}
         >
           Execute approved ({approved.length})
-        </button>
+        </Button>
         {msg && <span className="count-muted">{msg}</span>}
       </div>
 
@@ -227,57 +226,54 @@ export function SceneRenames({ stamp }: Props) {
               <tr key={pathKey(row.source_path)} className={isRejected ? "rejected-row" : undefined}>
                 <td>
                   <code>{row.scene_id}</code>
-                  {isApproved && <span className="badge ready">approved</span>}
-                  {isRejected && <span className="badge bucket">rejected</span>}
+                  {isApproved && <Badge tone="ready">approved</Badge>}
+                  {isRejected && <Badge tone="accent">rejected</Badge>}
                 </td>
                 <td>
                   <strong>{displayName}</strong>
                   <PathLink path={row.destination_path} />
                 </td>
                 <td>
-                  <span
-                    className="badge bucket"
-                    title={row.multipart_diagnosis || undefined}
-                  >
+                  <Badge tone="accent" title={row.multipart_diagnosis || undefined}>
                     {row.multipart_diagnosis_label || row.multipart_diagnosis || "—"}
-                  </span>
+                  </Badge>
                 </td>
                 <td>
                   <PathLink path={row.source_path} />
                 </td>
                 <td>
-                  <button
-                    type="button"
-                    className="keeper-btn"
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     title="Include this rename in the next dry-run or live execute"
                     onClick={() => void handleApprove(row)}
                   >
                     Approve
-                  </button>{" "}
-                  <button
-                    type="button"
-                    className="keeper-btn"
+                  </Button>{" "}
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     title="Edit the proposed product folder name"
                     onClick={() => void handleOverride(row)}
                   >
                     Edit name
-                  </button>{" "}
-                  <button
-                    type="button"
-                    className="keeper-btn"
+                  </Button>{" "}
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     title="Skip this rename — engine will not propose it again"
                     onClick={() => void handleReject(row)}
                   >
                     Reject
-                  </button>{" "}
-                  <button
-                    type="button"
-                    className="keeper-btn"
+                  </Button>{" "}
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     title="Mark multipart set as missing part 01 — defers rename"
                     onClick={() => void handleMissingPart01(row)}
                   >
                     Missing part01
-                  </button>
+                  </Button>
                 </td>
               </tr>
             );

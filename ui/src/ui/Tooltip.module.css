@@ -1,0 +1,16 @@
+.content {
+  background: var(--ui-surface-elevated);
+  border: 1px solid var(--ui-line-strong);
+  color: var(--ui-fg);
+  border-radius: var(--ui-radius-md);
+  padding: var(--ui-space-1) var(--ui-space-2);
+  font-size: var(--ui-fs-xs);
+  box-shadow: var(--ui-shadow-1);
+  max-width: 260px;
+  z-index: 60;
+  user-select: none;
+}
+
+.arrow {
+  fill: var(--ui-line-strong);
+}

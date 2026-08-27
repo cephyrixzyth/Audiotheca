@@ -6,6 +6,7 @@ import {
   type BrowseEntry,
 } from "../api/client";
 import { useExplorerPathDrag } from "../contexts/FileExplorerContext";
+import { Button } from "../ui";
 import { AudioPreviewStrip, isAuditionableFile } from "./AudioPreviewStrip";
 import { FileExplorerTree } from "./FileExplorerTree";
 import { ArchiveDiffWizard } from "./ArchiveDiffWizard";
@@ -231,24 +232,24 @@ function ExplorerPane({
 
         <div className="file-explorer-main">
           <div className="file-explorer-toolbar">
-            <button
-              type="button"
-              className="text-btn"
+            <Button
+              variant="secondary"
+              size="sm"
               disabled={!parent}
               title="Go to parent folder"
               onClick={() => parent && void loadDir(parent)}
             >
               ↑ Up
-            </button>
+            </Button>
             {archiveEntries && (
-              <button
-                type="button"
-                className="text-btn"
+              <Button
+                variant="secondary"
+                size="sm"
                 title="Return to folder listing"
                 onClick={() => parent && void loadDir(parent)}
               >
                 Back to folder
-              </button>
+              </Button>
             )}
           </div>
 
@@ -485,25 +486,27 @@ export function FileExplorerPanel({
           </div>
           <DropZoneOverlay />
           <div className="file-explorer-header-actions">
-            <button
-              type="button"
-              className={`icon-btn ${popOut ? "active" : ""}`}
+            <Button
+              variant="secondary"
+              size="sm"
+              active={popOut}
               title={popOut ? "Standard width panel" : "Pop out wide explorer"}
               onClick={onTogglePopOut}
             >
               {popOut ? "Standard" : "Pop out"}
-            </button>
-            <button
-              type="button"
-              className={`icon-btn ${pinned ? "active" : ""}`}
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              active={pinned}
               title={pinned ? "Unpin panel (closes on backdrop click)" : "Pin panel docked on the right"}
               onClick={onTogglePin}
             >
               {pinned ? "Unpin" : "Pin"}
-            </button>
-            <button type="button" className="icon-btn" onClick={onClose} title="Close explorer (Esc)">
+            </Button>
+            <Button variant="secondary" size="sm" onClick={onClose} title="Close explorer (Esc)">
               Close
-            </button>
+            </Button>
           </div>
         </header>
 

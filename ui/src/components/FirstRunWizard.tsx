@@ -6,6 +6,7 @@ import {
   saveLibraryRoots,
 } from "../api/client";
 import type { TabId } from "../types";
+import { Button } from "../ui";
 
 const STORAGE_KEY = "audiotheca.firstRunComplete";
 
@@ -111,12 +112,12 @@ export function FirstRunWizard({ onNavigate, onComplete }: Props) {
               spellCheck={false}
             />
             <div className="env-actions" style={{ marginTop: "0.75rem" }}>
-              <button type="button" className="primary-btn" disabled={busy} onClick={() => void saveRoot()}>
+              <Button variant="primary" disabled={busy} onClick={() => void saveRoot()}>
                 Save & continue
-              </button>
-              <button type="button" className="text-btn" onClick={() => setStep(1)}>
+              </Button>
+              <Button variant="ghost" onClick={() => setStep(1)}>
                 Skip for now
-              </button>
+              </Button>
             </div>
           </section>
         )}
@@ -132,12 +133,12 @@ export function FirstRunWizard({ onNavigate, onComplete }: Props) {
                   : "Checking toolchain…"}
             </p>
             <div className="env-actions">
-              <button type="button" className="text-btn" disabled={busy} onClick={() => void runInstall(false)}>
+              <Button variant="ghost" disabled={busy} onClick={() => void runInstall(false)}>
                 Preview install
-              </button>
-              <button type="button" className="primary-btn" disabled={busy} onClick={() => void runInstall(true)}>
+              </Button>
+              <Button variant="primary" disabled={busy} onClick={() => void runInstall(true)}>
                 Install missing dependencies
-              </button>
+              </Button>
             </div>
             {installLog.length > 0 && (
               <pre className="first-run-log">{installLog.join("\n")}</pre>
@@ -149,9 +150,9 @@ export function FirstRunWizard({ onNavigate, onComplete }: Props) {
               </a>
             </p>
             <div className="env-actions" style={{ marginTop: "0.75rem" }}>
-              <button type="button" className="primary-btn" onClick={() => setStep(2)}>
+              <Button variant="primary" onClick={() => setStep(2)}>
                 Continue
-              </button>
+              </Button>
             </div>
           </section>
         )}
@@ -163,29 +164,27 @@ export function FirstRunWizard({ onNavigate, onComplete }: Props) {
               Open the Scan tab for a dry-run, or Help for install paths, Docker, and staged live rollout.
             </p>
             <div className="env-actions">
-              <button
-                type="button"
-                className="text-btn"
+              <Button
+                variant="ghost"
                 onClick={() => {
                   onNavigate("help");
                   finish();
                 }}
               >
                 Open Help
-              </button>
-              <button
-                type="button"
-                className="primary-btn"
+              </Button>
+              <Button
+                variant="primary"
                 onClick={() => {
                   onNavigate("scan");
                   finish();
                 }}
               >
                 Start scanning
-              </button>
-              <button type="button" className="text-btn" onClick={finish}>
+              </Button>
+              <Button variant="ghost" onClick={finish}>
                 Close
-              </button>
+              </Button>
             </div>
           </section>
         )}

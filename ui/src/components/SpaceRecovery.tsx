@@ -11,6 +11,7 @@ import {
   spaceRecoveryReportDownload,
 } from "../api/client";
 import type { CoexistenceItem, JobSnapshot } from "../types";
+import { Button, Kpi } from "../ui";
 import { PathLink } from "./PathLink";
 
 interface Props {
@@ -197,22 +198,16 @@ export function SpaceRecovery({ stamp }: Props) {
       <section style={{ marginBottom: "1.5rem" }}>
         <h3>Coexistence summary</h3>
         <div className="kpi-grid" style={{ marginBottom: "1rem" }}>
-          <div className="kpi">
-            <div className="label">Total findings</div>
-            <div className="value">{Number(summary?.total ?? 0).toLocaleString()}</div>
-          </div>
-          <div className="kpi">
-            <div className="label">Deep installers</div>
-            <div className="value">{Number(summary?.deep_installer_count ?? 0).toLocaleString()}</div>
-          </div>
-          <div className="kpi">
-            <div className="label">Archive + extract sibling</div>
-            <div className="value">{Number(summary?.archive_sibling_count ?? 0).toLocaleString()}</div>
-          </div>
-          <div className="kpi">
-            <div className="label">Merge routes</div>
-            <div className="value">{Number(summary?.merge_route_count ?? 0).toLocaleString()}</div>
-          </div>
+          <Kpi label="Total findings" value={Number(summary?.total ?? 0).toLocaleString()} />
+          <Kpi
+            label="Deep installers"
+            value={Number(summary?.deep_installer_count ?? 0).toLocaleString()}
+          />
+          <Kpi
+            label="Archive + extract sibling"
+            value={Number(summary?.archive_sibling_count ?? 0).toLocaleString()}
+          />
+          <Kpi label="Merge routes" value={Number(summary?.merge_route_count ?? 0).toLocaleString()} />
         </div>
         {byIssue.length > 0 && (
           <div className="bar-chart">
@@ -239,14 +234,13 @@ export function SpaceRecovery({ stamp }: Props) {
         {reportLinks.length > 0 && (
           <div className="toolbar" style={{ marginTop: "0.5rem" }}>
             {reportLinks.map((link) => (
-              <button
+              <Button
                 key={link.filename}
-                type="button"
-                className="primary-btn"
+                variant="primary"
                 onClick={() => void spaceRecoveryReportDownload(link.filename)}
               >
                 {link.label}
-              </button>
+              </Button>
             ))}
           </div>
         )}
@@ -264,28 +258,26 @@ export function SpaceRecovery({ stamp }: Props) {
           run a <strong>full-library</strong> dry scan so route-ready metrics update.
         </p>
         <div className="toolbar">
-          <button type="button" className="primary-btn" disabled={busy} onClick={() => void handleSeedKnown()}>
+          <Button variant="primary" disabled={busy} onClick={() => void handleSeedKnown()}>
             Seed known vendors
-          </button>
-          <button
-            type="button"
-            className="primary-btn"
+          </Button>
+          <Button
+            variant="primary"
             disabled={busy || underscore.length === 0}
             onClick={() => void handleWhitelistAllAndScan()}
           >
             Whitelist all &amp; full dry scan
-          </button>
-          <button type="button" disabled={busy} onClick={selectAllNonWhitelisted}>
+          </Button>
+          <Button variant="secondary" disabled={busy} onClick={selectAllNonWhitelisted}>
             Select non-whitelisted
-          </button>
-          <button
-            type="button"
-            className="primary-btn"
+          </Button>
+          <Button
+            variant="primary"
             disabled={busy || selected.size === 0}
             onClick={() => void bulkWhitelistAndRescan()}
           >
             Whitelist selected &amp; full dry scan ({selected.size})
-          </button>
+          </Button>
         </div>
         <div className="table-wrap">
           <table className="data-table compact">
@@ -319,9 +311,9 @@ export function SpaceRecovery({ stamp }: Props) {
                     <PathLink path={row.path} />
                   </td>
                   <td>
-                    <button type="button" className="link-btn" disabled={busy} onClick={() => void toggleWhitelist(row)}>
+                    <Button variant="ghost" size="sm" disabled={busy} onClick={() => void toggleWhitelist(row)}>
                       {row.whitelisted ? "Remove" : "Whitelist"}
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               ))}

@@ -8,6 +8,7 @@ import {
   setArchiveKeeper,
 } from "../api/client";
 import type { ArchivePeekItem } from "../types";
+import { Badge, Button, Kpi } from "../ui";
 import { useLibraryRoot } from "../hooks/useLibraryRoot";
 import { lookupByPath, pathKey } from "../utils/pathKey";
 import { ArchiveDiffWizard } from "./ArchiveDiffWizard";
@@ -196,32 +197,21 @@ export function ArchivePeek({ stamp }: Props) {
         />
       )}
       <div className="kpi-grid" style={{ marginBottom: "1rem" }}>
-        <div className="kpi">
-          <div className="label">Delete candidates</div>
-          <div className="value">{deleteFiles}</div>
-        </div>
-        <div className="kpi">
-          <div className="label">Recoverable</div>
-          <div className="value">{(deleteMb / 1024).toFixed(1)} GB</div>
-        </div>
-        <div className="kpi">
-          <div className="label">Confirmed</div>
-          <div className="value">{confirmedCount}</div>
-        </div>
+        <Kpi label="Delete candidates" value={deleteFiles} />
+        <Kpi label="Recoverable" value={`${(deleteMb / 1024).toFixed(1)} GB`} />
+        <Kpi label="Confirmed" value={confirmedCount} />
       </div>
 
       <div className="toolbar" style={{ marginBottom: "1rem" }}>
-        <button
-          type="button"
-          className="keeper-btn"
+        <Button
+          variant="secondary"
           title="Simulate staging confirmed archives to _delete-canidates without moving files"
           onClick={() => void handleExecute(true)}
         >
           Dry-run confirmed
-        </button>
-        <button
-          type="button"
-          className="primary-btn"
+        </Button>
+        <Button
+          variant="primary"
           title="Move confirmed redundant archives to _delete-canidates on the library share"
           onClick={() => {
             if (
@@ -235,7 +225,7 @@ export function ArchivePeek({ stamp }: Props) {
           disabled={confirmedCount === 0}
         >
           Stage confirmed ({confirmedCount})
-        </button>
+        </Button>
         {msg && <span className="count-muted">{msg}</span>}
       </div>
 
@@ -302,17 +292,15 @@ export function ArchivePeek({ stamp }: Props) {
               return (
                 <tr key={pathKey(row.archive_path)}>
                   <td>
-                    <span
-                      className={`badge ${
-                        row.verdict === "MATCHES_EXTRACTED_FOLDER" ? "ready" : "bucket"
-                      }`}
+                    <Badge
+                      tone={row.verdict === "MATCHES_EXTRACTED_FOLDER" ? "ready" : "accent"}
                       title={row.verdict}
                     >
                       {verdictLabel(row.verdict)}
-                    </span>
-                    {isRejected && <span className="badge bucket">rejected</span>}
-                    {isConfirmed && <span className="badge ready">confirmed</span>}
-                    {keeper && <span className="badge bucket">keep {keeper}</span>}
+                    </Badge>
+                    {isRejected && <Badge tone="accent">rejected</Badge>}
+                    {isConfirmed && <Badge tone="ready">confirmed</Badge>}
+                    {keeper && <Badge tone="accent">keep {keeper}</Badge>}
                   </td>
                   <td>
                     <div>{row.item_name}</div>
@@ -326,51 +314,51 @@ export function ArchivePeek({ stamp }: Props) {
                   <td>{row.extracted_folder}</td>
                   <td>
                     {row.extracted_folder ? (
-                      <button
-                        type="button"
-                        className="keeper-btn"
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         title="Compare archive listing vs extracted folder side by side"
                         onClick={() => setDiffRow(row)}
                       >
                         Diff
-                      </button>
+                      </Button>
                     ) : (
                       <span className="count-muted">—</span>
                     )}{" "}
                     {row.verdict === "MATCHES_EXTRACTED_FOLDER" && !isRejected && (
                       <>
-                        <button
-                          type="button"
-                          className="keeper-btn"
+                        <Button
+                          variant="secondary"
+                          size="sm"
                           title="Mark this archive safe to delete — extracted folder is a match"
                           onClick={() => void handleConfirm(row)}
                         >
                           Confirm delete
-                        </button>{" "}
-                        <button
-                          type="button"
-                          className="keeper-btn"
+                        </Button>{" "}
+                        <Button
+                          variant="secondary"
+                          size="sm"
                           title="Archive is not redundant — engine will skip it on future scans"
                           onClick={() => void handleReject(row)}
                         >
                           Not redundant
-                        </button>{" "}
-                        <button
-                          type="button"
-                          className="keeper-btn"
+                        </Button>{" "}
+                        <Button
+                          variant="secondary"
+                          size="sm"
                           title="Keep the extracted folder and prefer deleting the archive later"
                           onClick={() => void handleKeeper(row, "folder")}
                         >
                           Keep folder
-                        </button>{" "}
-                        <button
-                          type="button"
-                          className="keeper-btn"
+                        </Button>{" "}
+                        <Button
+                          variant="secondary"
+                          size="sm"
                           title="Keep the archive file and treat the extracted folder as disposable"
                           onClick={() => void handleKeeper(row, "archive")}
                         >
                           Keep archive
-                        </button>
+                        </Button>
                       </>
                     )}
                     {isRejected && <span className="count-muted">Skipped next run</span>}

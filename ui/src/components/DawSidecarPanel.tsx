@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { exportDawSideBlueprint, installDawSidecar } from "../api/client";
 import { getApiBase } from "../platform";
+import { Button } from "../ui";
 
 export function DawSidecarPanel() {
   const [busy, setBusy] = useState(false);
@@ -73,15 +74,14 @@ export function DawSidecarPanel() {
         minutes.
       </p>
       <div className="btn-row">
-        <button type="button" className="primary-btn" disabled={busy} onClick={() => void exportBlueprint()}>
+        <Button variant="primary" disabled={busy} onClick={() => void exportBlueprint()}>
           {busy ? "Working…" : "Export blueprint"}
-        </button>
-        <button type="button" className="keeper-btn" disabled={busy} onClick={() => void runInstall(false)}>
+        </Button>
+        <Button variant="secondary" disabled={busy} onClick={() => void runInstall(false)}>
           Preview auto-install
-        </button>
-        <button
-          type="button"
-          className="primary-btn"
+        </Button>
+        <Button
+          variant="primary"
           disabled={busy}
           onClick={() => {
             if (
@@ -94,7 +94,7 @@ export function DawSidecarPanel() {
           }}
         >
           Auto-install VST3/AU
-        </button>
+        </Button>
       </div>
       {error && <p className="error-text">{error}</p>}
       {showPanel && (

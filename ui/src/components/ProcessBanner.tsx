@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { fetchJobEvents, fetchJobProgress, fetchJobs, fetchNetSafe } from "../api/client";
 import type { JobSnapshot, ProgressEvent } from "../types";
 import { formatPhaseLabel, isProgressStalled, latestProgressTimestamp } from "../utils/scanDisplay";
+import { Badge } from "../ui";
 import { PhaseProgressBar, latestPhaseProgress, phasesFromEvents } from "./PhaseProgressBar";
 
 const ACTIVE = new Set(["running", "paused", "pause_pending", "stop_pending"]);
@@ -83,14 +84,14 @@ export function ProcessBanner() {
           <span className="count-muted process-banner-step"> · {progress.detail}</span>
         )}
         {showStalled && (
-          <span className="badge review process-banner-stalled" title="No progress events for 10+ minutes">
+          <Badge tone="review" className="process-banner-stalled" title="No progress events for 10+ minutes">
             Stalled?
-          </span>
+          </Badge>
         )}
         {netPaused && (
-          <span className="badge bucket process-banner-stalled" title="NET-SAFE: scan paused — NAS unreachable">
+          <Badge tone="accent" className="process-banner-stalled" title="NET-SAFE: scan paused — NAS unreachable">
             NET-SAFE pause
-          </span>
+          </Badge>
         )}
       </div>
       <PhaseProgressBar

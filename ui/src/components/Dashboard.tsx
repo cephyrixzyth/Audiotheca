@@ -23,6 +23,7 @@ import type {
 } from "../types";
 import { formatCompact, formatDiskFree, formatGb, formatPct } from "../utils/format";
 import { formatEngineVersion } from "../utils/scanDisplay";
+import { Badge, Button, Gauge, StatTile } from "../ui";
 import { ReorderableSections } from "./ReorderableSections";
 import { EnvironmentSummaryWidget } from "./EnvironmentPanel";
 import { InstallationSummaryWidget } from "./InstallLifecyclePanel";
@@ -32,53 +33,6 @@ interface Props {
   summary?: RunSummary | null;
   runs: RunListItem[];
   onNavigate?: (tab: TabId) => void;
-}
-
-function GaugeBar({
-  label,
-  value,
-  max = 100,
-  detail,
-  tone = "accent",
-}: {
-  label: string;
-  value: number;
-  max?: number;
-  detail?: string;
-  tone?: "accent" | "warning" | "danger";
-}) {
-  const pct = Math.min(100, Math.max(0, (value / max) * 100));
-  return (
-    <div className="gauge-row">
-      <div className="gauge-row-top">
-        <span className="gauge-label">{label}</span>
-        <span className="gauge-value">{detail ?? formatPct(pct, 0)}</span>
-      </div>
-      <div className="gauge-track">
-        <div className={`gauge-fill tone-${tone}`} style={{ width: `${pct}%` }} />
-      </div>
-    </div>
-  );
-}
-
-function StatTile({
-  label,
-  value,
-  sub,
-  tone,
-}: {
-  label: string;
-  value: string | number;
-  sub?: string;
-  tone?: "accent" | "warning" | "danger";
-}) {
-  return (
-    <div className={`stat-tile ${tone ? `tone-${tone}` : ""}`.trim()}>
-      <div className="stat-label">{label}</div>
-      <div className="stat-value">{value}</div>
-      {sub && <div className="stat-sub">{sub}</div>}
-    </div>
-  );
 }
 
 function BarChart({
@@ -250,19 +204,19 @@ function DashboardRun({
         content: (
           <>
             <div className="gauge-stack">
-              <GaugeBar
+              <Gauge
                 label="Route-ready"
                 value={routeReadyPct ?? 0}
                 detail={routeReadyPct != null ? `${routeReadyPct}%` : "—"}
                 tone={(routeReadyPct ?? 0) < 50 ? "warning" : "accent"}
               />
-              <GaugeBar
+              <Gauge
                 label="Identified"
                 value={identificationPct ?? 0}
                 detail={identificationPct != null ? `${identificationPct}% have vendor guess` : "—"}
                 tone="accent"
               />
-              <GaugeBar
+              <Gauge
                 label="Bulk-fixable"
                 value={oneActionPct ?? 0}
                 detail={
@@ -402,28 +356,28 @@ function DashboardRun({
             {metrics ? (
               <div className="gauge-stack">
                 {metrics.cpu_percent != null && (
-                  <GaugeBar
+                  <Gauge
                     label={metrics.cpu_count ? `CPU (${metrics.cpu_count} cores)` : "CPU"}
                     value={metrics.cpu_percent}
                     detail={formatPct(metrics.cpu_percent, 0)}
                   />
                 )}
                 {metrics.ram_used_pct != null && (
-                  <GaugeBar
+                  <Gauge
                     label="RAM"
                     value={metrics.ram_used_pct}
                     detail={`${formatGb(metrics.ram_used_gb, 1)} / ${formatGb(metrics.ram_total_gb, 1)}`}
                     tone={metrics.ram_used_pct > 85 ? "warning" : "accent"}
                   />
                 )}
-                <GaugeBar
+                <Gauge
                   label="Disk"
                   value={metrics.disk_used_pct ?? 0}
                   detail={formatDiskFree(metrics)}
                   tone={(metrics.disk_free_pct ?? 100 - (metrics.disk_used_pct ?? 0)) < 10 ? "danger" : "accent"}
                 />
                 {metrics.disk_read_mb != null && (
-                  <GaugeBar
+                  <Gauge
                     label="Disk read"
                     value={Math.min(100, metrics.disk_read_mb / 100)}
                     detail={`${metrics.disk_read_mb.toLocaleString()} MB`}
@@ -431,7 +385,7 @@ function DashboardRun({
                   />
                 )}
                 {metrics.network_latency_ms != null && (
-                  <GaugeBar
+                  <Gauge
                     label={`NAS${metrics.network_host ? ` (${metrics.network_host})` : ""}`}
                     value={Math.min(100, metrics.network_latency_ms)}
                     detail={`${Math.round(metrics.network_latency_ms)} ms`}
@@ -484,14 +438,13 @@ function DashboardRun({
               />
               <StatTile label="Feedback skipped" value={formatCompact(summary.feedback_skipped ?? 0)} />
             </div>
-            <button
-              type="button"
-              className="primary-btn"
+            <Button
+              variant="primary"
               style={{ marginTop: "0.75rem" }}
               onClick={() => onNavigate?.("skipped")}
             >
               Open skipped files hub
-            </button>
+            </Button>
           </>
         ),
       },
@@ -531,9 +484,9 @@ function DashboardRun({
             </div>
             <div className="job-row">
               <span className="count-muted">Status</span>
-              <span className={`badge ${activeJob.status === "running" ? "ready" : "review"}`}>
+              <Badge tone={activeJob.status === "running" ? "ready" : "review"}>
                 {activeJob.status}
-              </span>
+              </Badge>
             </div>
             {activeJob.current_phase && (
               <div className="job-row">
@@ -541,16 +494,16 @@ function DashboardRun({
                 <span className="job-phase">{activeJob.current_phase}</span>
               </div>
             )}
-            <button type="button" className="primary-btn" onClick={() => onNavigate?.("scan")}>
+            <Button variant="primary" onClick={() => onNavigate?.("scan")}>
               Open scan controls
-            </button>
+            </Button>
           </div>
         ) : (
           <div className="job-card idle">
             <p>No scan running</p>
-            <button type="button" className="primary-btn" onClick={() => onNavigate?.("scan")}>
+            <Button variant="primary" onClick={() => onNavigate?.("scan")}>
               Start dry-run scan
-            </button>
+            </Button>
           </div>
         ),
       },
@@ -610,14 +563,14 @@ function DashboardRun({
                 <ul className="finding-list">
                   {executeHistory.items.map((item) => (
                     <li key={`${item.created}:${item.path}`} className="finding-row">
-                      <span className="badge bucket">{item.module}</span>
+                      <Badge tone="accent">{item.module}</Badge>
                       <span className="finding-detail" title={item.path}>
                         {basename(item.path)}
                         {item.destination ? ` → ${basename(item.destination)}` : ""}
                       </span>
-                      <span className={`badge ${item.ok ? "ready" : "review"}`}>
+                      <Badge tone={item.ok ? "ready" : "review"}>
                         {item.dry_run ? "dry" : item.status === "committed" ? "live" : item.status}
-                      </span>
+                      </Badge>
                     </li>
                   ))}
                 </ul>
@@ -710,9 +663,9 @@ function DashboardRun({
                     <td>{formatCompact(run.scanned)}</td>
                     <td>{formatCompact(run.investigation)}</td>
                     <td>
-                      <span className={`badge ${run.dry_run === false ? "high" : "ready"}`}>
+                      <Badge tone={run.dry_run === false ? "high" : "ready"}>
                         {run.dry_run === false ? "LIVE" : "dry"}
-                      </span>
+                      </Badge>
                     </td>
                   </tr>
                 ))}
@@ -729,19 +682,19 @@ function DashboardRun({
         content: scorecard ? (
           <>
             <div className="gauge-stack">
-              <GaugeBar
+              <Gauge
                 label="Identification"
                 value={scorecard.identification_rate_pct ?? 0}
                 detail={`${scorecard.identification_rate_pct ?? 0}% (${scorecard.confirmed_rate_pct ?? 0}% confirmed)`}
                 tone={(scorecard.identification_rate_pct ?? 0) < 80 ? "warning" : "accent"}
               />
-              <GaugeBar
+              <Gauge
                 label="Dedupe-eligible"
                 value={scorecard.dedupe_eligible_pct ?? 0}
                 detail={`${scorecard.dedupe_eligible_pct ?? 0}% have a dedupe key`}
                 tone={(scorecard.dedupe_eligible_pct ?? 0) < 60 ? "warning" : "accent"}
               />
-              <GaugeBar
+              <Gauge
                 label="Routes ready"
                 value={scorecard.route_ready_pct ?? 0}
                 detail={`${scorecard.route_ready_pct ?? 0}%`}
@@ -762,7 +715,7 @@ function DashboardRun({
               <ul className="finding-list">
                 {findings.slice(0, 6).map((finding, idx) => (
                   <li key={idx} className={`finding-row sev-${finding.severity.toLowerCase()}`}>
-                    <span className="badge bucket">{finding.check}</span>
+                    <Badge tone="accent">{finding.check}</Badge>
                     <span className="finding-detail" title={finding.suggestion}>
                       {finding.detail}
                     </span>
@@ -814,11 +767,11 @@ function DashboardRun({
           </span>
         </div>
         <div className="dash-run-meta">
-          {routeReadyPct != null && <span className="badge ready">{routeReadyPct}% route-ready</span>}
+          {routeReadyPct != null && <Badge tone="ready">{routeReadyPct}% route-ready</Badge>}
           {summary.dry_run ? (
-            <span className="badge bucket">no filesystem changes</span>
+            <Badge tone="accent">no filesystem changes</Badge>
           ) : (
-            <span className="badge high">live changes</span>
+            <Badge tone="high">live changes</Badge>
           )}
         </div>
       </div>

@@ -6,6 +6,7 @@ import {
   queryAiLookup,
 } from "../api/client";
 import type { AiLookupResult, AiLookupStatus, ProgressEvent } from "../types";
+import { Button } from "../ui";
 import { formatPct } from "../utils/format";
 
 interface Props {
@@ -141,9 +142,9 @@ export function AiAnalyzer({ libraryRoot, events = [] }: Props) {
             onChange={(e) => setQueryPath(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleQuery()}
           />
-          <button type="button" className="primary-btn" disabled={busy || !queryPath.trim()} onClick={handleQuery}>
+          <Button variant="primary" disabled={busy || !queryPath.trim()} onClick={handleQuery}>
             {busy ? "Querying…" : "Query"}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -202,12 +203,12 @@ export function AiAnalyzer({ libraryRoot, events = [] }: Props) {
                   )}
                   {row.pending_verification && (
                     <div className="toolbar ai-confirm-row">
-                      <button type="button" className="text-btn" onClick={() => handleConfirm(row.lookup_id, true)}>
+                      <Button variant="ghost" size="sm" onClick={() => handleConfirm(row.lookup_id, true)}>
                         Accept metadata
-                      </button>
-                      <button type="button" className="text-btn" onClick={() => handleConfirm(row.lookup_id, false)}>
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleConfirm(row.lookup_id, false)}>
                         Reject
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </div>

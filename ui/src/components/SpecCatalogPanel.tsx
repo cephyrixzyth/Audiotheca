@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { fetchMountEvents, fetchSpecCatalog } from "../api/client";
+import { Badge } from "../ui";
+import type { BadgeTone } from "../ui";
 
 type SpecEntry = {
   code: string;
@@ -10,10 +12,10 @@ type SpecEntry = {
   module: string;
 };
 
-const STATUS_CLASS: Record<SpecEntry["status"], string> = {
+const STATUS_TONE: Record<SpecEntry["status"], BadgeTone> = {
   done: "ready",
   partial: "review",
-  mvp: "warn",
+  mvp: "medium",
 };
 
 export function SpecCatalogPanel() {
@@ -79,7 +81,7 @@ export function SpecCatalogPanel() {
           <article key={entry.code} className="spec-catalog-card">
             <header>
               <code>{entry.code}</code>
-              <span className={`badge ${STATUS_CLASS[entry.status]}`}>{entry.status}</span>
+              <Badge tone={STATUS_TONE[entry.status]}>{entry.status}</Badge>
             </header>
             <strong>{entry.title}</strong>
             <p className="count-muted">{entry.description}</p>

@@ -6,6 +6,7 @@ import {
   planWebSpiderLookup,
   runWebSpiderLookup,
 } from "../api/client";
+import { Button } from "../ui";
 
 type Props = {
   defaultPath?: string;
@@ -112,12 +113,12 @@ export function InvestigationLookupPanel({ defaultPath = "" }: Props) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        <button type="button" className="text-btn" disabled={!!busy} onClick={() => void handlePlan()}>
+        <Button variant="ghost" disabled={!!busy} onClick={() => void handlePlan()}>
           Plan
-        </button>
-        <button type="button" className="primary-btn" disabled={!!busy} onClick={() => void handleRun()}>
+        </Button>
+        <Button variant="primary" disabled={!!busy} onClick={() => void handleRun()}>
           Run lookup
-        </button>
+        </Button>
       </div>
       {plan && (
         <p className="count-muted">
@@ -141,12 +142,12 @@ export function InvestigationLookupPanel({ defaultPath = "" }: Props) {
           value={path}
           onChange={(e) => setPath(e.target.value)}
         />
-        <button type="button" className="text-btn" disabled={!!busy} onClick={() => void handleNfo()}>
+        <Button variant="ghost" disabled={!!busy} onClick={() => void handleNfo()}>
           Parse NFO
-        </button>
-        <button type="button" className="text-btn" disabled={!!busy} onClick={() => void handleTags()}>
+        </Button>
+        <Button variant="ghost" disabled={!!busy} onClick={() => void handleTags()}>
           Generate tags
-        </button>
+        </Button>
       </div>
       <textarea
         className="env-manifest-editor"

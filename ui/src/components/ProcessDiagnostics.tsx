@@ -6,6 +6,7 @@ import {
   hardResetSystem,
 } from "../api/client";
 import type { ProgressEvent } from "../types";
+import { Badge, Button } from "../ui";
 
 export interface LogLine {
   text: string;
@@ -113,12 +114,12 @@ export function ProcessDiagnostics({ onLoadPastLog }: Props) {
   return (
     <div className="process-diagnostics">
       <div className="toolbar">
-        <button type="button" className="danger-btn" disabled={busy} onClick={() => void handleHardReset()}>
+        <Button variant="danger" disabled={busy} onClick={() => void handleHardReset()}>
           Hard-reset rogue processes
-        </button>
-        <button type="button" className="text-btn" disabled={busy} onClick={refresh}>
+        </Button>
+        <Button variant="ghost" disabled={busy} onClick={refresh}>
           Refresh
-        </button>
+        </Button>
       </div>
       <div className="field-stack compact">
         <label className="checkbox-label">
@@ -149,7 +150,7 @@ export function ProcessDiagnostics({ onLoadPastLog }: Props) {
         <ul className="process-list">
           {processes.map((p) => (
             <li key={p.pid}>
-              <code>{p.pid}</code> <span className="badge">{p.kind}</span>{" "}
+              <code>{p.pid}</code> <Badge tone="neutral">{p.kind}</Badge>{" "}
               <span className="count-muted">{p.cmdline}</span>
             </li>
           ))}
@@ -171,9 +172,9 @@ export function ProcessDiagnostics({ onLoadPastLog }: Props) {
             ))}
           </select>
         </label>
-        <button type="button" className="keeper-btn" disabled={!selectedLog || busy} onClick={() => void handleLoadLog()}>
+        <Button variant="secondary" disabled={!selectedLog || busy} onClick={() => void handleLoadLog()}>
           Load into progress log
-        </button>
+        </Button>
       </div>
     </div>
   );

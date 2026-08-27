@@ -17,6 +17,7 @@ import {
   type HarvestSourcePreset,
   type VendorGap,
 } from "../api/client";
+import { Badge, Button, Kpi } from "../ui";
 
 interface Props {
   stamp?: string;
@@ -230,46 +231,17 @@ export function VendorTools({ stamp }: Props) {
   return (
     <div>
       <div className="kpi-grid" style={{ marginBottom: "1rem" }}>
-        <div className="kpi">
-          <div className="label">Feedback items</div>
-          <div className="value" style={{ fontSize: "1.1rem" }}>
-            {summary ? summary.total.toLocaleString() : "—"}
-          </div>
-        </div>
-        <div className="kpi">
-          <div className="label">Investigation</div>
-          <div className="value" style={{ fontSize: "1.1rem" }}>
-            {summary ? summary.investigation : "—"}
-          </div>
-        </div>
-        <div className="kpi">
-          <div className="label">Duplicates</div>
-          <div className="value" style={{ fontSize: "1.1rem" }}>
-            {summary ? summary.duplicate : "—"}
-          </div>
-        </div>
-        <div className="kpi">
-          <div className="label">User vendors</div>
-          <div className="value" style={{ fontSize: "1.1rem" }}>
-            {userAdded.length}
-          </div>
-        </div>
-        <div className="kpi">
-          <div className="label">Research inbox</div>
-          <div className="value" style={{ fontSize: "1.1rem" }}>
-            {newCandidates.length}
-          </div>
-        </div>
+        <Kpi label="Feedback items" value={summary ? summary.total.toLocaleString() : "—"} />
+        <Kpi label="Investigation" value={summary ? summary.investigation : "—"} />
+        <Kpi label="Duplicates" value={summary ? summary.duplicate : "—"} />
+        <Kpi label="User vendors" value={userAdded.length} />
+        <Kpi label="Research inbox" value={newCandidates.length} />
       </div>
 
       <div className="toolbar" style={{ marginBottom: "1rem" }}>
-        <button
-          type="button"
-          className="primary-btn"
-          onClick={() => void unifiedFeedbackExportDownload(stamp)}
-        >
+        <Button variant="primary" onClick={() => void unifiedFeedbackExportDownload(stamp)}>
           Export all feedback (CSV)
-        </button>
+        </Button>
         <span className="count-muted">Backend_Enhancement_Export — investigation + duplicates + vendors</span>
       </div>
 
@@ -281,17 +253,16 @@ export function VendorTools({ stamp }: Props) {
             <code>vendor_overrides.json</code>.
           </div>
           <div className="toolbar">
-            <button
-              type="button"
-              className="primary-btn"
+            <Button
+              variant="primary"
               disabled={gapSelected.size === 0}
               onClick={() => void handleApproveGaps()}
             >
               Add selected to vendor base ({gapSelected.size})
-            </button>
-            <button type="button" className="keeper-btn" onClick={() => setGapSelected(new Set(gaps.map((g) => g.prefix)))}>
+            </Button>
+            <Button variant="secondary" onClick={() => setGapSelected(new Set(gaps.map((g) => g.prefix)))}>
               Select all ({gaps.length})
-            </button>
+            </Button>
           </div>
           <div className="table-wrap" style={{ maxHeight: "360px", overflow: "auto", marginTop: "0.5rem" }}>
             <table className="data-table">
@@ -358,16 +329,15 @@ export function VendorTools({ stamp }: Props) {
 
         <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.75rem" }}>
           {presets.map((preset) => (
-            <button
+            <Button
               key={preset.id}
-              type="button"
-              className="keeper-btn"
+              variant="secondary"
               disabled={harvesting}
               title={preset.notes}
               onClick={() => void handleHarvestPreset(preset.id)}
             >
               {harvesting ? "Scanning…" : preset.label}
-            </button>
+            </Button>
           ))}
         </div>
 
@@ -381,9 +351,9 @@ export function VendorTools({ stamp }: Props) {
               style={{ width: "100%", fontFamily: "monospace", fontSize: "0.85rem" }}
             />
           </label>
-          <button type="submit" className="primary-btn" disabled={harvesting}>
+          <Button type="submit" variant="primary" disabled={harvesting}>
             {harvesting ? "Harvesting…" : "Harvest custom URL list"}
-          </button>
+          </Button>
         </form>
 
         {lastRun && (
@@ -399,29 +369,23 @@ export function VendorTools({ stamp }: Props) {
             <h3 style={{ fontSize: "0.95rem", margin: 0 }}>
               Research inbox ({newCandidates.length} new, not in engine yet)
             </h3>
-            <button
-              type="button"
-              className="keeper-btn"
-              onClick={() => void vendorResearchExportDownload(false)}
-            >
+            <Button variant="secondary" onClick={() => void vendorResearchExportDownload(false)}>
               Export inbox (CSV)
-            </button>
-            <button
-              type="button"
-              className="primary-btn"
+            </Button>
+            <Button
+              variant="primary"
               disabled={selected.size === 0}
               onClick={() => void handleApproveSelected()}
             >
               Add selected to vendor base ({selected.size})
-            </button>
-            <button
-              type="button"
-              className="keeper-btn"
+            </Button>
+            <Button
+              variant="secondary"
               disabled={selected.size === 0}
               onClick={() => void handleRejectSelected()}
             >
               Reject selected
-            </button>
+            </Button>
           </div>
           <div className="table-wrap" style={{ maxHeight: "320px", overflow: "auto" }}>
             <table className="data-table">
@@ -448,9 +412,9 @@ export function VendorTools({ stamp }: Props) {
                     <td>
                       {row.company}
                       {row.already_known && (
-                        <span className="badge" style={{ marginLeft: "0.35rem" }}>
+                        <Badge tone="neutral" style={{ marginLeft: "0.35rem" }}>
                           known
-                        </span>
+                        </Badge>
                       )}
                     </td>
                     <td className="count-muted">{row.keywords.slice(0, 4).join(", ")}</td>
@@ -480,9 +444,9 @@ export function VendorTools({ stamp }: Props) {
               placeholder="native instruments, kontakt, ni"
             />
           </label>
-          <button type="submit" className="primary-btn">
+          <Button type="submit" variant="primary">
             Save to vendor_overrides.json
-          </button>
+          </Button>
         </form>
 
         <form onSubmit={(e) => void handleTest(e)}>
@@ -500,9 +464,9 @@ export function VendorTools({ stamp }: Props) {
               required
             />
           </label>
-          <button type="submit" className="keeper-btn">
+          <Button type="submit" variant="secondary">
             Test match
-          </button>
+          </Button>
           {testResult && <p className="count-muted">{testResult}</p>}
         </form>
       </div>

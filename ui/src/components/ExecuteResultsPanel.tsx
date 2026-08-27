@@ -1,3 +1,4 @@
+import { Badge } from "../ui";
 import { PathLink } from "./PathLink";
 
 export type ExecuteResultRow = {
@@ -26,10 +27,6 @@ function statusLabel(
 ): string {
   if (!ok) return "Failed";
   return dryRun ? okDryRunLabel : okLiveLabel;
-}
-
-function statusClass(ok: boolean): string {
-  return ok ? "ready" : "review";
 }
 
 export function ExecuteResultsPanel({
@@ -73,9 +70,9 @@ export function ExecuteResultsPanel({
                 </td>
                 <td>{row.action}</td>
                 <td>
-                  <span className={`badge ${statusClass(row.ok)}`}>
+                  <Badge tone={row.ok ? "ready" : "review"}>
                     {statusLabel(row.ok, dryRun, okDryRunLabel, okLiveLabel)}
-                  </span>
+                  </Badge>
                 </td>
                 <td className="execute-results-detail">
                   {row.error ? (

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { fetchVirtualPaths, saveVirtualPaths } from "../api/client";
+import { Badge, Button } from "../ui";
 
 type VirtualEntry = { virtual: string; physical: string; exists?: boolean };
 
@@ -42,15 +43,15 @@ export function VirtualPathsPanel() {
           <input value={physical} onChange={(e) => setPhysical(e.target.value)} placeholder="D:\Libraries\SFX" />
         </label>
       </div>
-      <button type="button" className="text-btn" onClick={() => void handleSave()}>
+      <Button variant="ghost" onClick={() => void handleSave()}>
         Save mapping
-      </button>
+      </Button>
       {msg && <p className="count-muted">{msg}</p>}
       <ul className="virtual-path-list">
         {entries.map((entry) => (
           <li key={entry.virtual}>
             <code>{entry.virtual}</code> → <code>{entry.physical}</code>
-            {!entry.exists && <span className="badge review">missing</span>}
+            {!entry.exists && <Badge tone="review">missing</Badge>}
           </li>
         ))}
       </ul>

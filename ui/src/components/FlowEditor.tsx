@@ -5,6 +5,7 @@ import {
   SCAN_FLOW_PHASES,
   type FlowPreset,
 } from "../flows/scanFlow";
+import { Button } from "../ui";
 
 interface Props {
   skipPhases: string[];
@@ -182,14 +183,13 @@ export function FlowEditor({
             )}
           </dl>
           {selected.skipKey && (
-            <button
-              type="button"
-              className="keeper-btn"
+            <Button
+              variant="secondary"
               title={skipSet.has(selected.skipKey!) ? "Include this phase in the next scan" : "Skip this phase in the next scan"}
               onClick={() => togglePhase(selected.id, selected.skipKey)}
             >
               {skipSet.has(selected.skipKey) ? "Enable phase" : "Skip phase"}
-            </button>
+            </Button>
           )}
         </aside>
       )}

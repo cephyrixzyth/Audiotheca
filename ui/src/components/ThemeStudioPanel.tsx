@@ -1,9 +1,10 @@
 import { useTheme } from "../contexts/ThemeContext";
 import { ThemePanel } from "./ThemePanel";
+import { Button } from "../ui";
 
 function ThemePreview() {
   const { activeTheme } = useTheme();
-  const { accent, bg, text, warning, danger, border } = activeTheme.tokens;
+  const { bg, text, warning, danger, border } = activeTheme.tokens;
 
   return (
     <div className="theme-studio-preview" style={{ background: bg, color: text, borderColor: border }}>
@@ -12,12 +13,12 @@ function ThemePreview() {
         <span className="theme-studio-preview-name">{activeTheme.name}</span>
       </div>
       <div className="theme-studio-preview-body">
-        <button type="button" className="primary-btn theme-studio-sample-btn" style={{ background: accent }}>
+        <Button variant="primary" className="theme-studio-sample-btn">
           Primary action
-        </button>
-        <button type="button" className="text-btn theme-studio-sample-btn">
+        </Button>
+        <Button variant="ghost" className="theme-studio-sample-btn">
           Secondary
-        </button>
+        </Button>
         <div className="stat-grid compact">
           <div className="stat-tile tone-accent">
             <div className="stat-label">Ready</div>

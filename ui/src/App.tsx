@@ -1,4 +1,5 @@
 ﻿import { useCallback, useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import "./App.css";
 import { fetchRun, fetchRuns, fetchJobs, fetchHealth, fetchLibraryRoots } from "./api/client";
 import { ArchivePeek } from "./components/ArchivePeek";
@@ -22,6 +23,10 @@ import { ProcessBanner } from "./components/ProcessBanner";
 import { NavTabs, REVIEW_TAB_IDS } from "./components/NavTabs";
 import { ThemeSwitcher } from "./components/ThemeSwitcher";
 import { VendorTools } from "./components/VendorTools";
+import { UiKitGallery } from "./components/UiKitGallery";
+import { CommandPalette, OPEN_COMMAND_PALETTE_EVENT } from "./components/CommandPalette";
+import { Button } from "./ui";
+import { pathForTab, readRunParam, setRunParam, tabForPath } from "./routes";
 import { FileExplorerProvider } from "./contexts/FileExplorerContext";
 import { useLibraryRoot } from "./hooks/useLibraryRoot";
 import { useDesktopCloseHandler } from "./hooks/useDesktopCloseHandler";
@@ -36,9 +41,26 @@ const SUBTREE_TABS: TabId[] = [
 
 export default function App() {
   const [runs, setRuns] = useState<RunListItem[]>([]);
-  const [stamp, setStamp] = useState("");
   const [summary, setSummary] = useState<RunSummary | null>(null);
-  const [tab, setTab] = useState<TabId>("dashboard");
+  const location = useLocation();
+  const navigate = useNavigate();
+  const tab = tabForPath(location.pathname);
+  const showUiKit = location.pathname === "/ui-kit";
+  // The selected run is deep-linkable via the `?run=` query param, so it
+  // survives reloads, back/forward, and can be shared as a URL.
+  const stamp = readRunParam(location.search);
+  const setTab = useCallback(
+    (id: TabId) => navigate({ pathname: pathForTab(id), search: location.search }),
+    [navigate, location.search],
+  );
+  const setStamp = useCallback(
+    (next: string) =>
+      navigate(
+        { pathname: location.pathname, search: setRunParam(location.search, next) },
+        { replace: true },
+      ),
+    [navigate, location.pathname, location.search],
+  );
   const [error, setError] = useState<string | null>(null);
   const [scanActive, setScanActive] = useState(false);
   const [engineVersion, setEngineVersion] = useState<string | null>(null);
@@ -47,6 +69,12 @@ export default function App() {
   const libraryRoot = useLibraryRoot();
   const explorerSubtree = SUBTREE_TABS.includes(tab) ? libraryRoot : null;
   const desktopClose = useDesktopCloseHandler();
+
+  useEffect(() => {
+    if (location.pathname === "/") {
+      navigate(pathForTab("dashboard"), { replace: true });
+    }
+  }, [location.pathname, navigate]);
 
   useEffect(() => {
     fetchHealth()
@@ -84,7 +112,6 @@ export default function App() {
       fetchRuns()
         .then((list) => {
           setRuns(list);
-          setStamp((current) => current || list[0]?.stamp || "");
           setError(null);
         })
         .catch((err: Error) => {
@@ -102,6 +129,13 @@ export default function App() {
     reloadRuns();
   }, [reloadRuns]);
 
+  // Default the deep-linked run to the latest available when none is selected.
+  useEffect(() => {
+    if (!stamp && runs.length > 0) {
+      setStamp(runs[0].stamp);
+    }
+  }, [stamp, runs, setStamp]);
+
   useEffect(() => {
     if (!stamp) return;
     setError(null);
@@ -113,10 +147,12 @@ export default function App() {
   const onScanComplete = useCallback(
     (newStamp: string) => {
       reloadRuns();
-      setStamp(newStamp);
-      setTab("scan-audit");
+      navigate({
+        pathname: pathForTab("scan-audit"),
+        search: setRunParam(location.search, newStamp),
+      });
     },
-    [reloadRuns],
+    [reloadRuns, navigate, location.search],
   );
 
   return (
@@ -131,6 +167,14 @@ export default function App() {
               </span>
             </div>
             <NavTabs tab={tab} onTabChange={setTab} scanActive={scanActive} />
+            <Button
+              variant="ghost"
+              size="sm"
+              title="Command palette (Ctrl/Cmd+K)"
+              onClick={() => window.dispatchEvent(new Event(OPEN_COMMAND_PALETTE_EVENT))}
+            >
+              Search ⌘K
+            </Button>
             <ThemeSwitcher />
           </header>
 
@@ -139,7 +183,8 @@ export default function App() {
 
             <main className="main">
               <ProcessBanner />
-              {tab !== "scan" && (
+              {showUiKit && <UiKitGallery />}
+              {tab !== "scan" && !showUiKit && (
                 <div className="toolbar compact-toolbar">
                   <label className="field-label-inline">
                     Run
@@ -169,7 +214,7 @@ export default function App() {
                 </div>
               )}
 
-              {tab === "dashboard" && (
+              {tab === "dashboard" && !showUiKit && (
                 <Dashboard summary={summary} runs={runs} onNavigate={setTab} />
               )}
               {tab === "investigation" &&
@@ -227,6 +272,7 @@ export default function App() {
             </main>
           </div>
         </div>
+        <CommandPalette />
         {showFirstRun && (
           <FirstRunWizard onNavigate={setTab} onComplete={() => setShowFirstRun(false)} />
         )}

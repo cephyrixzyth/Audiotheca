@@ -8,6 +8,7 @@ import {
   type RestructureExecuteResponse,
 } from "../api/client";
 import type { RestructureItem } from "../types";
+import { Badge, Button } from "../ui";
 import { useLibraryRoot } from "../hooks/useLibraryRoot";
 import { PathLink } from "./PathLink";
 import { useContextSidebar } from "./ContextSidebar";
@@ -125,17 +126,15 @@ export function RestructurePlan({ stamp }: Props) {
       </div>
 
       <div className="toolbar" style={{ marginBottom: "0.5rem" }}>
-        <button
-          type="button"
-          className="keeper-btn"
+        <Button
+          variant="secondary"
           title="Simulate moves for approved sections without changing disk"
           onClick={() => void handleExecute(true)}
         >
           Dry-run approved sections
-        </button>
-        <button
-          type="button"
-          className="primary-btn"
+        </Button>
+        <Button
+          variant="primary"
           title="Apply READY moves in approved sections on the library share"
           onClick={() => {
             if (window.confirm("Move READY items in approved sections on disk?")) {
@@ -145,7 +144,7 @@ export function RestructurePlan({ stamp }: Props) {
           disabled={approvedSections.length === 0}
         >
           Execute approved ({approvedSections.length} sections)
-        </button>
+        </Button>
       </div>
 
       {sections.length > 0 && (
@@ -153,10 +152,9 @@ export function RestructurePlan({ stamp }: Props) {
           {sections.map(([section, count]) => {
             const approved = approvedSections.includes(section);
             return (
-              <button
+              <Button
                 key={section}
-                type="button"
-                className={approved ? "primary-btn" : "keeper-btn"}
+                variant={approved ? "primary" : "secondary"}
                 title={
                   approved
                     ? `Section ${section} is approved for live execute`
@@ -165,7 +163,7 @@ export function RestructurePlan({ stamp }: Props) {
                 onClick={() => void handleApproveSection(section)}
               >
                 {approved ? "✓ " : ""}Section {section} ({count})
-              </button>
+              </Button>
             );
           })}
         </div>
@@ -224,7 +222,7 @@ export function RestructurePlan({ stamp }: Props) {
                   <td>
                     <code>{row.section}</code>
                     {approvedSections.includes(row.section) && (
-                      <span className="badge ready">approved</span>
+                      <Badge tone="ready">approved</Badge>
                     )}
                   </td>
                   <td>
@@ -241,25 +239,21 @@ export function RestructurePlan({ stamp }: Props) {
                     <div className="path">{row.id_confidence}</div>
                   </td>
                   <td>
-                    <span
-                      className={`badge ${row.status === "READY" ? "ready" : "review"}`}
-                    >
-                      {row.status}
-                    </span>
+                    <Badge tone={row.status === "READY" ? "ready" : "review"}>{row.status}</Badge>
                   </td>
                   <td>
                     <PathLink path={override ?? row.planned_destination} />
                     {override && <div className="count-muted">override</div>}
                   </td>
                   <td>
-                    <button
-                      type="button"
-                      className="keeper-btn"
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       title="Override planned destination relative to library root (e.g. a/Vendor/Product)"
                       onClick={() => void handleOverride(row)}
                     >
                       Edit dest
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               );

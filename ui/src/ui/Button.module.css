@@ -1,0 +1,116 @@
+.button {
+  --_bg: var(--ui-surface-elevated);
+  --_fg: var(--ui-fg);
+  --_bd: var(--ui-line);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ui-space-2);
+  border: 1px solid var(--_bd);
+  background: var(--_bg);
+  color: var(--_fg);
+  border-radius: var(--ui-radius-md);
+  font-family: var(--sans);
+  font-size: var(--ui-fs-sm);
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--ui-transition),
+    border-color var(--ui-transition),
+    color var(--ui-transition),
+    filter var(--ui-transition);
+}
+
+.button:hover:not(:disabled) {
+  background: var(--ui-surface-hover);
+  border-color: var(--accent-dim);
+}
+
+.button:focus-visible {
+  outline: var(--ui-focus-ring);
+  outline-offset: var(--ui-focus-offset);
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Sizes */
+.sm {
+  padding: var(--ui-space-1) var(--ui-space-2);
+  font-size: var(--ui-fs-xs);
+}
+
+.md {
+  padding: var(--ui-space-2) var(--ui-space-3);
+}
+
+/* Variants */
+.primary {
+  --_bg: linear-gradient(180deg, var(--accent), var(--accent-dim));
+  --_bd: var(--accent-dim);
+  --_fg: var(--accent-contrast);
+  font-weight: 600;
+}
+
+.primary:hover:not(:disabled) {
+  filter: brightness(1.06);
+  background: linear-gradient(180deg, var(--accent), var(--accent-dim));
+  border-color: var(--accent-dim);
+}
+
+.secondary {
+  --_bg: var(--ui-surface-elevated);
+}
+
+.ghost {
+  --_bg: transparent;
+  --_bd: transparent;
+  --_fg: var(--ui-fg-muted);
+}
+
+.ghost:hover:not(:disabled) {
+  color: var(--ui-fg);
+}
+
+.danger {
+  --_bg: var(--danger-soft);
+  --_bd: color-mix(in srgb, var(--danger) 50%, transparent);
+  --_fg: var(--danger);
+}
+
+.danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 28%, transparent);
+  border-color: color-mix(in srgb, var(--danger) 65%, transparent);
+}
+
+.icon {
+  --_bg: transparent;
+  --_bd: transparent;
+  --_fg: var(--ui-fg-muted);
+  padding: var(--ui-space-1);
+  aspect-ratio: 1;
+  border-radius: var(--ui-radius-md);
+}
+
+.icon:hover:not(:disabled) {
+  background: var(--ui-surface-hover);
+  color: var(--ui-fg);
+  border-color: var(--ui-line);
+}
+
+/* Modifiers */
+.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.block {
+  display: flex;
+  width: 100%;
+}

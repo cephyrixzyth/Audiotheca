@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { EDITABLE_TOKEN_GROUPS, useTheme } from "../contexts/ThemeContext";
 import type { ThemePreset } from "../themes/types";
+import { Button } from "../ui";
 
 function ThemeSwatch({ theme }: { theme: ThemePreset }) {
   const { accent, bg, text, warning, danger } = theme.tokens;
@@ -132,15 +133,15 @@ export function ThemePanel() {
             onChange={(e) => setCustomName(e.target.value)}
           />
         </label>
-        <button type="button" className="text-btn" onClick={handleDuplicate}>
+        <Button variant="ghost" onClick={handleDuplicate}>
           Duplicate &amp; save
-        </button>
-        <button type="button" className="text-btn" onClick={() => exportTheme(activeId)}>
+        </Button>
+        <Button variant="ghost" onClick={() => exportTheme(activeId)}>
           Export active
-        </button>
-        <button type="button" className="text-btn" onClick={() => fileRef.current?.click()}>
+        </Button>
+        <Button variant="ghost" onClick={() => fileRef.current?.click()}>
           Import file
-        </button>
+        </Button>
         <input
           ref={fileRef}
           type="file"
@@ -178,13 +179,12 @@ export function ThemePanel() {
               <p className="count-muted">{editorTheme.description}</p>
             </div>
             <div className="theme-editor-actions">
-              <button type="button" className="text-btn" onClick={() => exportTheme(editorTheme.id)}>
+              <Button variant="ghost" onClick={() => exportTheme(editorTheme.id)}>
                 Export
-              </button>
+              </Button>
               {isCustomEditor && (
-                <button
-                  type="button"
-                  className="danger-btn"
+                <Button
+                  variant="danger"
                   onClick={() => {
                     if (window.confirm(`Delete custom theme “${editorTheme.name}”?`)) {
                       deleteTheme(editorTheme.id);
@@ -193,7 +193,7 @@ export function ThemePanel() {
                   }}
                 >
                   Delete
-                </button>
+                </Button>
               )}
             </div>
           </header>
@@ -245,9 +245,9 @@ export function ThemePanel() {
           value={importText}
           onChange={(e) => setImportText(e.target.value)}
         />
-        <button type="button" className="text-btn" disabled={!importText.trim()} onClick={handleImport}>
+        <Button variant="ghost" disabled={!importText.trim()} onClick={handleImport}>
           Import pasted JSON
-        </button>
+        </Button>
       </details>
 
       {customThemes.length > 0 && (
