@@ -24,6 +24,8 @@ import { NavTabs, REVIEW_TAB_IDS } from "./components/NavTabs";
 import { ThemeSwitcher } from "./components/ThemeSwitcher";
 import { VendorTools } from "./components/VendorTools";
 import { UiKitGallery } from "./components/UiKitGallery";
+import { CommandPalette, OPEN_COMMAND_PALETTE_EVENT } from "./components/CommandPalette";
+import { Button } from "./ui";
 import { pathForTab, readRunParam, setRunParam, tabForPath } from "./routes";
 import { FileExplorerProvider } from "./contexts/FileExplorerContext";
 import { useLibraryRoot } from "./hooks/useLibraryRoot";
@@ -165,6 +167,14 @@ export default function App() {
               </span>
             </div>
             <NavTabs tab={tab} onTabChange={setTab} scanActive={scanActive} />
+            <Button
+              variant="ghost"
+              size="sm"
+              title="Command palette (Ctrl/Cmd+K)"
+              onClick={() => window.dispatchEvent(new Event(OPEN_COMMAND_PALETTE_EVENT))}
+            >
+              Search ⌘K
+            </Button>
             <ThemeSwitcher />
           </header>
 
@@ -262,6 +272,7 @@ export default function App() {
             </main>
           </div>
         </div>
+        <CommandPalette />
         {showFirstRun && (
           <FirstRunWizard onNavigate={setTab} onComplete={() => setShowFirstRun(false)} />
         )}

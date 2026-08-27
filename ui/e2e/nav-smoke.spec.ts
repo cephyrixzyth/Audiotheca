@@ -62,6 +62,26 @@ test("ui-kit gallery route renders the primitives", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Primary", exact: true })).toBeVisible();
 });
 
+test("command palette opens (Ctrl+K / button), filters, and navigates", async ({ page }) => {
+  await page.goto("/#/dashboard");
+
+  // Keyboard shortcut opens it.
+  await page.keyboard.press("Control+k");
+  const input = page.getByPlaceholder("Search tabs, actions, and spec codes…");
+  await expect(input).toBeVisible();
+  await input.fill("Restructure");
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/#\/review\/restructure/);
+
+  // Topbar button opens it too, and spec codes are searchable.
+  await page.getByRole("button", { name: "Search ⌘K" }).click();
+  const input2 = page.getByPlaceholder("Search tabs, actions, and spec codes…");
+  await expect(input2).toBeVisible();
+  await input2.fill("WEB-SPDR");
+  await expect(page.getByRole("option", { name: /WEB-SPDR/ })).toBeVisible();
+  await page.keyboard.press("Escape");
+});
+
 test("selected run is deep-linked via ?run= and survives tab changes", async ({ page }) => {
   // Default run param is applied to the URL once runs load.
   await page.goto("/#/dashboard");
