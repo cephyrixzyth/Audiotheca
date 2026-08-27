@@ -16,7 +16,7 @@ import {
   validateStagingRoot,
 } from "../api/client";
 import type { EnvironmentDependency, EnvironmentPayload } from "../types";
-import { Button } from "../ui";
+import { Button, StatTile } from "../ui";
 import { ReorderableSections } from "./ReorderableSections";
 import { ThemeStudioPanel } from "./ThemeStudioPanel";
 import { InstallLifecyclePanel } from "./InstallLifecyclePanel";
@@ -679,20 +679,23 @@ export function EnvironmentSummaryWidget({ onNavigate }: { onNavigate?: () => vo
   if (!summary) return null;
 
   return (
-    <div className={`stat-tile ${summary.healthy ? "tone-accent" : "tone-danger"}`}>
-      <div className="stat-label">Environment</div>
-      <div className="stat-value">{summary.healthy ? "OK" : `${summary.required_missing} required missing`}</div>
-      <div className="stat-sub">
-        {summary.ok}/{summary.total} tools ready
-        {onNavigate && (
-          <>
-            {" · "}
-            <Button variant="ghost" size="sm" onClick={onNavigate}>
-              Open Environment tab
-            </Button>
-          </>
-        )}
-      </div>
-    </div>
+    <StatTile
+      label="Environment"
+      value={summary.healthy ? "OK" : `${summary.required_missing} required missing`}
+      tone={summary.healthy ? "accent" : "danger"}
+      sub={
+        <>
+          {summary.ok}/{summary.total} tools ready
+          {onNavigate && (
+            <>
+              {" · "}
+              <Button variant="ghost" size="sm" onClick={onNavigate}>
+                Open Environment tab
+              </Button>
+            </>
+          )}
+        </>
+      }
+    />
   );
 }
