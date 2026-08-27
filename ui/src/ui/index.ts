@@ -21,3 +21,5 @@ export { Tooltip, TooltipProvider } from "./Tooltip";
 export type { TooltipProps } from "./Tooltip";
 export { Tabs } from "./Tabs";
 export type { TabsProps, TabItem } from "./Tabs";
+export { VirtualTable } from "./VirtualTable";
+export type { VirtualTableProps, VirtualRowAttrs } from "./VirtualTable";

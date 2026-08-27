@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { correctInvestigation, fetchInvestigationFeedback, fetchScanAudit, fetchScanInsights } from "../api/client";
 import type { ScanAuditItem } from "../types";
-import { Badge, Button } from "../ui";
+import { Badge, Button, VirtualTable } from "../ui";
 import { PathLink } from "./PathLink";
 import { useContextSidebar, useSidebarFilters } from "./ContextSidebar";
 
@@ -188,8 +188,11 @@ export function ScanAudit({ stamp }: Props) {
       )}
 
       {items.length > 0 && (
-        <table className="data-table">
-          <thead>
+        <VirtualTable
+          items={items}
+          colCount={7}
+          estimateSize={72}
+          header={
             <tr>
               <th>Section</th>
               <th>Item</th>
@@ -199,46 +202,44 @@ export function ScanAudit({ stamp }: Props) {
               <th>Destination</th>
               <th>Actions</th>
             </tr>
-          </thead>
-          <tbody>
-            {items.map((row) => (
-              <tr key={row.current_path}>
-                <td><code>{row.section}</code></td>
-                <td>
-                  <div>{row.item_name}</div>
-                  <PathLink path={row.current_path} />
-                  <div className="count-muted">
-                    {row.fingerprint}
-                    {row.version_key ? ` · v${row.version_key}` : ""}
-                    {row.size_mb != null ? ` · ${row.size_mb} MB` : ""}
-                  </div>
-                </td>
-                <td>
-                  <div>{row.vendor}</div>
-                  <div className="path">{row.id_method} · {row.id_confidence || "—"}</div>
-                </td>
-                <td>
-                  <Badge tone={row.status === "READY" ? "ready" : "accent"}>{row.status}</Badge>
-                  {row.investigation_bucket && (
-                    <div className="count-muted">{row.investigation_bucket}</div>
-                  )}
-                </td>
-                <td><code style={{ fontSize: "0.75rem" }}>{row.flags || "—"}</code></td>
-                <td><PathLink path={row.planned_destination} /></td>
-                <td>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    title="Override vendor for this path on the next scan"
-                    onClick={() => void handleSetVendor(row)}
-                  >
-                    Set vendor
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+          }
+          renderRow={(row, _index, rowAttrs) => (
+            <tr key={row.current_path} {...rowAttrs}>
+              <td><code>{row.section}</code></td>
+              <td>
+                <div>{row.item_name}</div>
+                <PathLink path={row.current_path} />
+                <div className="count-muted">
+                  {row.fingerprint}
+                  {row.version_key ? ` · v${row.version_key}` : ""}
+                  {row.size_mb != null ? ` · ${row.size_mb} MB` : ""}
+                </div>
+              </td>
+              <td>
+                <div>{row.vendor}</div>
+                <div className="path">{row.id_method} · {row.id_confidence || "—"}</div>
+              </td>
+              <td>
+                <Badge tone={row.status === "READY" ? "ready" : "accent"}>{row.status}</Badge>
+                {row.investigation_bucket && (
+                  <div className="count-muted">{row.investigation_bucket}</div>
+                )}
+              </td>
+              <td><code style={{ fontSize: "0.75rem" }}>{row.flags || "—"}</code></td>
+              <td><PathLink path={row.planned_destination} /></td>
+              <td>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  title="Override vendor for this path on the next scan"
+                  onClick={() => void handleSetVendor(row)}
+                >
+                  Set vendor
+                </Button>
+              </td>
+            </tr>
+          )}
+        />
       )}
 
       {bucketOptions.length > 0 && (

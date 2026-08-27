@@ -28,6 +28,7 @@
     "@radix-ui/react-tabs": "^1.1.21",
     "@radix-ui/react-tooltip": "^1.2.16",
     "@radix-ui/react-visually-hidden": "^1.2.11",
+    "@tanstack/react-virtual": "^3.14.10",
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-opener": "^2.5.0",
     "react": "^19.2.0",
