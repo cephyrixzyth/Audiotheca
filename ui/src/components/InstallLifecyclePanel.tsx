@@ -8,6 +8,7 @@ import {
   syncVersionManifestCatalog,
   upsertInstallation,
 } from "../api/client";
+import { Button } from "../ui";
 
 type InstallRecord = {
   install_id: string;
@@ -267,19 +268,18 @@ export function InstallLifecyclePanel() {
             onChange={(e) => setPresetName(e.target.value)}
             placeholder="Preset name"
           />
-          <button type="button" className="text-btn" disabled={busy} onClick={() => void handleSaveGoldMasterPreset()}>
+          <Button variant="ghost" disabled={busy} onClick={() => void handleSaveGoldMasterPreset()}>
             Save current as preset
-          </button>
+          </Button>
           {presets.map((preset) => (
-            <button
+            <Button
               key={preset.name}
-              type="button"
-              className="text-btn"
+              variant="ghost"
               onClick={() => applyPreset(preset.snapshot)}
               title="Apply tags, notes, and dependencies to draft"
             >
               Apply {preset.name}
-            </button>
+            </Button>
           ))}
         </div>
         <div className="install-tags-row">
@@ -289,9 +289,9 @@ export function InstallLifecyclePanel() {
             onChange={(e) => setCatalogUrl(e.target.value)}
             placeholder="Remote manifest catalog URL (JSON)"
           />
-          <button type="button" className="text-btn" disabled={busy || !catalogUrl.trim()} onClick={() => void handleSyncCatalog()}>
+          <Button variant="ghost" disabled={busy || !catalogUrl.trim()} onClick={() => void handleSyncCatalog()}>
             Sync catalog
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -309,15 +309,15 @@ export function InstallLifecyclePanel() {
             </option>
           ))}
         </select>
-        <button type="button" className="primary-btn" disabled={busy} onClick={() => void handleSave()}>
+        <Button variant="primary" disabled={busy} onClick={() => void handleSave()}>
           Save
-        </button>
-        <button type="button" className="text-btn" disabled={busy || !selectedId} onClick={() => void handleVersionCheck()}>
+        </Button>
+        <Button variant="ghost" disabled={busy || !selectedId} onClick={() => void handleVersionCheck()}>
           Check version
-        </button>
-        <button type="button" className="text-btn" disabled={busy} onClick={() => void handleRefreshManifest()}>
+        </Button>
+        <Button variant="ghost" disabled={busy} onClick={() => void handleRefreshManifest()}>
           Refresh manifest
-        </button>
+        </Button>
         {draft.update_status && (
           <span className={`env-badge ${statusBadgeClass(draft.update_status)}`}>
             {statusLabel(draft.update_status)}
@@ -386,13 +386,13 @@ export function InstallLifecyclePanel() {
               }
             }}
           />
-          <button type="button" className="text-btn" onClick={() => addTag(tagInput)}>
+          <Button variant="ghost" onClick={() => addTag(tagInput)}>
             Add tag
-          </button>
+          </Button>
           {defaultTags.map((tag) => (
-            <button key={tag} type="button" className="text-btn" onClick={() => addTag(tag)}>
+            <Button key={tag} variant="ghost" onClick={() => addTag(tag)}>
               + {tag}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
@@ -432,9 +432,9 @@ export function InstallLifecyclePanel() {
               }
             }}
           />
-          <button type="button" className="text-btn" onClick={addDependency}>
+          <Button variant="ghost" onClick={addDependency}>
             Add dependency
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -477,9 +477,9 @@ export function InstallationSummaryWidget({ onNavigate }: { onNavigate?: () => v
         <div className="value">{summary.current}</div>
       </div>
       {onNavigate && (
-        <button type="button" className="text-btn" onClick={onNavigate}>
+        <Button variant="ghost" size="sm" onClick={onNavigate}>
           Manage →
-        </button>
+        </Button>
       )}
     </div>
   );

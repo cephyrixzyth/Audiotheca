@@ -4,6 +4,7 @@ import {
   playbackRateForBpm,
   usePreviewSession,
 } from "../hooks/usePreviewSession";
+import { Badge } from "../ui";
 
 const AUDIO_EXT = /\.(wav|wave|mp3|flac|ogg|aif|aiff)$/i;
 
@@ -180,16 +181,16 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
       )}
       {isWav && (
         <span className="audio-preview-badges">
-          {assetLufs != null ? <span className="badge ready">{assetLufs} LUFS</span> : null}
-          {assetBpm ? <span className="badge bucket">{assetBpm} BPM</span> : null}
-          {assetKey ? <span className="badge review">{assetKey}</span> : null}
+          {assetLufs != null ? <Badge tone="ready">{assetLufs} LUFS</Badge> : null}
+          {assetBpm ? <Badge tone="accent">{assetBpm} BPM</Badge> : null}
+          {assetKey ? <Badge tone="review">{assetKey}</Badge> : null}
         </span>
       )}
       {!compact && (
         <span className="count-muted audio-preview-meta">
-          {assetLufs != null ? <span className="badge ready">{assetLufs} LUFS</span> : null}
-          {assetBpm ? <span className="badge bucket">{assetBpm} BPM</span> : null}
-          {assetKey ? <span className="badge review">{assetKey}</span> : null}
+          {assetLufs != null ? <Badge tone="ready">{assetLufs} LUFS</Badge> : null}
+          {assetBpm ? <Badge tone="accent">{assetBpm} BPM</Badge> : null}
+          {assetKey ? <Badge tone="review">{assetKey}</Badge> : null}
           {session.tempoSync && assetBpm ? ` ${assetBpm}→${session.projectBpm}bpm` : null}
           {session.pitchShiftSemitones !== 0 ? ` ${session.pitchShiftSemitones}st` : null}
           {session.mixChannel !== "stereo" ? ` ${session.mixChannel}` : null}

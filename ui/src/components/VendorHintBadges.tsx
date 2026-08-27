@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchVendorHints } from "../api/client";
+import { Badge } from "../ui";
 
 type Props = {
   path: string;
@@ -31,14 +32,14 @@ export function VendorHintBadges({ path, name }: Props) {
   return (
     <span className="vendor-hint-badges">
       {boutique.map((tag) => (
-        <span key={`b-${tag}`} className="badge ready" title="BTQ-FPT boutique match">
+        <Badge key={`b-${tag}`} tone="ready" title="BTQ-FPT boutique match">
           {tag}
-        </span>
+        </Badge>
       ))}
       {sfx.slice(0, 2).map((tag) => (
-        <span key={`s-${tag}`} className="badge bucket" title="SFX-MAP BWF library hint">
+        <Badge key={`s-${tag}`} tone="accent" title="SFX-MAP BWF library hint">
           {tag}
-        </span>
+        </Badge>
       ))}
     </span>
   );
