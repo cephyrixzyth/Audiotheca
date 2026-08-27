@@ -123,8 +123,8 @@ export function CommandPalette() {
     list.push({
       id: "act-pe-caps",
       label: "PE capability hints",
-      hint: "Security",
-      keywords: "pefile capa pe capabilities malware security",
+      hint: "Security · Explorer",
+      keywords: "pefile capa pe capabilities malware security explorer",
       run: () => goTab("security"),
     });
     list.push({

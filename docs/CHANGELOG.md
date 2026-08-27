@@ -24,6 +24,8 @@ Git tag **v1.0.7** was published with a broken Windows NSIS pre-install hook (si
 - **Vendor research** — Plan research (KVR / vi-control / vendor) surfaces the documented pipeline
 - **License reconcile** — lists orphaned installs, not only counts
 - **Config** — `ACOUSTID_CLIENT_KEY` / `AUDIOTHECA_AIR_GAP` documented in `.env.example`
+- **Analyze** — preview badges (BPM/key/tags) run for FLAC/MP3/AIFF/OGG/M4A; waveform and LUFS stay WAV-only
+- **PE hints** — Library explorer context menu and selected-binary **PE hints** call `POST /api/security/pe-hints`
 
 ### Phase M — external sources (M1–M9)
 

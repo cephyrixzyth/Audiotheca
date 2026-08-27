@@ -3,12 +3,14 @@ import {
   browseDirectoryEnriched,
   browseSearch,
   fetchBrowseFacets,
+  fetchPeHints,
   listArchiveContents,
   openInExplorer,
   type BrowseEntry,
 } from "../api/client";
 import { useExplorerPathDrag } from "../contexts/FileExplorerContext";
-import { Button, VirtualTable, type VirtualRowAttrs } from "../ui";
+import { Badge, Button, VirtualTable, type VirtualRowAttrs } from "../ui";
+import { isPeBinaryFile } from "../utils/peName";
 import { AudioPreviewStrip, isAuditionableFile } from "./AudioPreviewStrip";
 import { FileExplorerTree } from "./FileExplorerTree";
 import { ArchiveDiffWizard } from "./ArchiveDiffWizard";
@@ -95,6 +97,43 @@ function isUnderSubtree(path: string, subtreeRoot: string | null): boolean {
   return child === root || child.startsWith(`${root}/`);
 }
 
+type PeHintPayload = {
+  ok?: boolean;
+  error?: string;
+  engine?: string;
+  path?: string;
+  severity?: string;
+  capabilities?: Array<{ id: string; severity: string; description: string }>;
+};
+
+function PeHintBanner({ result, busy }: { result: PeHintPayload | null; busy: boolean }) {
+  if (busy) return <p className="count-muted">PE capability hints…</p>;
+  if (!result) return null;
+  const caps = result.capabilities ?? [];
+  return (
+    <div className="banner dry explorer-pe-hint" style={{ marginTop: "0.75rem" }}>
+      <strong>PE capability hints</strong>
+      {result.error ? <p className="count-muted">{result.error}</p> : null}
+      {result.engine && !result.error ? <p className="count-muted">Engine: {result.engine}</p> : null}
+      {!result.error && (
+        <div className="pe-cap-cell">
+          {caps.length === 0
+            ? "—"
+            : caps.slice(0, 8).map((cap) => (
+                <Badge
+                  key={cap.id}
+                  tone={cap.severity === "high" ? "high" : cap.severity === "medium" ? "medium" : "ready"}
+                  title={cap.description}
+                >
+                  {cap.id}
+                </Badge>
+              ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 type ContextMenuState = {
   x: number;
   y: number;
@@ -145,6 +184,8 @@ function ExplorerPane({
     key: Array<{ value: string; count: number }>;
   }>({ type: [], bpm: [], key: [] });
   const [facetBusy, setFacetBusy] = useState(false);
+  const [peHint, setPeHint] = useState<PeHintPayload | null>(null);
+  const [peHintBusy, setPeHintBusy] = useState(false);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadSeq = useRef(0);
 
@@ -237,6 +278,8 @@ function ExplorerPane({
         setSelectedEntry(null);
         setFacetType("");
         setFacetBuckets({ type: [], bpm: [], key: [] });
+        setPeHint(null);
+        setPeHintBusy(false);
       try {
         const data = await browseDirectoryEnriched(path, stamp ?? "");
         if (seq !== loadSeq.current) return;
@@ -308,6 +351,20 @@ function ExplorerPane({
       /* ignore */
     }
     setContextMenu(null);
+  }
+
+  async function handlePeHints(path: string) {
+    setContextMenu(null);
+    setPeHintBusy(true);
+    setPeHint(null);
+    try {
+      const data = (await fetchPeHints(path)) as PeHintPayload;
+      setPeHint(data);
+    } catch (err) {
+      setPeHint({ ok: false, error: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setPeHintBusy(false);
+    }
   }
 
   const crumbs = useMemo(() => pathSegments(currentPath), [currentPath]);
@@ -519,6 +576,24 @@ function ExplorerPane({
               <AudioPreviewStrip path={selectedEntry.path} name={selectedEntry.name} autoPlay={false} />
             </div>
           )}
+          {selectedEntry && !selectedEntry.is_dir && isPeBinaryFile(selectedEntry.name) && (
+            <div className="explorer-spot-preview" aria-label="PE capability hints">
+              <div className="explorer-spot-meta">
+                <strong title={selectedEntry.path}>{selectedEntry.name}</strong>
+                <span className="count-muted">{formatSize(selectedEntry.size)}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={peHintBusy}
+                  title="Capa-lite PE capability hints (pefile heuristics)"
+                  onClick={() => void handlePeHints(selectedEntry.path)}
+                >
+                  {peHintBusy ? "PE hints…" : "PE hints"}
+                </Button>
+              </div>
+            </div>
+          )}
+          <PeHintBanner result={peHint} busy={peHintBusy} />
         </div>
       </div>
 
@@ -549,6 +624,13 @@ function ExplorerPane({
               Copy path
             </button>
           </li>
+          {!contextMenu.entry.is_dir && isPeBinaryFile(contextMenu.entry.name) && (
+            <li>
+              <button type="button" onClick={() => void handlePeHints(contextMenu.entry.path)}>
+                PE capability hints
+              </button>
+            </li>
+          )}
           {isArchiveName(contextMenu.entry.name) && peerPath && onRequestDiff && (
             <li>
               <button

@@ -134,7 +134,7 @@ Most tabs support **drag-to-reorder sections** (Dashboard, Scan, and others); pr
 
 **URLs:** every tab is a hash route (`#/scan`, `#/review/investigation`, `#/system/environment`, …). Browser back/forward works. The selected run lives in `?run=<stamp>` so a link can open a specific scan. Press **⌘K** / **Ctrl+K** (or **Search** in the top bar) to jump to any tab, spec code, or the library explorer.
 
-**File explorer:** open **Library** from the top bar, or click **Browse** on any path link. Type to filter the current folder, or run a library-wide search; type/BPM/key **facets** sit above the listing. Click a WAV/FLAC for **Spot preview**. **Audio preview** on WAV/MP3/FLAC rows; **DropZone** when dragging files onto the explorer. Use **Pop out wide panel** for full-width review; dual-pane compare on two folders.
+**File explorer:** open **Library** from the top bar, or click **Browse** on any path link. Type to filter the current folder, or run a library-wide search; type/BPM/key **facets** sit above the listing. Click a WAV/FLAC/MP3 for **Spot preview** (BPM/key from tags or filename; LUFS/waveform stay WAV-only). Right-click a Windows binary for **PE capability hints**. **DropZone** when dragging files onto the explorer. Use **Pop out wide panel** for full-width review; dual-pane compare on two folders.
 
 **Themes:** use the ◐ selector in the top bar, or **Environment → Theme studio** for custom palettes. Buttons and accents follow the active theme (no hardcoded green).
 

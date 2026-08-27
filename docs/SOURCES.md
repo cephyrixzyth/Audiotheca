@@ -59,7 +59,7 @@ Candidate sources below are filtered for that threat model.
 | Chromaprint / `fpcalc` / pyacoustid | Acoustic fingerprint path |
 | mutagen, numpy, pyloudnorm | Tag I/O + ITU-R BS.1770 loudness (Phase M3) |
 | ssdeep / TLSH (soft) + rolling fallback | Fuzzy installer/pack similarity (`fuzzy_file_hash.py`) |
-| pefile capa-lite | PE capability hints on security findings |
+| pefile capa-lite | PE capability hints on security findings and Library explorer |
 | React, Vite, TypeScript, Vitest, Playwright, Tauri 2 | UI / desktop |
 | JUCE | DAW sidecar scaffold |
 | [klauspost/dedup](https://github.com/klauspost/dedup), [jpillora/dedup](https://github.com/jpillora/dedup) | Rust rolling-hash / parallel-walk inspirations |

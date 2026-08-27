@@ -118,6 +118,32 @@ def test_browse_search_api(client, tmp_path, monkeypatch):
     assert any("kick" in e["name"].lower() for e in body["entries"])
 
 
+def test_analyze_non_wav_keeps_filename_bpm(tmp_path):
+    mp3 = tmp_path / "kick_128bpm.mp3"
+    mp3.write_bytes(b"ID3")
+    result = analyze_audio_file(mp3)
+    assert result["ok"] is True
+    assert result["wav"] is False
+    assert result["partial"] is True
+    assert result["bpm"]["bpm"] == 128.0
+    assert result["bpm"]["source"] == "filename"
+    assert result["loudness"].get("ok") is False
+    assert result["waveform"].get("ok") is False
+
+
+def test_analyze_rejects_non_audio(tmp_path):
+    note = tmp_path / "readme.txt"
+    note.write_text("not audio", encoding="utf-8")
+    result = analyze_audio_file(note)
+    assert result["ok"] is False
+
+
+def test_analyze_missing_file(tmp_path):
+    result = analyze_audio_file(tmp_path / "gone.flac")
+    assert result["ok"] is False
+    assert result["error"] == "file not found"
+
+
 def test_analyze_api_includes_engine(client, tmp_path, monkeypatch):
     import api.security as sec
 
@@ -131,3 +157,19 @@ def test_analyze_api_includes_engine(client, tmp_path, monkeypatch):
     body = res.json()
     assert body["ok"] is True
     assert body["loudness"].get("engine") in {"pyloudnorm_bs1770", "rms_proxy"}
+
+
+def test_analyze_api_non_wav(client, tmp_path, monkeypatch):
+    import api.security as sec
+
+    root = tmp_path / "lib"
+    root.mkdir()
+    mp3 = root / "loop_128bpm.mp3"
+    mp3.write_bytes(b"ID3")
+    monkeypatch.setattr(sec, "library_roots", lambda: [root])
+    res = client.get(f"/api/audio/analyze?path={mp3}")
+    assert res.status_code == 200
+    body = res.json()
+    assert body["ok"] is True
+    assert body["partial"] is True
+    assert body["bpm"]["bpm"] == 128.0

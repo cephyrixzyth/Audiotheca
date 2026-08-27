@@ -63,22 +63,26 @@ def test_api_correct(tmp_path, monkeypatch, api_token):
     from api.server import app
     from fastapi.testclient import TestClient
 
+    library = tmp_path / "lib"
+    product = library / "a" / "Product"
+    product.mkdir(parents=True)
+
     monkeypatch.setattr(inv, "FEEDBACK_DIR", tmp_path)
     monkeypatch.setattr(inv, "GLOBAL_PATH", tmp_path / "investigation_feedback.json")
     monkeypatch.setattr(inv, "HINTS_PATH", tmp_path / "investigation_hints.json")
-    monkeypatch.setattr(security, "library_roots", lambda: [__import__("pathlib").Path(r"Z:\test")])
+    monkeypatch.setattr(security, "library_roots", lambda: [library])
 
     client = TestClient(app)
     client.headers.update({"Authorization": f"Bearer {api_token}"})
     res = client.post(
         "/api/runs/20260611_0208/investigation/correct",
         json={
-            "path": r"Z:\test\a\Product",
+            "path": str(product),
             "action": "set_vendor",
             "value": "Acme Audio",
             "reason": "vendor_known",
         },
     )
-    assert res.status_code == 200
+    assert res.status_code == 200, res.text
     state = client.get("/api/runs/20260611_0208/investigation/feedback").json()
     assert state["path_vendor_overrides"]

@@ -6,7 +6,7 @@ import {
 } from "../hooks/usePreviewSession";
 import { Badge, Button } from "../ui";
 
-const AUDIO_EXT = /\.(wav|wave|mp3|flac|ogg|aif|aiff)$/i;
+const AUDIO_EXT = /\.(wav|wave|mp3|flac|ogg|aif|aiff|m4a)$/i;
 
 export function isAuditionableFile(name: string): boolean {
   return AUDIO_EXT.test(name);
@@ -40,21 +40,32 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
   const isWav = /\.(wav|wave)$/i.test(name);
 
   useEffect(() => {
-    if (!isWav) return;
-    setLoading(true);
-    void fetchAudioWaveform(path, 32)
-      .then((data) => setPeaks((data.peaks as number[]) ?? []))
-      .catch(() => setPeaks([]))
-      .finally(() => setLoading(false));
+    setAssetBpm(undefined);
+    setAssetKey(undefined);
+    setAssetLufs(undefined);
+    setLoudnessEngine(undefined);
+    setBpmSource(undefined);
+    setKeySource(undefined);
+    if (isWav) {
+      setLoading(true);
+      void fetchAudioWaveform(path, 32)
+        .then((data) => setPeaks((data.peaks as number[]) ?? []))
+        .catch(() => setPeaks([]))
+        .finally(() => setLoading(false));
+    } else {
+      setPeaks([]);
+      setLoading(false);
+    }
     void fetchAudioAnalyze(path)
       .then((data) => {
         const bpm = data.bpm as { bpm?: number; source?: string } | undefined;
         const key = data.key as { key?: string; source?: string } | undefined;
         const loudness = data.loudness as { measured_lufs?: number; engine?: string } | undefined;
         const lufsNorm = data.lufs_norm as { measured_lufs?: number; target_lufs?: number; engine?: string } | undefined;
-        setAssetBpm(typeof bpm?.bpm === "number" ? bpm.bpm : undefined);
-        setAssetKey(typeof key?.key === "string" ? key.key : undefined);
-        setBpmSource(typeof bpm?.source === "string" ? bpm.source : undefined);
+        const bpmFromDefault = bpm?.source === "default";
+        setAssetBpm(typeof bpm?.bpm === "number" && !bpmFromDefault ? bpm.bpm : undefined);
+        setAssetKey(typeof key?.key === "string" && key.key ? key.key : undefined);
+        setBpmSource(typeof bpm?.source === "string" && !bpmFromDefault ? bpm.source : undefined);
         setKeySource(typeof key?.source === "string" ? key.source : undefined);
         const lufs = loudness?.measured_lufs ?? lufsNorm?.measured_lufs;
         setAssetLufs(typeof lufs === "number" ? Math.round(lufs * 10) / 10 : undefined);
@@ -181,6 +192,7 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
     Math.floor(trimStart * peaks.length),
     Math.max(Math.floor(trimStart * peaks.length) + 1, Math.ceil(trimEnd * peaks.length)),
   );
+  const hasBadges = assetLufs != null || Boolean(assetBpm) || Boolean(assetKey);
 
   return (
     <div className={`audio-preview-strip ${compact ? "compact" : ""}`}>
@@ -227,7 +239,7 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
           )}
         </svg>
       )}
-      {isWav && (
+      {compact && hasBadges && (
         <span className="audio-preview-badges">
           {assetLufs != null ? (
             <Badge tone="ready" title={loudnessEngine ? `Loudness engine: ${loudnessEngine}` : "Integrated loudness"}>
