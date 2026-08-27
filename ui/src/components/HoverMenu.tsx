@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
+import { DropdownMenu, type DropdownItem } from "../ui";
 
 export interface HoverMenuAction {
   id: string;
@@ -14,38 +15,23 @@ interface Props {
   className?: string;
 }
 
-/** Contextual action menu — appears on row/panel hover (Datadog-style quick actions). */
+/** Row action menu — Radix dropdown on the trigger (⋮). */
 export function HoverMenu({ actions, children, className = "" }: Props) {
-  const [open, setOpen] = useState(false);
-
   if (!actions.length) {
     return <div className={className}>{children}</div>;
   }
 
+  const items: DropdownItem[] = actions.map((action) => ({
+    id: action.id,
+    label: action.label,
+    title: action.title ?? action.label,
+    tone: action.tone ?? "default",
+    onSelect: action.onClick,
+  }));
+
   return (
-    <div
-      className={`hover-menu-wrap ${open ? "menu-open" : ""} ${className}`.trim()}
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-    >
-      {children}
-      <div className="hover-menu-panel" role="menu">
-        {actions.map((action) => (
-          <button
-            key={action.id}
-            type="button"
-            role="menuitem"
-            className={`hover-menu-item tone-${action.tone ?? "default"}`}
-            title={action.title ?? action.label}
-            onClick={(e) => {
-              e.stopPropagation();
-              action.onClick();
-            }}
-          >
-            {action.label}
-          </button>
-        ))}
-      </div>
+    <div className={`hover-menu-wrap ${className}`.trim()}>
+      <DropdownMenu trigger={children} items={items} align="end" ariaLabel="Row actions" />
     </div>
   );
 }

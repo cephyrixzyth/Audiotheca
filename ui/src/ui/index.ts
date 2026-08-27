@@ -21,5 +21,7 @@ export { Tooltip, TooltipProvider } from "./Tooltip";
 export type { TooltipProps } from "./Tooltip";
 export { Tabs } from "./Tabs";
 export type { TabsProps, TabItem } from "./Tabs";
+export { DropdownMenu } from "./DropdownMenu";
+export type { DropdownMenuProps, DropdownItem, DropdownTone } from "./DropdownMenu";
 export { VirtualTable } from "./VirtualTable";
 export type { VirtualTableProps, VirtualRowAttrs } from "./VirtualTable";

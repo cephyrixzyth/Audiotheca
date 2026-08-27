@@ -21,7 +21,10 @@ def test_symlink_escape_rejected(tmp_path, monkeypatch):
     outside = tmp_path / "secret.txt"
     outside.write_text("secret", encoding="utf-8")
     link = library / "escape.txt"
-    link.symlink_to(outside)
+    try:
+        link.symlink_to(outside)
+    except OSError as exc:
+        pytest.skip(f"symlink privilege unavailable: {exc}")
     monkeypatch.setattr(security, "library_roots", lambda: [library])
 
     with pytest.raises(ValueError, match="library root"):
@@ -34,7 +37,10 @@ def test_symlink_ancestor_nonexistent_child_rejected(tmp_path, monkeypatch):
     outside = tmp_path / "outside"
     outside.mkdir()
     link = library / "escape"
-    link.symlink_to(outside)
+    try:
+        link.symlink_to(outside)
+    except OSError as exc:
+        pytest.skip(f"symlink privilege unavailable: {exc}")
     monkeypatch.setattr(security, "library_roots", lambda: [library])
 
     with pytest.raises(ValueError, match="library root"):

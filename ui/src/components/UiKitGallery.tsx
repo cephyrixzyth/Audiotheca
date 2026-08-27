@@ -6,6 +6,7 @@ import {
   CardBody,
   CardHeader,
   Dialog,
+  DropdownMenu,
   Kpi,
   Tabs,
   Tooltip,
@@ -163,6 +164,16 @@ export function UiKitGallery() {
               Dialogs replace the ad-hoc modal markup with an accessible primitive.
             </p>
           </Dialog>
+          <DropdownMenu
+            align="start"
+            ariaLabel="Sample actions"
+            trigger={<Button variant="secondary">Open menu</Button>}
+            items={[
+              { id: "keep", label: "Keep", onSelect: () => undefined },
+              { id: "review", label: "Send to review", tone: "accent", onSelect: () => undefined },
+              { id: "reject", label: "Reject", tone: "danger", onSelect: () => undefined },
+            ]}
+          />
         </div>
       </section>
     </div>
