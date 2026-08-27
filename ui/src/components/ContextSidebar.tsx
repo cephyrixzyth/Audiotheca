@@ -9,6 +9,7 @@ import {
 } from "react";
 import { useFileExplorer } from "../contexts/FileExplorerContext";
 import type { TabId } from "../types";
+import { Button } from "../ui";
 
 export interface SidebarFilterDef {
   key: string;
@@ -202,27 +203,27 @@ export function ContextSidebar({ stamp }: { stamp?: string }) {
         <span className="context-label">Library explorer</span>
         {TAB_EXPLORER_HINTS[tab] && <p className="count-muted context-explorer-hint">{TAB_EXPLORER_HINTS[tab]}</p>}
         <div className="file-explorer-sidebar-controls">
-          <button type="button" className="text-btn" onClick={openAtRoots}>
+          <Button variant="secondary" block onClick={openAtRoots}>
             Browse library roots
-          </button>
-          <button
-            type="button"
-            className="text-btn"
+          </Button>
+          <Button
+            variant="secondary"
+            block
             onClick={() => {
               setPopOut(true);
               openAtRoots();
             }}
           >
             Pop out wide explorer
-          </button>
-          <button
-            type="button"
-            className="text-btn"
+          </Button>
+          <Button
+            variant="secondary"
+            block
             title="Compare archive vs extracted folder side-by-side"
             onClick={() => openDualPane("", "")}
           >
             Dual-pane compare
-          </button>
+          </Button>
         </div>
       </div>
     </aside>

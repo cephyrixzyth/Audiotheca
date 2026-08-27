@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { DesktopCloseAction } from "../hooks/useDesktopCloseBehavior";
+import { Button } from "../ui";
 
 interface Props {
   open: boolean;
@@ -67,12 +68,12 @@ export function CloseConfirmDialog({ open, initialAction, onConfirm, onCancel }:
         </label>
 
         <div className="env-actions" style={{ marginTop: "1rem" }}>
-          <button type="button" className="primary-btn" onClick={() => onConfirm(action, rememberChoice)}>
+          <Button variant="primary" onClick={() => onConfirm(action, rememberChoice)}>
             {action === "tray" ? "Hide to tray" : "Quit"}
-          </button>
-          <button type="button" className="text-btn" onClick={onCancel}>
+          </Button>
+          <Button variant="ghost" onClick={onCancel}>
             Cancel
-          </button>
+          </Button>
         </div>
       </div>
     </div>
