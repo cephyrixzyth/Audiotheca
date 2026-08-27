@@ -7,6 +7,7 @@ import {
   setArchiveKeeper,
 } from "../api/client";
 import type { ArchiveDiffResponse, ArchivePeekItem } from "../types";
+import { Badge, Button } from "../ui";
 
 import { PathLink } from "./PathLink";
 
@@ -102,9 +103,9 @@ export function ArchiveDiffWizard({
             <h2>Archive diff</h2>
             <p className="count-muted">{title}</p>
           </div>
-          <button type="button" className="icon-btn" onClick={onClose} title="Close (Esc)">
+          <Button variant="ghost" onClick={onClose} title="Close (Esc)">
             Close
-          </button>
+          </Button>
         </header>
 
         <div className="archive-diff-paths">
@@ -124,9 +125,9 @@ export function ArchiveDiffWizard({
         {!loading && !error && data && (
           <>
             <div className="archive-diff-summary">
-              <span className={`badge ${data.verdict_hint === "MATCHES_EXTRACTED_FOLDER" ? "ready" : "bucket"}`}>
+              <Badge tone={data.verdict_hint === "MATCHES_EXTRACTED_FOLDER" ? "ready" : "accent"}>
                 {data.verdict_hint}
-              </span>
+              </Badge>
               <span className="count-muted">
                 {data.matched.length} matched · {data.only_in_archive.length} only in archive ·{" "}
                 {data.only_on_disk.length} only on disk
@@ -178,18 +179,18 @@ export function ArchiveDiffWizard({
             </div>
 
             <div className="toolbar">
-              <button type="button" className="keeper-btn" onClick={() => void handleConfirm()}>
+              <Button variant="secondary" onClick={() => void handleConfirm()}>
                 Confirm delete archive
-              </button>
-              <button type="button" className="keeper-btn" onClick={() => void handleReject()}>
+              </Button>
+              <Button variant="secondary" onClick={() => void handleReject()}>
                 Not redundant
-              </button>
-              <button type="button" className="keeper-btn" onClick={() => void handleKeeper("folder")}>
+              </Button>
+              <Button variant="secondary" onClick={() => void handleKeeper("folder")}>
                 Keep folder
-              </button>
-              <button type="button" className="keeper-btn" onClick={() => void handleKeeper("archive")}>
+              </Button>
+              <Button variant="secondary" onClick={() => void handleKeeper("archive")}>
                 Keep archive
-              </button>
+              </Button>
               {msg && <span className="count-muted">{msg}</span>}
             </div>
           </>

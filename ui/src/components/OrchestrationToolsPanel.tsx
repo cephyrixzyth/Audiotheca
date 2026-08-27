@@ -9,6 +9,7 @@ import {
   setNetSafePaused,
 } from "../api/client";
 import { useLibraryRoot } from "../hooks/useLibraryRoot";
+import { Button } from "../ui";
 
 /** CLN-SWEEP, XFER-BNDL, PATH-RLOC, CUE-LOG, NET-SAFE, DIST-SCAN tools. */
 export function OrchestrationToolsPanel() {
@@ -106,36 +107,35 @@ export function OrchestrationToolsPanel() {
         <input className="field-input" value={root} onChange={(e) => setRoot(e.target.value)} />
       </label>
       <div className="env-actions">
-        <button type="button" className="text-btn" disabled={!!busy} onClick={() => void handleSweep()}>
+        <Button variant="ghost" disabled={!!busy} onClick={() => void handleSweep()}>
           CLN-SWEEP
-        </button>
-        <button type="button" className="text-btn" disabled={!!busy} onClick={() => void handleBundle()}>
+        </Button>
+        <Button variant="ghost" disabled={!!busy} onClick={() => void handleBundle()}>
           XFER-BNDL export
-        </button>
-        <button type="button" className="text-btn" disabled={!!busy} onClick={() => void handleCue()}>
+        </Button>
+        <Button variant="ghost" disabled={!!busy} onClick={() => void handleCue()}>
           CUE-LOG export
-        </button>
-        <button type="button" className="text-btn" disabled={!!busy} onClick={() => void handleDistScan()}>
+        </Button>
+        <Button variant="ghost" disabled={!!busy} onClick={() => void handleDistScan()}>
           DIST-SCAN preview
-        </button>
-        <button
-          type="button"
-          className="text-btn"
+        </Button>
+        <Button
+          variant="ghost"
           disabled={!!busy}
           onClick={() =>
             void setNetSafePaused(!netStatus?.paused).then(() => reloadNet())
           }
         >
           Toggle NET-SAFE pause
-        </button>
+        </Button>
       </div>
       <label className="context-field">
         <span className="context-label">PATH-RLOC source path</span>
         <input className="field-input" value={relocatePath} onChange={(e) => setRelocatePath(e.target.value)} />
       </label>
-      <button type="button" className="keeper-btn" disabled={!!busy} onClick={() => void handleRelocate()}>
+      <Button variant="secondary" disabled={!!busy} onClick={() => void handleRelocate()}>
         Translate to macOS
-      </button>
+      </Button>
       {bundleMsg && <p className="count-muted">{bundleMsg}</p>}
       {cueMsg && <p className="count-muted">{cueMsg}</p>}
       {distMsg && <p className="count-muted">{distMsg}</p>}
