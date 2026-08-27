@@ -27,6 +27,7 @@ import type {
   SkipPhaseImpact,
   SkippedItem,
 } from "../types";
+import { Button } from "../ui";
 import { PathLink } from "./PathLink";
 import { useContextSidebar } from "./ContextSidebar";
 
@@ -206,15 +207,14 @@ export function SkippedFiles({ stamp, runs }: Props) {
 
       <div className="toolbar" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
         {subTabs.map((t) => (
-          <button
+          <Button
             key={t.id}
-            type="button"
-            className={view === t.id ? "primary-btn" : "keeper-btn"}
+            variant={view === t.id ? "primary" : "secondary"}
             title={t.title ?? t.label}
             onClick={() => setView(t.id)}
           >
             {t.label}
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -237,22 +237,20 @@ export function SkippedFiles({ stamp, runs }: Props) {
           )}
           {selected.size > 0 && (
             <>
-              <button
-                type="button"
-                className="primary-btn"
+              <Button
+                variant="primary"
                 title="Force a targeted rescan of selected paths on the next run"
                 onClick={handleRescanSelected}
               >
                 Rescan selected ({selected.size})
-              </button>
-              <button
-                type="button"
-                className="keeper-btn"
+              </Button>
+              <Button
+                variant="secondary"
                 title="Send selected paths to the investigation inbox"
                 onClick={handleQueueInvestigation}
               >
                 Queue investigation
-              </button>
+              </Button>
             </>
           )}
         </div>
@@ -261,9 +259,9 @@ export function SkippedFiles({ stamp, runs }: Props) {
       {msg && (
         <div className="banner" style={{ marginBottom: "0.75rem" }}>
           {msg}
-          <button type="button" className="keeper-btn" style={{ marginLeft: "0.5rem" }} onClick={() => setMsg(null)}>
+          <Button variant="secondary" size="sm" style={{ marginLeft: "0.5rem" }} onClick={() => setMsg(null)}>
             Dismiss
-          </button>
+          </Button>
         </div>
       )}
 
@@ -548,9 +546,9 @@ export function SkippedFiles({ stamp, runs }: Props) {
                 ))}
               </select>
             </label>
-            <button type="button" className="primary-btn" onClick={handleCompare}>
+            <Button variant="primary" onClick={handleCompare}>
               Compare
-            </button>
+            </Button>
           </div>
           {comparison && (
             <div className="dash-grid" style={{ marginTop: "1rem" }}>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { correctInvestigation, fetchInvestigationFeedback, fetchScanAudit, fetchScanInsights } from "../api/client";
 import type { ScanAuditItem } from "../types";
+import { Badge, Button } from "../ui";
 import { PathLink } from "./PathLink";
 import { useContextSidebar, useSidebarFilters } from "./ContextSidebar";
 
@@ -141,14 +142,13 @@ export function ScanAudit({ stamp }: Props) {
 
       <div className="toolbar" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
         {QUICK_FILTERS.map((filter) => (
-          <button
+          <Button
             key={filter.id}
-            type="button"
-            className={
+            variant={
               (filter.status && status === filter.status) ||
               (filter.flags && flags === filter.flags)
-                ? "primary-btn"
-                : "keeper-btn"
+                ? "primary"
+                : "secondary"
             }
             title={filter.title ?? filter.label}
             onClick={() => {
@@ -157,24 +157,22 @@ export function ScanAudit({ stamp }: Props) {
             }}
           >
             {filter.label}
-          </button>
+          </Button>
         ))}
-        <button
-          type="button"
-          className="keeper-btn"
+        <Button
+          variant="secondary"
           title="Clear status and flag filters"
           onClick={() => { setFilter("status", ""); setFlags(""); }}
         >
           All rows
-        </button>
-        <button
-          type="button"
-          className="keeper-btn"
+        </Button>
+        <Button
+          variant="secondary"
           title="Show only routes ready to move on next live run"
           onClick={() => { setFilter("status", "READY"); setFlags(""); }}
         >
           READY only
-        </button>
+        </Button>
       </div>
 
       <div className="toolbar">
@@ -220,9 +218,7 @@ export function ScanAudit({ stamp }: Props) {
                   <div className="path">{row.id_method} · {row.id_confidence || "—"}</div>
                 </td>
                 <td>
-                  <span className={`badge ${row.status === "READY" ? "ready" : "bucket"}`}>
-                    {row.status}
-                  </span>
+                  <Badge tone={row.status === "READY" ? "ready" : "accent"}>{row.status}</Badge>
                   {row.investigation_bucket && (
                     <div className="count-muted">{row.investigation_bucket}</div>
                   )}
@@ -230,14 +226,14 @@ export function ScanAudit({ stamp }: Props) {
                 <td><code style={{ fontSize: "0.75rem" }}>{row.flags || "—"}</code></td>
                 <td><PathLink path={row.planned_destination} /></td>
                 <td>
-                  <button
-                    type="button"
-                    className="keeper-btn"
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     title="Override vendor for this path on the next scan"
                     onClick={() => void handleSetVendor(row)}
                   >
                     Set vendor
-                  </button>
+                  </Button>
                 </td>
               </tr>
             ))}
