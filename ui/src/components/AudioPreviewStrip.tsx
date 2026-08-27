@@ -5,6 +5,7 @@ import {
   usePreviewSession,
 } from "../hooks/usePreviewSession";
 import { Badge, Button } from "../ui";
+import { formatAcoustIdResult } from "../utils/acoustId";
 
 const AUDIO_EXT = /\.(wav|wave|mp3|flac|ogg|aif|aiff|m4a)$/i;
 
@@ -154,26 +155,7 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
     setAcoustIdMsg(null);
     try {
       const res = await lookupAcoustId({ path });
-      if (res.skipped) {
-        setAcoustIdMsg(typeof res.error === "string" ? res.error : "AcoustID lookup skipped");
-        return;
-      }
-      if (res.ok === false) {
-        setAcoustIdMsg(typeof res.error === "string" ? res.error : "AcoustID lookup failed");
-        return;
-      }
-      const results = Array.isArray(res.results) ? res.results : [];
-      const first = results[0] as
-        | { score?: number; recordings?: Array<{ title?: string; artists?: string[] }> }
-        | undefined;
-      const recording = first?.recordings?.[0];
-      if (!recording?.title) {
-        setAcoustIdMsg("No AcoustID match");
-        return;
-      }
-      const artists = (recording.artists ?? []).filter(Boolean).join(", ");
-      const score = typeof first?.score === "number" ? ` (${Math.round(first.score * 100)}%)` : "";
-      setAcoustIdMsg(`${artists ? `${artists} — ` : ""}${recording.title}${score}`);
+      setAcoustIdMsg(formatAcoustIdResult(res));
     } catch (err) {
       setAcoustIdMsg(err instanceof Error ? err.message : String(err));
     } finally {
