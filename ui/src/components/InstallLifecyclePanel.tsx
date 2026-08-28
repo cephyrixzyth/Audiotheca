@@ -412,7 +412,7 @@ export function InstallLifecyclePanel() {
       <div className="install-tags">
         <div className="install-tags-row">
           {(draft.tags ?? []).map((tag) => (
-            <button key={tag} type="button" className="badge bucket" onClick={() => removeTag(tag)} title="Remove tag">
+            <button key={tag} type="button" className="badge bucket" onClick={() => removeTag(tag)} title={`Remove tag ${tag}`} aria-label={`Remove tag ${tag}`}>
               {tag} ×
             </button>
           ))}
@@ -422,6 +422,7 @@ export function InstallLifecyclePanel() {
             className="field-input"
             value={tagInput}
             placeholder="Custom tag"
+            aria-label="Custom tag"
             onChange={(e) => setTagInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") {

@@ -54,6 +54,7 @@ function FacetStrip({
           key={opt.value}
           type="button"
           className={`bucket-chip ${selected === opt.value ? "active" : ""}`.trim()}
+          aria-pressed={selected === opt.value}
           onClick={() => onSelect(opt.value === selected ? "" : opt.value)}
           title={`${opt.count} files`}
         >
@@ -485,6 +486,7 @@ function ExplorerPane({
                 type="search"
                 value={pathQuery}
                 placeholder="Filter folder · Search library…"
+                aria-label="Search paths"
                 title="Type to filter this folder instantly. Press Enter or Search for recursive library search."
                 onChange={(e) => {
                   setPathQuery(e.target.value);
@@ -543,6 +545,7 @@ function ExplorerPane({
               <button
                 type="button"
                 className={`bucket-chip ${!facetType ? "active" : ""}`.trim()}
+                aria-pressed={!facetType}
                 onClick={() => setFacetType("")}
               >
                 All facets

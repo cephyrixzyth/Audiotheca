@@ -138,6 +138,7 @@ export function AiAnalyzer({ libraryRoot, events = [] }: Props) {
             type="text"
             className="field-input"
             placeholder="Manual lookup path (relative or library path)"
+            aria-label="Manual lookup path"
             value={queryPath}
             onChange={(e) => setQueryPath(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleQuery()}

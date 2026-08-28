@@ -59,6 +59,7 @@ export function ThemeSwitcher() {
                 min={70}
                 max={140}
                 value={contrastPreview}
+                aria-label="Contrast"
                 onChange={(e) => setContrastPreview(Number(e.target.value))}
               />
               <span className="count-muted">{contrastPreview}%</span>
