@@ -156,10 +156,6 @@ export function ContextSidebar({ stamp }: { stamp?: string }) {
         </label>
       )}
 
-      {!SEARCH_TABS.has(tab) && TAB_HINTS[tab] && (
-        <p className="count-muted context-search-hint">{TAB_HINTS[tab]}</p>
-      )}
-
       {filterDefs.length > 0 && (
         <div className="context-sidebar-section">
           <span className="context-label">Filters</span>

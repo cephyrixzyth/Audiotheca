@@ -125,6 +125,8 @@ def load_run_summary(stamp: str) -> RunSummary:
             data["quarantined"] = _int(value) or 0
         elif key == "Reconciled vendors":
             data["reconciled_vendors"] = _int(value) or 0
+        elif key == "Deep identified":
+            data["deep_identified"] = _int(value) or 0
         elif key == "Vendor conflicts":
             data["vendor_conflicts"] = _int(value) or 0
         elif key == "Nested issues":
