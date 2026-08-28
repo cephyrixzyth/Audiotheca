@@ -17,7 +17,12 @@ _STRG_HISTORY: deque[dict[str, Any]] = deque(maxlen=_HISTORY_SIZE)
 
 
 def _disk_usage_path(path: Path | None) -> tuple[Path, str | None]:
-    """Pick a local path for disk_usage; never block on SMB/UNC roots."""
+    """Pick a local path for disk_usage; never block on SMB/UNC roots.
+
+    Docker library binds are often mountpoints (``/library``). Those must still
+    be used for ``disk_usage`` — skipping mounts incorrectly fell back to
+    ``Path.home()`` (``/root`` inside the API container).
+    """
     scan_root = str(path) if path else None
     if path is None:
         return Path.home(), scan_root
@@ -25,7 +30,7 @@ def _disk_usage_path(path: Path | None) -> tuple[Path, str | None]:
     if raw.startswith("\\\\") or raw.startswith("//"):
         return Path.home(), scan_root
     try:
-        if not os.path.ismount(raw) and path.exists():
+        if path.exists():
             return path, scan_root
     except OSError:
         pass
