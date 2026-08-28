@@ -30,15 +30,29 @@ def test_collect_metrics_includes_scan_root_for_unc():
     assert "disk_free_gb" in metrics
 
 
-def test_disk_io_busy_pct_needs_interval(monkeypatch):
+def test_disk_io_busy_pct_needs_interval():
     system_metrics._LAST_DISK_IO = None
-    assert _disk_io_busy_pct(10_000.0) is None
-    # Simulate 1s elapsed with 200ms of busy time → ~20%.
-    system_metrics._LAST_DISK_IO = {"t": time.monotonic() - 1.0, "busy": 10_000.0}
-    assert _disk_io_busy_pct(10_200.0) == 20.0
+    assert _disk_io_busy_pct({"sda": 10_000.0}) is None
+    # Simulate 1s elapsed with 200ms of busy time on one disk → ~20%.
+    system_metrics._LAST_DISK_IO = {
+        "t": time.monotonic() - 1.0,
+        "disks": {"sda": 10_000.0, "sdb": 50_000.0},
+    }
+    assert _disk_io_busy_pct({"sda": 10_200.0, "sdb": 50_050.0}) == 20.0
+
+
+def test_disk_io_busy_pct_ignores_aggregate_sum_trap():
+    """Many disks each lightly busy must not sum past 100% wall time."""
+    system_metrics._LAST_DISK_IO = {
+        "t": time.monotonic() - 1.0,
+        "disks": {f"sd{i}": 1_000.0 for i in range(8)},
+    }
+    # 8 disks × 50ms busy in 1s → max single-disk = 5%, not 40%.
+    current = {f"sd{i}": 1_050.0 for i in range(8)}
+    assert _disk_io_busy_pct(current) == 5.0
 
 
 def test_disk_io_busy_pct_not_cumulative_raw():
-    """Regression: busy_time/10 was always ~100 after a few seconds of uptime."""
+    """Regression: first sample has no prior interval."""
     system_metrics._LAST_DISK_IO = None
-    assert _disk_io_busy_pct(1_000_000.0) is None
+    assert _disk_io_busy_pct({"sda": 1_000_000.0}) is None

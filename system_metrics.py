@@ -14,28 +14,45 @@ _HISTORY_SIZE = int(os.environ.get("AUDIOTHECA_METRICS_HISTORY", "60"))
 _HISTORY_LOCK = threading.Lock()
 _PERF_HISTORY: deque[dict[str, Any]] = deque(maxlen=_HISTORY_SIZE)
 _STRG_HISTORY: deque[dict[str, Any]] = deque(maxlen=_HISTORY_SIZE)
-# Cumulative ``busy_time`` samples for interval % (not instantaneous).
-_LAST_DISK_IO: dict[str, float] | None = None
+# Cumulative per-disk ``busy_time`` samples for interval % (not instantaneous).
+_LAST_DISK_IO: dict[str, Any] | None = None
 _LAST_DISK_IO_LOCK = threading.Lock()
 
 
-def _disk_io_busy_pct(busy_time_ms: float | None) -> float | None:
-    """Convert cumulative disk busy_time (ms since boot) into a recent busy %."""
+def _disk_io_busy_pct(perdisk_busy_ms: dict[str, float]) -> float | None:
+    """Convert per-disk cumulative busy_time into the busiest disk's recent %.
+
+    Aggregate ``disk_io_counters()`` sums busy_time across every disk, so a NAS
+    with several active volumes always looked ~100% busy. Use per-disk samples
+    and report the maximum single-disk busy fraction over the interval.
+    """
     global _LAST_DISK_IO
-    if busy_time_ms is None:
+    if not perdisk_busy_ms:
         return None
     now = time.monotonic()
     with _LAST_DISK_IO_LOCK:
         prev = _LAST_DISK_IO
-        _LAST_DISK_IO = {"t": now, "busy": float(busy_time_ms)}
+        _LAST_DISK_IO = {"t": now, "disks": dict(perdisk_busy_ms)}
         if prev is None:
             return None
-        dt = now - prev["t"]
-        delta_ms = float(busy_time_ms) - prev["busy"]
-    if dt <= 0.05 or delta_ms < 0:
+        dt = now - float(prev["t"])
+        prev_disks = prev.get("disks") or {}
+    if dt <= 0.05:
         return None
-    # busy_time is milliseconds of I/O activity; dt is wall seconds.
-    return min(100.0, max(0.0, round((delta_ms / 1000.0) / dt * 100.0, 1)))
+    max_pct = 0.0
+    for name, busy_ms in perdisk_busy_ms.items():
+        prev_busy = prev_disks.get(name)
+        if prev_busy is None:
+            continue
+        delta_ms = float(busy_ms) - float(prev_busy)
+        if delta_ms < 0:
+            continue
+        pct = (delta_ms / 1000.0) / dt * 100.0
+        if pct > max_pct:
+            max_pct = pct
+    if max_pct <= 0:
+        return 0.0
+    return min(100.0, round(max_pct, 1))
 
 
 def _disk_usage_path(path: Path | None) -> tuple[Path, str | None]:
@@ -163,9 +180,15 @@ def collect_metrics(*, path: Path | None = None) -> dict:
         if io:
             payload["disk_read_mb"] = round(io.read_bytes / (1024**2), 1)
             payload["disk_write_mb"] = round(io.write_bytes / (1024**2), 1)
-            busy_pct = _disk_io_busy_pct(getattr(io, "busy_time", None))
-            if busy_pct is not None:
-                payload["disk_io_busy_pct"] = busy_pct
+        perdisk = psutil.disk_io_counters(perdisk=True) or {}
+        busy_map: dict[str, float] = {}
+        for name, counters in perdisk.items():
+            busy = getattr(counters, "busy_time", None)
+            if busy is not None:
+                busy_map[str(name)] = float(busy)
+        busy_pct = _disk_io_busy_pct(busy_map)
+        if busy_pct is not None:
+            payload["disk_io_busy_pct"] = busy_pct
     except (AttributeError, OSError):
         pass
 
