@@ -46,7 +46,8 @@ function TreeNode({ entry, depth, selectedPath, expandedPaths, onToggle, onSelec
         <button
           type="button"
           className="explorer-tree-toggle"
-          title={expanded ? "Collapse folder" : "Expand folder"}
+          title={expanded ? `Collapse ${entry.name}` : `Expand ${entry.name}`}
+          aria-label={expanded ? `Collapse ${entry.name}` : `Expand ${entry.name}`}
           aria-expanded={expanded}
           onClick={() => onToggle(entry.path)}
         >
@@ -56,6 +57,7 @@ function TreeNode({ entry, depth, selectedPath, expandedPaths, onToggle, onSelec
           type="button"
           className="explorer-tree-label"
           title={entry.path}
+          aria-current={selectedPath === entry.path ? "true" : undefined}
           onClick={() => onSelect(entry.path)}
         >
           {entry.name}

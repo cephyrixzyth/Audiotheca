@@ -133,30 +133,35 @@ export function FlowEditor({
                 return (
                   <div key={phase.id} className="flow-node-wrap">
                     {idx > 0 && <div className={`flow-connector ${enabled ? "on" : "off"}`} />}
-                    <button
-                      type="button"
+                    <div
                       className={`flow-node ${enabled ? "enabled" : "disabled"} ${isActive || isRunning ? "running" : ""} ${selectedNode === phase.id ? "selected" : ""}`}
-                      onClick={() => setSelectedNode(phase.id)}
-                      title={phase.description}
                     >
-                      <span className="flow-node-engine">{phase.enginePhase}</span>
-                      <span className="flow-node-label">{phase.label}</span>
+                      <button
+                        type="button"
+                        className="flow-node-select"
+                        onClick={() => setSelectedNode(phase.id)}
+                        title={phase.description}
+                        aria-pressed={selectedNode === phase.id}
+                        aria-label={`${phase.label} (${phase.enginePhase})`}
+                      >
+                        <span className="flow-node-engine">{phase.enginePhase}</span>
+                        <span className="flow-node-label">{phase.label}</span>
+                        {!phase.skipKey && <span className="flow-node-required">required</span>}
+                      </button>
                       {phase.skipKey && (
-                        <span
+                        <button
+                          type="button"
                           className={`flow-node-toggle ${enabled ? "on" : "off"}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            togglePhase(phase.id, phase.skipKey);
-                          }}
+                          onClick={() => togglePhase(phase.id, phase.skipKey)}
                           role="switch"
                           aria-checked={enabled}
-                          title={enabled ? "Click to skip this phase" : "Click to enable"}
+                          aria-label={`${enabled ? "Skip" : "Enable"} ${phase.label}`}
+                          title={enabled ? "Skip this phase in the next scan" : "Include this phase in the next scan"}
                         >
                           {enabled ? "ON" : "OFF"}
-                        </span>
+                        </button>
                       )}
-                      {!phase.skipKey && <span className="flow-node-required">required</span>}
-                    </button>
+                    </div>
                   </div>
                 );
               })}
