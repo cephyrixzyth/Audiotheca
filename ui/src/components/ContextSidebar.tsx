@@ -172,6 +172,7 @@ export function ContextSidebar({ stamp }: { stamp?: string }) {
               <span className="context-label">{def.label}</span>
               <select
                 className="field-input"
+                aria-label={def.label}
                 value={filters[def.key] ?? ""}
                 title={def.title ?? def.label}
                 onChange={(e) => setFilter(def.key, e.target.value)}

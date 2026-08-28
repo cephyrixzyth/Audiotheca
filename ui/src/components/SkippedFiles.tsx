@@ -221,6 +221,7 @@ export function SkippedFiles({ stamp, runs }: Props) {
           {view === "hub" && (
             <select
               className="field-input"
+              aria-label="Filter by skip reason"
               value={reason}
               title="Filter by why the engine skipped or deferred this path"
               onChange={(e) => setReason(e.target.value)}
@@ -542,7 +543,7 @@ export function SkippedFiles({ stamp, runs }: Props) {
           <div className="toolbar">
             <label>
               Run A
-              <select value={compareA} onChange={(e) => setCompareA(e.target.value)}>
+              <select aria-label="Run A" value={compareA} onChange={(e) => setCompareA(e.target.value)}>
                 {runs.map((r) => (
                   <option key={r.stamp} value={r.stamp}>
                     {r.stamp}
@@ -552,7 +553,7 @@ export function SkippedFiles({ stamp, runs }: Props) {
             </label>
             <label>
               Run B
-              <select value={compareB} onChange={(e) => setCompareB(e.target.value)}>
+              <select aria-label="Run B" value={compareB} onChange={(e) => setCompareB(e.target.value)}>
                 {runs.map((r) => (
                   <option key={r.stamp} value={r.stamp}>
                     {r.stamp}

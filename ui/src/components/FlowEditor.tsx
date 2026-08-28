@@ -86,6 +86,7 @@ export function FlowEditor({
           Preset
           <select
             className="field-input flow-preset-select"
+            aria-label="Preset"
             value={presetId}
             onChange={(e) => {
               const preset = FLOW_PRESETS.find((p) => p.id === e.target.value);
