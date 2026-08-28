@@ -172,7 +172,7 @@ export function RestructurePlan({ stamp }: Props) {
       <div className="toolbar">
         <label title="Filter by route readiness — READY items can move when section is approved">
           Status
-          <select value={status} onChange={(e) => setStatus(e.target.value)}>
+          <select aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="">All</option>
             <option value="READY">READY</option>
             <option value="NEEDS REVIEW">NEEDS REVIEW</option>

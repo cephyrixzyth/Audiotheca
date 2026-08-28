@@ -219,7 +219,12 @@ export default function App() {
                 <div className="toolbar compact-toolbar">
                   <label className="field-label-inline">
                     Run
-                    <select className="field-input" value={stamp} onChange={(e) => setStamp(e.target.value)}>
+                    <select
+                      className="field-input"
+                      aria-label="Run"
+                      value={stamp}
+                      onChange={(e) => setStamp(e.target.value)}
+                    >
                       {runs.map((run) => (
                         <option key={run.stamp} value={run.stamp}>
                           {run.stamp}

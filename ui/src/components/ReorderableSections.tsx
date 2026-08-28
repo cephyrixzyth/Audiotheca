@@ -982,6 +982,7 @@ export function ReorderableSections({
                 <select
                   className="field-input layout-preset-select"
                   defaultValue=""
+                  aria-label="Load layout preset"
                   onChange={(e) => {
                     const val = e.target.value;
                     if (val) handleLoadPreset(val);
@@ -1035,6 +1036,7 @@ export function ReorderableSections({
                 <select
                   className="field-input layout-preset-select"
                   defaultValue=""
+                  aria-label="Delete layout preset"
                   title="Delete a saved layout"
                   onChange={(e) => {
                     const val = e.target.value;

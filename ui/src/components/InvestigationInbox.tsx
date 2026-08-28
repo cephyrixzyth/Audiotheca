@@ -484,6 +484,7 @@ export function InvestigationInbox({ stamp }: Props) {
                   <select
                     className="reject-select"
                     defaultValue=""
+                    aria-label="Reassign investigation bucket"
                     title="Move item to a different investigation bucket"
                     onChange={(e) => {
                       if (e.target.value === "__new__") {

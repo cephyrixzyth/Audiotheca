@@ -339,7 +339,11 @@ export function VendorTools({ stamp }: Props) {
         <div className="toolbar" style={{ flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.75rem" }}>
           <label>
             Category
-            <select value={harvestCategory} onChange={(e) => setHarvestCategory(e.target.value)}>
+            <select
+              aria-label="Category"
+              value={harvestCategory}
+              onChange={(e) => setHarvestCategory(e.target.value)}
+            >
               {categories.map((cat) => (
                 <option key={cat} value={cat}>
                   {cat}
@@ -370,6 +374,7 @@ export function VendorTools({ stamp }: Props) {
           <label>
             SearX preset
             <select
+              aria-label="SearX preset"
               value={researchPreset}
               onChange={(e) => {
                 const value = e.target.value;

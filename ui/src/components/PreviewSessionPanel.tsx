@@ -48,6 +48,7 @@ export function PreviewSessionPanel() {
         <label>
           Mix matrix
           <select
+            aria-label="Mix matrix"
             value={session.mixChannel}
             onChange={(e) =>
               patch({ mixChannel: e.target.value as "stereo" | "mono" | "left" | "right" })

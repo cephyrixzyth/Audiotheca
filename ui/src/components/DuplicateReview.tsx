@@ -343,7 +343,7 @@ export function DuplicateReview({ stamp }: Props) {
       <div className="toolbar">
         <label title="Filter duplicate groups by engine confidence score">
           Confidence
-          <select value={confidence} onChange={(e) => setConfidence(e.target.value)}>
+          <select aria-label="Confidence" value={confidence} onChange={(e) => setConfidence(e.target.value)}>
             <option value="">All</option>
             <option value="HIGH">HIGH</option>
             <option value="MEDIUM">MEDIUM</option>

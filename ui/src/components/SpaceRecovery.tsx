@@ -328,7 +328,11 @@ export function SpaceRecovery({ stamp }: Props) {
           <h3 style={{ margin: 0 }}>Coexistence queue</h3>
           <label>
             Issue type
-            <select value={issueFilter} onChange={(e) => setIssueFilter(e.target.value)}>
+            <select
+              aria-label="Issue type"
+              value={issueFilter}
+              onChange={(e) => setIssueFilter(e.target.value)}
+            >
               <option value="DEEP_INSTALLER">DEEP_INSTALLER</option>
               <option value="ARCHIVE_EXTRACTED_SIBLING">ARCHIVE_EXTRACTED_SIBLING</option>
               <option value="">All types</option>

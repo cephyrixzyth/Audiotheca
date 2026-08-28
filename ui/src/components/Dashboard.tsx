@@ -313,7 +313,11 @@ function DashboardRun({
           <>
             <label>
               Baseline run
-              <select value={compareStamp} onChange={(e) => setCompareStamp(e.target.value)}>
+              <select
+                aria-label="Baseline run"
+                value={compareStamp}
+                onChange={(e) => setCompareStamp(e.target.value)}
+              >
                 <option value="">Select prior run…</option>
                 {runs.filter((r) => r.stamp !== summary.stamp).map((r) => (
                   <option key={r.stamp} value={r.stamp}>

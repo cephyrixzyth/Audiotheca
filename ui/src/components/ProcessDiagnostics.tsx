@@ -161,6 +161,7 @@ export function ProcessDiagnostics({ onLoadPastLog }: Props) {
           <span className="context-label">Past session logs</span>
           <select
             className="field-input"
+            aria-label="Past session logs"
             value={selectedLog}
             onChange={(e) => setSelectedLog(e.target.value)}
           >
