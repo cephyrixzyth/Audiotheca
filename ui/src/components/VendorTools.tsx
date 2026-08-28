@@ -18,7 +18,7 @@ import {
   type HarvestSourcePreset,
   type VendorGap,
 } from "../api/client";
-import { Badge, Button, Kpi, VirtualTable } from "../ui";
+import { Badge, Button, Kpi, LabeledSelect, VirtualTable } from "../ui";
 
 interface Props {
   stamp?: string;
@@ -337,20 +337,17 @@ export function VendorTools({ stamp }: Props) {
       <section style={{ marginBottom: "1.5rem" }}>
         <h3 style={{ fontSize: "0.95rem", marginBottom: "0.75rem" }}>Scrape web sources → research inbox</h3>
         <div className="toolbar" style={{ flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.75rem" }}>
-          <label>
-            Category
-            <select
-              aria-label="Category"
-              value={harvestCategory}
-              onChange={(e) => setHarvestCategory(e.target.value)}
-            >
-              {categories.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
-          </label>
+          <LabeledSelect
+            label="Category"
+            value={harvestCategory}
+            onChange={(e) => setHarvestCategory(e.target.value)}
+          >
+            {categories.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </LabeledSelect>
           <label style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
             <input
               type="checkbox"
@@ -371,23 +368,20 @@ export function VendorTools({ stamp }: Props) {
               placeholder="kontakt library"
             />
           </label>
-          <label>
-            SearX preset
-            <select
-              aria-label="SearX preset"
-              value={researchPreset}
-              onChange={(e) => {
-                const value = e.target.value;
-                if (value === "kvr" || value === "vi-control" || value === "vendor") {
-                  setResearchPreset(value);
-                }
-              }}
-            >
-              <option value="kvr">kvr</option>
-              <option value="vi-control">vi-control</option>
-              <option value="vendor">vendor</option>
-            </select>
-          </label>
+          <LabeledSelect
+            label="SearX preset"
+            value={researchPreset}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value === "kvr" || value === "vi-control" || value === "vendor") {
+                setResearchPreset(value);
+              }
+            }}
+          >
+            <option value="kvr">kvr</option>
+            <option value="vi-control">vi-control</option>
+            <option value="vendor">vendor</option>
+          </LabeledSelect>
           <Button
             variant="secondary"
             disabled={researchBusy}

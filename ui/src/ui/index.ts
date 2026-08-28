@@ -25,3 +25,5 @@ export { DropdownMenu } from "./DropdownMenu";
 export type { DropdownMenuProps, DropdownItem, DropdownTone } from "./DropdownMenu";
 export { VirtualTable } from "./VirtualTable";
 export type { VirtualTableProps, VirtualRowAttrs } from "./VirtualTable";
+export { LabeledSelect } from "./LabeledSelect";
+export type { LabeledSelectProps } from "./LabeledSelect";

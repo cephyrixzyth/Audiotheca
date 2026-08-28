@@ -27,7 +27,7 @@ import type {
   SkipPhaseImpact,
   SkippedItem,
 } from "../types";
-import { Button, Tabs, VirtualTable } from "../ui";
+import { Button, LabeledSelect, Tabs, VirtualTable } from "../ui";
 import { PathLink } from "./PathLink";
 import { useContextSidebar } from "./ContextSidebar";
 
@@ -541,26 +541,20 @@ export function SkippedFiles({ stamp, runs }: Props) {
       {view === "compare" && (
         <div>
           <div className="toolbar">
-            <label>
-              Run A
-              <select aria-label="Run A" value={compareA} onChange={(e) => setCompareA(e.target.value)}>
-                {runs.map((r) => (
-                  <option key={r.stamp} value={r.stamp}>
-                    {r.stamp}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Run B
-              <select aria-label="Run B" value={compareB} onChange={(e) => setCompareB(e.target.value)}>
-                {runs.map((r) => (
-                  <option key={r.stamp} value={r.stamp}>
-                    {r.stamp}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <LabeledSelect label="Run A" value={compareA} onChange={(e) => setCompareA(e.target.value)}>
+              {runs.map((r) => (
+                <option key={r.stamp} value={r.stamp}>
+                  {r.stamp}
+                </option>
+              ))}
+            </LabeledSelect>
+            <LabeledSelect label="Run B" value={compareB} onChange={(e) => setCompareB(e.target.value)}>
+              {runs.map((r) => (
+                <option key={r.stamp} value={r.stamp}>
+                  {r.stamp}
+                </option>
+              ))}
+            </LabeledSelect>
             <Button variant="primary" onClick={handleCompare}>
               Compare
             </Button>

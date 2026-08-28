@@ -9,7 +9,7 @@ import {
 } from "react";
 import { useFileExplorer } from "../contexts/FileExplorerContext";
 import type { TabId } from "../types";
-import { Button } from "../ui";
+import { Button, LabeledSelect } from "../ui";
 
 export interface SidebarFilterDef {
   key: string;
@@ -168,22 +168,23 @@ export function ContextSidebar({ stamp }: { stamp?: string }) {
         <div className="context-sidebar-section">
           <span className="context-label">Filters</span>
           {filterDefs.map((def) => (
-            <label key={def.key} className="context-field">
-              <span className="context-label">{def.label}</span>
-              <select
-                className="field-input"
-                aria-label={def.label}
-                value={filters[def.key] ?? ""}
-                title={def.title ?? def.label}
-                onChange={(e) => setFilter(def.key, e.target.value)}
-              >
-                {def.options.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <LabeledSelect
+              key={def.key}
+              className="field-input"
+              wrapperClassName="context-field"
+              labelClassName="context-label"
+              label={def.label}
+              labelTitle={def.title ?? def.label}
+              value={filters[def.key] ?? ""}
+              title={def.title ?? def.label}
+              onChange={(e) => setFilter(def.key, e.target.value)}
+            >
+              {def.options.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </LabeledSelect>
           ))}
         </div>
       )}

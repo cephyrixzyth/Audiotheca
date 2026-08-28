@@ -1,3 +1,4 @@
+import { LabeledSelect } from "../ui";
 import { usePreviewSession } from "../hooks/usePreviewSession";
 
 /** TMP-SYNC, KEY-PITCH, MIX-MATX controls for library preview auditioning. */
@@ -45,21 +46,18 @@ export function PreviewSessionPanel() {
             onChange={(e) => patch({ pitchShiftSemitones: Number(e.target.value) || 0 })}
           />
         </label>
-        <label>
-          Mix matrix
-          <select
-            aria-label="Mix matrix"
-            value={session.mixChannel}
-            onChange={(e) =>
-              patch({ mixChannel: e.target.value as "stereo" | "mono" | "left" | "right" })
-            }
-          >
-            <option value="stereo">Stereo</option>
-            <option value="mono">Mono</option>
-            <option value="left">Left only</option>
-            <option value="right">Right only</option>
-          </select>
-        </label>
+        <LabeledSelect
+          label="Mix matrix"
+          value={session.mixChannel}
+          onChange={(e) =>
+            patch({ mixChannel: e.target.value as "stereo" | "mono" | "left" | "right" })
+          }
+        >
+          <option value="stereo">Stereo</option>
+          <option value="mono">Mono</option>
+          <option value="left">Left only</option>
+          <option value="right">Right only</option>
+        </LabeledSelect>
         <label className="preview-toggle">
           <input
             type="checkbox"

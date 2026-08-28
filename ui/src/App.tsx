@@ -26,7 +26,7 @@ import { ThemeSwitcher } from "./components/ThemeSwitcher";
 import { VendorTools } from "./components/VendorTools";
 import { UiKitGallery } from "./components/UiKitGallery";
 import { CommandPalette, OPEN_COMMAND_PALETTE_EVENT } from "./components/CommandPalette";
-import { Button } from "./ui";
+import { Button, LabeledSelect } from "./ui";
 import { pathForTab, readRunParam, setRunParam, tabForPath } from "./routes";
 import { FileExplorerProvider } from "./contexts/FileExplorerContext";
 import { useLibraryRoot } from "./hooks/useLibraryRoot";
@@ -217,23 +217,21 @@ export default function App() {
               {showUiKit && <UiKitGallery />}
               {tab !== "scan" && !showUiKit && (
                 <div className="toolbar compact-toolbar">
-                  <label className="field-label-inline">
-                    Run
-                    <select
-                      className="field-input"
-                      aria-label="Run"
-                      value={stamp}
-                      onChange={(e) => setStamp(e.target.value)}
-                    >
-                      {runs.map((run) => (
-                        <option key={run.stamp} value={run.stamp}>
-                          {run.stamp}
-                          {run.engine_version ? ` · ${formatEngineVersion(run.engine_version)}` : ""}
-                          {run.dry_run === false ? " · LIVE" : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <LabeledSelect
+                    className="field-input"
+                    wrapperClassName="field-label-inline"
+                    label="Run"
+                    value={stamp}
+                    onChange={(e) => setStamp(e.target.value)}
+                  >
+                    {runs.map((run) => (
+                      <option key={run.stamp} value={run.stamp}>
+                        {run.stamp}
+                        {run.engine_version ? ` · ${formatEngineVersion(run.engine_version)}` : ""}
+                        {run.dry_run === false ? " · LIVE" : ""}
+                      </option>
+                    ))}
+                  </LabeledSelect>
                   {summary && (
                     <span className="count-muted">
                       {formatEngineVersion(summary.engine_version)} · {summary.scanned.toLocaleString()} items

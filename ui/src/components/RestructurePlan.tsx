@@ -8,7 +8,7 @@ import {
   type RestructureExecuteResponse,
 } from "../api/client";
 import type { RestructureItem } from "../types";
-import { Badge, Button, VirtualTable } from "../ui";
+import { Badge, Button, LabeledSelect, VirtualTable } from "../ui";
 import { useLibraryRoot } from "../hooks/useLibraryRoot";
 import { PathLink } from "./PathLink";
 import { useContextSidebar } from "./ContextSidebar";
@@ -170,15 +170,17 @@ export function RestructurePlan({ stamp }: Props) {
       )}
 
       <div className="toolbar">
-        <label title="Filter by route readiness — READY items can move when section is approved">
-          Status
-          <select aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">All</option>
-            <option value="READY">READY</option>
-            <option value="NEEDS REVIEW">NEEDS REVIEW</option>
-            <option value="DEST EXISTS (merge)">DEST EXISTS (merge)</option>
-          </select>
-        </label>
+        <LabeledSelect
+          label="Status"
+          labelTitle="Filter by route readiness — READY items can move when section is approved"
+          value={status}
+          onChange={(e) => setStatus(e.target.value)}
+        >
+          <option value="">All</option>
+          <option value="READY">READY</option>
+          <option value="NEEDS REVIEW">NEEDS REVIEW</option>
+          <option value="DEST EXISTS (merge)">DEST EXISTS (merge)</option>
+        </LabeledSelect>
         <span className="count-muted">
           {loading ? "Loading…" : `${total.toLocaleString()} routes`}
           {approvedSections.length ? ` · ${approvedSections.length} sections approved` : ""}
