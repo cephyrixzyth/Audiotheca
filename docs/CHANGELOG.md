@@ -13,7 +13,7 @@ Git tag **v1.0.7** was published with a broken Windows NSIS pre-install hook (si
 - **Selected run in the URL** — `?run=<stamp>` survives reloads, back/forward, and tab switches; defaults to the latest run
 - **Command palette** — ⌘K / Ctrl+K (or top-bar **Search**) jumps to tabs, library explorer, spec codes, and the UI-kit gallery (`#/ui-kit`)
 - **Virtualized tables** — Scan audit, Investigation, Skipped files, Restructure, Scene renames, Archives, Vendors, Security findings, Space recovery, execute results, and Library explorer window large result sets (small lists render unchanged)
-- **Tabs primitive** — Skipped-files views, Investigation prefix/list, and Security audit/ledger use the shared Radix tab list
+- **Tabs primitive** — Skipped-files views, Investigation prefix/list, Security audit/ledger, and the main/review/system nav chrome use the shared Radix tab list (Library stays an overlay action in that row)
 - **Self-hosted fonts** — bundled IBM Plex (`@fontsource`); no Google Fonts CDN
 
 ### Phase M UI wiring
