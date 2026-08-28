@@ -11,7 +11,7 @@ import {
   spaceRecoveryReportDownload,
 } from "../api/client";
 import type { CoexistenceItem, JobSnapshot } from "../types";
-import { Button, Kpi, VirtualTable } from "../ui";
+import { Button, Kpi, LabeledSelect, VirtualTable } from "../ui";
 import { PathLink } from "./PathLink";
 
 interface Props {
@@ -326,18 +326,15 @@ export function SpaceRecovery({ stamp }: Props) {
       <section>
         <div className="toolbar">
           <h3 style={{ margin: 0 }}>Coexistence queue</h3>
-          <label>
-            Issue type
-            <select
-              aria-label="Issue type"
-              value={issueFilter}
-              onChange={(e) => setIssueFilter(e.target.value)}
-            >
-              <option value="DEEP_INSTALLER">DEEP_INSTALLER</option>
-              <option value="ARCHIVE_EXTRACTED_SIBLING">ARCHIVE_EXTRACTED_SIBLING</option>
-              <option value="">All types</option>
-            </select>
-          </label>
+          <LabeledSelect
+            label="Issue type"
+            value={issueFilter}
+            onChange={(e) => setIssueFilter(e.target.value)}
+          >
+            <option value="DEEP_INSTALLER">DEEP_INSTALLER</option>
+            <option value="ARCHIVE_EXTRACTED_SIBLING">ARCHIVE_EXTRACTED_SIBLING</option>
+            <option value="">All types</option>
+          </LabeledSelect>
         </div>
         <p className="count-muted">
           Showing {coexistence.length} of {coexistenceTotal.toLocaleString()}

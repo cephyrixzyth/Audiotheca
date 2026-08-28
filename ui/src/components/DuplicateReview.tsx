@@ -18,7 +18,7 @@ import {
   type ManualDuplicateFinding,
 } from "../api/client";
 import type { DuplicateGroup } from "../types";
-import { Badge, Button } from "../ui";
+import { Badge, Button, LabeledSelect } from "../ui";
 import type { BadgeTone } from "../ui";
 import { useLibraryRoot } from "../hooks/useLibraryRoot";
 import { PathLink } from "./PathLink";
@@ -341,14 +341,16 @@ export function DuplicateReview({ stamp }: Props) {
   return (
     <div>
       <div className="toolbar">
-        <label title="Filter duplicate groups by engine confidence score">
-          Confidence
-          <select aria-label="Confidence" value={confidence} onChange={(e) => setConfidence(e.target.value)}>
-            <option value="">All</option>
-            <option value="HIGH">HIGH</option>
-            <option value="MEDIUM">MEDIUM</option>
-          </select>
-        </label>
+        <LabeledSelect
+          label="Confidence"
+          labelTitle="Filter duplicate groups by engine confidence score"
+          value={confidence}
+          onChange={(e) => setConfidence(e.target.value)}
+        >
+          <option value="">All</option>
+          <option value="HIGH">HIGH</option>
+          <option value="MEDIUM">MEDIUM</option>
+        </LabeledSelect>
         <label className="checkbox-label" title="Hide groups you marked as bad matches">
           <input
             type="checkbox"

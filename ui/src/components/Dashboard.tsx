@@ -23,7 +23,7 @@ import type {
 } from "../types";
 import { formatCompact, formatDiskFree, formatGb, formatPct } from "../utils/format";
 import { formatEngineVersion } from "../utils/scanDisplay";
-import { Badge, Button, Gauge, StatTile } from "../ui";
+import { Badge, Button, Gauge, LabeledSelect, StatTile } from "../ui";
 import { ReorderableSections } from "./ReorderableSections";
 import { EnvironmentSummaryWidget } from "./EnvironmentPanel";
 import { InstallationSummaryWidget } from "./InstallLifecyclePanel";
@@ -311,21 +311,18 @@ function DashboardRun({
         hidden: runs.filter((r) => r.stamp !== summary.stamp).length === 0,
         content: (
           <>
-            <label>
-              Baseline run
-              <select
-                aria-label="Baseline run"
-                value={compareStamp}
-                onChange={(e) => setCompareStamp(e.target.value)}
-              >
-                <option value="">Select prior run…</option>
-                {runs.filter((r) => r.stamp !== summary.stamp).map((r) => (
-                  <option key={r.stamp} value={r.stamp}>
-                    {r.stamp}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <LabeledSelect
+              label="Baseline run"
+              value={compareStamp}
+              onChange={(e) => setCompareStamp(e.target.value)}
+            >
+              <option value="">Select prior run…</option>
+              {runs.filter((r) => r.stamp !== summary.stamp).map((r) => (
+                <option key={r.stamp} value={r.stamp}>
+                  {r.stamp}
+                </option>
+              ))}
+            </LabeledSelect>
             {compareResult?.metrics ? (
               <div className="stat-grid compact" style={{ marginTop: "0.75rem" }}>
                 {Object.entries((compareResult.delta as Record<string, number>) ?? {}).map(([key, val]) => (

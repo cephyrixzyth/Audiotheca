@@ -176,6 +176,7 @@
 }
 
 .field-label-inline {
+  display: flex;
   flex-direction: row;
   align-items: center;
   gap: 0.45rem;
@@ -183,6 +184,12 @@
   letter-spacing: normal;
   font-size: 0.82rem;
   color: var(--text-muted);
+}
+
+.labeled-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
 }
 
 .field-input,

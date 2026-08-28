@@ -5,7 +5,7 @@ import {
   SCAN_FLOW_PHASES,
   type FlowPreset,
 } from "../flows/scanFlow";
-import { Button } from "../ui";
+import { Button, LabeledSelect } from "../ui";
 import { resolveFlowPhase } from "../utils/scanDisplay";
 
 interface Props {
@@ -82,25 +82,24 @@ export function FlowEditor({
   return (
     <div className="flow-editor">
       <div className="flow-editor-toolbar">
-        <label className="field-label-inline" title="Pick a scan preset — each enables or skips engine phases">
-          Preset
-          <select
-            className="field-input flow-preset-select"
-            aria-label="Preset"
-            value={presetId}
-            onChange={(e) => {
-              const preset = FLOW_PRESETS.find((p) => p.id === e.target.value);
-              if (preset) applyPreset(preset);
-            }}
-          >
-            {FLOW_PRESETS.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label}
-              </option>
-            ))}
-            <option value="custom">Custom</option>
-          </select>
-        </label>
+        <LabeledSelect
+          className="field-input flow-preset-select"
+          wrapperClassName="field-label-inline"
+          label="Preset"
+          labelTitle="Pick a scan preset — each enables or skips engine phases"
+          value={presetId}
+          onChange={(e) => {
+            const preset = FLOW_PRESETS.find((p) => p.id === e.target.value);
+            if (preset) applyPreset(preset);
+          }}
+        >
+          {FLOW_PRESETS.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.label}
+            </option>
+          ))}
+          <option value="custom">Custom</option>
+        </LabeledSelect>
         <label className="checkbox-label" title="Pause after each major phase so you can review logs before continuing">
           <input
             type="checkbox"

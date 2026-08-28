@@ -6,7 +6,7 @@ import {
   hardResetSystem,
 } from "../api/client";
 import type { ProgressEvent } from "../types";
-import { Badge, Button } from "../ui";
+import { Badge, Button, LabeledSelect } from "../ui";
 
 export interface LogLine {
   text: string;
@@ -157,22 +157,21 @@ export function ProcessDiagnostics({ onLoadPastLog }: Props) {
         </ul>
       )}
       <div className="session-log-picker">
-        <label className="context-field">
-          <span className="context-label">Past session logs</span>
-          <select
-            className="field-input"
-            aria-label="Past session logs"
-            value={selectedLog}
-            onChange={(e) => setSelectedLog(e.target.value)}
-          >
-            <option value="">Select a log…</option>
-            {logs.map((log) => (
-              <option key={log.id} value={log.id}>
-                {log.id} ({log.kind}, {Math.round(log.size_bytes / 1024)} KB)
-              </option>
-            ))}
-          </select>
-        </label>
+        <LabeledSelect
+          className="field-input"
+          wrapperClassName="context-field"
+          labelClassName="context-label"
+          label="Past session logs"
+          value={selectedLog}
+          onChange={(e) => setSelectedLog(e.target.value)}
+        >
+          <option value="">Select a log…</option>
+          {logs.map((log) => (
+            <option key={log.id} value={log.id}>
+              {log.id} ({log.kind}, {Math.round(log.size_bytes / 1024)} KB)
+            </option>
+          ))}
+        </LabeledSelect>
         <Button variant="secondary" disabled={!selectedLog || busy} onClick={() => void handleLoadLog()}>
           Load into progress log
         </Button>
