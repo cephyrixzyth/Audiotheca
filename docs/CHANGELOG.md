@@ -33,6 +33,7 @@ Git tag **v1.0.7** was published with a broken Windows NSIS pre-install hook (si
 - **DropdownMenu** — Radix menu primitive; theme switcher, row ⋮ actions, and Library explorer right-click menu
 - **Symlink tests** — skip on Windows when creating a junction/symlink is not permitted
 - **Docker SearXNG** — Unraid Compose starts SearXNG + Valkey with api/ui (no `--profile search`); `SEARXNG_URL` is passed into the API and the all-in-one image
+- **Docker Windows binds** — library volume uses long-form bind syntax; `start-local.ps1` maps `Z:/` drive letters to UNC so Docker Desktop does not reject the mount
 
 ### Phase M — external sources (M1–M9)
 

@@ -158,6 +158,18 @@ docker compose run --rm --no-deps api pytest tests/ -q
 
 `my-audiotheca.xml` is a full Unraid **Add Container** template. Install with `install-template.sh` (see above) or copy manually to `/boot/config/plugins/dockerMan/templates-user/audiotheca.xml`.
 
+## Windows Docker Desktop
+
+Do not set `LIBRARY_HOST_PATH` to a mapped drive letter (`Z:/_software/_audio`). Docker parses `:` as a volume separator and errors with `invalid volume specification`.
+
+Use a UNC path instead, and add that share under **Docker Desktop → Settings → Resources → File sharing**:
+
+```
+LIBRARY_HOST_PATH=//nas-host/share/_software/_audio
+```
+
+`.\start-local.ps1` converts `Z:/...` to UNC automatically. Extra Compose profiles (`vpn`, `space-recovery`) are not started unless you pass them yourself.
+
 ## Windows dev vs Unraid
 
 | Layout | UI | API |
