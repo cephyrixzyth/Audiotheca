@@ -972,6 +972,7 @@ export function ReorderableSections({
                 type="text"
                 className="field-input layout-preset-name"
                 placeholder="Preset name…"
+                aria-label="Layout preset name"
                 value={presetName}
                 onChange={(e) => setPresetName(e.target.value)}
               />
@@ -1013,6 +1014,7 @@ export function ReorderableSections({
                 type="text"
                 className="field-input layout-preset-name"
                 placeholder="Paste JSON…"
+                aria-label="Layout blueprint JSON"
                 value={importText}
                 onChange={(e) => setImportText(e.target.value)}
               />

@@ -105,6 +105,38 @@ interface LogLine {
   initializing?: boolean;
 }
 
+type LogLevelFilter = "all" | "error" | "warn" | "scanner";
+
+const LOG_LEVEL_FILTERS: { id: LogLevelFilter; label: string; title: string }[] = [
+  { id: "all", label: "ALL", title: "Show every log line" },
+  { id: "error", label: "ERROR", title: "Errors only" },
+  { id: "warn", label: "WARNING", title: "Warnings and errors" },
+  { id: "scanner", label: "SCANNER", title: "Scanner phase events" },
+];
+
+function applyLogLevelFilter(lines: LogLine[], filter: LogLevelFilter): LogLine[] {
+  switch (filter) {
+    case "all":
+      return lines;
+    case "error":
+      return lines.filter((line) => line.level === "error");
+    case "warn":
+      return lines.filter((line) => line.level === "warn" || line.level === "error");
+    case "scanner":
+      return lines.filter(
+        (line) =>
+          line.kind === "phase-progress" ||
+          line.kind === "phase-start" ||
+          line.kind === "phase-finish" ||
+          /phase|scan|identify|dedupe|route/i.test(line.text),
+      );
+    default: {
+      const _exhaustive: never = filter;
+      return _exhaustive;
+    }
+  }
+}
+
 function inferEngineLog(line: string, level: LogLevel): { kind: LogKind; level: LogLevel } {
   const lower = line.toLowerCase();
   if (/malware|suspicious|keygen|crack|trojan|threat|quarantine/.test(lower)) {
@@ -274,7 +306,7 @@ export function ScanPanel({ onRunComplete }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [completedSummary, setCompletedSummary] = useState<RunSummary | null>(null);
-  const [logLevelFilter, setLogLevelFilter] = useState<"all" | "error" | "warn" | "scanner">("all");
+  const [logLevelFilter, setLogLevelFilter] = useState<LogLevelFilter>("all");
   const [logSearch, setLogSearch] = useState("");
   const [autoScroll, setAutoScroll] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -574,21 +606,8 @@ export function ScanPanel({ onRunComplete }: Props) {
         ]
       : lines;
     const q = (logSearch || sidebarQuery).trim().toLowerCase();
-    let filtered = q ? merged.filter((line) => line.text.toLowerCase().includes(q)) : merged;
-    if (logLevelFilter === "error") {
-      filtered = filtered.filter((line) => line.level === "error");
-    } else if (logLevelFilter === "warn") {
-      filtered = filtered.filter((line) => line.level === "warn" || line.level === "error");
-    } else if (logLevelFilter === "scanner") {
-      filtered = filtered.filter(
-        (line) =>
-          line.kind === "phase-progress" ||
-          line.kind === "phase-start" ||
-          line.kind === "phase-finish" ||
-          /phase|scan|identify|dedupe|route/i.test(line.text),
-      );
-    }
-    return dedupeLogLines(filtered.slice(-400));
+    const searched = q ? merged.filter((line) => line.text.toLowerCase().includes(q)) : merged;
+    return dedupeLogLines(applyLogLevelFilter(searched, logLevelFilter).slice(-400));
   }, [events, importedLogLines, sidebarQuery, logSearch, logLevelFilter]);
 
   useEffect(() => {
@@ -987,30 +1006,18 @@ export function ScanPanel({ onRunComplete }: Props) {
         content: (
           <div className="log-panel log-panel-full">
             <div className="log-toolbar">
-              <div className="log-level-filters">
-                {(["all", "error", "warn", "scanner"] as const).map((level) => (
+              <div className="log-level-filters" role="group" aria-label="Log level">
+                {LOG_LEVEL_FILTERS.map((level) => (
                   <button
-                    key={level}
+                    key={level.id}
                     type="button"
-                    className={`log-level-btn ${logLevelFilter === level ? "active" : ""}`}
-                    title={
-                      level === "all"
-                        ? "Show every log line"
-                        : level === "error"
-                          ? "Errors only"
-                          : level === "warn"
-                            ? "Warnings and errors"
-                            : "Scanner phase events"
-                    }
-                    onClick={() => setLogLevelFilter(level)}
+                    className={`log-level-btn ${logLevelFilter === level.id ? "active" : ""}`}
+                    title={level.title}
+                    aria-pressed={logLevelFilter === level.id}
+                    aria-label={level.title}
+                    onClick={() => setLogLevelFilter(level.id)}
                   >
-                    {level === "all"
-                      ? "ALL"
-                      : level === "error"
-                        ? "ERROR"
-                        : level === "warn"
-                          ? "WARNING"
-                          : "SCANNER"}
+                    {level.label}
                   </button>
                 ))}
               </div>

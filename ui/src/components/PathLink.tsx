@@ -28,6 +28,7 @@ export function PathLink({ path, className = "path", secondaryPath, dualPane }: 
         type="button"
         className="icon-btn"
         title="Browse this path in the built-in library explorer"
+        aria-label={`Browse ${path} in the library explorer`}
         onClick={handleBrowse}
       >
         Browse
@@ -36,6 +37,7 @@ export function PathLink({ path, className = "path", secondaryPath, dualPane }: 
         type="button"
         className="icon-btn"
         title="Reveal in the OS file manager"
+        aria-label={`Reveal ${path} in the OS file manager`}
         onClick={() => void openInExplorer(path)}
       >
         Reveal

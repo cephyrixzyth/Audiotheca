@@ -363,6 +363,7 @@ export function DuplicateReview({ stamp }: Props) {
           type="button"
           className={`bucket-chip ${showReferenceExtras ? "active" : ""}`.trim()}
           title="Show duplicate groups that also exist under configured reference library roots"
+          aria-pressed={showReferenceExtras}
           onClick={() => setShowReferenceExtras((v) => !v)}
         >
           Reference extras

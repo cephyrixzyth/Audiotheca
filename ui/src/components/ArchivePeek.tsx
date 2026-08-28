@@ -246,6 +246,7 @@ export function ArchivePeek({ stamp }: Props) {
             type="button"
             className={`bucket-chip ${verdict === name ? "active-chip" : ""}`}
             title={`Filter rows with verdict ${verdictLabel(name)}`}
+            aria-pressed={verdict === name}
             onClick={() => setVerdict(name)}
           >
             {verdictLabel(name)}
@@ -256,6 +257,7 @@ export function ArchivePeek({ stamp }: Props) {
           type="button"
           className={`bucket-chip ${verdict === "" ? "active-chip" : ""}`}
           title="Show all archive verdicts"
+          aria-pressed={verdict === ""}
           onClick={() => setVerdict("")}
         >
           All
