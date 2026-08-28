@@ -21,6 +21,7 @@ Git tag **v1.0.7** was published with a broken Windows NSIS pre-install hook (si
 - **Quieter sidebar** — drop the “search not available” apologetic copy on Dashboard and other non-search tabs
 - **Trim empty panels** — hide Compare / Investigation buckets / idle Active job / empty Feedback / missing Quality scorecard until they have data
 - **Host metrics path** — Docker library mountpoints (e.g. `/library`) are used for disk usage instead of falling back to `/root`
+- **Disk I/O busy hint** — uses an interval busy% from `busy_time` deltas (cumulative ms-since-boot is no longer treated as a percentage)
 
 ### UI design system & routing
 
