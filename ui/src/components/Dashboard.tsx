@@ -218,26 +218,41 @@ function DashboardRun({
               label="Deep identified"
               value={formatCompact(summary.deep_identified ?? 0)}
               tone="accent"
+              title="Open Deep identify review"
+              onClick={() => onNavigate?.("deep-identify")}
             />
             <StatTile
               label="Reconciled vendors"
               value={formatCompact(summary.reconciled_vendors ?? 0)}
               tone="accent"
+              title="Open Vendor tools"
+              onClick={() => onNavigate?.("vendors")}
             />
             <StatTile
               label="Vendor conflicts"
               value={formatCompact(summary.vendor_conflicts ?? 0)}
               tone={(summary.vendor_conflicts ?? 0) > 0 ? "warning" : undefined}
+              title="Open Vendor tools"
+              onClick={() => onNavigate?.("vendors")}
             />
             <StatTile
               label="Coverage gaps"
               value={formatCompact(summary.coverage_gaps ?? 0)}
               tone={(summary.coverage_gaps ?? 0) > 0 ? "warning" : undefined}
+              title="Open Skipped files hub"
+              onClick={() => onNavigate?.("skipped")}
             />
-            <StatTile label="Nested issues" value={formatCompact(summary.nested_issues)} />
+            <StatTile
+              label="Nested issues"
+              value={formatCompact(summary.nested_issues)}
+              title="Open Skipped files hub"
+              onClick={() => onNavigate?.("skipped")}
+            />
             <StatTile
               label="Coexistence"
               value={formatCompact(summary.coexistence_findings)}
+              title="Open Space recovery"
+              onClick={() => onNavigate?.("space-recovery")}
             />
           </div>
         ) : (
@@ -348,32 +363,60 @@ function DashboardRun({
         tone: "accent" as const,
         content: (
           <div className="stat-grid">
-            <StatTile label="Scanned" value={formatCompact(summary.scanned)} />
+            <StatTile
+              label="Scanned"
+              value={formatCompact(summary.scanned)}
+              title="Open Scan audit"
+              onClick={() => onNavigate?.("scan-audit")}
+            />
             <StatTile
               label="Ready"
               value={formatCompact(summary.ready_count ?? 0)}
               sub={routeReadyPct != null ? `${routeReadyPct}% route-ready` : undefined}
               tone="accent"
+              title="Open Restructure plan"
+              onClick={() => onNavigate?.("restructure")}
             />
             <StatTile
               label="Investigation"
               value={formatCompact(summary.investigation)}
               sub={invPct != null ? `${invPct}% needs review` : undefined}
               tone={invPct != null && invPct > 15 ? "warning" : undefined}
+              title="Open Investigation inbox"
+              onClick={() => onNavigate?.("investigation")}
             />
-            <StatTile label="Routes planned" value={formatCompact(summary.routes_planned)} />
-            <StatTile label="Cache hits" value={formatCompact(summary.cache_hits)} />
+            <StatTile
+              label="Routes planned"
+              value={formatCompact(summary.routes_planned)}
+              title="Open Restructure plan"
+              onClick={() => onNavigate?.("restructure")}
+            />
+            <StatTile
+              label="Cache hits"
+              value={formatCompact(summary.cache_hits)}
+              title="Open Skipped files hub"
+              onClick={() => onNavigate?.("skipped")}
+            />
             <StatTile
               label="Scan failures"
               value={formatCompact(summary.scan_failures ?? 0)}
               tone={(summary.scan_failures ?? 0) > 0 ? "danger" : undefined}
+              title="Open Skipped files hub"
+              onClick={() => onNavigate?.("skipped")}
             />
             <StatTile
               label="Coverage gaps"
               value={formatCompact(summary.coverage_gaps ?? 0)}
               tone={(summary.coverage_gaps ?? 0) > 0 ? "warning" : undefined}
+              title="Open Skipped files hub"
+              onClick={() => onNavigate?.("skipped")}
             />
-            <StatTile label="Nested issues" value={formatCompact(summary.nested_issues)} />
+            <StatTile
+              label="Nested issues"
+              value={formatCompact(summary.nested_issues)}
+              title="Open Skipped files hub"
+              onClick={() => onNavigate?.("skipped")}
+            />
           </div>
         ),
       },
@@ -672,6 +715,7 @@ function DashboardRun({
         content: (
           <div className="quick-links">
             <QuickLink label="Scan audit" tab="scan-audit" onNavigate={onNavigate} />
+            <QuickLink label="Deep identify" tab="deep-identify" onNavigate={onNavigate} />
             <QuickLink label="Skipped files" tab="skipped" onNavigate={onNavigate} />
             <QuickLink label="Investigation inbox" tab="investigation" onNavigate={onNavigate} />
             <QuickLink label="Duplicate review" tab="duplicates" onNavigate={onNavigate} />

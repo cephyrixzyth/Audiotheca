@@ -18,6 +18,7 @@ export const TAB_TO_PATH: Record<TabId, string> = {
   restructure: "/review/restructure",
   archives: "/review/archives",
   "scene-renames": "/review/scene-renames",
+  "deep-identify": "/review/deep-identify",
   "scan-audit": "/review/scan-audit",
   skipped: "/review/skipped",
   "space-recovery": "/system/space-recovery",

@@ -167,6 +167,12 @@ Review multipart diagnosis before staging live renames.`,
         media: { screenshot: "/help/scene-renames.png" },
       },
       {
+        id: "deep-identify",
+        title: "Deep identify",
+        body: `Phase 1.7 fuzzy / sibling vendor recoveries from Deep_Identify_*.csv.
+Use after an Identify-only or full scan to review recovered vendors, methods, scores, and evidence before a live restructure.`,
+      },
+      {
         id: "scan-audit",
         title: "Scan audit",
         body: `Per-item scan status, ID method, confidence, and flags. Quick corrections without leaving the run.

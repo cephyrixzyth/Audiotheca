@@ -111,6 +111,7 @@ const SEARCH_TABS = new Set<TabId>([
   "skipped",
   "security",
   "scene-renames",
+  "deep-identify",
 ]);
 
 const TAB_HINTS: Partial<Record<TabId, string>> = {
@@ -127,6 +128,7 @@ const TAB_HINTS: Partial<Record<TabId, string>> = {
   dashboard: "Search not available on Dashboard — use tab filters on data views.",
   vendors: "Use in-panel vendor tools — sidebar search not used here.",
   "scene-renames": "Filter by scene ID, proposed name, or source path.",
+  "deep-identify": "Filter recoveries by item, vendor, method, or evidence.",
   "space-recovery": "Use Space Recovery panel filters.",
 };
 

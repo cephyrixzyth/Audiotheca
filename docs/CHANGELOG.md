@@ -22,6 +22,11 @@ Git tag **v1.0.7** was published with a broken Windows NSIS pre-install hook (si
 - **Trim empty panels** — hide Compare / Investigation buckets / idle Active job / empty Feedback / missing Quality scorecard until they have data
 - **Host metrics path** — Docker library mountpoints (e.g. `/library`) are used for disk usage instead of falling back to `/root`
 - **Disk I/O busy hint** — uses per-disk `busy_time` interval % (aggregate counters summed every disk and always looked ~100% busy on NAS hosts)
+- **KPI click-throughs** — Identification and Library throughput tiles navigate to Deep identify / Skipped / Vendors / related Review tabs
+
+### Review
+
+- **Deep identify tab** — `#/review/deep-identify` lists Phase 1.7 fuzzy/sibling vendor recoveries with sidebar search
 
 ### UI design system & routing
 
