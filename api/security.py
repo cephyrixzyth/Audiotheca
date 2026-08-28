@@ -282,6 +282,37 @@ def verify_ws_credential(credential: str | None, *, path: str | None = None) -> 
     return verify_token(credential)
 
 
+def _split_host_port(value: str) -> tuple[str, str]:
+    """Split Host / Origin netloc into (hostname, port). Port is '' if omitted."""
+    parsed = urlparse(f"//{value.strip()}")
+    hostname = (parsed.hostname or "").lower()
+    port = str(parsed.port) if parsed.port is not None else ""
+    return hostname, port
+
+
+def _csrf_host_candidates(request: Request) -> list[str]:
+    """Public Host values the browser used — prefer X-Forwarded-Host (nginx / reverse proxy)."""
+    hosts: list[str] = []
+    for key in ("x-forwarded-host", "host"):
+        raw = request.headers.get(key) or ""
+        for part in raw.split(","):
+            part = part.strip().lower()
+            if part and part not in hosts:
+                hosts.append(part)
+    return hosts
+
+
+def _netloc_matches_hosts(netloc: str, hosts: list[str]) -> bool:
+    origin_host, origin_port = _split_host_port(netloc)
+    if not origin_host:
+        return False
+    for host in hosts:
+        cand_host, cand_port = _split_host_port(host)
+        if cand_host and cand_host == origin_host and origin_port == cand_port:
+            return True
+    return False
+
+
 def cookie_csrf_ok(request: Request) -> bool:
     """Reject cross-origin mutating requests authenticated only by session cookie."""
     if request.method in {"GET", "HEAD", "OPTIONS"}:
@@ -293,7 +324,7 @@ def cookie_csrf_ok(request: Request) -> bool:
             return True
     if not request.cookies.get(SESSION_COOKIE):
         return True
-    host = (request.headers.get("host") or "").lower()
+    candidates = _csrf_host_candidates(request)
     for header in ("origin", "referer"):
         raw = request.headers.get(header) or ""
         if not raw:
@@ -302,7 +333,9 @@ def cookie_csrf_ok(request: Request) -> bool:
             netloc = urlparse(raw).netloc.lower()
         except ValueError:
             continue
-        if netloc and netloc == host:
+        if not netloc:
+            continue
+        if _netloc_matches_hosts(netloc, candidates):
             return True
         return False
     # No Origin/Referer: allow loopback (Tauri / local tools); block LAN cookie CSRF.
