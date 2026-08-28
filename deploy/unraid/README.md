@@ -1,6 +1,6 @@
 # Audiotheca on Unraid
 
-Production Docker stack: **API** (FastAPI + scan engine) + **UI** (nginx + Vite build), with optional **SearXNG** for vendor research.
+Production Docker stack: **API** (FastAPI + scan engine) + **UI** (nginx + Vite build) + **SearXNG** (vendor research), with optional **ClamAV** / **VPN** profiles.
 
 Designed for Unraid 6.x/7.x where the audio library lives on local array paths (`/mnt/user/...`), not over SMB from a PC.
 
@@ -51,7 +51,7 @@ The all-in-one image runs nginx (UI) and the FastAPI engine in one container (`d
 
 ## Docker Compose (optional)
 
-For multi-container or SearXNG profiles, use Compose instead:
+For multi-container (API + UI + SearXNG), use Compose instead:
 2. Copy this folder to e.g. `/mnt/user/appdata/audiotheca/compose/`.
 3. Copy `.env.example` → `.env` and set `LIBRARY_HOST_PATH` to your **local** share path.
 4. Create appdata: `mkdir -p /mnt/user/appdata/audiotheca`
@@ -62,7 +62,7 @@ cd /mnt/user/appdata/audiotheca/compose
 docker compose up -d --build
 ```
 
-6. Open `http://<unraid-ip>:4210` in a browser on your LAN.
+6. Open `http://<unraid-ip>:4210` in a browser on your LAN. SearXNG is on `http://127.0.0.1:8081` on the Unraid host (localhost only).
 
 ## Volume mappings
 
@@ -78,18 +78,12 @@ The API reads `AUDIOTHECA_LIBRARY_ROOTS=/library` inside the container. The UI p
 | Service | Port | Notes |
 |---------|------|-------|
 | `ui` | 4210 (default) | Browser entry point; proxies `/api` to the API container |
-| `api` | 4211 | Direct API access (optional; UI proxy is usually enough) |
-| `searxng` | 8081 (localhost) | Optional — `docker compose --profile search up -d` |
+| `api` | internal `:8787` | Not published to the host by default; UI nginx proxies `/api/` |
+| `searxng` | 8081 (localhost) | Vendor research / WEB-SPDR — starts with the default stack |
 | `clamav` | 3310 (localhost) | Optional — `docker compose --profile clamav up -d` |
 | `gluetun` | shares API/SearXNG ports | Optional VPN sidecar — `docker compose --profile vpn up -d` |
 
 ## Optional profiles
-
-**SearXNG** (vendor/web research from the API network):
-
-```bash
-docker compose --profile search up -d --build
-```
 
 **ClamAV** (Security tab deep scans):
 
@@ -122,6 +116,7 @@ See `.env.example`. Key variables:
 - `APPDATA_PATH` — persistent config and reports
 - `AUDIOTHECA_API_TOKEN` — **required** fixed bearer (server-side / never in the JS bundle)
 - `AUDIOTHECA_PROXY_SECRET` — **required** shared secret for opaque HttpOnly session minting via nginx
+- `SEARXNG_URL` — in-compose URL for the API (`http://searxng:8080`); host UI is `127.0.0.1:${SEARXNG_PORT:-8081}`
 
 ## Security
 

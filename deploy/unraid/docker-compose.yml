@@ -1,5 +1,5 @@
 # Audiotheca on Unraid — Docker Compose stack
-# API + nginx UI + optional SearXNG for vendor research
+# API + nginx UI + SearXNG (vendor research). Optional: clamav, vpn, space-recovery, single.
 
 name: audiotheca-unraid
 
@@ -70,7 +70,6 @@ services:
         max-file: "2"
 
   searxng:
-    profiles: ["search"]
     image: docker.io/searxng/searxng:latest
     container_name: audiotheca-searxng
     restart: unless-stopped
@@ -81,6 +80,12 @@ services:
       - "127.0.0.1:${SEARXNG_PORT:-8081}:8080"
     volumes:
       - ./searxng-config:/etc/searxng:ro
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
     logging:
       driver: json-file
       options:
@@ -88,11 +93,12 @@ services:
         max-file: "2"
 
   valkey:
-    profiles: ["search"]
     image: docker.io/valkey/valkey:9-alpine
     container_name: audiotheca-searxng-valkey
     command: valkey-server --save 30 1 --loglevel warning
     restart: unless-stopped
+    volumes:
+      - searxng-valkey:/data
 
   clamav:
     profiles: ["clamav"]
@@ -131,8 +137,10 @@ services:
       - ${LIBRARY_CONTAINER_PATH:-/library}
     restart: "no"
 
-  # Gluetun VPN sidecar (DKR-TUN). With --profile vpn, api + searxng route through VPN:
-  #   docker compose --profile vpn --profile search up -d
+  # Gluetun VPN sidecar (DKR-TUN). Route API + SearXNG through VPN:
+  #   docker compose --profile vpn up -d
+  # Then stop the default searxng (host port 8081) so gluetun can bind it:
+  #   docker compose stop searxng
   gluetun:
     profiles: ["vpn"]
     image: qmcgaw/gluetun:latest
@@ -170,7 +178,7 @@ services:
         condition: service_started
 
   searxng-vpn:
-    profiles: ["vpn", "search"]
+    profiles: ["vpn"]
     extends:
       service: searxng
     container_name: audiotheca-searxng-vpn
@@ -204,6 +212,7 @@ services:
       AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP: "${AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP:-1}"
       AUDIOTHECA_API_TOKEN: "${AUDIOTHECA_API_TOKEN:?Set AUDIOTHECA_API_TOKEN in .env}"
       AUDIOTHECA_PROXY_SECRET: "${AUDIOTHECA_PROXY_SECRET:?Set AUDIOTHECA_PROXY_SECRET in .env}"
+      SEARXNG_URL: ${SEARXNG_URL:-http://searxng:8080}
     volumes:
       - ${APPDATA_PATH:-./appdata}:/data
       - ${LIBRARY_HOST_PATH}:${LIBRARY_CONTAINER_PATH:-/library}:ro
@@ -213,3 +222,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 45s
+
+volumes:
+  searxng-valkey:

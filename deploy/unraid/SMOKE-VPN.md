@@ -46,7 +46,8 @@ When credentials are valid:
 
 ```bash
 cd deploy/unraid
-docker compose --profile vpn --profile search up -d --build
+docker compose --profile vpn up -d --build
+docker compose stop searxng
 ```
 
 Check:
@@ -58,7 +59,7 @@ Check:
 Teardown:
 
 ```bash
-docker compose --profile vpn --profile search down
+docker compose --profile vpn down
 ```
 
 ## Related

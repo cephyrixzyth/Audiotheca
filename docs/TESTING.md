@@ -226,7 +226,11 @@ $env:AUDIOTHECA_HOME = "C:\AudiothecaData"
 
 ## 9. Optional: SearXNG (online research helper)
 
-Private meta-search for vendor/library research (not required for core scans):
+Private meta-search for vendor/library research (not required for core scans).
+
+**Unraid / Docker Desktop stack** already starts SearXNG with `deploy/unraid` (`http://127.0.0.1:8081`, API uses `SEARXNG_URL=http://searxng:8080`).
+
+**Standalone** (Windows, no Audiotheca compose):
 
 ```powershell
 cd docker\searxng

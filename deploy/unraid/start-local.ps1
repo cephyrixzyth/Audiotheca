@@ -24,13 +24,14 @@ if (-not (Test-Path ".env")) {
 
 New-Item -ItemType Directory -Force -Path "./appdata" | Out-Null
 
-Write-Host "Building and starting api + ui..."
+Write-Host "Building and starting api + ui + searxng..."
 docker compose down 2>$null
 docker compose up -d --build
 
 Write-Host ""
 Write-Host "Audiotheca Docker stack:" -ForegroundColor Green
-Write-Host "  UI:  http://localhost:4210"
-Write-Host "  API: http://localhost:4211/api/health"
+Write-Host "  UI:      http://localhost:4210"
+Write-Host "  SearXNG: http://127.0.0.1:8081"
+Write-Host "  API:     proxied at http://localhost:4210/api/health"
 Write-Host ""
 Write-Host "Stop: docker compose down"

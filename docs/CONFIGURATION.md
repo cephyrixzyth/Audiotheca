@@ -64,7 +64,7 @@ Alternative allowlist file: `dedupe_reports/.library_roots.json` (see API securi
 | Variable | Description |
 |----------|-------------|
 | `PYTHONUNBUFFERED` | Set `1` for live terminal progress during CLI scans |
-| `SEARXNG_URL` | Base URL for `scripts/searx_search.py` (default `http://127.0.0.1:8080`) |
+| `SEARXNG_URL` | Base URL for `scripts/searx_search.py` and WEB-SPDR (default `http://127.0.0.1:8080`; Docker Compose uses `http://searxng:8080`) |
 | `AUDIOTHECA_REQUIRE_ADMIN` | Set `1` to require elevation for live delete/quarantine/shred/repair |
 | `AUDIOTHECA_NET_PAUSE` | Set `1` to pause scans when NAS is unreachable (NET-SAFE) |
 | `AUDIOTHECA_METRICS_HISTORY` | Rolling telemetry samples for sparklines (default `60`) |

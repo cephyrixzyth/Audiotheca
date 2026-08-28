@@ -552,7 +552,7 @@ docker run -d --name audiotheca \
 
 Open `http://localhost:4210`. Appdata holds reports, scan cache, and the API token (`AUDIOTHECA_HOME=/data`).
 
-**Docker Compose** — separate API and UI containers (optional SearXNG / ClamAV profiles):
+**Docker Compose** — API + UI + SearXNG (optional ClamAV / VPN profiles):
 
 ```bash
 cd deploy/unraid
