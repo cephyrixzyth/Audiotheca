@@ -1,6 +1,7 @@
 # Docker build context exclusions (repo root)
 .git
 .github
+audiotheca-[0-9]*
 **/__pycache__
 **/*.pyc
 **/.pytest_cache
