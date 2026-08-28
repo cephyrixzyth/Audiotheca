@@ -47,7 +47,7 @@ When credentials are valid:
 ```bash
 cd deploy/unraid
 docker compose --profile vpn up -d --build
-docker compose stop searxng
+docker compose stop api searxng
 ```
 
 Check:

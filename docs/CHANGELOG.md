@@ -34,6 +34,7 @@ Git tag **v1.0.7** was published with a broken Windows NSIS pre-install hook (si
 - **Symlink tests** — skip on Windows when creating a junction/symlink is not permitted
 - **Docker SearXNG** — Unraid Compose starts SearXNG + Valkey with api/ui (no `--profile search`); `SEARXNG_URL` is passed into the API and the all-in-one image
 - **Docker Windows binds** — library volume uses long-form bind syntax; `start-local.ps1` maps `Z:/` drive letters to UNC so Docker Desktop does not reject the mount
+- **Docker VPN sidecars** — `api-vpn` / `searxng-vpn` no longer inherit `expose`/`ports` (incompatible with `network_mode: service:gluetun`)
 
 ### Phase M — external sources (M1–M9)
 
