@@ -1,4 +1,4 @@
-import { SCAN_FLOW_PHASES } from "../flows/scanFlow";
+import { SCAN_FLOW_PHASES, type FlowPhase } from "../flows/scanFlow";
 import type { ProgressEvent } from "../types";
 
 export function dedupeLogLines<T extends { text: string; key?: string }>(lines: T[]): T[] {
@@ -56,19 +56,41 @@ export function phasesAwaitingProgress(
   return awaiting;
 }
 
+/** Map a raw engine/job phase string onto one flow phase (most specific hit wins). */
+export function matchesFlowPhase(raw: string, phase: FlowPhase): boolean {
+  const norm = raw.toLowerCase();
+  if (norm.includes(phase.id.replace(/_/g, " "))) return true;
+  if (phase.skipKey && (norm === phase.skipKey || norm.includes(phase.skipKey.replace(/_/g, " ")))) {
+    return true;
+  }
+  if (norm.includes(phase.enginePhase.toLowerCase())) return true;
+  if (norm.includes(phase.label.toLowerCase())) return true;
+  if (phase.id === "quarantine" && /os[\s_-]*lane/.test(norm)) return true;
+  return false;
+}
+
+function flowPhaseMatchScore(raw: string, phase: FlowPhase): number {
+  const norm = raw.toLowerCase();
+  const idSpaced = phase.id.replace(/_/g, " ");
+  let score = 0;
+  if (norm === phase.id || norm === phase.skipKey || norm === idSpaced) score += 200;
+  if (norm.includes(idSpaced)) score += 100;
+  if (phase.skipKey && (norm === phase.skipKey || norm.includes(phase.skipKey.replace(/_/g, " ")))) {
+    score += 80;
+  }
+  if (phase.id === "quarantine" && /os[\s_-]*lane/.test(norm)) score += 90;
+  if (norm.includes(phase.label.toLowerCase())) score += phase.label.length;
+  if (norm.includes(phase.enginePhase.toLowerCase())) score += phase.enginePhase.length;
+  return score;
+}
+
 /** Map raw engine phase string to canonical flow phase metadata. */
 export function resolveFlowPhase(raw?: string | null) {
   if (!raw) return null;
-  const norm = raw.toLowerCase();
-  return (
-    SCAN_FLOW_PHASES.find(
-      (phase) =>
-        norm.includes(phase.id.replace(/_/g, " ")) ||
-        norm.includes(phase.enginePhase.toLowerCase()) ||
-        norm.includes(phase.label.toLowerCase()) ||
-        norm.startsWith(phase.enginePhase.toLowerCase()),
-    ) ?? null
-  );
+  const hits = SCAN_FLOW_PHASES.filter((phase) => matchesFlowPhase(raw, phase));
+  if (hits.length === 0) return null;
+  if (hits.length === 1) return hits[0];
+  return [...hits].sort((a, b) => flowPhaseMatchScore(raw, b) - flowPhaseMatchScore(raw, a))[0];
 }
 
 /** Standard label shown across panels: "Phase 1a · Resolve targets" */

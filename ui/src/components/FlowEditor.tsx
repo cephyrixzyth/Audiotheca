@@ -6,6 +6,7 @@ import {
   type FlowPreset,
 } from "../flows/scanFlow";
 import { Button } from "../ui";
+import { resolveFlowPhase } from "../utils/scanDisplay";
 
 interface Props {
   skipPhases: string[];
@@ -122,19 +123,13 @@ export function FlowEditor({
             <div className="flow-group-nodes">
               {phases.map((phase, idx) => {
                 const enabled = !phase.skipKey || !skipSet.has(phase.skipKey);
-                const isRunning =
-                  activePhase != null &&
-                  activePhase.toLowerCase().includes(phase.enginePhase.toLowerCase().replace("phase ", "phase "));
-                const isActive =
-                  activePhase != null &&
-                  (activePhase.includes(phase.label) ||
-                    activePhase.toLowerCase().includes(phase.id.replace("_", " ")));
+                const isRunning = resolveFlowPhase(activePhase)?.id === phase.id;
 
                 return (
                   <div key={phase.id} className="flow-node-wrap">
                     {idx > 0 && <div className={`flow-connector ${enabled ? "on" : "off"}`} />}
                     <div
-                      className={`flow-node ${enabled ? "enabled" : "disabled"} ${isActive || isRunning ? "running" : ""} ${selectedNode === phase.id ? "selected" : ""}`}
+                      className={`flow-node ${enabled ? "enabled" : "disabled"} ${isRunning ? "running" : ""} ${selectedNode === phase.id ? "selected" : ""}`}
                     >
                       <button
                         type="button"
@@ -142,7 +137,11 @@ export function FlowEditor({
                         onClick={() => setSelectedNode(phase.id)}
                         title={phase.description}
                         aria-pressed={selectedNode === phase.id}
-                        aria-label={`${phase.label} (${phase.enginePhase})`}
+                        aria-label={
+                          phase.enginePhase.toLowerCase() === phase.label.toLowerCase()
+                            ? phase.label
+                            : `${phase.label} (${phase.enginePhase})`
+                        }
                       >
                         <span className="flow-node-engine">{phase.enginePhase}</span>
                         <span className="flow-node-label">{phase.label}</span>
