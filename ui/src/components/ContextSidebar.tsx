@@ -190,11 +190,11 @@ export function ContextSidebar({ stamp }: { stamp?: string }) {
         </label>
       )}
 
-      {filterDefs.length === 0 && (
+      {filterDefs.length === 0 && SEARCH_TABS.has(tab) && (
         <div className="context-sidebar-section">
           <span className="context-label">Filters</span>
           <p className="count-muted context-placeholder">
-            {TAB_HINTS[tab] ?? "Tab-specific filters and quick actions will appear here."}
+            Tab-specific filters appear here when this view supports them.
           </p>
         </div>
       )}
