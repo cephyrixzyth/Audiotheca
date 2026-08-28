@@ -219,6 +219,39 @@ def test_csrf_blocks_cross_origin_cookie_mutation(api_token, monkeypatch):
     assert allowed.status_code == 200
 
 
+def test_csrf_allows_nginx_ui_port_via_forwarded_host(api_token, monkeypatch):
+    """Docker UI is :4210; nginx `$host` used to strip the port and fail CSRF."""
+    monkeypatch.delenv("AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP", raising=False)
+    monkeypatch.setattr(security, "is_localhost", lambda _request: True)
+    client = TestClient(app)
+    assert client.post("/api/auth/session").status_code == 200
+
+    stripped = client.post(
+        "/api/auth/ticket",
+        json={"scope": "/api/feedback/export"},
+        headers={"Origin": "http://localhost:4210", "Host": "localhost"},
+    )
+    assert stripped.status_code == 403
+
+    forwarded = client.post(
+        "/api/auth/ticket",
+        json={"scope": "/api/feedback/export"},
+        headers={
+            "Origin": "http://localhost:4210",
+            "Host": "localhost",
+            "X-Forwarded-Host": "localhost:4210",
+        },
+    )
+    assert forwarded.status_code == 200
+
+    http_host = client.post(
+        "/api/auth/ticket",
+        json={"scope": "/api/feedback/export"},
+        headers={"Origin": "http://localhost:4210", "Host": "localhost:4210"},
+    )
+    assert http_host.status_code == 200
+
+
 def test_csrf_failure_does_not_consume_single_use_ticket(client, monkeypatch):
     monkeypatch.delenv("AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP", raising=False)
     monkeypatch.setattr(security, "is_localhost", lambda _request: True)
