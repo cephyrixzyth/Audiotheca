@@ -155,6 +155,9 @@ export function ContextSidebar({ stamp }: { stamp?: string }) {
             onChange={(e) => setQuery(e.target.value)}
             title={TAB_HINTS[tab] ?? "Context search for the active tab"}
           />
+          {TAB_HINTS[tab] ? (
+            <span className="count-muted context-placeholder">{TAB_HINTS[tab]}</span>
+          ) : null}
         </label>
       )}
 
@@ -186,15 +189,6 @@ export function ContextSidebar({ stamp }: { stamp?: string }) {
           <span className="context-label">Active run</span>
           <input type="text" className="field-input" value={stamp} readOnly title="Selected report stamp" />
         </label>
-      )}
-
-      {filterDefs.length === 0 && SEARCH_TABS.has(tab) && (
-        <div className="context-sidebar-section">
-          <span className="context-label">Filters</span>
-          <p className="count-muted context-placeholder">
-            Tab-specific filters appear here when this view supports them.
-          </p>
-        </div>
       )}
 
       <div className="context-sidebar-section">
