@@ -11,49 +11,72 @@ x-library-volume: &library-volume
   target: ${LIBRARY_CONTAINER_PATH:-/library}
   read_only: true
 
+# Shared API image/config. Do not put ports/expose here — Gluetun sidecar
+# uses network_mode: service:gluetun, which cannot expose or publish ports.
+x-api-core: &api-core
+  build:
+    context: ../..
+    dockerfile: deploy/unraid/Dockerfile.api
+    args:
+      PYTHON_VERSION: ${PYTHON_VERSION:-3.13}
+      AUDIOTHECA_VERSION: "${AUDIOTHECA_VERSION:-1.0.12}"
+      ENGINE_VERSION: "10.0.0"
+  restart: unless-stopped
+  env_file: .env
+  environment:
+    AUDIOTHECA_HOME: /data
+    AUDIOTHECA_LIBRARY_ROOT: ${LIBRARY_CONTAINER_PATH:-/library}
+    AUDIOTHECA_LIBRARY_ROOTS: ${LIBRARY_CONTAINER_PATH:-/library}
+    AUDIOTHECA_API_PORT: "8787"
+    AUDIOTHECA_API_HOST: "0.0.0.0"
+    AUDIOTHECA_NO_RELOAD: "1"
+    AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP: "${AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP:-1}"
+    AUDIOTHECA_API_TOKEN: "${AUDIOTHECA_API_TOKEN:?Set AUDIOTHECA_API_TOKEN in .env}"
+    AUDIOTHECA_PROXY_SECRET: "${AUDIOTHECA_PROXY_SECRET:?Set AUDIOTHECA_PROXY_SECRET in .env}"
+    SEARXNG_URL: ${SEARXNG_URL:-http://searxng:8080}
+  volumes:
+    - ${APPDATA_PATH:-./appdata}:/data
+    - *library-volume
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://127.0.0.1:8787/api/health"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 40s
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+x-searxng-core: &searxng-core
+  image: docker.io/searxng/searxng:latest
+  restart: unless-stopped
+  depends_on:
+    valkey:
+      condition: service_started
+  volumes:
+    - ./searxng-config:/etc/searxng:ro
+  healthcheck:
+    test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8080/healthz"]
+    interval: 30s
+    timeout: 10s
+    retries: 5
+    start_period: 20s
+  logging:
+    driver: json-file
+    options:
+      max-size: "5m"
+      max-file: "2"
+
 services:
   api:
-    build:
-      context: ../..
-      dockerfile: deploy/unraid/Dockerfile.api
-      args:
-        PYTHON_VERSION: ${PYTHON_VERSION:-3.13}
-        AUDIOTHECA_VERSION: "${AUDIOTHECA_VERSION:-1.0.12}"
-        ENGINE_VERSION: "10.0.0"
+    <<: *api-core
     container_name: audiotheca-api
-    restart: unless-stopped
-    env_file: .env
-    environment:
-      AUDIOTHECA_HOME: /data
-      AUDIOTHECA_LIBRARY_ROOT: ${LIBRARY_CONTAINER_PATH:-/library}
-      AUDIOTHECA_LIBRARY_ROOTS: ${LIBRARY_CONTAINER_PATH:-/library}
-      AUDIOTHECA_API_PORT: "8787"
-      AUDIOTHECA_API_HOST: "0.0.0.0"
-      AUDIOTHECA_NO_RELOAD: "1"
-      # Token bootstrap is disabled for Docker/LAN. UI establishes an HttpOnly
-      # session via nginx + AUDIOTHECA_PROXY_SECRET (token never baked into JS).
-      AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP: "${AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP:-1}"
-      AUDIOTHECA_API_TOKEN: "${AUDIOTHECA_API_TOKEN:?Set AUDIOTHECA_API_TOKEN in .env}"
-      AUDIOTHECA_PROXY_SECRET: "${AUDIOTHECA_PROXY_SECRET:?Set AUDIOTHECA_PROXY_SECRET in .env}"
-      SEARXNG_URL: ${SEARXNG_URL:-http://searxng:8080}
-    volumes:
-      - ${APPDATA_PATH:-./appdata}:/data
-      - *library-volume
     # Reachable on the Docker network (UI nginx proxies /api/). Do not publish
     # 8787 to the host/LAN by default — add ports only for local debugging.
     expose:
       - "8787"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:8787/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
 
   ui:
     build:
@@ -78,27 +101,10 @@ services:
         max-file: "2"
 
   searxng:
-    image: docker.io/searxng/searxng:latest
+    <<: *searxng-core
     container_name: audiotheca-searxng
-    restart: unless-stopped
-    depends_on:
-      valkey:
-        condition: service_started
     ports:
       - "127.0.0.1:${SEARXNG_PORT:-8081}:8080"
-    volumes:
-      - ./searxng-config:/etc/searxng:ro
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8080/healthz"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 20s
-    logging:
-      driver: json-file
-      options:
-        max-size: "5m"
-        max-file: "2"
 
   valkey:
     image: docker.io/valkey/valkey:9-alpine
@@ -147,8 +153,8 @@ services:
 
   # Gluetun VPN sidecar (DKR-TUN). Route API + SearXNG through VPN:
   #   docker compose --profile vpn up -d
-  # Then stop the default searxng (host port 8081) so gluetun can bind it:
-  #   docker compose stop searxng
+  # Then stop the default api/searxng so only the *-vpn sidecars share Gluetun:
+  #   docker compose stop api searxng
   gluetun:
     profiles: ["vpn"]
     image: qmcgaw/gluetun:latest
@@ -175,24 +181,22 @@ services:
         max-file: "3"
 
   api-vpn:
+    <<: *api-core
     profiles: ["vpn"]
-    extends:
-      service: api
     container_name: audiotheca-api-vpn
     network_mode: "service:gluetun"
-    ports: []
     depends_on:
       gluetun:
         condition: service_started
 
   searxng-vpn:
+    <<: *searxng-core
     profiles: ["vpn"]
-    extends:
-      service: searxng
     container_name: audiotheca-searxng-vpn
     network_mode: "service:gluetun"
-    ports: []
     depends_on:
+      valkey:
+        condition: service_started
       gluetun:
         condition: service_started
 

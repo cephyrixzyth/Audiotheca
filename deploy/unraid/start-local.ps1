@@ -76,7 +76,7 @@ New-Item -ItemType Directory -Force -Path "./appdata" | Out-Null
 
 Write-Host "Building and starting api + ui + searxng..."
 docker compose down 2>$null
-docker compose up -d --build
+docker compose up -d --build api ui searxng valkey
 
 Write-Host ""
 Write-Host "Audiotheca Docker stack:" -ForegroundColor Green
