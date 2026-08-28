@@ -133,6 +133,7 @@ class RunSummary:
     investigation_buckets: dict[str, int] = field(default_factory=dict)
     quarantined: int = 0
     reconciled_vendors: int = 0
+    deep_identified: int = 0
     vendor_conflicts: int = 0
     nested_issues: int = 0
     coexistence_findings: int = 0

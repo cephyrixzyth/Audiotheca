@@ -15,6 +15,9 @@ export interface RunSummary {
   routes_planned: number;
   investigation: number;
   investigation_buckets: Record<string, number>;
+  reconciled_vendors?: number;
+  deep_identified?: number;
+  vendor_conflicts?: number;
   nested_issues: number;
   coexistence_findings: number;
   scene_renames_planned: number;

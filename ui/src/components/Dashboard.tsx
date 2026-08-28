@@ -31,6 +31,7 @@ import { DashboardHome } from "./DashboardHome";
 
 interface Props {
   summary?: RunSummary | null;
+  summaryLoading?: boolean;
   runs: RunListItem[];
   onNavigate?: (tab: TabId) => void;
 }
@@ -104,6 +105,13 @@ function basename(path: string): string {
 }
 
 export function Dashboard(props: Props) {
+  if (props.summaryLoading) {
+    return (
+      <div className="dash dash-loading">
+        <p className="count-muted">Loading run summary…</p>
+      </div>
+    );
+  }
   if (!props.summary) {
     return <DashboardHome runs={props.runs} onNavigate={props.onNavigate} />;
   }
@@ -186,6 +194,7 @@ function DashboardRun({
   const oneActionPct = summary.one_action_pct ?? null;
   const invPct =
     summary.scanned > 0 ? Math.round((summary.investigation / summary.scanned) * 100) : null;
+  const identifyOnly = summary.routes_planned === 0;
   const activeJob = jobs.find((j) =>
       ["running", "paused", "pause_pending", "stop_pending"].includes(j.status),
     );
@@ -198,10 +207,40 @@ function DashboardRun({
     () => [
       {
         id: "hit-rate",
-        title: "Hit rate",
-        subtitle: "Identification vs routing success",
+        title: identifyOnly ? "Identification" : "Hit rate",
+        subtitle: identifyOnly
+          ? "Identify-only scan — no routes planned"
+          : "Identification vs routing success",
         span: 2,
-        content: (
+        content: identifyOnly ? (
+          <div className="stat-grid compact">
+            <StatTile
+              label="Deep identified"
+              value={formatCompact(summary.deep_identified ?? 0)}
+              tone="accent"
+            />
+            <StatTile
+              label="Reconciled vendors"
+              value={formatCompact(summary.reconciled_vendors ?? 0)}
+              tone="accent"
+            />
+            <StatTile
+              label="Vendor conflicts"
+              value={formatCompact(summary.vendor_conflicts ?? 0)}
+              tone={(summary.vendor_conflicts ?? 0) > 0 ? "warning" : undefined}
+            />
+            <StatTile
+              label="Coverage gaps"
+              value={formatCompact(summary.coverage_gaps ?? 0)}
+              tone={(summary.coverage_gaps ?? 0) > 0 ? "warning" : undefined}
+            />
+            <StatTile label="Nested issues" value={formatCompact(summary.nested_issues)} />
+            <StatTile
+              label="Coexistence"
+              value={formatCompact(summary.coexistence_findings)}
+            />
+          </div>
+        ) : (
           <>
             <div className="gauge-stack">
               <Gauge
@@ -222,8 +261,8 @@ function DashboardRun({
                 detail={
                   oneActionPct != null
                     ? `${oneActionPct}% inv = unverified vendor (add to DB)`
-              : "—"
-          }
+                    : "—"
+                }
                 tone="warning"
               />
             </div>
@@ -745,6 +784,7 @@ function DashboardRun({
       findings,
       harvestPending,
       identificationPct,
+      identifyOnly,
       invPct,
       metrics,
       onNavigate,

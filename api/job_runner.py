@@ -570,11 +570,24 @@ class JobManager:
         return None
 
 
+_ERROR_COUNT_ZERO_RE = re.compile(r"\berrors?\s*:\s*0\b")
+_ERROR_WORD_RE = re.compile(r"\berror\b")
+_FAILED_WORD_RE = re.compile(r"\bfailed\b")
+
+
 def _log_level(line: str) -> str:
+    """Classify a log line for the session UI.
+
+    Ignore summary counters like ``Errors: 0`` so successful runs are not
+    painted as error-level in the progress log.
+    """
     lowered = line.lower()
-    if "[!!]" in line or "error" in lowered or "failed" in lowered or "traceback" in lowered:
+    if "[!!]" in line or "traceback" in lowered:
         return "error"
-    if "[!]" in line or "warn" in lowered or "skipped" in lowered:
+    cleaned = _ERROR_COUNT_ZERO_RE.sub(" ", lowered)
+    if _ERROR_WORD_RE.search(cleaned) or _FAILED_WORD_RE.search(cleaned):
+        return "error"
+    if "[!]" in line or "warn" in cleaned or "skipped" in cleaned:
         return "warn"
     if line.startswith(">>>") or "[OK]" in line:
         return "info"

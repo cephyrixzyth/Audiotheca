@@ -42,6 +42,7 @@ const SUBTREE_TABS: TabId[] = [
 export default function App() {
   const [runs, setRuns] = useState<RunListItem[]>([]);
   const [summary, setSummary] = useState<RunSummary | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const tab = tabForPath(location.pathname);
@@ -137,11 +138,30 @@ export default function App() {
   }, [stamp, runs, setStamp]);
 
   useEffect(() => {
-    if (!stamp) return;
+    if (!stamp) {
+      setSummary(null);
+      setSummaryLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setSummaryLoading(true);
     setError(null);
     fetchRun(stamp)
-      .then(setSummary)
-      .catch((err: Error) => setError(err.message));
+      .then((next) => {
+        if (!cancelled) setSummary(next);
+      })
+      .catch((err: Error) => {
+        if (!cancelled) {
+          setSummary(null);
+          setError(err.message);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setSummaryLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [stamp]);
 
   const onScanComplete = useCallback(
@@ -225,7 +245,12 @@ export default function App() {
               )}
 
               {tab === "dashboard" && !showUiKit && (
-                <Dashboard summary={summary} runs={runs} onNavigate={setTab} />
+                <Dashboard
+                  summary={summary}
+                  summaryLoading={summaryLoading}
+                  runs={runs}
+                  onNavigate={setTab}
+                />
               )}
               {tab === "investigation" &&
                 (stamp ? (

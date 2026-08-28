@@ -11,6 +11,14 @@ Git tag **v1.0.7** was published with a broken Windows NSIS pre-install hook (si
 - **Engine launch path** — when `AUDIOTHECA_HOME` points at Docker appdata (`/data`), jobs spawn `main.py` from the code root (`/app`), not `/data/main.py` (dry-runs no longer die instantly as “stopped by user”)
 - **Identify-only preset** — also skips live moves and purge empty dirs (act phases), matching the “scan and identify only” label
 - **Vendors count** — shows “Loading…” instead of a misleading “0 vendors” flash before `/api/vendors` returns
+- **Session log levels** — summary lines like `Errors: 0` no longer paint as error-level in the scan progress log
+- **Deep identified** — run summary API/UI parse the `Deep identified` counter from `Run_Summary_*.txt`
+
+### Dashboard
+
+- **Loading state** — selecting a run shows “Loading run summary…” instead of a false “No scan reports yet” flash
+- **Identify-only Hit rate** — when `routes_planned` is 0, the lead widget shows deep ID / vendor reconcile / gaps instead of empty 0% gauges
+- **Quieter sidebar** — drop the “search not available” apologetic copy on Dashboard and other non-search tabs
 
 ### UI design system & routing
 
