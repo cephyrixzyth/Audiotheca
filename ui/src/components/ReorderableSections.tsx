@@ -4,7 +4,7 @@ import { useSectionSpan } from "../hooks/useSectionSpan";
 import { useLayoutPresets } from "../hooks/useLayoutPresets";
 import { useGroupTitles } from "../hooks/useGroupTitles";
 import { canvasStyle, useCanvasLayout } from "../hooks/useCanvasLayout";
-import { Button } from "../ui";
+import { Button, DropdownMenu, type DropdownItem } from "../ui";
 
 function bindHeaderPointerDrag(
   sectionId: string,
@@ -193,6 +193,30 @@ function DragControls({
   onCycleWidth?: (id: string) => void;
 }) {
   const handleDrag = bindHandleDrag(sectionId, onDragStart, onDragEnd);
+  const menuItems: DropdownItem[] = [
+    ...(showWidthControl && onCycleWidth
+      ? [
+          {
+            id: "width",
+            label: "Cycle width",
+            title: "Widen or narrow this panel",
+            onSelect: () => onCycleWidth(sectionId),
+          } satisfies DropdownItem,
+        ]
+      : []),
+    {
+      id: "up",
+      label: "Move up",
+      disabled: index === 0,
+      onSelect: () => onMoveUp(sectionId),
+    },
+    {
+      id: "down",
+      label: "Move down",
+      disabled: index >= total - 1,
+      onSelect: () => onMoveDown(sectionId),
+    },
+  ];
   return (
     <div className="section-drag-controls panel-header-toolbar" onClick={(e) => e.stopPropagation()}>
       <span
@@ -200,7 +224,7 @@ function DragControls({
         tabIndex={0}
         className="section-drag-handle"
         title={`Drag to reorder: ${title}`}
-        aria-label={`Move ${title}`}
+        aria-label={`Drag to reorder ${title}`}
         onPointerDown={(e) => {
           if (e.button !== 0) return;
           e.preventDefault();
@@ -213,34 +237,21 @@ function DragControls({
           ⠿
         </span>
       </span>
-      {showWidthControl && onCycleWidth && (
-        <button
-          type="button"
-          className="section-move-btn section-width-btn"
-          title="Cycle panel width"
-          onClick={() => onCycleWidth(sectionId)}
-        >
-          ↔
-        </button>
-      )}
-      <button
-        type="button"
-        className="section-move-btn"
-        disabled={index === 0}
-        title="Move up"
-        onClick={() => onMoveUp(sectionId)}
-      >
-        ↑
-      </button>
-      <button
-        type="button"
-        className="section-move-btn"
-        disabled={index >= total - 1}
-        title="Move down"
-        onClick={() => onMoveDown(sectionId)}
-      >
-        ↓
-      </button>
+      <DropdownMenu
+        align="start"
+        ariaLabel={`${title} panel actions`}
+        trigger={
+          <button
+            type="button"
+            className="section-move-btn"
+            title="More panel actions"
+            aria-label={`More actions for ${title}`}
+          >
+            ⋮
+          </button>
+        }
+        items={menuItems}
+      />
       {onToggleCollapse && (
         <button
           type="button"
@@ -645,6 +656,7 @@ export function ReorderableSections({
   const [presetName, setPresetName] = useState("");
   const [presetMsg, setPresetMsg] = useState<string | null>(null);
   const [importText, setImportText] = useState("");
+  const [layoutOpen, setLayoutOpen] = useState(false);
 
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
@@ -932,111 +944,118 @@ export function ReorderableSections({
 
   return (
     <div className={`reorderable-layout${dragId ? " is-reordering" : ""}`}>
-      <div className="reorderable-hint">
-        <div className="reorderable-hint-main">
-          <strong>Move widgets</strong>
-          <span className="count-muted">
-            Drag the <strong>⠿</strong> grip or <strong>panel title</strong> onto a green drop line, drop into empty slots, or use ↑↓ arrows.
-            Grid panels: <strong>↔</strong> cycles width.
-          </span>
-        </div>
-        <div className="reorderable-hint-actions">
-          <Button variant="ghost" size="sm" title="Insert invisible vertical space" onClick={() => insertSpacerAfter(null)}>
-            + Space
-          </Button>
-          <Button variant="ghost" size="sm" title="Restore default layout" onClick={resetOrder}>
-            Reset layout
-          </Button>
-        </div>
-      </div>
-      <div className="layout-preset-bar">
-        <input
-          type="text"
-          className="field-input layout-preset-name"
-          placeholder="Layout preset name…"
-          value={presetName}
-          onChange={(e) => setPresetName(e.target.value)}
-        />
-        <Button variant="ghost" size="sm" onClick={handleSavePreset} disabled={!presetName.trim()}>
-          Save layout
-        </Button>
+      <div className="layout-toolbar">
         <Button
           variant="ghost"
           size="sm"
-          title="Export all layout presets as JSON (BPRNT-SAVE)"
-          onClick={() => {
-            const text = exportBlueprint();
-            void navigator.clipboard.writeText(text);
-            setPresetMsg("Layout blueprint copied to clipboard");
-          }}
+          active={layoutOpen}
+          title="Show or hide layout customization tools"
+          onClick={() => setLayoutOpen((open) => !open)}
         >
-          Export JSON
+          Layout
         </Button>
-        <input
-          type="text"
-          className="field-input layout-preset-name"
-          placeholder="Paste layout JSON to import…"
-          value={importText}
-          onChange={(e) => setImportText(e.target.value)}
-        />
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={!importText.trim()}
-          onClick={() => {
-            try {
-              const count = importBlueprint(importText);
-              setPresetMsg(`Imported ${count} layout preset(s)`);
-              setImportText("");
-            } catch {
-              setPresetMsg("Invalid layout JSON");
-            }
-          }}
-        >
-          Import JSON
-        </Button>
-        {presetNames.length > 0 && (
-          <select
-            className="field-input layout-preset-select"
-            defaultValue=""
-            onChange={(e) => {
-              const val = e.target.value;
-              if (val) handleLoadPreset(val);
-              e.target.value = "";
-            }}
-          >
-            <option value="">Load layout…</option>
-            {presetNames.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-        )}
-        {presetNames.length > 0 && (
-          <select
-            className="field-input layout-preset-select"
-            defaultValue=""
-            title="Delete a saved layout"
-            onChange={(e) => {
-              const val = e.target.value;
-              if (val && window.confirm(`Delete layout preset “${val}”?`)) {
-                removePreset(val);
-                setPresetMsg(`Deleted “${val}”`);
-              }
-              e.target.value = "";
-            }}
-          >
-            <option value="">Delete layout…</option>
-            {presetNames.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
+        {layoutOpen && (
+          <div className="layout-toolbar-panel">
+            <p className="count-muted layout-toolbar-hint">
+              Drag the <strong>⠿</strong> grip or a panel title to reorder. Use <strong>⋮</strong> for move up/down and width.
+            </p>
+            <div className="layout-toolbar-actions">
+              <Button variant="ghost" size="sm" title="Insert invisible vertical space" onClick={() => insertSpacerAfter(null)}>
+                + Space
+              </Button>
+              <Button variant="ghost" size="sm" title="Restore default layout" onClick={resetOrder}>
+                Reset
+              </Button>
+              <input
+                type="text"
+                className="field-input layout-preset-name"
+                placeholder="Preset name…"
+                value={presetName}
+                onChange={(e) => setPresetName(e.target.value)}
+              />
+              <Button variant="ghost" size="sm" onClick={handleSavePreset} disabled={!presetName.trim()}>
+                Save
+              </Button>
+              {presetNames.length > 0 && (
+                <select
+                  className="field-input layout-preset-select"
+                  defaultValue=""
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val) handleLoadPreset(val);
+                    e.target.value = "";
+                  }}
+                >
+                  <option value="">Load…</option>
+                  {presetNames.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                title="Export all layout presets as JSON"
+                onClick={() => {
+                  const text = exportBlueprint();
+                  void navigator.clipboard.writeText(text);
+                  setPresetMsg("Layout blueprint copied to clipboard");
+                }}
+              >
+                Export
+              </Button>
+              <input
+                type="text"
+                className="field-input layout-preset-name"
+                placeholder="Paste JSON…"
+                value={importText}
+                onChange={(e) => setImportText(e.target.value)}
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={!importText.trim()}
+                onClick={() => {
+                  try {
+                    const count = importBlueprint(importText);
+                    setPresetMsg(`Imported ${count} layout preset(s)`);
+                    setImportText("");
+                  } catch {
+                    setPresetMsg("Invalid layout JSON");
+                  }
+                }}
+              >
+                Import
+              </Button>
+              {presetNames.length > 0 && (
+                <select
+                  className="field-input layout-preset-select"
+                  defaultValue=""
+                  title="Delete a saved layout"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val && window.confirm(`Delete layout preset “${val}”?`)) {
+                      removePreset(val);
+                      setPresetMsg(`Deleted “${val}”`);
+                    }
+                    e.target.value = "";
+                  }}
+                >
+                  <option value="">Delete…</option>
+                  {presetNames.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+            {presetMsg && <p className="count-muted layout-preset-msg">{presetMsg}</p>}
+          </div>
         )}
       </div>
-      {presetMsg && <p className="count-muted layout-preset-msg">{presetMsg}</p>}
       <div
         className={containerClass}
         onDragOver={(e) => {

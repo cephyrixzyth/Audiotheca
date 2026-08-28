@@ -5,9 +5,7 @@ import type { JobSnapshot, RunListItem, TabId } from "../types";
 import { Badge, Button } from "../ui";
 import { ReorderableSections } from "./ReorderableSections";
 import { EnvironmentSummaryWidget } from "./EnvironmentPanel";
-import { InstallationSummaryWidget } from "./InstallLifecyclePanel";
 import { TabEmptyState } from "./TabEmptyState";
-import { TelemetryDualPanel } from "./TelemetryDualPanel";
 
 interface Props {
   runs: RunListItem[];
@@ -38,29 +36,35 @@ export function DashboardHome({ runs, onNavigate }: Props) {
   const sections = useMemo(
     () => [
       {
-        id: "dual-telemetry",
-        title: "Dual telemetry",
-        subtitle: "Host vs remote mount I/O and latency",
-        group: "telemetry",
-        groupTitle: "System",
-        tone: "accent" as const,
+        id: "quick-views",
+        title: "Quick start",
+        subtitle: "Jump into the next action",
         span: 2 as const,
-        content: <TelemetryDualPanel />,
+        content: (
+          <div className="quick-links">
+            <button type="button" className="quick-link" onClick={() => onNavigate?.("scan")}>
+              Start scan <span aria-hidden>→</span>
+            </button>
+            <button type="button" className="quick-link" onClick={() => onNavigate?.("environment")}>
+              Environment <span aria-hidden>→</span>
+            </button>
+            <button type="button" className="quick-link" onClick={() => onNavigate?.("security")}>
+              Security <span aria-hidden>→</span>
+            </button>
+            <button type="button" className="quick-link" onClick={() => onNavigate?.("vendors")}>
+              Vendors {harvestPending > 0 ? `(${harvestPending} pending)` : ""} <span aria-hidden>→</span>
+            </button>
+            <button type="button" className="quick-link" onClick={() => onNavigate?.("help")}>
+              Help <span aria-hidden>→</span>
+            </button>
+          </div>
+        ),
       },
       {
         id: "environment-home",
         title: "Environment",
         subtitle: "Toolchain health",
-        group: "telemetry",
         content: <EnvironmentSummaryWidget onNavigate={() => onNavigate?.("environment")} />,
-      },
-      {
-        id: "installations-home",
-        title: "Installations",
-        subtitle: "Version status and updates",
-        group: "telemetry",
-        tone: "accent" as const,
-        content: <InstallationSummaryWidget onNavigate={() => onNavigate?.("environment")} />,
       },
       {
         id: "active-job",
@@ -88,30 +92,6 @@ export function DashboardHome({ runs, onNavigate }: Props) {
         ),
       },
       {
-        id: "quick-views",
-        title: "Quick navigation",
-        subtitle: "Open tools without a run selected",
-        content: (
-          <div className="quick-links">
-            <button type="button" className="quick-link" onClick={() => onNavigate?.("scan")}>
-              Start scan <span aria-hidden>→</span>
-            </button>
-            <button type="button" className="quick-link" onClick={() => onNavigate?.("environment")}>
-              Environment <span aria-hidden>→</span>
-            </button>
-            <button type="button" className="quick-link" onClick={() => onNavigate?.("security")}>
-              Security <span aria-hidden>→</span>
-            </button>
-            <button type="button" className="quick-link" onClick={() => onNavigate?.("vendors")}>
-              Vendors {harvestPending > 0 ? `(${harvestPending} pending)` : ""} <span aria-hidden>→</span>
-            </button>
-            <button type="button" className="quick-link" onClick={() => onNavigate?.("help")}>
-              Help <span aria-hidden>→</span>
-            </button>
-          </div>
-        ),
-      },
-      {
         id: "run-history-home",
         title: "Recent runs",
         subtitle: runs.length ? `${runs.length} reports on disk` : "No reports yet",
@@ -132,9 +112,9 @@ export function DashboardHome({ runs, onNavigate }: Props) {
   );
 
   return (
-    <div className="dash">
+    <div className="dash dash-home">
       <TabEmptyState tab="dashboard" onStartScan={() => onNavigate?.("scan")} />
-      <ReorderableSections layoutId="dashboard" layout="grid" autoFlow canvasGrid sections={sections} />
+      <ReorderableSections layoutId="dashboard-home" layout="grid" sections={sections} />
     </div>
   );
 }

@@ -22,6 +22,21 @@
   min-width: 8rem;
 }
 
+.topbar-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.topbar-logo {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 6px;
+  flex-shrink: 0;
+  object-fit: cover;
+  box-shadow: 0 0 0 1px var(--border);
+}
+
 .topbar-brand h1 {
   margin: 0;
   font-size: 1rem;
@@ -253,27 +268,38 @@
   margin: 0;
 }
 
-.reorderable-hint {
+.layout-toolbar {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   align-items: flex-start;
-  gap: 0.75rem;
+  gap: 0.4rem;
+}
+
+.layout-toolbar-panel {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
   padding: 0.5rem 0.65rem;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: 8px;
 }
 
-.reorderable-hint-main {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  font-size: 0.78rem;
+.layout-toolbar-hint {
+  margin: 0;
+  font-size: 0.76rem;
 }
 
-.reorderable-hint-main strong {
-  color: var(--accent);
-  font-size: 0.82rem;
+.layout-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.dash-home .tab-empty-state {
+  margin-bottom: 0.75rem;
 }
 
 .section-collapse-btn {
@@ -2255,12 +2281,6 @@ tr.inv-vendor-set {
   color: var(--danger);
 }
 
-.reorderable-hint-actions {
-  display: flex;
-  gap: 0.35rem;
-  align-items: center;
-}
-
 .reorder-item-wrap {
   display: flex;
   flex-direction: column;
@@ -3048,17 +3068,9 @@ tr.inv-vendor-set {
   }
 }
 
-.layout-preset-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-  align-items: center;
-  margin-bottom: 0.35rem;
-}
-
 .layout-preset-name {
-  min-width: 10rem;
-  flex: 1 1 140px;
+  min-width: 8rem;
+  flex: 1 1 120px;
 }
 
 .layout-preset-select {
