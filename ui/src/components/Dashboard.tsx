@@ -293,6 +293,7 @@ function DashboardRun({
         id: "compare-runs",
         title: "Compare runs",
         subtitle: "Delta vs prior stamp",
+        hidden: runs.filter((r) => r.stamp !== summary.stamp).length === 0,
         content: (
           <>
             <label>
@@ -389,7 +390,7 @@ function DashboardRun({
       {
         id: "host-metrics",
         title: "Host metrics",
-        subtitle: metrics?.disk_path ?? libraryRoot,
+        subtitle: metrics?.scan_root ?? metrics?.disk_path ?? libraryRoot,
         content: (
           <>
             {metrics ? (
@@ -509,12 +510,14 @@ function DashboardRun({
         subtitle: "Where items landed",
         span: 2,
         tone: "accent" as const,
+        hidden: bucketData.length === 0,
         content: <BarChart data={bucketData} maxItems={10} />,
       },
       {
         id: "active-job",
         title: "Active scan job",
         subtitle: "Live engine status",
+        hidden: !activeJob,
         content: activeJob ? (
           <div className="job-card">
             <div className="job-row">
@@ -550,6 +553,10 @@ function DashboardRun({
         id: "feedback",
         title: "Feedback & execute",
         subtitle: "Corrections pending scan · recent staged moves for this run",
+        hidden:
+          !(feedback && (feedback.total ?? 0) > 0) &&
+          !(executeHistory && executeHistory.total > 0) &&
+          harvestPending === 0,
         content: (
           <>
             <div className="stat-grid compact">
@@ -718,6 +725,7 @@ function DashboardRun({
         title: "Quality scorecard",
         subtitle: "Phase 3.5 verification results",
         span: 2,
+        hidden: !scorecard,
         content: scorecard ? (
           <>
             <div className="gauge-stack">

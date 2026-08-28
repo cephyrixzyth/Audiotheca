@@ -19,6 +19,8 @@ Git tag **v1.0.7** was published with a broken Windows NSIS pre-install hook (si
 - **Loading state** — selecting a run shows “Loading run summary…” instead of a false “No scan reports yet” flash
 - **Identify-only Hit rate** — when `routes_planned` is 0, the lead widget shows deep ID / vendor reconcile / gaps instead of empty 0% gauges
 - **Quieter sidebar** — drop the “search not available” apologetic copy on Dashboard and other non-search tabs
+- **Trim empty panels** — hide Compare / Investigation buckets / idle Active job / empty Feedback / missing Quality scorecard until they have data
+- **Host metrics path** — Docker library mountpoints (e.g. `/library`) are used for disk usage instead of falling back to `/root`
 
 ### UI design system & routing
 
