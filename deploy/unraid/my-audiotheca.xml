@@ -8,7 +8,7 @@
   <Privileged>false</Privileged>
   <Support>https://forums.unraid.net/</Support>
   <Project>https://github.com/chrisjrovira/Audiotheca</Project>
-  <Overview>Audiotheca v1.0.12 (engine 10.0.0) scans, deduplicates, and restructures large audio sample libraries on local disk. Includes browser UI and API in one container.[br][br][b]Before adding:[/b] build the image once on Unraid: [code]bash /path/to/audiotheca/deploy/unraid/build-image.sh[/code][br]Or install the template: [code]bash deploy/unraid/install-template.sh[/code]</Overview>
+  <Overview>Audiotheca v1.0.12 (engine 10.0.0) scans, deduplicates, and restructures large audio sample libraries on local disk. Includes browser UI and API in one container.[br][br]Vendor research uses SearXNG — run the Compose stack in deploy/unraid (api + ui + searxng) or set SEARXNG_URL to a sidecar.[br][br][b]Before adding:[/b] build the image once on Unraid: [code]bash /path/to/audiotheca/deploy/unraid/build-image.sh[/code][br]Or install the template: [code]bash deploy/unraid/install-template.sh[/code]</Overview>
   <Category>Tools:Utilities MediaApp:Other</Category>
   <WebUI>http://[IP]:[PORT:4210]/</WebUI>
   <Icon>/boot/config/plugins/dockerMan/templates-user/audiotheca-icon.png</Icon>
@@ -35,4 +35,5 @@
   <Config Name="AUDIOTHECA_API_TOKEN" Target="AUDIOTHECA_API_TOKEN" Default="" Mode="" Description="Required fixed API token (long random string)" Type="Variable" Display="always" Required="true" Mask="true"/>
   <Config Name="AUDIOTHECA_PROXY_SECRET" Target="AUDIOTHECA_PROXY_SECRET" Default="" Mode="" Description="Shared secret for nginx→API session minting (required; different from API token)" Type="Variable" Display="always" Required="true" Mask="true"/>
   <Config Name="AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP" Target="AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP" Default="1" Mode="" Description="Keep 1 for LAN — sessions via proxy secret only" Type="Variable" Display="advanced" Required="false" Mask="false">1</Config>
+  <Config Name="SEARXNG_URL" Target="SEARXNG_URL" Default="" Mode="" Description="Optional SearXNG base URL for vendor research (Compose default: http://searxng:8080). Leave empty if SearXNG is not running." Type="Variable" Display="advanced" Required="false" Mask="false"/>
 </Container>
