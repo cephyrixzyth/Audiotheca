@@ -3,6 +3,14 @@
 
 name: audiotheca-unraid
 
+# Long-form bind: short syntax `Z:/path:/library:ro` is invalid on Windows
+# (the drive-letter colon is parsed as a volume separator).
+x-library-volume: &library-volume
+  type: bind
+  source: ${LIBRARY_HOST_PATH}
+  target: ${LIBRARY_CONTAINER_PATH:-/library}
+  read_only: true
+
 services:
   api:
     build:
@@ -30,7 +38,7 @@ services:
       SEARXNG_URL: ${SEARXNG_URL:-http://searxng:8080}
     volumes:
       - ${APPDATA_PATH:-./appdata}:/data
-      - ${LIBRARY_HOST_PATH}:${LIBRARY_CONTAINER_PATH:-/library}:ro
+      - *library-volume
     # Reachable on the Docker network (UI nginx proxies /api/). Do not publish
     # 8787 to the host/LAN by default — add ports only for local debugging.
     expose:
@@ -129,7 +137,7 @@ services:
       AUDIOTHECA_LIBRARY_ROOT: ${LIBRARY_CONTAINER_PATH:-/library}
     volumes:
       - ${APPDATA_PATH:-./appdata}:/data
-      - ${LIBRARY_HOST_PATH}:${LIBRARY_CONTAINER_PATH:-/library}:ro
+      - *library-volume
     command:
       - python
       - space_recovery.py
@@ -215,7 +223,7 @@ services:
       SEARXNG_URL: ${SEARXNG_URL:-http://searxng:8080}
     volumes:
       - ${APPDATA_PATH:-./appdata}:/data
-      - ${LIBRARY_HOST_PATH}:${LIBRARY_CONTAINER_PATH:-/library}:ro
+      - *library-volume
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1/api/health"]
       interval: 30s
