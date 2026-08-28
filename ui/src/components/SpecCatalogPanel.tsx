@@ -55,26 +55,32 @@ export function SpecCatalogPanel() {
         </p>
       )}
       <div className="log-toolbar">
-        {sections.map((section) => (
-          <button
-            key={section}
-            type="button"
-            className={`log-level-btn ${filter === section ? "active" : ""}`}
-            onClick={() => setFilter(section)}
-          >
-            {section === "all" ? "All sections" : section}
-          </button>
-        ))}
-        {(["all", "done", "partial", "mvp"] as const).map((status) => (
-          <button
-            key={status}
-            type="button"
-            className={`log-level-btn ${statusFilter === status ? "active" : ""}`}
-            onClick={() => setStatusFilter(status)}
-          >
-            {status}
-          </button>
-        ))}
+        <div className="log-level-filters" role="group" aria-label="Spec section">
+          {sections.map((section) => (
+            <button
+              key={section}
+              type="button"
+              className={`log-level-btn ${filter === section ? "active" : ""}`}
+              aria-pressed={filter === section}
+              onClick={() => setFilter(section)}
+            >
+              {section === "all" ? "All sections" : section}
+            </button>
+          ))}
+        </div>
+        <div className="log-level-filters" role="group" aria-label="Spec status">
+          {(["all", "done", "partial", "mvp"] as const).map((status) => (
+            <button
+              key={status}
+              type="button"
+              className={`log-level-btn ${statusFilter === status ? "active" : ""}`}
+              aria-pressed={statusFilter === status}
+              onClick={() => setStatusFilter(status)}
+            >
+              {status}
+            </button>
+          ))}
+        </div>
       </div>
       <div className="spec-catalog-grid">
         {visible.map((entry) => (

@@ -110,6 +110,7 @@ export function InvestigationLookupPanel({ defaultPath = "" }: Props) {
         <input
           className="log-search-input"
           placeholder="Vendor or product query"
+          aria-label="Vendor or product query"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -139,6 +140,7 @@ export function InvestigationLookupPanel({ defaultPath = "" }: Props) {
         <input
           className="log-search-input"
           placeholder="NFO path or paste release text"
+          aria-label="NFO path"
           value={path}
           onChange={(e) => setPath(e.target.value)}
         />
@@ -153,6 +155,7 @@ export function InvestigationLookupPanel({ defaultPath = "" }: Props) {
         className="env-manifest-editor"
         rows={3}
         placeholder="Optional release text for tag generation"
+        aria-label="Release text for tag generation"
         value={nfoText}
         onChange={(e) => setNfoText(e.target.value)}
       />

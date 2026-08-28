@@ -446,6 +446,7 @@ function ExplorerPane({
               size="sm"
               className="breadcrumb-link"
               title={crumb.path}
+              aria-label={`Open ${crumb.path}`}
               onClick={() => void loadDir(crumb.path)}
             >
               {crumb.label}
@@ -733,6 +734,13 @@ function ExplorerRow({
                 : isArchiveName(entry.name)
                   ? "List archive contents without extracting"
                   : "Click to Spot-preview · drag to Scan path fields"
+            }
+            aria-label={
+              entry.is_dir
+                ? `Open folder ${entry.name}`
+                : isArchiveName(entry.name)
+                  ? `List archive ${entry.name}`
+                  : `Select ${entry.name}`
             }
             onClick={(e) => {
               e.stopPropagation();
