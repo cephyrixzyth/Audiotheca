@@ -240,7 +240,11 @@ export default function App() {
               {error && <div className="error">{error}</div>}
 
               {(tab === "scan" || scanActive) && (
-                <div className={tab !== "scan" ? "scan-panel-hidden" : undefined} aria-hidden={tab !== "scan"}>
+                <div
+                  className={tab !== "scan" ? "scan-panel-hidden" : undefined}
+                  aria-hidden={tab !== "scan"}
+                  inert={tab !== "scan"}
+                >
                   <ScanPanel onRunComplete={onScanComplete} />
                 </div>
               )}

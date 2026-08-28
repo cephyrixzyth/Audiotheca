@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { fetchDeepIdentify } from "../api/client";
 import type { DeepIdentifyItem } from "../types";
+import { matchesDeepIdentifyQuery } from "../utils/deepIdentifyQuery";
 import { Badge, VirtualTable } from "../ui";
 import { useContextSidebar } from "./ContextSidebar";
 import { PathLink } from "./PathLink";
@@ -12,7 +13,7 @@ interface Props {
 export function DeepIdentifyReview({ stamp }: Props) {
   const { query } = useContextSidebar();
   const [items, setItems] = useState<DeepIdentifyItem[]>([]);
-  const [total, setTotal] = useState(0);
+  const [fetchedTotal, setFetchedTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,16 +21,16 @@ export function DeepIdentifyReview({ stamp }: Props) {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    fetchDeepIdentify(stamp, { limit: 2000, q: query.trim() || undefined })
+    fetchDeepIdentify(stamp, { limit: 2000 })
       .then((res) => {
         if (cancelled) return;
         setItems(res.items);
-        setTotal(res.total);
+        setFetchedTotal(res.total);
       })
       .catch((err: Error) => {
         if (cancelled) return;
         setItems([]);
-        setTotal(0);
+        setFetchedTotal(0);
         setError(err.message);
       })
       .finally(() => {
@@ -38,25 +39,31 @@ export function DeepIdentifyReview({ stamp }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [stamp, query]);
+  }, [stamp]);
+
+  const q = query.trim().toLowerCase();
+  const visible = useMemo(() => items.filter((row) => matchesDeepIdentifyQuery(row, q)), [items, q]);
 
   const methodCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const row of items) {
+    for (const row of visible) {
       const key = row.method || "UNKNOWN";
       counts[key] = (counts[key] ?? 0) + 1;
     }
     return Object.entries(counts).sort((a, b) => b[1] - a[1]);
-  }, [items]);
+  }, [visible]);
 
   if (loading) return <div className="count-muted">Loading deep identify results…</div>;
   if (error) return <div className="error">{error}</div>;
-  if (total === 0) {
+  if (items.length === 0) {
     return (
       <div className="empty">
         No deep-identify recoveries for this run. Enable the deep identify phase on the next scan.
       </div>
     );
+  }
+  if (visible.length === 0) {
+    return <div className="empty">No deep-identify recoveries match your search.</div>;
   }
 
   return (
@@ -65,10 +72,16 @@ export function DeepIdentifyReview({ stamp }: Props) {
         Fuzzy / sibling vendor recoveries from Phase 1.7 — review before relying on them in a live
         restructure.
       </div>
+      {fetchedTotal > items.length ? (
+        <div className="banner warn">
+          Showing the first {items.length.toLocaleString()} of {fetchedTotal.toLocaleString()} recoveries.
+        </div>
+      ) : null}
       <div className="toolbar compact-toolbar">
         <span className="count-muted">
-          {total.toLocaleString()} recover{total === 1 ? "y" : "ies"}
-          {query.trim() ? ` matching “${query.trim()}”` : ""}
+          {visible.length.toLocaleString()} recover{visible.length === 1 ? "y" : "ies"}
+          {q ? ` matching “${query.trim()}”` : ""}
+          {q && visible.length !== items.length ? ` · ${items.length.toLocaleString()} total` : ""}
         </span>
         {methodCounts.slice(0, 6).map(([method, count]) => (
           <Badge key={method} tone="accent" title={`${count} via ${method}`}>
@@ -77,7 +90,7 @@ export function DeepIdentifyReview({ stamp }: Props) {
         ))}
       </div>
       <VirtualTable
-        items={items}
+        items={visible}
         colCount={5}
         estimateSize={72}
         header={
