@@ -145,20 +145,23 @@ export function ContextSidebar({ stamp }: { stamp?: string }) {
       </div>
 
       {SEARCH_TABS.has(tab) && (
-        <label className="context-field">
-          <span className="context-label">Search</span>
-          <input
-            type="search"
-            className="field-input"
-            placeholder="Filter this view…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            title={TAB_HINTS[tab] ?? "Context search for the active tab"}
-          />
+        <div className="context-field">
+          <label className="context-field" htmlFor="context-sidebar-search">
+            <span className="context-label">Search</span>
+            <input
+              id="context-sidebar-search"
+              type="search"
+              className="field-input"
+              placeholder="Filter this view…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              title={TAB_HINTS[tab] ?? "Context search for the active tab"}
+            />
+          </label>
           {TAB_HINTS[tab] ? (
-            <span className="count-muted context-placeholder">{TAB_HINTS[tab]}</span>
+            <p className="count-muted context-placeholder">{TAB_HINTS[tab]}</p>
           ) : null}
-        </label>
+        </div>
       )}
 
       {filterDefs.length > 0 && (
