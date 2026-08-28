@@ -32,6 +32,12 @@ describe("scan flow presets", () => {
     expect(phase?.label.toLowerCase()).toContain("heuristic");
   });
 
+  it("labels OS lanes with a distinct engine phase code", () => {
+    const phase = SCAN_FLOW_PHASES.find((p) => p.id === "quarantine");
+    expect(phase?.label).toBe("OS lanes");
+    expect(phase?.enginePhase).toBe("Phase 1b-OS");
+  });
+
   it("identify-only skips planning and act phases", () => {
     const identify = FLOW_PRESETS.find((p) => p.id === "identify");
     expect(identify?.skipPhases).toEqual(

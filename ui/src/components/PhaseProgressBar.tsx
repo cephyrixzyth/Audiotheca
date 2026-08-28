@@ -9,6 +9,7 @@ import {
   latestProgressTimestamp,
   phasesAwaitingProgress,
   progressStaleSeconds,
+  resolveFlowPhase,
 } from "../utils/scanDisplay";
 
 
@@ -177,26 +178,6 @@ export function PhaseLinearProgress({
 
 
 
-function phaseMatches(raw: string, phase: (typeof SCAN_FLOW_PHASES)[number]): boolean {
-
-  const norm = raw.toLowerCase();
-
-  const code = phase.enginePhase.toLowerCase();
-
-  return (
-
-    norm.includes(phase.id.replace(/_/g, " ")) ||
-
-    norm.includes(code) ||
-
-    norm.includes(phase.label.toLowerCase())
-
-  );
-
-}
-
-
-
 type PhaseVisualState = "active" | "done" | "starting" | "pending";
 
 
@@ -216,8 +197,6 @@ export function PhaseProgressBar({ activePhase, completedPhases = [], isActive, 
   const lastProgressTs = latestProgressTimestamp(events);
   const completed = new Set(completedPhases);
 
-  const activeNorm = activePhase?.toLowerCase() ?? "";
-
   const awaiting = phasesAwaitingProgress(events);
 
   const initializing =
@@ -236,7 +215,7 @@ export function PhaseProgressBar({ activePhase, completedPhases = [], isActive, 
 
     const code = phase.enginePhase;
 
-    const matchActive = activeNorm ? phaseMatches(activeNorm, phase) : false;
+    const matchActive = resolveFlowPhase(activePhase)?.id === phase.id;
 
     const done =
 
@@ -244,13 +223,13 @@ export function PhaseProgressBar({ activePhase, completedPhases = [], isActive, 
 
       completed.has(code) ||
 
-      [...completed].some((c) => phaseMatches(c, phase));
+      [...completed].some((c) => resolveFlowPhase(c)?.id === phase.id);
 
     const starting =
 
       isActive &&
 
-      [...awaiting].some((raw) => phaseMatches(raw, phase)) &&
+      [...awaiting].some((raw) => resolveFlowPhase(raw)?.id === phase.id) &&
 
       !matchActive &&
 

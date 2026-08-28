@@ -94,7 +94,7 @@ export const SCAN_FLOW_PHASES: FlowPhase[] = [
     id: "quarantine",
     label: "OS lanes",
     description: "Route Mac/Linux/Windows-only items under _mac, _linux, or _windows.",
-    enginePhase: "OS lanes",
+    enginePhase: "Phase 1b-OS",
     skipKey: "quarantine",
     group: "analyze",
     estimatedWeight: 4,

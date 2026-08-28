@@ -256,7 +256,8 @@ function DragControls({
         <button
           type="button"
           className="section-move-btn section-collapse-btn"
-          title={collapsed ? "Expand panel" : "Collapse panel"}
+          title={collapsed ? `Expand ${title}` : `Collapse ${title}`}
+          aria-label={collapsed ? `Expand ${title}` : `Collapse ${title}`}
           onClick={onToggleCollapse}
         >
           {collapsed ? "▸" : "▾"}
@@ -377,7 +378,8 @@ function WidgetBody({
           type="button"
           className="section-move-btn section-collapse-btn"
           onClick={onToggle}
-          title={collapsed ? "Expand panel" : "Collapse panel"}
+          title={collapsed ? `Expand ${section.title}` : `Collapse ${section.title}`}
+          aria-label={collapsed ? `Expand ${section.title}` : `Collapse ${section.title}`}
         >
           {collapsed ? "▸" : "▾"}
         </button>
