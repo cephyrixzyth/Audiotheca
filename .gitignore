@@ -33,3 +33,5 @@ docs/assets/screenshots/page-*.png
 pytest_*.txt
 ui_build_out.txt
 6.0.0
+# Accidental nested copies of this repo (do not commit)
+/audiotheca-[0-9]*/
