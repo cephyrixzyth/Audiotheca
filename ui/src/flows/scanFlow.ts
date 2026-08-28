@@ -179,6 +179,8 @@ export const FLOW_PRESETS: FlowPreset[] = [
       "duplicates",
       "restructure",
       "verification",
+      "restructure_live",
+      "purge",
       "malware_scan",
       "ai_lookup",
     ],

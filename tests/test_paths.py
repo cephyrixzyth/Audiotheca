@@ -12,6 +12,15 @@ def test_workspace_root_env(monkeypatch, tmp_path):
     assert paths.report_dir() == tmp_path / "dedupe_reports"
 
 
+def test_code_root_ignores_audiotheca_home(monkeypatch, tmp_path):
+    """Docker sets AUDIOTHECA_HOME=/data; engine script still lives beside api/."""
+    monkeypatch.setenv("AUDIOTHECA_HOME", str(tmp_path / "data"))
+    assert paths.code_root() == Path(paths.__file__).resolve().parent.parent
+    assert paths.engine_main_script() == paths.code_root() / "main.py"
+    assert paths.engine_main_script().is_file()
+    assert paths.workspace_root() == tmp_path / "data"
+
+
 def test_engine_executable_env(monkeypatch, tmp_path):
     engine = tmp_path / "audiotheca-engine.exe"
     engine.write_text("stub", encoding="utf-8")
