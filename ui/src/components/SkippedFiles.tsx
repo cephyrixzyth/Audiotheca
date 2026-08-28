@@ -300,6 +300,7 @@ export function SkippedFiles({ stamp, runs }: Props) {
                       type="checkbox"
                       checked={selected.has(row.path)}
                       onChange={() => toggleSelect(row.path)}
+                      aria-label={`Select ${row.item_name || row.path}`}
                     />
                   )}
                 </td>
@@ -332,7 +333,12 @@ export function SkippedFiles({ stamp, runs }: Props) {
           renderRow={(row, _index, rowAttrs) => (
             <tr key={row.path} {...rowAttrs}>
               <td>
-                <input type="checkbox" checked={selected.has(row.path)} onChange={() => toggleSelect(row.path)} />
+                <input
+                  type="checkbox"
+                  checked={selected.has(row.path)}
+                  onChange={() => toggleSelect(row.path)}
+                  aria-label={`Select ${row.item_name || row.path}`}
+                />
               </td>
               <td>{row.section}</td>
               <td>{row.item_name}</td>
@@ -362,7 +368,12 @@ export function SkippedFiles({ stamp, runs }: Props) {
           renderRow={(row, _index, rowAttrs) => (
             <tr key={row.path} {...rowAttrs}>
               <td>
-                <input type="checkbox" checked={selected.has(row.path)} onChange={() => toggleSelect(row.path)} />
+                <input
+                  type="checkbox"
+                  checked={selected.has(row.path)}
+                  onChange={() => toggleSelect(row.path)}
+                  aria-label={`Select ${row.name || row.path}`}
+                />
               </td>
               <td>
                 <code>{row.reason}</code>
@@ -393,7 +404,12 @@ export function SkippedFiles({ stamp, runs }: Props) {
           renderRow={(row, _index, rowAttrs) => (
             <tr key={row.path} {...rowAttrs}>
               <td>
-                <input type="checkbox" checked={selected.has(row.path)} onChange={() => toggleSelect(row.path)} />
+                <input
+                  type="checkbox"
+                  checked={selected.has(row.path)}
+                  onChange={() => toggleSelect(row.path)}
+                  aria-label={`Select ${row.name || row.path}`}
+                />
               </td>
               <td>{row.section}</td>
               <td>{row.name}</td>
