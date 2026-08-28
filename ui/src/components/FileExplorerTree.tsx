@@ -37,34 +37,45 @@ function TreeNode({ entry, depth, selectedPath, expandedPaths, onToggle, onSelec
       });
   }, [entry.path, expanded]);
 
+  const selected = selectedPath === entry.path;
+
   return (
-    <li className="explorer-tree-node">
+    <li
+      className="explorer-tree-node"
+      role="treeitem"
+      aria-label={entry.name}
+      aria-level={depth + 1}
+      aria-selected={selected}
+      aria-expanded={entry.is_dir ? expanded : undefined}
+    >
       <div
-        className={`explorer-tree-row ${selectedPath === entry.path ? "selected" : ""}`}
+        className={`explorer-tree-row ${selected ? "selected" : ""}`}
         style={{ paddingLeft: `${depth * 0.75 + 0.25}rem` }}
       >
-        <button
-          type="button"
-          className="explorer-tree-toggle"
-          title={expanded ? `Collapse ${entry.name}` : `Expand ${entry.name}`}
-          aria-label={expanded ? `Collapse ${entry.name}` : `Expand ${entry.name}`}
-          aria-expanded={expanded}
-          onClick={() => onToggle(entry.path)}
-        >
-          {loading ? "…" : expanded ? "▾" : "▸"}
-        </button>
+        {entry.is_dir ? (
+          <button
+            type="button"
+            className="explorer-tree-toggle"
+            title={expanded ? `Collapse ${entry.name}` : `Expand ${entry.name}`}
+            aria-label={expanded ? `Collapse ${entry.name}` : `Expand ${entry.name}`}
+            onClick={() => onToggle(entry.path)}
+          >
+            {loading ? "…" : expanded ? "▾" : "▸"}
+          </button>
+        ) : (
+          <span className="explorer-tree-toggle" aria-hidden />
+        )}
         <button
           type="button"
           className="explorer-tree-label"
           title={entry.path}
-          aria-current={selectedPath === entry.path ? "true" : undefined}
           onClick={() => onSelect(entry.path)}
         >
           {entry.name}
         </button>
       </div>
-      {expanded && children && children.length > 0 && (
-        <ul className="explorer-tree-children">
+      {entry.is_dir && expanded && children && children.length > 0 && (
+        <ul className="explorer-tree-children" role="group">
           {children.map((child) => (
             <TreeNode
               key={child.path}
@@ -131,7 +142,7 @@ export function FileExplorerTree({ roots, selectedPath, onSelect }: Props) {
 
   return (
     <nav className="explorer-tree" aria-label="Folder tree">
-      <ul className="explorer-tree-roots">
+      <ul className="explorer-tree-roots" role="tree">
         {roots.map((root) => (
           <TreeNode
             key={root.path}

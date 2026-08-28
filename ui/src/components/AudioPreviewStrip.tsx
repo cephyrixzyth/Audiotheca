@@ -190,7 +190,7 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
         type="button"
         className="icon-btn audio-play-btn hvr-hl"
         title={playing ? "Stop preview" : "Preview audio (AUTO-AUD)"}
-        aria-label={playing ? "Stop preview" : "Preview audio"}
+        aria-label={playing ? `Stop preview of ${name}` : `Preview ${name}`}
         onClick={(e) => {
           e.stopPropagation();
           if (playing) stop();
