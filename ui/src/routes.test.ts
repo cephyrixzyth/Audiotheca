@@ -18,6 +18,7 @@ const ALL_TABS: TabId[] = [
   "restructure",
   "archives",
   "scene-renames",
+  "deep-identify",
   "scan-audit",
   "skipped",
   "space-recovery",

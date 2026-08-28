@@ -14,6 +14,11 @@ export const ALL_TABS: TabDef[] = [
   { id: "restructure", label: "Restructure", title: "Planned vendor folder moves — edit destinations before live run" },
   { id: "archives", label: "Archives", title: "Archive vs extracted-folder pairs — confirm redundant archives" },
   { id: "scene-renames", label: "Scene renames", title: "Approve renaming scene-hash folders to product names" },
+  {
+    id: "deep-identify",
+    label: "Deep identify",
+    title: "Fuzzy / sibling vendor recoveries from the deep-identify phase",
+  },
   { id: "scan-audit", label: "Scan audit", title: "Per-item scan status, ID method, and quick corrections" },
   { id: "skipped", label: "Skipped", title: "Failures, loose archives, cache hits, and rescan targets" },
   { id: "space-recovery", label: "Space recovery", title: "Hardlink dedup and bloat detection plans" },
@@ -29,6 +34,7 @@ export const REVIEW_TAB_IDS: TabId[] = [
   "restructure",
   "archives",
   "scene-renames",
+  "deep-identify",
   "scan-audit",
   "skipped",
 ];
@@ -60,6 +66,7 @@ export function primaryNavId(tab: TabId): PrimaryNavId {
     case "restructure":
     case "archives":
     case "scene-renames":
+    case "deep-identify":
     case "scan-audit":
     case "skipped":
       return "review";

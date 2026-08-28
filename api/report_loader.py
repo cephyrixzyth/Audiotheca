@@ -902,7 +902,11 @@ def load_deep_identify(
         items = [
             item
             for item in items
-            if q in item.item_name.lower() or q in item.path.lower() or q in item.vendor.lower()
+            if q in item.item_name.lower()
+            or q in item.path.lower()
+            or q in item.vendor.lower()
+            or q in item.method.lower()
+            or q in item.evidence.lower()
         ]
     total = len(items)
     return items[offset : offset + limit], total

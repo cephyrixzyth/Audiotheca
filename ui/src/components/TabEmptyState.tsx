@@ -26,6 +26,10 @@ const MESSAGES: Partial<Record<TabId, { title: string; body: string }>> = {
     title: "No scene rename plan",
     body: "Run a scan to stage scene-hash folder rename candidates.",
   },
+  "deep-identify": {
+    title: "No deep-identify recoveries",
+    body: "Run a scan with the deep identify phase enabled to recover fuzzy vendor matches.",
+  },
   "scan-audit": {
     title: "No scan audit rows",
     body: "Run a scan to populate per-item audit and correction tools.",

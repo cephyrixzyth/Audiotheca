@@ -490,6 +490,7 @@ export type TabId =
   | "restructure"
   | "archives"
   | "scene-renames"
+  | "deep-identify"
   | "scan-audit"
   | "skipped"
   | "vendors"

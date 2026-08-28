@@ -1000,6 +1000,24 @@
   min-width: 0;
 }
 
+button.stat-tile-button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+button.stat-tile-button:hover {
+  border-color: var(--border-bright);
+}
+
+button.stat-tile-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .stat-tile.tone-accent {
   border-left-color: var(--accent);
   background: var(--accent-faint);

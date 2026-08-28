@@ -13,6 +13,7 @@ import { ScanPanel } from "./components/ScanPanel";
 import { TabEmptyState } from "./components/TabEmptyState";
 import { SkippedFiles } from "./components/SkippedFiles";
 import { SceneRenames } from "./components/SceneRenames";
+import { DeepIdentifyReview } from "./components/DeepIdentifyReview";
 import { SpaceRecovery } from "./components/SpaceRecovery";
 import { MalwarePanel } from "./components/MalwarePanel";
 import { EnvironmentPanel } from "./components/EnvironmentPanel";
@@ -281,6 +282,12 @@ export default function App() {
                   <SceneRenames stamp={stamp} />
                 ) : (
                   <TabEmptyState tab="scene-renames" onStartScan={() => setTab("scan")} />
+                ))}
+              {tab === "deep-identify" &&
+                (stamp ? (
+                  <DeepIdentifyReview stamp={stamp} />
+                ) : (
+                  <TabEmptyState tab="deep-identify" onStartScan={() => setTab("scan")} />
                 ))}
               {tab === "scan-audit" &&
                 (stamp ? (
