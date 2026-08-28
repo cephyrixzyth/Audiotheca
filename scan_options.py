@@ -8,6 +8,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 
+def format_banner_flag(enabled: bool, *, skipped: bool = False) -> str:
+    """Startup-banner label: skipped phases must not print Python True."""
+    if skipped:
+        return "skipped"
+    return "on" if enabled else "off"
+
+
 SKIPPABLE_PHASES = frozenset({
     "scene_peek",
     "archive_peek",
