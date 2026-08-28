@@ -161,7 +161,17 @@ export default function App() {
         <div className="app-shell">
           <header className="topbar">
             <div className="topbar-brand">
-              <h1>Audiotheca</h1>
+              <div className="topbar-brand-row">
+                <img
+                  className="topbar-logo"
+                  src={`${import.meta.env.BASE_URL}logo.png`}
+                  alt=""
+                  width={28}
+                  height={28}
+                  decoding="async"
+                />
+                <h1>Audiotheca</h1>
+              </div>
               <span className="count-muted">
                 {formatEngineLabel(engineVersion ?? summary?.engine_version)} · {webUiHeaderLabel(uiVersion)}
               </span>

@@ -4,7 +4,7 @@ import { Button } from "../ui";
 const MESSAGES: Partial<Record<TabId, { title: string; body: string }>> = {
   dashboard: {
     title: "No scan reports yet",
-    body: "Run a dry-run scan to populate KPIs, or use the panels below for host metrics and environment status.",
+    body: "Start a dry-run scan to populate KPIs and review queues.",
   },
   investigation: {
     title: "No investigation data",
