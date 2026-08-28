@@ -31,6 +31,7 @@ export function VendorTools({ stamp }: Props) {
   const [testSample, setTestSample] = useState("");
   const [testResult, setTestResult] = useState<string | null>(null);
   const [known, setKnown] = useState<string[]>([]);
+  const [vendorsLoaded, setVendorsLoaded] = useState(false);
   const [userAdded, setUserAdded] = useState<Array<{ company: string; keywords: string[] }>>([]);
   const [summary, setSummary] = useState<Record<string, number> | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -73,8 +74,12 @@ export function VendorTools({ stamp }: Props) {
       .then((res) => {
         setKnown(res.known);
         setUserAdded(res.user_added);
+        setVendorsLoaded(true);
       })
-      .catch((err: Error) => setError(err.message));
+      .catch((err: Error) => {
+        setError(err.message);
+        setVendorsLoaded(true);
+      });
     fetchFeedbackSummary(stamp)
       .then(setSummary)
       .catch(() => setSummary(null));
@@ -552,7 +557,9 @@ export function VendorTools({ stamp }: Props) {
       )}
 
       <p className="count-muted" style={{ marginTop: "1rem" }}>
-        {known.length.toLocaleString()} vendors in database (incl. user additions)
+        {vendorsLoaded
+          ? `${known.length.toLocaleString()} vendors in database (incl. user additions)`
+          : "Loading vendor database…"}
       </p>
 
       {msg && <div className="banner dry">{msg}</div>}
