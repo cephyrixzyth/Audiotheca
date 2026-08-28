@@ -14,6 +14,28 @@ _HISTORY_SIZE = int(os.environ.get("AUDIOTHECA_METRICS_HISTORY", "60"))
 _HISTORY_LOCK = threading.Lock()
 _PERF_HISTORY: deque[dict[str, Any]] = deque(maxlen=_HISTORY_SIZE)
 _STRG_HISTORY: deque[dict[str, Any]] = deque(maxlen=_HISTORY_SIZE)
+# Cumulative ``busy_time`` samples for interval % (not instantaneous).
+_LAST_DISK_IO: dict[str, float] | None = None
+_LAST_DISK_IO_LOCK = threading.Lock()
+
+
+def _disk_io_busy_pct(busy_time_ms: float | None) -> float | None:
+    """Convert cumulative disk busy_time (ms since boot) into a recent busy %."""
+    global _LAST_DISK_IO
+    if busy_time_ms is None:
+        return None
+    now = time.monotonic()
+    with _LAST_DISK_IO_LOCK:
+        prev = _LAST_DISK_IO
+        _LAST_DISK_IO = {"t": now, "busy": float(busy_time_ms)}
+        if prev is None:
+            return None
+        dt = now - prev["t"]
+        delta_ms = float(busy_time_ms) - prev["busy"]
+    if dt <= 0.05 or delta_ms < 0:
+        return None
+    # busy_time is milliseconds of I/O activity; dt is wall seconds.
+    return min(100.0, max(0.0, round((delta_ms / 1000.0) / dt * 100.0, 1)))
 
 
 def _disk_usage_path(path: Path | None) -> tuple[Path, str | None]:
@@ -141,9 +163,9 @@ def collect_metrics(*, path: Path | None = None) -> dict:
         if io:
             payload["disk_read_mb"] = round(io.read_bytes / (1024**2), 1)
             payload["disk_write_mb"] = round(io.write_bytes / (1024**2), 1)
-            busy = getattr(io, "busy_time", None)
-            if busy is not None:
-                payload["disk_io_busy_pct"] = min(100.0, round(float(busy) / 10.0, 1))
+            busy_pct = _disk_io_busy_pct(getattr(io, "busy_time", None))
+            if busy_pct is not None:
+                payload["disk_io_busy_pct"] = busy_pct
     except (AttributeError, OSError):
         pass
 
