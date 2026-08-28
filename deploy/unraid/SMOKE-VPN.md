@@ -39,6 +39,7 @@ Pass criteria for wiring-only smoke:
 - `docker compose config` succeeds (no YAML errors)
 - `gluetun` service appears in `docker compose ps` before credential failure
 - Logs mention VPN provider env vars (not "compose file missing")
+- `api-vpn` / `searxng-vpn` create without `port exposing and the container type network mode`
 
 ## Smoke with VPN (API + SearXNG through tunnel)
 

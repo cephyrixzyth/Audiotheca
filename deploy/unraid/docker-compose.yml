@@ -185,6 +185,9 @@ services:
     profiles: ["vpn"]
     container_name: audiotheca-api-vpn
     network_mode: "service:gluetun"
+    # Image/compose EXPOSE and published ports are illegal with this network mode.
+    expose: !reset []
+    ports: !reset []
     depends_on:
       gluetun:
         condition: service_started
@@ -194,6 +197,8 @@ services:
     profiles: ["vpn"]
     container_name: audiotheca-searxng-vpn
     network_mode: "service:gluetun"
+    expose: !reset []
+    ports: !reset []
     depends_on:
       valkey:
         condition: service_started
