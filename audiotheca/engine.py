@@ -35,7 +35,13 @@ from restructure_feedback import (
     get_section_approvals,
     load_store as load_restructure_store,
 )
-from scan_options import ScanOptions, apply_scan_options, apply_staging_paths, load_scan_options
+from scan_options import (
+    ScanOptions,
+    apply_scan_options,
+    apply_staging_paths,
+    format_banner_flag,
+    load_scan_options,
+)
 from vendor_db import VENDOR_DATABASE
 
 from audiotheca.config import *  # noqa: F403
@@ -410,9 +416,13 @@ class DeduplicationEngine(
         print("=" * 60)
         print(f" VERSION: {ENGINE_VERSION}")
         print(f" ROOT: {self.root_dir}")
-        print(f" DRY_RUN: {self.dry_run}")
+        print(f" DRY_RUN: {format_banner_flag(self.dry_run)}")
         print(f" MAX_WALK_DEPTH: {MAX_WALK_DEPTH} | PROBE_DEPTH: {PROBE_DEPTH} | WORKERS: {self.max_workers}")
-        print(f" ARCHIVE_PEEK: {ENABLE_ARCHIVE_PEEK} | SCENE_PEEK: {ENABLE_SCENE_ARCHIVE_PEEK} | SCENE_RENAME: {SCENE_AUTO_RENAME}")
+        print(
+            f" ARCHIVE_PEEK: {format_banner_flag(ENABLE_ARCHIVE_PEEK, skipped=self.scan_options.skip('archive_peek'))} | "
+            f"SCENE_PEEK: {format_banner_flag(ENABLE_SCENE_ARCHIVE_PEEK, skipped=self.scan_options.skip('scene_peek'))} | "
+            f"SCENE_RENAME: {format_banner_flag(SCENE_AUTO_RENAME)}"
+        )
         if self.scan_options.skip_phases:
             print(f" SKIP PHASES: {', '.join(sorted(self.scan_options.skip_phases))}")
         if self.scan_options.staging_root:
