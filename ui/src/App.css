@@ -77,7 +77,8 @@
   color: var(--text);
 }
 
-.top-tab.active {
+.top-tab.active,
+.top-tab[data-state="active"] {
   background: var(--accent-soft);
   border-color: var(--border-bright);
   color: var(--text);

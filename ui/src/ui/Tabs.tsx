@@ -8,6 +8,8 @@ export interface TabItem {
   /** Omit to use the list as a switcher; parent renders the active pane. */
   content?: ReactNode;
   title?: string;
+  /** Extra class on this trigger (e.g. screenshot hooks). */
+  className?: string;
 }
 
 export interface TabsProps {
@@ -16,22 +18,37 @@ export interface TabsProps {
   defaultValue?: string;
   onValueChange?: (value: string) => void;
   "aria-label"?: string;
+  /** Replaces the default list chrome (app nav uses the existing top-tab row). */
+  listClassName?: string;
+  /** Replaces the default trigger chrome. */
+  triggerClassName?: string;
+  rootClassName?: string;
 }
 
-export function Tabs({ items, value, defaultValue, onValueChange, ...aria }: TabsProps) {
+export function Tabs({
+  items,
+  value,
+  defaultValue,
+  onValueChange,
+  listClassName,
+  triggerClassName,
+  rootClassName,
+  ...aria
+}: TabsProps) {
   const panes = items.filter((item) => item.content != null);
   return (
     <RadixTabs.Root
+      className={rootClassName}
       value={value}
       defaultValue={defaultValue ?? items[0]?.value}
       onValueChange={onValueChange}
     >
-      <RadixTabs.List className={styles.list} aria-label={aria["aria-label"]}>
+      <RadixTabs.List className={listClassName ?? styles.list} aria-label={aria["aria-label"]}>
         {items.map((item) => (
           <RadixTabs.Trigger
             key={item.value}
             value={item.value}
-            className={styles.trigger}
+            className={[triggerClassName ?? styles.trigger, item.className].filter(Boolean).join(" ")}
             title={item.title}
           >
             {item.label}
