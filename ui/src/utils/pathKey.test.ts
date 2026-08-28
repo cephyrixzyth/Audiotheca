@@ -31,4 +31,22 @@ describe("scan flow presets", () => {
     const phase = SCAN_FLOW_PHASES.find((p) => p.id === "malware_scan");
     expect(phase?.label.toLowerCase()).toContain("heuristic");
   });
+
+  it("identify-only skips planning and act phases", () => {
+    const identify = FLOW_PRESETS.find((p) => p.id === "identify");
+    expect(identify?.skipPhases).toEqual(
+      expect.arrayContaining([
+        "duplicates",
+        "restructure",
+        "verification",
+        "restructure_live",
+        "purge",
+        "quarantine",
+        "archive_peek",
+        "scene_peek",
+        "malware_scan",
+        "ai_lookup",
+      ]),
+    );
+  });
 });

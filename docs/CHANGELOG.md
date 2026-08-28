@@ -6,6 +6,11 @@ Git tag **v1.0.7** was published with a broken Windows NSIS pre-install hook (si
 
 ## Unreleased
 
+### Scan / Docker
+
+- **Engine launch path** — when `AUDIOTHECA_HOME` points at Docker appdata (`/data`), jobs spawn `main.py` from the code root (`/app`), not `/data/main.py` (dry-runs no longer die instantly as “stopped by user”)
+- **Identify-only preset** — also skips live moves and purge empty dirs (act phases), matching the “scan and identify only” label
+
 ### UI design system & routing
 
 - **Radix primitives** — shared token-driven `Button`, `Badge`, `Card`, `Kpi`, `StatTile`, `Gauge`, `Dialog`, `Tooltip`, `Tabs`, `DropdownMenu`, and `VirtualTable` under `ui/src/ui/`; screens re-skinned without changing IA or data flow

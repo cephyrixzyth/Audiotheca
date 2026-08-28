@@ -16,13 +16,14 @@ from api import engine_lock
 from api import process_control
 from api import report_loader
 from api import service as api_service
-from api.paths import engine_executable, workspace_root
+from api.paths import code_root, engine_executable, engine_main_script, workspace_root
 from api.security import ensure_library_path
+from audiotheca.config import ROOT_DIR as DEFAULT_ROOT
 from scan_options import SKIPPABLE_PHASES, ScanOptions
 from system_metrics import collect_metrics
 
 PROJECT_ROOT = workspace_root()
-from audiotheca.config import ROOT_DIR as DEFAULT_ROOT
+CODE_ROOT = code_root()
 
 ENGINE_MAX_RUNTIME_S = int(os.environ.get("AUDIOTHECA_ENGINE_MAX_RUNTIME_S", "43200"))
 MAX_STORED_JOB_EVENTS = int(os.environ.get("AUDIOTHECA_MAX_STORED_JOB_EVENTS", "8000"))
@@ -271,7 +272,7 @@ class JobManager:
 
         proc = subprocess.Popen(
             cmd,
-            cwd=str(PROJECT_ROOT),
+            cwd=str(CODE_ROOT),
             env=env,
             stdout=stdout_handle,
             stderr=stderr_handle,
@@ -438,7 +439,26 @@ class JobManager:
 
             job.exit_code = proc.returncode
             job.stamp = self._detect_stamp(job.started_at)
-            if job.user_stopped or proc.returncode == 2:
+            stderr_tail = _read_log_tail(stderr_log)
+            # Python exits 2 when the script path is missing; the CLI also uses 2
+            # for an intentional PhaseStopRequested stop. Prefer stderr + flag.
+            engine_start_failed = bool(
+                stderr_tail
+                and ("can't open file" in stderr_tail or "No such file or directory" in stderr_tail)
+            )
+            if engine_start_failed:
+                job.status = "failed"
+                job.error = f"Engine failed to start: {stderr_tail}"
+                await self._broadcast(
+                    job,
+                    {
+                        "type": "job_failed",
+                        "exit_code": proc.returncode,
+                        "error": job.error,
+                        "stamp": job.stamp,
+                    },
+                )
+            elif job.user_stopped or proc.returncode == 2:
                 job.status = "stopped"
                 job.error = job.error or "Scan stopped by user"
                 await self._broadcast(
@@ -472,11 +492,10 @@ class JobManager:
                 )
             elif proc.returncode != 0:
                 job.status = "failed"
-                tail = _read_log_tail(stderr_log)
                 exit_label = _format_exit_code(proc.returncode)
                 job.error = f"Engine exited with code {exit_label}"
-                if tail:
-                    job.error = f"{job.error}: {tail}"
+                if stderr_tail:
+                    job.error = f"{job.error}: {stderr_tail}"
                 await self._broadcast(
                     job,
                     {
@@ -598,7 +617,7 @@ def _engine_command(root_dir: str, dry_run: bool) -> list[str]:
     if engine:
         cmd = [str(engine), "--root", root_dir]
     else:
-        cmd = [sys.executable, str(PROJECT_ROOT / "main.py"), "--root", root_dir]
+        cmd = [sys.executable, str(engine_main_script()), "--root", root_dir]
     if dry_run:
         cmd.append("--dry-run")
     else:

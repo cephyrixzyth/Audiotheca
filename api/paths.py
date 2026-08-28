@@ -8,10 +8,22 @@ from pathlib import Path
 
 
 def workspace_root() -> Path:
+    """Data / reports home (``AUDIOTHECA_HOME`` in Docker; repo root in dev)."""
     if home := os.environ.get("AUDIOTHECA_HOME"):
         return Path(home)
     if getattr(sys, "frozen", False):
         return Path.cwd()
+    return Path(__file__).resolve().parent.parent
+
+
+def code_root() -> Path:
+    """Directory that contains ``main.py`` and the ``api`` / ``audiotheca`` packages.
+
+    Distinct from :func:`workspace_root` — Docker mounts appdata at
+    ``AUDIOTHECA_HOME=/data`` while source lives under ``/app``.
+    """
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
     return Path(__file__).resolve().parent.parent
 
 
@@ -30,3 +42,8 @@ def engine_executable() -> Path | None:
         if sibling.is_file():
             return sibling
     return None
+
+
+def engine_main_script() -> Path:
+    """Path to ``main.py`` used when no frozen/sidecar engine binary is set."""
+    return code_root() / "main.py"
