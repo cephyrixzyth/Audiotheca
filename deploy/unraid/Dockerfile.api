@@ -36,7 +36,8 @@ ENV PYTHONUNBUFFERED=1 \
     AUDIOTHECA_API_HOST=0.0.0.0 \
     AUDIOTHECA_API_PORT=8787
 
-EXPOSE 8787
+# Do not EXPOSE 8787 — api-vpn shares Gluetun's network namespace, and Docker
+# rejects "port exposing" with network_mode: service:gluetun.
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://127.0.0.1:8787/api/health || exit 1
