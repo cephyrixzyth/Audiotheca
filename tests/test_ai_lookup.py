@@ -77,6 +77,26 @@ class TestNfoParsing:
         assert meta["release_group"] == "ARCADiA"
         assert meta["product_hint"] == "Mega Drums"
 
+    def test_read_release_metadata_ignores_symlinked_files(self, tmp_path, monkeypatch):
+        folder = tmp_path / "SceneHash-ABC"
+        folder.mkdir()
+        outside = tmp_path / "outside.nfo"
+        outside.write_text("Release Group: OUTSIDE\nProduct: Private Metadata", encoding="utf-8")
+        link = folder / "release.nfo"
+        link.write_text("Release Group: INSIDE", encoding="utf-8")
+        try:
+            link.unlink()
+            link.symlink_to(outside)
+        except (OSError, NotImplementedError):
+            # Windows may deny symlink creation without Developer Mode/elevation.
+            link.write_text("Release Group: INSIDE", encoding="utf-8")
+            is_symlink = Path.is_symlink
+            monkeypatch.setattr(Path, "is_symlink", lambda path: path == link or is_symlink(path))
+
+        meta = read_release_metadata(folder)
+        assert meta["release_group"] is None
+        assert meta["product_hint"] is None
+
 
 class TestLookupCache:
     def test_put_and_get(self, tmp_path):

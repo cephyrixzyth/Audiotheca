@@ -89,9 +89,7 @@ services:
     restart: unless-stopped
     environment:
       AUDIOTHECA_PROXY_SECRET: "${AUDIOTHECA_PROXY_SECRET:?Set AUDIOTHECA_PROXY_SECRET in .env}"
-    depends_on:
-      api:
-        condition: service_healthy
+      AUDIOTHECA_API_UPSTREAM: "${AUDIOTHECA_API_UPSTREAM:-api:8787}"
     ports:
       - "${UI_PORT:-4210}:80"
     logging:
@@ -152,7 +150,7 @@ services:
     restart: "no"
 
   # Gluetun VPN sidecar (DKR-TUN). Route API + SearXNG through VPN:
-  #   docker compose --profile vpn up -d
+  #   AUDIOTHECA_API_UPSTREAM=gluetun:8787 docker compose --profile vpn up -d
   # Then stop the default api/searxng so only the *-vpn sidecars share Gluetun:
   #   docker compose stop api searxng
   gluetun:
@@ -171,6 +169,7 @@ services:
       OPENVPN_PASSWORD: ${OPENVPN_PASSWORD:-}
       SERVER_COUNTRIES: ${SERVER_COUNTRIES:-}
       FIREWALL_OUTBOUND_SUBNETS: ${FIREWALL_OUTBOUND_SUBNETS:-172.16.0.0/12,192.168.0.0/16}
+      FIREWALL_INPUT_PORTS: "${FIREWALL_INPUT_PORTS:-8787}"
     ports:
       - "${API_PORT:-4211}:8787"
       - "127.0.0.1:${SEARXNG_PORT:-8081}:8080"
@@ -188,9 +187,13 @@ services:
     # Image/compose EXPOSE and published ports are illegal with this network mode.
     expose: !reset []
     ports: !reset []
+    environment:
+      SEARXNG_URL: http://127.0.0.1:8080
     depends_on:
       gluetun:
         condition: service_started
+      searxng-vpn:
+        condition: service_healthy
 
   searxng-vpn:
     <<: *searxng-core

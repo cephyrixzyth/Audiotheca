@@ -43,11 +43,24 @@ def find_metadata_files(root: Path, *, max_depth: int = 3) -> list[Path]:
     names = {".nfo", ".diz", ".txt", ".md"}
     readme_names = {"readme", "read_me", "install", "release"}
     found: list[Path] = []
+    # A scan target can itself be a symlink. Do not let metadata lookup follow it
+    # outside the library tree supplied by the caller.
+    try:
+        if root.is_symlink():
+            return []
+        if any(parent.is_symlink() for parent in root.parents):
+            return []
+    except OSError:
+        return []
     if root.is_file():
         if root.suffix.lower() in names or root.stem.lower() in readme_names:
             return [root]
         root = root.parent
     if not root.is_dir():
+        return []
+    try:
+        scan_root = root.resolve(strict=True)
+    except OSError:
         return []
     depth = 0
     queue: list[Path] = [root]
@@ -59,12 +72,20 @@ def find_metadata_files(root: Path, *, max_depth: int = 3) -> list[Path]:
             except OSError:
                 continue
             for entry in entries:
+                try:
+                    # Reject symlinks before is_file()/is_dir(), which follow them.
+                    if entry.is_symlink():
+                        continue
+                    resolved = entry.resolve(strict=True)
+                    resolved.relative_to(scan_root)
+                except (OSError, ValueError):
+                    continue
                 if entry.is_file():
                     stem = entry.stem.lower()
                     if entry.suffix.lower() in {".nfo", ".diz"} or stem in readme_names:
-                        found.append(entry)
+                        found.append(resolved)
                 elif entry.is_dir() and depth < max_depth:
-                    next_queue.append(entry)
+                    next_queue.append(resolved)
         queue = next_queue
         depth += 1
     return found[:8]

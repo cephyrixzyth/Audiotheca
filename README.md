@@ -21,6 +21,7 @@
 - [Screenshots](#screenshots)
 - [Video walkthroughs](#video-walkthroughs)
 - [Documentation index](#documentation-index)
+- [Local project hub](#local-project-hub)
 - [Project layout](#project-layout)
 - [Other commands](#other-commands)
 - [Staged live rollout](#staged-live-rollout)
@@ -456,6 +457,10 @@ Animated previews render inline on GitHub. [Download full video](#download-full-
 Build GIFs from MP4 sources: `python scripts/build_doc_gifs.py`. Capture instructions: [docs/assets/README.md](docs/assets/README.md).
 
 ---
+
+## Local project hub
+
+For an offline, read-only project landing page with roadmap, quality, and docs subpages, run `python start-project-hub.py` (or double-click `start-project-hub.cmd`) and open **http://127.0.0.1:6129/**. See [Project Hub](docs/PROJECT_HUB.md).
 
 ## Documentation index
 

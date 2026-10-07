@@ -47,9 +47,11 @@ When credentials are valid:
 
 ```bash
 cd deploy/unraid
-docker compose --profile vpn up -d --build
+AUDIOTHECA_API_UPSTREAM=gluetun:8787 docker compose --profile vpn up -d --build
 docker compose stop api searxng
 ```
+
+Keep `AUDIOTHECA_API_UPSTREAM=gluetun:8787` on subsequent Compose commands that recreate `ui`; the UI proxy then reaches the API through Gluetun. The VPN API reaches SearXNG at `127.0.0.1:8080` inside the shared Gluetun network namespace. The default stack continues to use `api:8787` and `searxng:8080`.
 
 Check:
 

@@ -6,13 +6,35 @@ Git tag **v1.0.7** was published with a broken Windows NSIS pre-install hook (si
 
 ## Unreleased
 
+### Privacy and security
+
+- **AI release metadata** — ignore symlinked metadata files and directories so lookup cannot read release notes outside the scanned folder
+- **ZIP CRC diagnosis** — cap archive bytes, entry count, and streamed decompressed bytes instead of decompressing unbounded members
+- **Release tags** — refuse to force-move an existing release tag; published tags must match the current build commit
+
+### Dependencies and builds
+
+- **UI dependencies** — update Vitest to 4.1.11 and refresh the npm lockfile; `npm audit` reports no known vulnerabilities
+- **Python dependencies** — let Pydantic resolve its matching `pydantic-core` version instead of pinning an incompatible core release
+- **Tauri lockfile** — align the local crate version in `Cargo.lock` with `Cargo.toml` so locked builds can resolve
+
 ### Scan / Docker
+
+- **VPN proxy routing** — make the UI API upstream selectable and route VPN-profile requests through Gluetun; the VPN API now targets SearXNG in its shared network namespace
 
 - **Engine launch path** — when `AUDIOTHECA_HOME` points at Docker appdata (`/data`), jobs spawn `main.py` from the code root (`/app`), not `/data/main.py` (dry-runs no longer die instantly as “stopped by user”)
 - **Identify-only preset** — also skips live moves and purge empty dirs (act phases), matching the “scan and identify only” label
 - **Vendors count** — shows “Loading…” instead of a misleading “0 vendors” flash before `/api/vendors` returns
 - **Session log levels** — summary lines like `Errors: 0` no longer paint as error-level in the scan progress log
 - **Deep identified** — run summary API/UI parse the `Deep identified` counter from `Run_Summary_*.txt`
+
+### Desktop
+
+- **API selection** — use the sidecar URL reported by Tauri instead of probing neighboring local ports that may belong to another Audiotheca instance
+
+### Preview audio
+
+- **Mix matrix** — implement stereo, mono, left-only, and right-only channel routing with Web Audio; indicate that pitch shift is suspended during tempo sync
 
 ### Dashboard
 

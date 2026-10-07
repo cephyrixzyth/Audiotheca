@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="dark light"><title>Quality &amp; security · Audiotheca</title><link rel="stylesheet" href="/assets/theme.css"><script defer src="/assets/hub.js"></script></head>
+<body><header><div class="headrow"><small>Audiotheca · project workspace</small><button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false">Dark mode</button></div><h1>Quality &amp; security</h1><p class="subtitle">A quick entry point to validation evidence and security boundaries. Results shown here are snapshots from the current local work, not an always-running scanner.</p><nav aria-label="Project pages"><a href="/">Project hub</a><a href="/roadmap.html">Roadmap</a><a href="/quality.html" aria-current="page">Quality &amp; security</a><a href="/docs.html">Documentation</a><a href="/changes.html">Recent changes</a></nav></header>
+<main>
+  <section class="statusline"><strong>Safety defaults</strong><div class="meta">Audiotheca is designed as a local operator tool. The API defaults to 127.0.0.1; scans and file-moving operations use explicit dry-run/confirmation controls; path allowlists guard library operations.</div></section>
+  <div class="section-head"><h2>Recorded validation</h2><span class="tag">Local audit snapshot · 2026-10-06</span></div>
+  <div class="table-wrap"><table><thead><tr><th>Check</th><th>Recorded result</th><th>Notes</th></tr></thead><tbody>
+    <tr><td>Python tests</td><td>634 passed · 6 skipped</td><td>Last recorded full run for the audit work.</td></tr>
+    <tr><td>UI unit tests</td><td>52 passed</td><td>Vitest suite.</td></tr>
+    <tr><td>UI production build</td><td>Passed</td><td>Large main bundle warning remains documented in the audit notes.</td></tr>
+    <tr><td>npm dependency audit</td><td>0 known vulnerabilities</td><td>At the time of the recorded check.</td></tr>
+    <tr><td>Repository-wide deep security scan</td><td>Incomplete</td><td>Tool could not run because the managed filesystem permission profile was unavailable.</td></tr>
+  </tbody></table></div>
+  <section class="panel"><h2>Security boundaries</h2><p>The hub is separate from the Audiotheca API. It has no write endpoint and does not load configuration, secrets, scan reports, or library data. It binds to 127.0.0.1 and serves a fixed allowlist of static pages and project documents.</p><p><a href="/source/SECURITY.md">Open the security guide</a> · <a href="/source/TESTING.md">Open the testing guide</a></p></section>
+  <section class="panel"><h2>Relevant audit work</h2><p>The current unreleased notes cover symlink-safe AI release metadata, bounded ZIP CRC diagnosis, protected release tags, and dependency/build updates. See the changelog for the repository’s full record.</p><p><a href="/changes.html">Review recent changes</a> · <a href="/source/CHANGELOG.md">Read the changelog source</a></p></section>
+  <footer>Validation can become stale as source changes. The checks above reflect recorded results, and the repository-wide security scan remains unfinished.</footer>
+</main></body></html>

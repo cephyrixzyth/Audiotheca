@@ -36,15 +36,17 @@ export function PreviewSessionPanel() {
           />
           Tempo sync (TMP-SYNC)
         </label>
-        <label>
+        <label title={session.tempoSync ? "Pitch shift is suspended while tempo sync is on." : undefined}>
           Pitch shift (st)
           <input
             type="number"
             min={-12}
             max={12}
             value={session.pitchShiftSemitones}
+            disabled={session.tempoSync}
             onChange={(e) => patch({ pitchShiftSemitones: Number(e.target.value) || 0 })}
           />
+          {session.tempoSync ? <small className="count-muted">Suspended during tempo sync</small> : null}
         </label>
         <LabeledSelect
           label="Mix matrix"
