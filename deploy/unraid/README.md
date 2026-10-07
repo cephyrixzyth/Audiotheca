@@ -94,10 +94,11 @@ docker compose --profile clamav up -d --build
 **Gluetun VPN** (DKR-TUN — route outbound traffic through VPN; configure `.env` VPN vars):
 
 ```bash
-docker compose --profile vpn up -d
+AUDIOTHECA_API_UPSTREAM=gluetun:8787 docker compose --profile vpn up -d --build
+docker compose stop api searxng
 ```
 
-See **[SMOKE-VPN.md](SMOKE-VPN.md)** for wiring-only and live VPN smoke steps (no creds in repo).
+The UI proxy then reaches the VPN API through Gluetun. Keep the upstream override when recreating the UI. See **[SMOKE-VPN.md](SMOKE-VPN.md)** for wiring-only and live VPN smoke steps (no creds in repo).
 
 **Space recovery** (one-shot hardlink/bloat report):
 

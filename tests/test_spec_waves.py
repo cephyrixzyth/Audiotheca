@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+import archive_crc
 from archive_crc import diagnose_zip
 from hash_ext import hash_file
 from multitrack_group import collapse_session_objects
@@ -62,6 +63,31 @@ def test_archive_crc_zip_ok(tmp_path):
         zf.writestr("a.txt", "data")
     result = diagnose_zip(zpath)
     assert result["ok"] is True
+
+
+def test_archive_crc_enforces_uncompressed_size_budget(tmp_path, monkeypatch):
+    zpath = tmp_path / "large.zip"
+    with zipfile.ZipFile(zpath, "w") as zf:
+        zf.writestr("a.txt", "1234")
+    monkeypatch.setattr(archive_crc, "MAX_ZIP_UNCOMPRESSED_BYTES", 3)
+
+    result = diagnose_zip(zpath)
+
+    assert result["ok"] is False
+    assert "uncompressed_size_limit_exceeded" in result["issues"]
+
+
+def test_archive_crc_enforces_entry_count_budget(tmp_path, monkeypatch):
+    zpath = tmp_path / "many.zip"
+    with zipfile.ZipFile(zpath, "w") as zf:
+        zf.writestr("a.txt", "a")
+        zf.writestr("b.txt", "b")
+    monkeypatch.setattr(archive_crc, "MAX_ZIP_ENTRIES", 1)
+
+    result = diagnose_zip(zpath)
+
+    assert result["ok"] is False
+    assert "entry_count_limit_exceeded" in result["issues"]
 
 
 def test_registry_emu_roundtrip(tmp_path, monkeypatch):

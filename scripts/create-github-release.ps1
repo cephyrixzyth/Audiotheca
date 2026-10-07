@@ -32,6 +32,54 @@ macOS ``*_aarch64.dmg`` and Linux artifacts require building on those platforms 
 See README and INSTALL.md in the repo.
 "@
 
+function Ensure-ReleaseTag {
+    Set-Location $Root
+    $head = (& git rev-parse HEAD).Trim()
+    if ($LASTEXITCODE -ne 0) { throw "Unable to resolve current HEAD." }
+
+    $remoteLines = & git ls-remote origin "refs/tags/$Tag" "refs/tags/$Tag^{}"
+    if ($LASTEXITCODE -ne 0) { throw "Unable to inspect remote tag $Tag." }
+    $remoteCommit = $null
+    foreach ($line in $remoteLines) {
+        $parts = $line -split '\s+'
+        if ($parts.Count -ge 2 -and $parts[1] -eq "refs/tags/${Tag}^{}") {
+            $remoteCommit = $parts[0]
+            break
+        }
+        if ($parts.Count -ge 2 -and $parts[1] -eq "refs/tags/$Tag" -and -not $remoteCommit) {
+            $remoteCommit = $parts[0]
+        }
+    }
+
+    $localCommit = & git rev-parse --verify "$Tag^{commit}" 2>$null
+    $localTagExists = $LASTEXITCODE -eq 0
+    if ($localTagExists) { $localCommit = $localCommit.Trim() }
+
+    if ($remoteCommit) {
+        if ($remoteCommit -ne $head) {
+            throw "Remote tag $Tag points to $remoteCommit, not current HEAD $head; refusing to move a published release tag."
+        }
+        if ($localTagExists -and $localCommit -ne $head) {
+            throw "Local tag $Tag points to $localCommit, not current HEAD $head; refusing to move the release tag."
+        }
+        if (-not $localTagExists) {
+            & git fetch --no-tags origin "refs/tags/$Tag:refs/tags/$Tag"
+            if ($LASTEXITCODE -ne 0) { throw "Unable to fetch existing remote tag $Tag." }
+        }
+        return
+    }
+
+    if ($localTagExists -and $localCommit -ne $head) {
+        throw "Local tag $Tag points to $localCommit, not current HEAD $head; refusing to move the release tag."
+    }
+    if (-not $localTagExists) {
+        & git tag $Tag
+        if ($LASTEXITCODE -ne 0) { throw "Unable to create tag $Tag." }
+    }
+    & git push origin $Tag
+    if ($LASTEXITCODE -ne 0) { throw "Unable to publish tag $Tag without overwriting an existing tag." }
+}
+
 if (-not (Test-Path $WinDir)) {
     Write-Error "Missing $WinDir - run build-installers.ps1 and build-portable.ps1 first."
 }
@@ -45,9 +93,7 @@ if ($Assets.Count -eq 0) {
 
 $gh = Get-Command gh -ErrorAction SilentlyContinue
 if ($gh) {
-    Set-Location $Root
-    git tag -f $Tag 2>$null
-    git push origin $Tag --force
+    Ensure-ReleaseTag
     $assetArgs = @($Assets | ForEach-Object { $_.FullName })
 
     $releaseExists = $false
@@ -84,9 +130,7 @@ $Headers = @{
 }
 $Repo = "chrisjrovira/Audiotheca"
 
-Set-Location $Root
-git tag -f $Tag
-git push origin $Tag --force
+Ensure-ReleaseTag
 
 $releaseJson = @{
     tag_name   = $Tag

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchAudioAnalyze, fetchAudioWaveform, lookupAcoustId, mediaStreamUrl } from "../api/client";
+import { channelMixGains } from "../audioMix";
 import {
   playbackRateForBpm,
   usePreviewSession,
@@ -20,6 +21,15 @@ type Props = {
   compact?: boolean;
 };
 
+type ChannelMixer = {
+  audio: HTMLAudioElement;
+  context: AudioContext;
+  source: MediaElementAudioSourceNode;
+  splitter: ChannelSplitterNode;
+  merger: ChannelMergerNode;
+  gains: GainNode[];
+};
+
 /** AUTO-AUD, WAV-TRIM, TMP-SYNC, KEY-PITCH, MIX-MATX preview strip. */
 export function AudioPreviewStrip({ path, name, autoPlay = false, compact = false }: Props) {
   const { session } = usePreviewSession();
@@ -38,6 +48,8 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
   const [trimStart, setTrimStart] = useState(session.trimStart);
   const [trimEnd, setTrimEnd] = useState(session.trimEnd);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const channelMixerRef = useRef<ChannelMixer | null>(null);
+  const pendingAudioContextRef = useRef<AudioContext | null>(null);
 
   const isWav = /\.(wav|wave)$/i.test(name);
 
@@ -105,10 +117,63 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
     setAcoustIdBusy(false);
   }, [path]);
 
-  const applyMix = useCallback((audio: HTMLAudioElement) => {
-    if (session.mixChannel === "mono") {
-      audio.style.filter = "none";
+  useEffect(() => () => {
+    audioRef.current?.pause();
+    audioRef.current = null;
+    const mixer = channelMixerRef.current;
+    channelMixerRef.current = null;
+    if (mixer) {
+      mixer.source.disconnect();
+      mixer.splitter.disconnect();
+      mixer.gains.forEach((gain) => gain.disconnect());
+      mixer.merger.disconnect();
+      void mixer.context.close();
     }
+    const pendingContext = pendingAudioContextRef.current;
+    pendingAudioContextRef.current = null;
+    if (pendingContext) void pendingContext.close();
+  }, [path]);
+
+  const applyChannelMix = useCallback((audio: HTMLAudioElement) => {
+    let mixer = channelMixerRef.current;
+    if (!mixer && session.mixChannel !== "stereo") {
+      const AudioContextClass = window.AudioContext;
+      if (!AudioContextClass) return;
+      const context = pendingAudioContextRef.current ?? new AudioContextClass();
+      pendingAudioContextRef.current = null;
+      try {
+        const source = context.createMediaElementSource(audio);
+        const splitter = context.createChannelSplitter(2);
+        const merger = context.createChannelMerger(2);
+        const gains = Array.from({ length: 4 }, () => context.createGain());
+        const routes: Array<[number, number, number]> = [
+          [0, 0, 0], // left input → left output
+          [1, 1, 0], // right input → left output
+          [2, 0, 1], // left input → right output
+          [3, 1, 1], // right input → right output
+        ];
+        source.connect(splitter);
+        for (const [index, channel, output] of routes) {
+          splitter.connect(gains[index], channel);
+          gains[index].connect(merger, 0, output);
+        }
+        merger.connect(context.destination);
+        mixer = { audio, context, source, splitter, merger, gains };
+        channelMixerRef.current = mixer;
+      } catch {
+        void context.close();
+        return;
+      }
+    }
+    if (!mixer || mixer.audio !== audio) return;
+    channelMixGains(session.mixChannel).forEach((value, index) => {
+      mixer!.gains[index].gain.setTargetAtTime(value, mixer!.context.currentTime, 0.01);
+    });
+    if (mixer.context.state === "suspended") void mixer.context.resume().catch(() => undefined);
+  }, [session.mixChannel]);
+
+  const applyMix = useCallback((audio: HTMLAudioElement) => {
+    applyChannelMix(audio);
     const rate = playbackRateForBpm(assetBpm, session.projectBpm, session.tempoSync);
     let effectiveRate = rate;
     if (!session.tempoSync && session.pitchShiftSemitones !== 0) {
@@ -116,12 +181,25 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
     }
     audio.playbackRate = Math.max(0.25, Math.min(4, effectiveRate));
     audio.preservesPitch = session.tempoSync;
-  }, [assetBpm, assetKey, session]);
+  }, [applyChannelMix, assetBpm, session]);
 
   const play = useCallback(async () => {
+    if (session.mixChannel !== "stereo" && !channelMixerRef.current && !pendingAudioContextRef.current) {
+      try {
+        const AudioContextClass = window.AudioContext;
+        if (AudioContextClass) {
+          const context = new AudioContextClass();
+          pendingAudioContextRef.current = context;
+          void context.resume().catch(() => undefined);
+        }
+      } catch {
+        /* Channel mixing is optional on browsers without Web Audio support. */
+      }
+    }
     // Always mint a fresh ticketed URL — tickets expire with TTL.
     const url = await mediaStreamUrl(path);
-    const audio = audioRef.current ?? new Audio(url);
+    const audio = audioRef.current ?? new Audio();
+    if (!audioRef.current) audio.crossOrigin = "anonymous";
     if (audio.src !== url) {
       audio.src = url;
     }
@@ -142,7 +220,7 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
     audio.onpause = () => setPlaying(false);
     await audio.play();
     setPlaying(true);
-  }, [applyMix, path, trimEnd, trimStart]);
+  }, [applyMix, path, session.mixChannel, trimEnd, trimStart]);
 
   const stop = useCallback(() => {
     audioRef.current?.pause();
@@ -271,7 +349,7 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
             </Badge>
           ))}
           {session.tempoSync && assetBpm ? ` ${assetBpm}→${session.projectBpm}bpm` : null}
-          {session.pitchShiftSemitones !== 0 ? ` ${session.pitchShiftSemitones}st` : null}
+          {!session.tempoSync && session.pitchShiftSemitones !== 0 ? ` ${session.pitchShiftSemitones}st` : null}
           {session.mixChannel !== "stereo" ? ` ${session.mixChannel}` : null}
         </span>
       )}

@@ -11,6 +11,7 @@ Engine **10.0.0** · Web UI **1.0.12**
 | I want to… | Read |
 |------------|------|
 | **Get oriented (new user)** | [Main README](../README.md) |
+| Open the local project hub | [Project Hub](PROJECT_HUB.md) |
 | **Test on my own PC** | [TESTING.md](TESTING.md) |
 | Use the app day to day | [USER_GUIDE.md](USER_GUIDE.md) |
 | Install Python, 7-Zip, Node | [INSTALL.md](INSTALL.md) |

@@ -3,11 +3,6 @@ map $http_upgrade $connection_upgrade {
     "" close;
 }
 
-upstream audiotheca_api {
-    server api:8787;
-    keepalive 8;
-}
-
 server {
     listen 80;
     server_name _;
@@ -17,8 +12,13 @@ server {
 
     client_max_body_size 32m;
 
+    # Resolve the Compose-selected API upstream at request time so the UI can
+    # start before the API and switch between api and Gluetun in the VPN profile.
+    resolver 127.0.0.11 ipv6=off valid=10s;
+    set $audiotheca_api ${AUDIOTHECA_API_UPSTREAM};
+
     location /api/ {
-        proxy_pass http://audiotheca_api;
+        proxy_pass http://$audiotheca_api;
         proxy_http_version 1.1;
         proxy_set_header Host $http_host;
         proxy_set_header X-Forwarded-Host $http_host;

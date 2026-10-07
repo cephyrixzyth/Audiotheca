@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>Audiotheca · Project Hub</title>
+  <link rel="stylesheet" href="/assets/theme.css">
+  <script defer src="/assets/hub.js"></script>
+</head>
+<body>
+  <header>
+    <div class="headrow"><small>Audiotheca · local project workspace</small><button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false">Dark mode</button></div>
+    <h1>Project hub</h1>
+    <p class="subtitle">A local landing page for Audiotheca’s roadmap, quality notes, documentation, and recent changes. It runs independently of Codex and reads only this repository’s public project files.</p>
+    <nav aria-label="Project pages">
+      <a href="/" aria-current="page">Project hub</a><a href="/roadmap.html">Roadmap</a><a href="/quality.html">Quality &amp; security</a><a href="/docs.html">Documentation</a><a href="/changes.html">Recent changes</a>
+    </nav>
+  </header>
+  <main>
+    <section class="statusline" aria-live="polite"><strong>Audiotheca · Engine 10.0.0 · Web UI 1.0.12</strong><div class="meta">The hub is a read-only project overview. It does not start scans, connect to the Audiotheca API, or expose library paths.</div></section>
+    <section class="stats" aria-label="Local repository status">
+      <div class="stat"><b id="git-branch">Loading…</b><span>Git branch</span></div>
+      <div class="stat"><b id="git-commit">Loading…</b><span>Current commit</span></div>
+      <div class="stat"><b id="changed-files">Loading…</b><span>Changed files</span></div>
+      <div class="stat"><b>127.0.0.1</b><span>Local-only address</span></div>
+    </section>
+    <p class="meta">Git status checked <span id="checked-at">when this page loads</span>. Filenames and environment variables are not shown.</p>
+    <div class="section-head"><h2>Project work</h2><span class="tag">Focused subpages</span></div>
+    <section class="tiles" aria-label="Project sections">
+      <a class="tile" href="/roadmap.html"><span class="eyebrow">Direction and scope</span><h3>Roadmap</h3><p>See the current recorded delivery state, completed phases, and the source document’s update date.</p><span class="meta">Roadmap and phase plan</span></a>
+      <a class="tile" href="/quality.html"><span class="eyebrow">Reliability and trust</span><h3>Quality &amp; security</h3><p>Review safety defaults, audit evidence, and the current limits of recorded validation.</p><span class="meta">Test and security references</span></a>
+      <a class="tile" href="/docs.html"><span class="eyebrow">Operator reference</span><h3>Documentation</h3><p>Open the guides for using, installing, testing, and understanding Audiotheca.</p><span class="meta">Local Markdown sources</span></a>
+      <a class="tile" href="/changes.html"><span class="eyebrow">What changed</span><h3>Recent changes</h3><p>Read the current unreleased notes and the versioned changelog in the repository.</p><span class="meta">Release notes and current work</span></a>
+      <a class="tile" href="/source/README.md"><span class="eyebrow">Start here</span><h3>Project README</h3><p>Product overview, capabilities, quick start, architecture entry points, and links to guides.</p><span class="meta">Opens the repository source directly</span></a>
+      <a class="tile" href="/source/SPEC_CATALOG.md"><span class="eyebrow">Capability reference</span><h3>Spec catalog</h3><p>Browse the implementation catalog and the stable names used across the project.</p><span class="meta">94-code catalog · waves A–R</span></a>
+    </section>
+    <footer>Runs from this checkout with Python’s standard library. The server binds to IPv4 loopback and serves a fixed set of pages and Markdown documents.</footer>
+  </main>
+</body>
+</html>

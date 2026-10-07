@@ -15,12 +15,8 @@ pyloudnorm>=0.1.1     # ITU-R BS.1770 / EBU R128 integrated loudness (Phase M3)
 fastapi>=0.139.0
 uvicorn[standard]>=0.49.0
 pydantic>=2.13.4,<3
-pydantic-core==2.46.4
-# NOTE: never `pip install -U pydantic-core` on its own. Each pydantic release
-# pins its exact matching pydantic-core (compiled Rust core); a newer core than
-# pydantic expects makes pydantic refuse to import. To get a newer core,
-# upgrade pydantic itself: python -m pip install -U "pydantic" "pydantic-core==<matching>"
-# If imports fail with a core mismatch, reinstall the pin above.
+# Pydantic declares the exact compatible pydantic-core version; keep it under
+# Pydantic's resolver so this range cannot pair a newer Pydantic with a stale core.
 
 # Desktop sidecar build (maintainers only)
 pyinstaller>=6.21.0
