@@ -62,11 +62,12 @@ function spatialNodes(
   track: Track,
   buffer: AudioBuffer,
   audible: boolean,
+  panningModel: PanningModelType = "HRTF",
 ) {
   const source = context.createBufferSource();
   source.buffer = buffer;
   const panner = new PannerNode(context, {
-    panningModel: "HRTF",
+    panningModel,
     distanceModel: "inverse",
     refDistance: 1,
     rolloffFactor: 0.35,
@@ -247,7 +248,8 @@ export async function renderMix(project: Project, bank: AudioBank) {
     const buffer = bank.get(t.id);
     if (!buffer) throw new Error("Missing audio for " + t.name);
     if (!isAudible(t, project.tracks)) continue;
-    const { source } = spatialNodes(context, t, buffer, true);
+    // Render a conventional stereo mix without waiting for a browser HRTF database.
+    const { source } = spatialNodes(context, t, buffer, true, "equalpower");
     source.start(t.offset, t.start, t.end - t.start);
   }
   const rendered = await context.startRendering();

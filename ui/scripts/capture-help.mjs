@@ -185,6 +185,21 @@ async function scenario(name, shots, actions) {
       .catch(() => {});
     throw err;
   }
+  const finalPaint = join(output, "recording", name + "-result.png");
+  if (record) {
+    // Chromium can close a screencast before its last painted result reaches the encoder.
+    await page.evaluate(
+      () =>
+        new Promise((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve)),
+        ),
+    );
+    const finalFrame = await devtools.send("Page.captureScreenshot", {
+      format: "png",
+      optimizeForSpeed: true,
+    });
+    await fs.writeFile(finalPaint, Buffer.from(finalFrame.data, "base64"));
+  }
   const video = page.video();
   await ctx.close();
   if (record) {
@@ -206,9 +221,21 @@ async function scenario(name, shots, actions) {
       lead.toFixed(2),
       "-i",
       source,
+      "-loop",
+      "1",
+      "-framerate",
+      "16",
+      "-t",
+      "2",
+      "-i",
+      finalPaint,
       "-an",
-      "-vf",
-      cut + "fps=16,scale=1280:800:flags=lanczos",
+      "-filter_complex",
+      "[0:v]" +
+        cut +
+        "fps=16,scale=1280:800:flags=lanczos,format=yuv420p,setsar=1,setpts=PTS-STARTPTS[motion];[1:v]scale=1280:800:flags=lanczos,format=yuv420p,setsar=1,setpts=PTS-STARTPTS[end];[motion][end]concat=n=2:v=1:a=0[v]",
+      "-map",
+      "[v]",
       "-c:v",
       "libx264",
       "-preset",
@@ -232,6 +259,7 @@ async function scenario(name, shots, actions) {
     ]);
     artifacts.push({ type: "walkthrough", name, steps: [...steps] });
     await fs.unlink(source);
+    await fs.unlink(finalPaint);
   }
 }
 try {
@@ -287,9 +315,13 @@ try {
         throw Error("Expected a fresh scan, received " + newer);
       await page.goto(origin + "/#/dashboard?run=" + encodeURIComponent(value));
       await assert(run).toHaveValue(value);
-      await click(button("Run analysis"), "Open analysis for the completed scan");
+      await click(
+        button("Run analysis"),
+        "Open analysis for the completed scan",
+      );
       const summary = page.locator(".dash-run-banner");
       await assert(summary).toContainText(value);
+      await show(summary);
       await verify("Read the completed dry-run dashboard", summary, /Dry run/i);
       expect(new URL(page.url()).hash).toContain("#/dashboard?run=" + value);
     },
@@ -636,7 +668,9 @@ try {
       await fs.access(
         join(lib, "a", "Acme Audio", "SynthOne", "kick_120bpm_C.wav"),
       );
-      await verify("Verify the staged destination and result", main);
+      const receipt = main.getByText(/Live: 1 move\(s\) applied \(0 failed\)/i);
+      await show(receipt);
+      await verify("Verify the staged destination and result", receipt);
     },
   );
 } finally {

@@ -1,6 +1,9 @@
 import { test, expect } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 
+// Use a predictable WebGL implementation on headless CI hosts.
+test.use({ launchOptions: { args: ["--enable-unsafe-swiftshader", "--use-gl=angle", "--use-angle=swiftshader"] } });
+
 test("a studio edit reopens with its imported audio and renders a stereo file", async ({
   page,
   browser,
