@@ -1,6 +1,6 @@
 import { useReviewDecision, WorkScope, WorkIssue } from "./ReviewWorkbench";
 import { LoadingStatus } from "../ui/LoadingStatus";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   addManualDuplicate,
   downloadDecisionsDownload,
@@ -67,6 +67,7 @@ export function DuplicateReview({ stamp }: Props) {
   const libraryRoot = useLibraryRoot();
   const { queue, updateQueue } = useContextSidebar();
   const { query, offset, confidence, hideRejected, showReferenceExtras } = queue;
+  const previousQuery = useRef(query);
   const [groups, setGroups] = useState<DuplicateGroup[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -162,6 +163,8 @@ export function DuplicateReview({ stamp }: Props) {
   useEffect(() => {
     let current = true;
     setLoadError(""); setLoading(true);
+    const queryChanged = previousQuery.current !== query;
+    previousQuery.current = query;
     const timer = setTimeout(() => {
       fetchDuplicates(stamp, {
         confidence: confidence || undefined,
@@ -184,7 +187,7 @@ export function DuplicateReview({ stamp }: Props) {
           }
         })
         .finally(() => { if (current) setLoading(false); });
-    }, query ? 250 : 0);
+    }, query && queryChanged ? 250 : 0);
     return () => { current = false; clearTimeout(timer); };
   }, [stamp, confidence, query, offset, updateQueue, revision]);
 
@@ -407,9 +410,9 @@ export function DuplicateReview({ stamp }: Props) {
       </WorkScope>
       {loadError && <WorkIssue message={loadError} retry={() => setRevision(v => v + 1)} />}
       {total > 100 && <nav className="toolbar" aria-label="Duplicate group pages">
-        <Button variant="secondary" disabled={!offset || loading} onClick={() => updateQueue({ offset: offset - 100 })}>Previous</Button>
+        <Button variant="secondary" disabled={!offset} onClick={() => updateQueue({ offset: offset - 100 })}>Previous</Button>
         <span>{offset + 1}–{Math.min(offset + 100, total)} of {total} groups</span>
-        <Button variant="secondary" disabled={offset + 100 >= total || loading} onClick={() => updateQueue({ offset: offset + 100 })}>Next</Button>
+        <Button variant="secondary" disabled={offset + 100 >= total} onClick={() => updateQueue({ offset: offset + 100 })}>Next</Button>
       </nav>}
       <div className="toolbar">
         <LabeledSelect

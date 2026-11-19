@@ -13,7 +13,10 @@ test("duplicate filters and page six reopen independently for each scan", async 
   await page.goto("/#/review/duplicates?run=20260704_1300");
   await search.fill("Tape");
   await confidence.selectOption("MEDIUM");
-  for (let i = 0; i < 5; i++) await next.click();
+  for (let i = 1; i <= 5; i++) {
+    await next.click();
+    await expect(page.getByText(`${i * 100 + 1}–${(i + 1) * 100} of 601 groups`)).toBeVisible();
+  }
   await expect(page.getByText("501–600 of 601 groups")).toBeVisible();
   await page.reload();
   await expect(search).toHaveValue("Tape");
