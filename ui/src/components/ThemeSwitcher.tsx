@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useTheme } from "../contexts/ThemeContext";
+import { themeArtwork } from "../themes/presets";
+import { WorkspaceIcon } from "../ui/WorkspaceIcon";
 import { DropdownMenu } from "../ui";
 
 export function ThemeSwitcher() {
@@ -18,9 +20,7 @@ export function ThemeSwitcher() {
             title="UI color theme"
             aria-label="Select UI theme"
           >
-            <span className="theme-switcher-icon" aria-hidden>
-              ◐
-            </span>
+            <WorkspaceIcon name="palette" size={15} />
             <span className="theme-switcher-label">{activeTheme.name}</span>
             <span className="theme-switcher-chevron" aria-hidden>
               ▾
@@ -32,6 +32,8 @@ export function ThemeSwitcher() {
           active: theme.id === activeId,
           label: (
             <span className="theme-switcher-option-name">
+              <img className="theme-menu-thumb" src={import.meta.env.BASE_URL + "rooms/" + themeArtwork(theme) + ".webp"} alt="" />
+              <i className="theme-dot" style={{ background: theme.tokens.accent, borderColor: theme.tokens.bg }} aria-hidden="true" />
               {theme.name}
               {!theme.builtIn ? <span className="theme-switcher-custom"> ★</span> : null}
             </span>

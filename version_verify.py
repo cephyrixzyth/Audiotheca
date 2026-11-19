@@ -230,18 +230,27 @@ def sync_catalog_from_url(url: str, *, timeout_s: float = 8.0) -> dict[str, Any]
         return {"ok": False, "error": "url required", "merged": 0}
 
     try:
-        require_outbound("manifest catalog sync")
-    except PermissionError as exc:
-        return {"ok": False, "error": str(exc), "merged": 0}
-
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Audiotheca/1.0"})
-        with urllib.request.urlopen(req, timeout=timeout_s) as resp:
-            raw = resp.read().decode("utf-8", errors="replace")
+        parts = urllib.parse.urlsplit(url)
+        if parts.scheme == "file" and parts.netloc in ("", "localhost"):
+            local = urllib.request.url2pathname(parts.path)
+            if local.startswith(("//", "\\\\")):
+                raise ValueError("A local manifest file is required")
+            raw = Path(local).read_text(encoding="utf-8")
+        elif parts.scheme in ("https", "http"):
+            require_outbound("manifest catalog sync")
+            req = urllib.request.Request(url, headers={"User-Agent": "Audiotheca/1.0"})
+            with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+                raw = resp.read().decode("utf-8")
+        else:
+            raise ValueError("Choose a local file or an HTTP(S) catalog URL")
         payload = json.loads(raw)
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
+    except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:
         return {"ok": False, "error": str(exc), "merged": 0}
 
+    return merge_catalog(payload, source=url)
+
+
+def merge_catalog(payload: object, *, source: str) -> dict[str, Any]:
     products_in = payload.get("products") if isinstance(payload, dict) else payload
     if not isinstance(products_in, dict):
         return {"ok": False, "error": "catalog must be object with products", "merged": 0}
@@ -261,4 +270,4 @@ def sync_catalog_from_url(url: str, *, timeout_s: float = 8.0) -> dict[str, Any]
         }
         merged += 1
     save_manifest(manifest)
-    return {"ok": True, "merged": merged, "url": url}
+    return {"ok": True, "merged": merged, "url": source}

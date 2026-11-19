@@ -11,6 +11,7 @@ WORKDIR /app/ui
 COPY ui/package.json ui/package-lock.json* ./
 RUN npm ci
 COPY ui/ .
+COPY docs/assets/ /app/docs/assets/
 
 ARG VITE_DEFAULT_LIBRARY_ROOT=/library
 ENV VITE_DEFAULT_LIBRARY_ROOT=${VITE_DEFAULT_LIBRARY_ROOT}

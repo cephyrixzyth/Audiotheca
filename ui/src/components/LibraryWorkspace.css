@@ -1,0 +1,567 @@
+.library-workspace,
+.file-explorer-shell {
+  --library-line: var(--border);
+  --library-tint: color-mix(in srgb, var(--accent) 7%, var(--bg-panel));
+  min-width: 0;
+}
+.library-workspace .route-explorer {
+  display: block;
+  position: static;
+  width: 100%;
+  height: auto;
+  max-height: none;
+  transform: none;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+.library-view-tools,
+.library-view-mode,
+.library-rail-heading,
+.library-location-title,
+.library-kind-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.library-view-tools {
+  justify-content: space-between;
+  margin-bottom: 0.7rem;
+}
+.library-view-mode {
+  padding: 0.18rem;
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  border-radius: 0.55rem;
+}
+.library-view-mode button {
+  border: 0;
+}
+.file-explorer-shell .file-explorer-pane {
+  gap: 0;
+}
+.library-workspace .file-explorer-pane {
+  border: 1px solid var(--library-line);
+  border-radius: 0.8rem;
+  overflow: hidden;
+  background: var(--bg-panel);
+}
+.file-explorer-shell .file-explorer-breadcrumbs {
+  gap: 0.2rem;
+  padding: 0.55rem 0.7rem;
+  border-bottom: 1px solid var(--library-line);
+  background: var(--bg-elevated);
+}
+.file-explorer-shell .file-explorer-breadcrumbs button {
+  min-height: 1.8rem;
+  line-height: 1.1;
+  font-size: 0.77rem;
+}
+.file-explorer-shell .file-explorer-body {
+  display: grid;
+  grid-template-columns: minmax(8rem, 0.65fr) minmax(14rem, 2.1fr) minmax(
+      10rem,
+      0.92fr
+    );
+  gap: 0;
+  align-items: stretch;
+  min-width: 0;
+}
+.library-workspace .file-explorer-body {
+  min-height: clamp(26rem, 54vh, 52rem);
+}
+.library-location-rail,
+.library-asset-inspector,
+.file-explorer-shell .file-explorer-main {
+  min-width: 0;
+  padding: clamp(0.65rem, 1.25vw, 1.1rem);
+}
+.library-location-rail {
+  border-right: 1px solid var(--library-line);
+  background: var(--bg-elevated);
+}
+.library-location-rail h3,
+.library-asset-inspector h3,
+.library-drop-block h4,
+.library-location-title h3 {
+  margin: 0;
+}
+.library-rail-heading h3,
+.library-asset-inspector h3,
+.library-drop-block h4 {
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-weight: 500;
+  font-size: 0.71rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.library-rail-heading {
+  justify-content: space-between;
+  margin-bottom: 0.65rem;
+}
+.library-rail-heading span {
+  font-family: var(--mono);
+  font-size: 0.73rem;
+  color: var(--text-muted);
+}
+.library-location-rail .explorer-tree {
+  border: 0;
+  padding: 0;
+  width: 100%;
+  max-height: 26rem;
+}
+.library-location-rail .explorer-tree-row {
+  margin: 0.13rem 0;
+  min-height: 1.8rem;
+  border-radius: 0.33rem;
+}
+.library-location-rail .explorer-tree-label {
+  padding: 0.28rem 0.25rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+  font-size: 0.8rem;
+}
+.library-location-rail .explorer-tree-row.selected {
+  background: var(--accent-soft);
+}
+.library-drop-block {
+  border-top: 1px solid var(--library-line);
+  margin-top: 1.3rem;
+  padding-top: 0.8rem;
+}
+.library-drop-block .drop-zone-overlay {
+  margin: 0.65rem 0 0;
+  padding: 0.6rem;
+  border: 1px dashed var(--border-bright);
+  background: var(--bg-panel);
+  border-radius: 0.45rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.library-drop-block .drop-zone-overlay.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.library-drop-target {
+  display: grid;
+  justify-items: center;
+  gap: 0.3rem;
+  padding: 0.5rem 0.1rem 0.8rem;
+  color: var(--text-muted);
+}
+.library-drop-target > span {
+  display: grid;
+  place-items: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  border: 1px solid var(--border-bright);
+  border-radius: 50%;
+  color: var(--accent);
+  font-size: 1.15rem;
+  line-height: 1;
+}
+.library-drop-target strong {
+  font-weight: 500;
+  font-size: 0.75rem;
+}
+.library-drop-block .drop-zone-overlay form {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.4rem;
+}
+.library-drop-block .drop-zone-overlay input {
+  width: 100%;
+  min-width: 0;
+  padding: 0.36rem;
+  font: inherit;
+  font-size: 0.76rem;
+  border: 1px solid var(--border-bright);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 0.35rem;
+}
+.library-drop-block ul {
+  padding: 0;
+  list-style: none;
+  font-size: 0.76rem;
+}
+.library-drop-block li button {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.library-location-title {
+  justify-content: space-between;
+  margin: 0.05rem 0 0.6rem;
+}
+.library-location-title h3 {
+  font-size: clamp(1.1rem, 2vw, 1.6rem);
+  line-height: 1.14;
+  letter-spacing: -0.035em;
+  overflow-wrap: anywhere;
+}
+.library-location-title span {
+  display: block;
+  margin-top: 0.25rem;
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+.file-explorer-shell .file-explorer-toolbar {
+  display: flex;
+  gap: 0.32rem;
+  align-items: center;
+}
+.file-explorer-shell .explorer-search-field {
+  flex: 1 1 9rem;
+  min-width: 7rem;
+}
+.file-explorer-shell .explorer-search-field input {
+  background: var(--bg);
+  padding: 0.45rem 0.65rem;
+  min-height: 2rem;
+  font-size: 0.8rem;
+}
+.library-kind-filter {
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+  padding: 0.5rem 0 0.45rem;
+}
+.library-kind-filter button {
+  color: var(--text-muted);
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 2rem;
+  padding: 0.18rem 0.5rem;
+  font-size: 0.74rem;
+}
+.library-kind-filter button[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--text);
+  border-color: var(--border-bright);
+}
+.file-explorer-shell .explorer-page-controls {
+  gap: 0.4rem;
+  justify-content: space-between;
+  padding: 0.3rem 0;
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+.file-explorer-shell .file-explorer-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.file-explorer-shell .file-explorer-table th {
+  font: 500 0.68rem var(--mono);
+  text-align: left;
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+}
+.file-explorer-shell .file-explorer-table td {
+  padding: 0.4rem;
+  font-size: 0.76rem;
+  border-color: var(--border);
+}
+.file-explorer-shell .file-explorer-table tr.selected {
+  background: var(--library-tint);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.file-explorer-shell .explorer-name-cell {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  flex-wrap: wrap;
+  min-width: 7rem;
+}
+.file-explorer-shell .explorer-name-cell .linkish-btn {
+  font-size: 0.8rem;
+  text-align: left;
+  font-weight: 550;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  flex: 1 1 4rem;
+}
+.file-explorer-shell .explorer-name-cell .audio-preview-strip.compact {
+  margin: 0;
+  padding: 0;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.file-explorer-shell .explorer-name-cell .compact .audio-waveform-svg:empty {
+  display: none;
+}
+.library-asset-icon {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  color: var(--text-muted);
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  border-radius: 0.4rem;
+  position: relative;
+}
+.library-asset-icon.large {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.65rem;
+  font-size: 1.35rem;
+}
+.library-asset-icon.kind-folder {
+  color: var(--warning);
+}
+.library-asset-icon.kind-folder > i {
+  width: 1em;
+  height: 0.69em;
+  background: currentColor;
+  position: relative;
+  border-radius: 0.1em;
+}
+.library-asset-icon.kind-folder > i::before {
+  content: "";
+  position: absolute;
+  top: -0.12em;
+  left: 0.03em;
+  width: 0.45em;
+  height: 0.2em;
+  background: currentColor;
+  border-radius: 0.08em;
+}
+.library-asset-icon.kind-archive {
+  color: var(--review);
+}
+.library-asset-icon.kind-archive > i,
+.library-asset-icon.kind-file > i {
+  height: 0.9em;
+  width: 0.71em;
+  border: 1.5px solid currentColor;
+  border-radius: 0.1em;
+}
+.library-asset-icon.kind-archive > i {
+  border-top-width: 3px;
+  background: linear-gradient(
+    90deg,
+    transparent 40%,
+    currentColor 40% 53%,
+    transparent 53%
+  );
+}
+.library-asset-icon.kind-audio {
+  color: var(--accent);
+}
+.library-bars {
+  display: flex;
+  align-items: center;
+  gap: 0.08em;
+}
+.library-bars i {
+  background: currentColor;
+  width: 0.12em;
+  height: 0.36em;
+  border-radius: 0.1em;
+}
+.library-bars i:nth-child(2),
+.library-bars i:nth-child(4) {
+  height: 0.73em;
+}
+.library-bars i:nth-child(3) {
+  height: 1em;
+}
+.file-explorer-shell .library-type-cell {
+  font: 500 0.67rem var(--mono);
+  color: var(--text-muted);
+}
+.library-asset-inspector {
+  border-left: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+.library-inspector-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  align-items: flex-start;
+  margin: 1rem 0 0.8rem;
+}
+.library-inspector-title strong {
+  font-size: 1.05rem;
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
+}
+.library-inspector-title > span:last-child {
+  color: var(--text-muted);
+  text-transform: capitalize;
+  font: 500 0.69rem var(--mono);
+}
+.library-asset-inspector dl {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.55rem 0.35rem;
+  font-size: 0.8rem;
+  border-block: 1px solid var(--border);
+  padding: 0.8rem 0;
+}
+.library-asset-inspector dt,
+.library-inspector-hint,
+.library-location-details {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+.library-asset-inspector dd {
+  margin: 0;
+  font-family: var(--mono);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.library-location-details p {
+  overflow-wrap: anywhere;
+  font-size: 0.7rem;
+}
+.library-asset-inspector .explorer-spot-preview {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  gap: 0.65rem;
+}
+.library-asset-inspector .audio-preview-strip {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.45rem;
+  padding: 0.65rem;
+  border-radius: 0.45rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+.library-asset-inspector .audio-play-btn {
+  border: 1px solid var(--border-bright);
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 50%;
+  width: 2rem;
+  height: 2rem;
+}
+.library-asset-inspector .audio-waveform-svg {
+  width: 100%;
+  height: 2.1rem;
+}
+.library-asset-inspector .audio-preview-meta,
+.library-asset-inspector .audio-preview-acoustid,
+.library-preview-trim {
+  grid-column: 1 / -1;
+}
+.library-preview-trim {
+  display: grid;
+  gap: 0.3rem;
+  font: 400 0.64rem var(--mono);
+  color: var(--text-muted);
+}
+.library-preview-trim label {
+  display: grid;
+  grid-template-columns: 2em 1fr 3.4em;
+  gap: 0.4rem;
+}
+.library-preview-trim input {
+  width: 100%;
+  min-width: 0;
+  accent-color: var(--accent);
+}
+.file-explorer-single {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+.file-explorer-shell.dual-pane .file-explorer-dual {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.file-explorer-shell.dual-pane .file-explorer-body {
+  grid-template-columns: 1fr;
+}
+.file-explorer-shell.dual-pane .library-location-rail {
+  max-height: 12rem;
+  overflow: auto;
+}
+.file-explorer-shell.dual-pane .library-location-rail .library-drop-block {
+  display: none;
+}
+.file-explorer-shell.dual-pane .library-asset-inspector {
+  border-left: 0;
+  border-top: 1px solid var(--border);
+}
+.file-explorer-shell:not(.route-explorer) .file-explorer-body {
+  grid-template-columns: minmax(7rem, 0.65fr) minmax(13rem, 2fr);
+}
+.file-explorer-shell:not(.route-explorer) .library-asset-inspector {
+  grid-column: 1/-1;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+.library-workspace .file-explorer-dual .file-explorer-pane {
+  padding: 0;
+  border: 1px solid var(--border);
+}
+@media (max-width: 1170px) {
+  .file-explorer-shell .file-explorer-body {
+    grid-template-columns: minmax(8rem, 0.72fr) minmax(14rem, 2fr);
+  }
+  .library-asset-inspector {
+    grid-column: 1/-1;
+    border-top: 1px solid var(--border);
+    border-left: 0;
+  }
+}
+@media (max-width: 720px) {
+  .library-workspace .file-explorer-body,
+  .file-explorer-shell:not(.route-explorer) .file-explorer-body,
+  .file-explorer-shell.dual-pane .file-explorer-dual {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .library-location-rail {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.35rem 0.6rem;
+  }
+  .library-rail-heading {
+    grid-column: 1;
+    margin: 0;
+  }
+  .library-location-rail .explorer-tree {
+    grid-column: 1;
+    max-height: 10rem;
+  }
+  .library-drop-block {
+    grid-column: 2;
+    grid-row: 1 / 3;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .library-drop-block .drop-zone-overlay {
+    margin: 0.35rem 0 0;
+    padding: 0.3rem;
+  }
+  .library-drop-target {
+    display: none;
+  }
+  .library-workspace .file-explorer-table th:last-child,
+  .library-workspace .file-explorer-table td:last-child {
+    display: none;
+  }
+  .library-view-tools {
+    flex-wrap: wrap;
+  }
+  .library-location-details .count-muted,
+  .library-location-title span {
+    font-size: 0.62rem;
+  }
+}

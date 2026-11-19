@@ -751,13 +751,13 @@ def save_decisions(stamp: str, body: dict = Body(...)) -> dict[str, object]:
     raw = body.get("decisions", body.get("keepers", {}))
     if not isinstance(raw, dict):
         raise HTTPException(status_code=400, detail="decisions must be an object")
-    plan = decisions.build_plan_from_decisions(stamp, {str(k): str(v) for k, v in raw.items()})
-    path = decisions.save_plan(plan)
+    plan, path = decisions.save_review_decisions(stamp, {str(k): str(v) for k, v in raw.items()})
     return {
         "ok": True,
         "stamp": stamp,
         "path": str(path),
         "count": len(plan.duplicate_decisions),
+        "unresolved": sorted(set(raw) - {row.dedup_key for row in plan.duplicate_decisions}),
     }
 
 @router.post("/api/runs/{stamp}/duplicates/reject")
@@ -771,14 +771,15 @@ def reject_duplicate_group(stamp: str, body: dict = Body(...)) -> dict[str, obje
     reason = str(body.get("reason", "bad_match"))
     note = str(body.get("note", ""))
     fingerprint = str(body.get("fingerprint", "")).strip()
-    add_rejection(
-        dedup_key,
-        [str(p) for p in paths],
-        fingerprint=fingerprint,
-        reason=reason,
-        note=note,
-        stamp=stamp,
-    )
+    with decisions.decision_lock():
+        add_rejection(
+            dedup_key,
+            [str(p) for p in paths],
+            fingerprint=fingerprint,
+            reason=reason,
+            note=note,
+            stamp=stamp,
+        )
     return {"ok": True, "dedup_key": dedup_key, "reason": reason}
 
 @router.post("/api/runs/{stamp}/duplicates/manual")
@@ -897,7 +898,7 @@ def get_archive_diff(
     stamp: str,
     archive_path: str = Query(...),
     folder_path: str = Query(...),
-    limit: int = Query(default=500, le=2000),
+    limit: int = Query(default=500, ge=1, le=2000),
 ) -> dict[str, object]:
     from api.archive_diff import build_archive_diff
 

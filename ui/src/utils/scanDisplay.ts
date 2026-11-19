@@ -109,6 +109,7 @@ export function formatPhaseCode(raw?: string | null): string {
 }
 
 export function progressEventKey(event: ProgressEvent, index?: number): string {
+  if (event.sequence != null) return `event-${event.sequence}`;
   const base = event.ts ?? "";
   switch (event.type) {
     case "phase_progress":
@@ -200,4 +201,12 @@ export function saveCachedJobEvents(jobId: string, events: ProgressEvent[]): voi
   } catch {
     /* quota */
   }
+}
+
+export function scanLabel(stamp: string): string {
+  const parts = stamp.match(/^(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})/);
+  if (!parts) return stamp;
+  const [, year, month, day, hour, minute] = parts;
+  const date = new Date(+year, +month - 1, +day, +hour, +minute);
+  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }).format(date);
 }

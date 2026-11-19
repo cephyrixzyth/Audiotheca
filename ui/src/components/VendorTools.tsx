@@ -1,3 +1,4 @@
+import { WorkScope, WorkIssue } from "./ReviewWorkbench";
 import { useCallback, useEffect, useState } from "react";
 import {
   addVendor,
@@ -18,13 +19,16 @@ import {
   type HarvestSourcePreset,
   type VendorGap,
 } from "../api/client";
-import { Badge, Button, Kpi, LabeledSelect, VirtualTable } from "../ui";
+import { Badge, Button, Kpi, LabeledSelect, Tabs, VirtualTable } from "../ui";
 
 interface Props {
   stamp?: string;
 }
 
 export function VendorTools({ stamp }: Props) {
+  const [view, setView] = useState("review");
+  const [revision, setRevision] = useState(0);
+  const [candidatesLoading, setCandidatesLoading] = useState(true);
   const [company, setCompany] = useState("");
   const [keywords, setKeywords] = useState("");
   const [testKw, setTestKw] = useState("");
@@ -57,19 +61,21 @@ export function VendorTools({ stamp }: Props) {
     if (!stamp) return;
     fetchVendorGaps(stamp, 2)
       .then((res) => setGaps(res.gaps))
-      .catch(() => setGaps([]));
+      .catch((err: Error) => {setGaps([]); setError(err.message);});
   }, [stamp]);
 
   const reloadCandidates = useCallback(() => {
+    setCandidatesLoading(true);
     fetchHarvestCandidates(includeKnown)
       .then((res) => {
         setCandidates(res.pending);
         setLastRun(res.last_run);
       })
-      .catch(() => undefined);
+      .catch((err: Error) => setError(err.message)).finally(() => setCandidatesLoading(false));
   }, [includeKnown]);
 
   useEffect(() => {
+    setError(null);
     fetchVendors()
       .then((res) => {
         setKnown(res.known);
@@ -89,10 +95,10 @@ export function VendorTools({ stamp }: Props) {
         setCategories(res.categories);
         setExtraUrls(res.default_urls.join("\n"));
       })
-      .catch(() => undefined);
+      .catch((err: Error) => setError(err.message));
     reloadCandidates();
     reloadGaps();
-  }, [stamp, reloadCandidates, reloadGaps]);
+  }, [stamp, reloadCandidates, reloadGaps, revision]);
 
   async function handleAddVendor(e: React.FormEvent) {
     e.preventDefault();
@@ -140,7 +146,9 @@ export function VendorTools({ stamp }: Props) {
         category: harvestCategory,
         include_known: includeKnown,
       });
-      setMsg(`Harvest complete — ${res.added} new candidates (${res.total_pending} pending review)`);
+      const failed = res.results.filter(source => !source.ok);
+      setMsg(`${res.added} new candidates, ${res.total_pending} pending. ${res.results.length - failed.length} of ${res.results.length} sources read.`);
+      if (failed.length) setError(failed.map(source => `${source.url}: ${source.error}`).join(" · "));
       reloadCandidates();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Harvest failed");
@@ -164,7 +172,9 @@ export function VendorTools({ stamp }: Props) {
         category: harvestCategory,
         include_known: includeKnown,
       });
-      setMsg(`Harvest complete — ${res.added} new candidates (${res.total_pending} pending review)`);
+      const failed = res.results.filter(source => !source.ok);
+      setMsg(`${res.added} new candidates, ${res.total_pending} pending. ${res.results.length - failed.length} of ${res.results.length} sources read.`);
+      if (failed.length) setError(failed.map(source => `${source.url}: ${source.error}`).join(" · "));
       reloadCandidates();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Harvest failed");
@@ -253,7 +263,16 @@ export function VendorTools({ stamp }: Props) {
   const newCandidates = candidates.filter((c) => !c.already_known);
 
   return (
-    <div>
+    <div className="review-workspace">
+      <Tabs aria-label="Vendor workflows" value={view} onValueChange={setView} items={[
+        {value: "review", label: "Candidate inbox"}, {value: "sources", label: "Harvest sources"}, {value: "database", label: "Vendor database"},
+      ]}/>
+      {view === "review" && <WorkScope title="Review candidate evidence" detail="Open each source to check the company name and keywords. Approve selected candidates to add them to the local vendor database for future scans.">
+        <Button variant="secondary" onClick={() => setView("sources")}>Find candidates</Button>
+      </WorkScope>}
+      {msg && <div className="banner dry" role="status">{msg}</div>}
+      {error && <WorkIssue message={error} retry={() => setRevision(v => v + 1)} />}
+      {view === "database" && <>
       <div className="kpi-grid" style={{ marginBottom: "1rem" }}>
         <Kpi label="Feedback items" value={summary ? summary.total.toLocaleString() : "—"} />
         <Kpi label="Investigation" value={summary ? summary.investigation : "—"} />
@@ -269,7 +288,8 @@ export function VendorTools({ stamp }: Props) {
         <span className="count-muted">Backend_Enhancement_Export — investigation + duplicates + vendors</span>
       </div>
 
-      {stamp && gaps.length > 0 && (
+      </>}
+      {view === "review" && stamp && gaps.length > 0 && (
         <section style={{ marginBottom: "1.5rem" }}>
           <div className="banner dry" style={{ marginBottom: "0.75rem" }}>
             <strong>Vendor gaps from run {stamp}</strong> — prefixes from{" "}
@@ -307,7 +327,7 @@ export function VendorTools({ stamp }: Props) {
                 <td>
                   <input
                     type="checkbox"
-                    checked={gapSelected.has(row.prefix)}
+                    aria-label={`Select vendor gap ${row.prefix}`} checked={gapSelected.has(row.prefix)}
                     onChange={() => toggleGap(row.prefix)}
                   />
                 </td>
@@ -321,21 +341,8 @@ export function VendorTools({ stamp }: Props) {
         </section>
       )}
 
-      <div className="banner dry" style={{ marginBottom: "1rem" }}>
-        <strong>Vendor research inbox</strong> — scrapes public pages and stores name/keyword{" "}
-        <em>suggestions only</em> in <code>vendor_harvest_candidates.json</code>. Nothing touches the scan
-        engine or <code>vendor_db.py</code> until you click <strong>Add selected to vendor base</strong> (writes{" "}
-        <code>vendor_overrides.json</code> for the next scan). Export CSV to review offline first.
-        <br />
-        <span className="count-muted">
-          Pipeline: gaps → SearXNG preset <code>kvr</code> / <code>vi-control</code> → harvest presets{" "}
-          <strong>KVR Audio</strong> / <strong>vi-control</strong> → approve. See{" "}
-          <code>docs/VENDOR_RESEARCH.md</code>.
-        </span>
-      </div>
-
-      <section style={{ marginBottom: "1.5rem" }}>
-        <h3 style={{ fontSize: "0.95rem", marginBottom: "0.75rem" }}>Scrape web sources → research inbox</h3>
+      {view === "sources" && <section>
+        <WorkScope title="Collect vendor suggestions" detail="Choose a source preset or enter URLs to collect candidate names. Each suggestion goes to the inbox with its source for review." />
         <div className="toolbar" style={{ flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.75rem" }}>
           <LabeledSelect
             label="Category"
@@ -432,9 +439,10 @@ export function VendorTools({ stamp }: Props) {
             Last run added {(lastRun as { added?: number }).added ?? 0} candidates
           </p>
         )}
-      </section>
+      </section>}
 
-      {candidates.length > 0 && (
+      {view === "review" && candidates.length === 0 && !error && <p className="empty" role="status">{candidatesLoading ? "Loading candidates…" : "No candidates awaiting review. Choose Find candidates to collect suggestions."}</p>}
+      {view === "review" && candidates.length > 0 && (
         <section style={{ marginBottom: "1.5rem" }}>
           <div className="toolbar">
             <h3 style={{ fontSize: "0.95rem", margin: 0 }}>
@@ -478,6 +486,7 @@ export function VendorTools({ stamp }: Props) {
                 <td>
                   <input
                     type="checkbox"
+                    aria-label={`Select ${row.company}`}
                     checked={selected.has(row.harvest_id)}
                     onChange={() => toggleSelect(row.harvest_id)}
                   />
@@ -492,7 +501,10 @@ export function VendorTools({ stamp }: Props) {
                 </td>
                 <td className="count-muted">{row.keywords.slice(0, 4).join(", ")}</td>
                 <td>{row.category}</td>
-                <td className="count-muted">{row.source_label}</td>
+                <td><details><summary>{row.source_label} ({row.sources?.length ?? 1})</summary>
+                  {(row.sources ?? [row.source_url]).map(url => <div key={url}><a href={url} target="_blank" rel="noreferrer">{url}</a></div>)}
+                  {row.notes && <p>{row.notes}</p>}
+                </details></td>
                 <td>{row.confidence}</td>
               </tr>
             )}
@@ -500,7 +512,7 @@ export function VendorTools({ stamp }: Props) {
         </section>
       )}
 
-      <div className="two-col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
+      {view === "database" && <><div className="work-grid">
         <form onSubmit={(e) => void handleAddVendor(e)}>
           <h3 style={{ fontSize: "0.95rem", marginBottom: "0.75rem" }}>Add vendor manually</h3>
           <label>
@@ -561,8 +573,7 @@ export function VendorTools({ stamp }: Props) {
           : "Loading vendor database…"}
       </p>
 
-      {msg && <div className="banner dry">{msg}</div>}
-      {error && <div className="error">{error}</div>}
+      </>}
     </div>
   );
 }

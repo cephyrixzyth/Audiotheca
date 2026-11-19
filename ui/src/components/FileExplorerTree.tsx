@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { explorerBreadcrumbs } from "../utils/explorerBreadcrumbs";
 import { browseTreeChildren, type BrowseEntry } from "../api/client";
 
 interface TreeNodeProps {
@@ -13,29 +14,32 @@ interface TreeNodeProps {
 function TreeNode({ entry, depth, selectedPath, expandedPaths, onToggle, onSelect }: TreeNodeProps) {
   const [children, setChildren] = useState<BrowseEntry[] | null>(null);
   const [loading, setLoading] = useState(false);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [error, setError] = useState("");
   const expanded = expandedPaths.has(entry.path);
   const loadSeq = useRef(0);
 
-  useEffect(() => {
-    if (!expanded) {
-      setChildren(null);
-      return;
-    }
+  const load = useCallback((next = "") => {
     const seq = ++loadSeq.current;
     setLoading(true);
-    void browseTreeChildren(entry.path)
+    setError("");
+    void browseTreeChildren(entry.path, next)
       .then((data) => {
         if (seq !== loadSeq.current) return;
-        setChildren(data.children);
+        setChildren((prior) => next ? [...(prior ?? []), ...data.children] : data.children);
+        setCursor(data.next_cursor);
       })
-      .catch(() => {
-        if (seq !== loadSeq.current) return;
-        setChildren([]);
+      .catch((reason) => {
+        if (seq === loadSeq.current) setError(reason instanceof Error ? reason.message : String(reason));
       })
-      .finally(() => {
-        if (seq === loadSeq.current) setLoading(false);
-      });
-  }, [entry.path, expanded]);
+      .finally(() => { if (seq === loadSeq.current) setLoading(false); });
+  }, [entry.path]);
+
+  useEffect(() => {
+    if (expanded) load();
+    else { setChildren(null); setCursor(null); setError(""); }
+    return () => { loadSeq.current += 1; };
+  }, [expanded, load]);
 
   const selected = selectedPath === entry.path;
 
@@ -89,6 +93,8 @@ function TreeNode({ entry, depth, selectedPath, expandedPaths, onToggle, onSelec
           ))}
         </ul>
       )}
+      {expanded && cursor && <button disabled={loading} onClick={() => load(cursor)}>More folders</button>}
+      {expanded && error && <span role="status">{error} <button onClick={() => load()}>Refresh folders</button></span>}
     </li>
   );
 }
@@ -97,24 +103,6 @@ interface Props {
   roots: BrowseEntry[];
   selectedPath: string;
   onSelect: (path: string) => void;
-}
-
-function ancestorPaths(fullPath: string): string[] {
-  if (!fullPath) return [];
-  const sep = fullPath.includes("\\") ? "\\" : "/";
-  const parts = fullPath.split(/[/\\]/).filter(Boolean);
-  const paths: string[] = [];
-  let acc = "";
-  for (let i = 0; i < parts.length; i += 1) {
-    const part = parts[i];
-    if (i === 0 && /^[a-zA-Z]:/.test(part)) {
-      acc = part.endsWith(":") ? `${part}${sep}` : part.includes(sep) ? part : `${part}${sep}`;
-    } else {
-      acc = acc ? `${acc}${sep}${part}` : part;
-    }
-    paths.push(acc);
-  }
-  return paths;
 }
 
 export function FileExplorerTree({ roots, selectedPath, onSelect }: Props) {
@@ -133,7 +121,7 @@ export function FileExplorerTree({ roots, selectedPath, onSelect }: Props) {
     if (!selectedPath) return;
     setExpandedPaths((prev) => {
       const next = new Set(prev);
-      for (const path of ancestorPaths(selectedPath)) {
+      for (const path of explorerBreadcrumbs(selectedPath).map((crumb) => crumb.path)) {
         next.add(path);
       }
       return next;

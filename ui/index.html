@@ -6,11 +6,20 @@
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/logo.png" />
     <title>Audiotheca</title>
+    <style>
+      .boot-screen { position:fixed; inset:0; display:grid; align-content:center; justify-items:center; gap:12px; background:#181817; color:#fcf6ea; font:16px system-ui,sans-serif }
+      .boot-screen img { border-radius:12px; animation:boot-glow 1.2s ease-in-out infinite alternate }
+      .boot-screen strong { font-size:27px; letter-spacing:-.05em } .boot-screen span { color:#c7c2b7 }
+      @keyframes boot-glow { to { opacity:.55 } } @media(prefers-reduced-motion:reduce) { .boot-screen img { animation:none } }
+    </style>
     <!-- Fonts are self-hosted via @fontsource (imported in src/main.tsx) so the
          app has no external network dependency, matching the air-gap posture. -->
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><div class="boot-screen" role="status">
+      <img src="/logo.png" alt="" width="46" height="46">
+      <strong>Audiotheca</strong><span>Opening workspace…</span>
+    </div></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

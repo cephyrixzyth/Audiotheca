@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
+from api.paths import report_dir
+from audiotheca.local_storage import serialized_store, write_json
 from pathlib import Path
 
-FEEDBACK_DIR = Path(__file__).resolve().parent.parent / "dedupe_reports" / "feedback"
+FEEDBACK_DIR = report_dir() / "feedback"
 WHITELIST_PATH = FEEDBACK_DIR / "underscore_whitelist.json"
 
 # Common `_`-prefixed vendor bins seen in audio libraries (name-only match).
@@ -51,7 +53,7 @@ def save_whitelist(*, folders: list[str], paths: list[str]) -> Path:
         "folders": clean_folders,
         "paths": clean_paths,
     }
-    WHITELIST_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    write_json(WHITELIST_PATH, payload)
     return WHITELIST_PATH
 
 
@@ -75,6 +77,7 @@ def is_underscore_scannable(name: str, path: str | Path | None = None) -> bool:
     return norm in whitelisted_paths()
 
 
+@serialized_store(lambda: WHITELIST_PATH)
 def add_entries(*, folders: list[str] | None = None, paths: list[str] | None = None) -> dict[str, object]:
     data = load_whitelist()
     folder_set = set(data.get("folders") or [])
@@ -99,6 +102,7 @@ def add_entries(*, folders: list[str] | None = None, paths: list[str] | None = N
     return {"added_folders": added_folders, "added_paths": added_paths, "total_folders": len(folder_set)}
 
 
+@serialized_store(lambda: WHITELIST_PATH)
 def remove_entries(*, folders: list[str] | None = None, paths: list[str] | None = None) -> dict[str, object]:
     data = load_whitelist()
     folder_set = set(data.get("folders") or [])

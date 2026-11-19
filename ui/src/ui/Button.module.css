@@ -40,17 +40,19 @@
 
 /* Sizes */
 .sm {
+  min-height: 28px;
   padding: var(--ui-space-1) var(--ui-space-2);
   font-size: var(--ui-fs-xs);
 }
 
 .md {
+  min-height: 35px;
   padding: var(--ui-space-2) var(--ui-space-3);
 }
 
 /* Variants */
 .primary {
-  --_bg: linear-gradient(180deg, var(--accent), var(--accent-dim));
+  --_bg: var(--accent);
   --_bd: var(--accent-dim);
   --_fg: var(--accent-contrast);
   font-weight: 600;

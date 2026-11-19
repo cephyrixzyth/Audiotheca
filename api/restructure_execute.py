@@ -26,7 +26,7 @@ def execute_approved_sections(
         }
 
     store = rst_fb.load_store()
-    items, _total = report_loader.load_restructure(stamp, limit=100_000, offset=0)
+    items, _total = report_loader.load_restructure(stamp, limit=None, offset=0)
     targets = [row for row in items if row.section in approved and row.status == "READY"]
 
     if not targets:

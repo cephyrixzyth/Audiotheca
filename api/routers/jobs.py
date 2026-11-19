@@ -72,14 +72,16 @@ def get_job(job_id: str) -> dict:
     return job.snapshot()
 
 @router.get("/api/jobs/{job_id}/events")
-def get_job_events(job_id: str, after: int = Query(default=0, ge=0)) -> dict[str, object]:
-    try:
-        events = job_manager.get_events(job_id, after=after)
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail="Job not found") from exc
+async def get_job_events(job_id: str, after: int = Query(default=0, ge=0)) -> dict[str, object]:
     job = job_manager.get(job_id)
-    total = len(job.events) if job else after + len(events)
-    return {"events": events, "total": total, "after": after}
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    first = job.first_event_index
+    retained = job.events.copy()
+    end = first + len(retained)
+    return {"events": retained[max(0, after - first):], "total": end, "after": after,
+            "oldest": first, "next_cursor": end, "missed": after < first}
+
 
 @router.get("/api/jobs/{job_id}/progress")
 def get_job_progress(job_id: str) -> dict[str, object]:

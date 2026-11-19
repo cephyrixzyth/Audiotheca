@@ -12,6 +12,8 @@ import {
 } from "./navTabs";
 
 const ALL_TAB_IDS: TabId[] = [
+  "studio",
+  "library",
   "dashboard",
   "scan",
   "investigation",
@@ -32,7 +34,7 @@ const ALL_TAB_IDS: TabId[] = [
 describe("primaryNavId", () => {
   it("maps every TabId onto a primary chrome id", () => {
     const ids = ALL_TAB_IDS.map((tab) => primaryNavId(tab));
-    expect(new Set(ids)).toEqual(new Set<PrimaryNavId>(["dashboard", "scan", "review", "system", "help"]));
+    expect(new Set(ids)).toEqual(new Set<PrimaryNavId>(["studio", "library", "dashboard", "scan", "review", "system", "help"]));
     for (const tab of ALL_TAB_IDS) {
       expect(ALL_TABS.some((def) => def.id === tab)).toBe(true);
     }

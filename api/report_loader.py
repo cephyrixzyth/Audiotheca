@@ -35,7 +35,7 @@ from api.models import (
 
 REPORT_DIR = report_dir()
 
-SUMMARY_STAMP_RE = re.compile(r"Run_Summary_(\d{8}_\d{4})\.txt$")
+from audiotheca.run_identity import SUMMARY_RE as SUMMARY_STAMP_RE
 
 
 def _float(value: str | None) -> float | None:
@@ -245,6 +245,7 @@ def load_duplicates(
     stamp: str,
     *,
     confidence: str | None = None,
+    keys: set[str] | None = None,
     query: str | None = None,
     limit: int = 100,
     offset: int = 0,
@@ -253,7 +254,8 @@ def load_duplicates(
     grouped: dict[str, list[dict[str, str]]] = {}
     for row in rows:
         key = row.get("Dedup Key", "")
-        grouped.setdefault(key, []).append(row)
+        if keys is None or key in keys:
+            grouped.setdefault(key, []).append(row)
 
     groups: list[DuplicateGroup] = []
     for key, members in grouped.items():
@@ -370,7 +372,7 @@ def load_restructure(
     status: str | None = None,
     section: str | None = None,
     query: str | None = None,
-    limit: int = 500,
+    limit: int | None = 500,
     offset: int = 0,
 ) -> tuple[list[RestructureItem], int]:
     rows = _read_csv(stamp, "Restructure_Plan")
@@ -404,7 +406,7 @@ def load_restructure(
             or q in item.vendor.lower()
         ]
     total = len(items)
-    return items[offset : offset + limit], total
+    return items[offset : None if limit is None else offset + limit], total
 
 
 def load_scene_renames(stamp: str) -> list[SceneRenameItem]:

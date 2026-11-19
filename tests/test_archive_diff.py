@@ -78,3 +78,22 @@ def test_archive_diff_folder_required(diff_client, tmp_path):
         params={"archive_path": str(archive_path), "folder_path": str(outside)},
     )
     assert res.status_code == 403
+
+def test_preserves_hierarchy_multiplicity_and_case():
+    result = compute_diff(["Keys/A.wav", "Drums/A.wav", "Drums/A.wav", "a.wav"], [
+        {"name": "A.wav", "relative_path": "Drums/A.wav", "size": 4},
+        {"name": "A.wav", "relative_path": "A.wav", "size": 4},
+    ])
+    assert [r["name"] for r in result["matched"]] == ["Drums/A.wav"]
+    assert result["only_in_archive"] == ["Drums/A.wav", "Keys/A.wav", "a.wav"]
+    assert result["only_on_disk"] == ["A.wav"]
+
+
+def test_live_zip_checksum_and_partial_listing(diff_client):
+    client, archive, folder = diff_client
+    endpoint = f"/api/runs/{STAMP}/archive-diff"
+    params = {"archive_path": str(archive), "folder_path": str(folder)}
+    body = client.get(endpoint, params=params).json()
+    assert body["different_contents"] == ["item.txt"]
+    assert body["complete"]
+    assert not client.get(endpoint, params={**params, "limit": 1}).json()["complete"]

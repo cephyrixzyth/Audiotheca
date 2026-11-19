@@ -1,6 +1,8 @@
 import type { TabId } from "../types";
 import { Button } from "../ui";
 
+import { WorkspaceIcon } from "../ui/WorkspaceIcon";
+
 const MESSAGES: Partial<Record<TabId, { title: string; body: string }>> = {
   dashboard: {
     title: "No scan reports yet",
@@ -56,7 +58,7 @@ export function TabEmptyState({ tab, onStartScan }: Props) {
   };
 
   return (
-    <div className="tab-empty-state">
+    <div className="tab-empty-state"><WorkspaceIcon name="scan" size={26} />
       <h3>{msg.title}</h3>
       <p className="count-muted">{msg.body}</p>
       {onStartScan && (

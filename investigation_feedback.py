@@ -6,10 +6,12 @@ import csv
 import json
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
+from api.paths import report_dir
+from audiotheca.local_storage import serialized_store, write_json
 from pathlib import Path
 
 FEEDBACK_VERSION = 1
-FEEDBACK_DIR = Path(__file__).resolve().parent / "dedupe_reports" / "feedback"
+FEEDBACK_DIR = report_dir() / "feedback"
 GLOBAL_PATH = FEEDBACK_DIR / "investigation_feedback.json"
 HINTS_PATH = FEEDBACK_DIR / "investigation_hints.json"
 
@@ -127,7 +129,7 @@ def load_store() -> InvestigationStore:
 def save_store(store: InvestigationStore) -> Path:
     FEEDBACK_DIR.mkdir(parents=True, exist_ok=True)
     store.updated = _now_iso()
-    GLOBAL_PATH.write_text(json.dumps(store.to_dict(), indent=2), encoding="utf-8")
+    write_json(GLOBAL_PATH, store.to_dict())
     export_engine_hints(store)
     _sync_sidecar_files(store)
     return GLOBAL_PATH
@@ -165,10 +167,7 @@ def load_run_corrections(stamp: str) -> list[dict]:
 def save_run_corrections(stamp: str, corrections: list[dict]) -> Path:
     FEEDBACK_DIR.mkdir(parents=True, exist_ok=True)
     path = run_corrections_path(stamp)
-    path.write_text(
-        json.dumps({"stamp": stamp, "updated": _now_iso(), "corrections": corrections}, indent=2),
-        encoding="utf-8",
-    )
+    write_json(path, {"stamp": stamp, "updated": _now_iso(), "corrections": corrections})
     return path
 
 
@@ -185,6 +184,7 @@ def all_bucket_names(store: InvestigationStore | None = None) -> list[str]:
     return sorted(set(names))
 
 
+@serialized_store(lambda: GLOBAL_PATH)
 def define_custom_bucket(name: str, description: str = "") -> dict[str, str]:
     store = load_store()
     bucket = name.strip()
@@ -198,6 +198,7 @@ def define_custom_bucket(name: str, description: str = "") -> dict[str, str]:
     return {"name": bucket, "description": store.custom_buckets[bucket]}
 
 
+@serialized_store(lambda: GLOBAL_PATH)
 def apply_correction(
     *,
     path: str,
@@ -413,7 +414,7 @@ def export_engine_hints(store: InvestigationStore | None = None) -> Path:
         "vendor_additions": [row.to_dict() for row in store.vendor_additions],
     }
     FEEDBACK_DIR.mkdir(parents=True, exist_ok=True)
-    HINTS_PATH.write_text(json.dumps(hints, indent=2), encoding="utf-8")
+    write_json(HINTS_PATH, hints)
     return HINTS_PATH
 
 

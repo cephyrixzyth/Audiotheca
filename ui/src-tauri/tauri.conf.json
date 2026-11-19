@@ -43,13 +43,32 @@
         "type": "downloadBootstrapper"
       },
       "nsis": {
-        "installerHooks": "./windows/hooks.nsh"
+        "installerHooks": "./windows/hooks.nsh",
+        "headerImage": "installer-art/header.bmp",
+        "sidebarImage": "installer-art/sidebar.bmp",
+        "installerIcon": "icons/icon.ico",
+        "uninstallerIcon": "icons/icon.ico"
       }
     },
     "macOS": {
       "minimumSystemVersion": "11.0",
       "entitlements": "entitlements.plist",
-      "signingIdentity": "-"
+      "signingIdentity": "-",
+      "dmg": {
+        "background": "installer-art/disk-image.png",
+        "windowSize": {
+          "width": 660,
+          "height": 400
+        },
+        "appPosition": {
+          "x": 175,
+          "y": 190
+        },
+        "applicationFolderPosition": {
+          "x": 487,
+          "y": 190
+        }
+      }
     }
   },
   "plugins": {}

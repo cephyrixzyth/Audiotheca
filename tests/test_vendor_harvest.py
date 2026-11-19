@@ -174,3 +174,15 @@ def test_list_source_presets_includes_user_seeds():
     assert "stems_bootleg" in ids
     user = next(p for p in presets if p["id"] == "user_seeds")
     assert "kvraudio.com" in user["urls"][0]
+
+def test_provenance_and_rejection_survive_repeat(tmp_path, monkeypatch):
+    monkeypatch.setattr(vh, "CANDIDATES_PATH", tmp_path / "inbox.json")
+    monkeypatch.setattr(vh, "FEEDBACK_DIR", tmp_path)
+    urls = ["https://example.com/a", "https://example.com/b"]
+    rows = [vh.HarvestCandidate(str(i), "Synth House", [], "Instruments", url, "site",
+                                "high", "title") for i, url in enumerate(urls)]
+    assert vh._merge_harvest(urls, "Instruments", rows, [])["added"] == 1
+    saved, = vh.list_pending_candidates()
+    assert saved["sources"] == urls
+    vh.reject_candidates([saved["harvest_id"]])
+    assert vh._merge_harvest(urls, "Instruments", rows, [])["total_pending"] == 0

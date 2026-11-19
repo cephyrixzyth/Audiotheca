@@ -1,49 +1,35 @@
 import { invoke } from "@tauri-apps/api/core";
 
-const API_PORT = import.meta.env.VITE_API_PORT || "8787";
-const API_HOST = `http://127.0.0.1:${API_PORT}`;
-
 let cachedApiBase: string | null = null;
 let cachedLibraryRoot: string | null = null;
+let rootRead: Promise<string> | undefined;
+export const ROOT_CHANGED = "audiotheca:library-root";
+
+export function updateLibraryRoot(root: string): void {
+  cachedLibraryRoot = root;
+  window.dispatchEvent(new Event(ROOT_CHANGED));
+}
 
 const BUILD_DEFAULT_LIBRARY_ROOT =
-  import.meta.env.VITE_DEFAULT_LIBRARY_ROOT || "Z:\\_software\\_audio";
+  import.meta.env.VITE_DEFAULT_LIBRARY_ROOT || "";
 
 /** Synchronous fallback before API config is fetched (web build default or Windows dev). */
 export function defaultLibraryRootSync(): string {
-  return BUILD_DEFAULT_LIBRARY_ROOT;
+  return cachedLibraryRoot ?? BUILD_DEFAULT_LIBRARY_ROOT;
 }
 
 /** @deprecated use defaultLibraryRootSync() or getDefaultLibraryRoot() */
 export const DEFAULT_LIBRARY_ROOT = BUILD_DEFAULT_LIBRARY_ROOT;
 
 export async function getDefaultLibraryRoot(): Promise<string> {
-  if (cachedLibraryRoot) return cachedLibraryRoot;
-  if (isTauri()) {
-    cachedLibraryRoot = BUILD_DEFAULT_LIBRARY_ROOT;
-    return BUILD_DEFAULT_LIBRARY_ROOT;
-  }
-  try {
-    // Establish session first so library-roots (auth-required) can succeed.
-    await fetch("/api/auth/session", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: "{}",
-    });
-    const res = await fetch("/api/security/library-roots", { credentials: "include" });
-    if (res.ok) {
-      const data = (await res.json()) as { roots?: string[] };
-      const first = data.roots?.find((item) => item.trim());
-      if (first) {
-        cachedLibraryRoot = first;
-        return first;
-      }
-    }
-  } catch {
-    /* offline / API not ready — do not cache the fallback forever */
-  }
-  return BUILD_DEFAULT_LIBRARY_ROOT;
+  if (cachedLibraryRoot !== null) return cachedLibraryRoot;
+  rootRead ??= import("./api/client").then(async ({ fetchLibraryRoots }) => {
+    const data = await fetchLibraryRoots();
+    const first = data.roots.find(root => root.trim());
+    if (first) cachedLibraryRoot ??= first;
+    return cachedLibraryRoot ?? BUILD_DEFAULT_LIBRARY_ROOT;
+  }).catch(() => BUILD_DEFAULT_LIBRARY_ROOT).finally(() => { rootRead = undefined; });
+  return rootRead;
 }
 
 export function isTauri(): boolean {
@@ -54,23 +40,12 @@ export async function getApiBase(): Promise<string> {
   if (!isTauri()) return "/api";
   if (cachedApiBase) return cachedApiBase;
 
-  try {
-    const fromTauri = await invoke<string>("api_base_url");
-    const url = new URL(fromTauri);
-    if (
-      url.protocol === "http:" &&
-      url.hostname === "127.0.0.1" &&
-      url.pathname === "/api"
-    ) {
-      cachedApiBase = url.toString().replace(/\/$/, "");
-      return cachedApiBase;
-    }
-  } catch {
-    /* sidecar URL unavailable */
+  const fromTauri = await invoke<string>("api_base_url");
+  const url = new URL(fromTauri);
+  if (url.protocol !== "http:" || url.hostname !== "127.0.0.1" || url.pathname !== "/api") {
+    throw new Error("The desktop service returned an invalid address.");
   }
-
-  // Do not probe neighboring ports: another Audiotheca instance may own them.
-  cachedApiBase = `${API_HOST}/api`;
+  cachedApiBase = url.toString();
   return cachedApiBase;
 }
 

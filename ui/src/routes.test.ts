@@ -12,6 +12,8 @@ import type { TabId } from "./types";
 
 const ALL_TABS: TabId[] = [
   "dashboard",
+  "studio",
+  "library",
   "scan",
   "investigation",
   "duplicates",

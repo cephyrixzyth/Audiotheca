@@ -1,0 +1,37 @@
+.review-workspace { display: grid; gap: var(--ui-space-4, 1rem); align-content: start; min-width: 0; }
+.review-workspace > *, .work-scope > div { min-width: 0; }
+.review-workspace .toolbar, .work-scope-actions, .work-dialog footer { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
+.review-workspace > .toolbar, .review-workspace > section, .review-workspace > .banner, .review-workspace > .bucket-grid { margin-block: 0 !important; }
+.work-scope { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; border: 1px solid var(--ui-line); border-inline-start: 3px solid var(--accent); background: var(--ui-surface); border-radius: var(--ui-radius-lg); padding: clamp(.85rem, 2vw, 1.35rem); }
+.work-scope h3, .work-dialog h2, .review-workspace article h3, .work-queue-heading { margin: 0; font-weight: 650; color: var(--ui-fg); overflow-wrap: anywhere; }
+.work-scope p, .work-dialog header p { margin: .35rem 0 0; font-size: .9rem; line-height: 1.5; color: var(--ui-fg-muted); max-width: 80ch; }
+.work-scope-actions { align-self: center; }
+.work-disclosure { background: var(--ui-surface); border: 1px solid var(--ui-line); border-radius: var(--ui-radius-md); padding: .7rem .9rem; min-width: 0; }
+.work-disclosure > summary, .work-record summary { cursor: pointer; font-weight: 600; }
+.work-disclosure[open] > summary { margin-bottom: .7rem; }
+.review-workspace .member-row { display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: .7rem; align-items: center; }
+.review-workspace .member-row > div, .review-workspace .dupe-card header, .work-dialog-scope { overflow-wrap: anywhere; }
+.work-neutral { color: var(--ui-fg-muted); margin: 0; }
+.work-issue { display: flex; gap: .65rem; align-items: center; flex-wrap: wrap; background: var(--ui-surface); border-inline-start: 3px solid var(--warning); padding: .65rem 1rem; }
+.work-dialog { color: var(--ui-fg); background: var(--ui-surface-elevated); border: 1px solid var(--ui-line-strong); border-radius: var(--ui-radius-lg); box-shadow: var(--ui-shadow-2); padding: clamp(1rem, 2.5vw, 1.7rem); width: min(34rem, calc(100vw - 2rem)); max-height: 86dvh; overflow: auto; }
+.work-dialog-wide { width: min(65rem, calc(100vw - 2rem)); }
+.work-dialog::backdrop { background: rgb(0 0 0 / .64); }
+.work-dialog header { display: flex; justify-content: space-between; align-items: start; gap: 1rem; padding-bottom: 1rem; }
+.work-dialog h2 { font-size: 1.3rem; }
+.work-dialog label { display: grid; gap: .3rem; margin-block: 1rem; }
+.work-dialog input { width: 100%; }
+.work-dialog footer { justify-content: flex-end; padding-top: 1rem; }
+.work-dialog-scope, .work-record { background: var(--ui-surface); border: 1px solid var(--ui-line); border-radius: var(--ui-radius-md); padding: .7rem .85rem; }
+.work-dialog-scope ul { padding-inline-start: 1.2rem; max-height: 12rem; overflow: auto; }
+.work-record-list { display: grid; gap: .45rem; max-height: 32rem; overflow: auto; }
+.work-record summary { display: flex; justify-content: space-between; flex-wrap: wrap; gap: .4rem; }
+.work-record pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .78rem; }
+.work-record p { margin: .45rem 0 0; color: var(--ui-fg-muted); overflow-wrap: anywhere; }
+.review-workspace .work-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,18rem),1fr)); gap: 1rem; }
+.review-workspace .execute-results-header { display: flex; align-items: baseline; flex-wrap: wrap; gap: .65rem; }
+@media(max-width:700px) { .work-scope { align-items: start; flex-direction: column; } .work-dialog .archive-diff-columns { grid-template-columns: 1fr; } .work-dialog .archive-diff-paths { flex-wrap: wrap; } }
+
+.work-row-options { margin-top: .4rem; font-size: .83rem; }
+.work-row-options summary { cursor: pointer; color: var(--accent); }
+.work-row-options[open] > div { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .5rem; }
+.work-dialog-scope pre { margin: 0; max-height: 14rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }

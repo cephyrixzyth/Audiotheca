@@ -19,6 +19,7 @@ from api import service as api_service
 from api.paths import code_root, engine_executable, engine_main_script, workspace_root
 from api.security import ensure_library_path
 from audiotheca.config import ROOT_DIR as DEFAULT_ROOT
+from audiotheca.run_identity import new_stamp
 from scan_options import SKIPPABLE_PHASES, ScanOptions
 from system_metrics import collect_metrics
 
@@ -29,7 +30,6 @@ ENGINE_MAX_RUNTIME_S = int(os.environ.get("AUDIOTHECA_ENGINE_MAX_RUNTIME_S", "43
 MAX_STORED_JOB_EVENTS = int(os.environ.get("AUDIOTHECA_MAX_STORED_JOB_EVENTS", "8000"))
 EPHEMERAL_EVENT_TYPES = frozenset({"system_metrics"})
 
-STAMP_RE = re.compile(r"Run_Summary_(\d{8}_\d{4})\.txt$")
 # PhaseProgress counter lines, e.g. "  1,234 / 5,000 item  ( 25%)  |  elapsed ..."
 _COUNTER_RE = re.compile(r"^\s+[\d,]+ / [\d,]+ \S+\s+")
 # PhaseProgress.finish lines duplicate structured phase_finish events
@@ -50,8 +50,10 @@ class JobState:
     current_phase: str | None = None
     scan_options: dict = field(default_factory=dict)
     events: list[dict] = field(default_factory=list)
+    first_event_index: int = 0
     user_stopped: bool = False
     _queues: list[asyncio.Queue] = field(default_factory=list, repr=False)
+    _run_id: str | None = field(default=None, repr=False)
     _control_path: Path | None = field(default=None, repr=False)
     _progress_path: Path | None = field(default=None, repr=False)
 
@@ -66,7 +68,7 @@ class JobState:
             "error": self.error,
             "current_phase": self.current_phase,
             "scan_options": self.scan_options,
-            "event_count": len(self.events),
+            "event_count": self.first_event_index + len(self.events),
         }
 
 
@@ -81,7 +83,7 @@ class JobManager:
         job = self._jobs.get(job_id)
         if not job:
             raise KeyError(job_id)
-        start = max(0, after)
+        start = max(0, after - job.first_event_index)
         return job.events[start:]
 
     def get_progress(self, job_id: str) -> dict:
@@ -114,7 +116,7 @@ class JobManager:
             "current_phase": job.current_phase,
             "last_event_ts": last_ts,
             "last_progress": last_progress,
-            "event_count": len(job.events),
+            "event_count": job.first_event_index + len(job.events),
             "stalled": stalled,
         }
 
@@ -167,9 +169,12 @@ class JobManager:
     async def _broadcast(self, job: JobState, event: dict) -> None:
         event_type = str(event.get("type", ""))
         if event_type not in EPHEMERAL_EVENT_TYPES:
+            event = {**event, "sequence": job.first_event_index + len(job.events)}
             job.events.append(event)
             if len(job.events) > MAX_STORED_JOB_EVENTS:
-                del job.events[: len(job.events) - MAX_STORED_JOB_EVENTS]
+                overflow = len(job.events) - MAX_STORED_JOB_EVENTS
+                job.first_event_index += overflow
+                del job.events[:overflow]
             process_control.append_session_event(job.job_id, event)
         if event.get("type") == "phase_start":
             job.current_phase = str(event.get("phase", ""))
@@ -256,6 +261,9 @@ class JobManager:
         control_file.write_text(json.dumps({"command": "run"}, indent=2), encoding="utf-8")
 
         env = os.environ.copy()
+        run_id = new_stamp()
+        env["AUDIOTHECA_RUN_ID"] = run_id
+        env["AUDIOTHECA_JOB_ID"] = job_id
         env["AUDIOTHECA_PROGRESS_FILE"] = str(progress_file)
         env["AUDIOTHECA_CONTROL_FILE"] = str(control_file)
         env["AUDIOTHECA_SCAN_OPTIONS"] = json.dumps(options.to_dict())
@@ -288,6 +296,7 @@ class JobManager:
             started_at=time.time(),
             auth_token=auth_token,
             scan_options=options.to_dict(),
+            _run_id=run_id,
             _control_path=control_file,
             _progress_path=progress_file,
         )
@@ -438,7 +447,7 @@ class JobManager:
             await drain_stdout()
 
             job.exit_code = proc.returncode
-            job.stamp = self._detect_stamp(job.started_at)
+            job.stamp = self._detect_stamp(job)
             stderr_tail = _read_log_tail(stderr_log)
             # Python exits 2 when the script path is missing; the CLI also uses 2
             # for an intentional PhaseStopRequested stop. Prefer stderr + flag.
@@ -556,17 +565,19 @@ class JobManager:
         except Exception:
             pass
 
-    def _detect_stamp(self, started_at: float) -> str | None:
-        candidates = sorted(
-            report_loader.REPORT_DIR.glob("Run_Summary_*.txt"),
-            key=lambda path: path.stat().st_mtime,
-            reverse=True,
-        )
-        for path in candidates:
-            if path.stat().st_mtime >= started_at - 10:
-                match = STAMP_RE.search(path.name)
-                if match:
-                    return match.group(1)
+    def _detect_stamp(self, job: JobState) -> str | None:
+        if not job._run_id:
+            return None
+        manifest = report_loader.REPORT_DIR / f"Run_Manifest_{job._run_id}.json"
+        try:
+            data = json.loads(manifest.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+        if data.get("job_id") != job.job_id or data.get("stamp") != job._run_id:
+            return None
+        summary = f"Run_Summary_{job._run_id}.txt"
+        if summary in data.get("reports", []) and (manifest.parent / summary).is_file():
+            return job._run_id
         return None
 
 

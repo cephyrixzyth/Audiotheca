@@ -1,3 +1,5 @@
+import { useReviewDecision, WorkScope, WorkIssue } from "./ReviewWorkbench";
+import { LoadingStatus } from "../ui/LoadingStatus";
 import { useEffect, useState } from "react";
 import {
   confirmArchiveDelete,
@@ -10,7 +12,7 @@ import {
 import type { ArchivePeekItem } from "../types";
 import { Badge, Button, Kpi, VirtualTable } from "../ui";
 import { useLibraryRoot } from "../hooks/useLibraryRoot";
-import { lookupByPath, pathKey } from "../utils/pathKey";
+import { pathKey } from "../utils/pathKey";
 import { ArchiveDiffWizard } from "./ArchiveDiffWizard";
 import {
   archiveExecuteRows,
@@ -32,6 +34,10 @@ const VERDICT_LABELS: Record<string, string> = {
   UNKNOWN_CONTENT: "Unknown content",
 };
 
+function archiveKey(path: string) {
+  return path.startsWith("/") && !path.startsWith("//") ? path : pathKey(path);
+}
+
 function verdictLabel(code: string): string {
   return VERDICT_LABELS[code] ?? code.replaceAll("_", " ").toLowerCase();
 }
@@ -41,6 +47,9 @@ interface Props {
 }
 
 export function ArchivePeek({ stamp }: Props) {
+  const { ask, dialog } = useReviewDecision();
+  const [loadError, setLoadError] = useState("");
+  const [revision, setRevision] = useState(0);
   const libraryRoot = useLibraryRoot();
   const { query } = useContextSidebar();
   const [items, setItems] = useState<ArchivePeekItem[]>([]);
@@ -77,7 +86,8 @@ export function ArchivePeek({ stamp }: Props) {
   }, [stamp]);
 
   useEffect(() => {
-    setLoading(true);
+    let current = true;
+    setLoadError(""); setLoading(true);
     const timer = setTimeout(() => {
       fetchArchivePeek(stamp, {
         verdict: verdict || undefined,
@@ -85,16 +95,18 @@ export function ArchivePeek({ stamp }: Props) {
         limit: 200,
       })
         .then((res) => {
+          if (!current) return;
           setItems(res.items);
           setTotal(res.total);
           setVerdictCounts(res.verdict_counts);
           setDeleteFiles(res.delete_candidate_files);
           setDeleteMb(res.delete_candidate_mb);
         })
-        .finally(() => setLoading(false));
+        .catch((err: Error) => { if (current) { setLoadError(err.message); setItems([]); } })
+        .finally(() => { if (current) setLoading(false); });
     }, query ? 250 : 0);
-    return () => clearTimeout(timer);
-  }, [stamp, verdict, query]);
+    return () => { current = false; clearTimeout(timer); };
+  }, [stamp, verdict, query, revision]);
 
   async function handleReject(row: ArchivePeekItem) {
     try {
@@ -186,23 +198,25 @@ export function ArchivePeek({ stamp }: Props) {
   const confirmedCount = Object.keys(confirmed).length;
 
   return (
-    <div>
+    <div className="review-workspace">
+      {dialog}
+      {loadError && <WorkIssue message={loadError} retry={() => setRevision(v => v + 1)} />}
       {diffRow && diffRow.extracted_folder && (
         <ArchiveDiffWizard
           stamp={stamp}
           row={diffRow}
           archivePath={diffRow.archive_path}
           folderPath={diffRow.extracted_folder}
-          onClose={() => setDiffRow(null)}
+          onDecision={() => refreshFeedback()} onClose={() => setDiffRow(null)}
         />
       )}
       <div className="kpi-grid" style={{ marginBottom: "1rem" }}>
-        <Kpi label="Delete candidates" value={deleteFiles} />
-        <Kpi label="Recoverable" value={`${(deleteMb / 1024).toFixed(1)} GB`} />
-        <Kpi label="Confirmed" value={confirmedCount} />
+        <Kpi label="Report candidates" value={deleteFiles} />
+        <Kpi label="Potential space" value={`${(deleteMb / 1024).toFixed(1)} GB`} />
+        <Kpi label="Approved for staging" value={confirmedCount} />
       </div>
 
-      <div className="toolbar" style={{ marginBottom: "1rem" }}>
+      <WorkScope title="Stage approved archives" detail="Compare an archive with its extracted folder before approving it. Staging moves approved archives into the configured staging folder. Multipart archives include their companion files.">
         <Button
           variant="secondary"
           title="Simulate staging confirmed archives to _delete-canidates without moving files"
@@ -213,21 +227,15 @@ export function ArchivePeek({ stamp }: Props) {
         <Button
           variant="primary"
           title="Move confirmed redundant archives to _delete-canidates on the library share"
-          onClick={() => {
-            if (
-              window.confirm(
-                "Stage confirmed archives to _delete-canidates? Files will be moved on disk.",
-              )
-            ) {
-              void handleExecute(false, true);
-            }
-          }}
+          onClick={() => ask({title: "Stage approved archives?", detail: `Move all ${confirmedCount} approved archive selections for run ${stamp}, including matches outside the current view.`,
+            scope: <><strong>Library</strong><p>{libraryRoot || "Configured library root"}</p><ul>{Object.keys(confirmed).map(path => <li key={path}>{path}</li>)}</ul></>,
+            writesFiles: true, action: "Stage approved archives", accept: () => handleExecute(false, true)})}
           disabled={confirmedCount === 0}
         >
           Stage confirmed ({confirmedCount})
         </Button>
-        {msg && <span className="count-muted">{msg}</span>}
-      </div>
+      </WorkScope>
+      {msg && <p role="status" className="banner dry">{msg}</p>}
 
       {executeResults.length > 0 && (
         <ExecuteResultsPanel
@@ -266,11 +274,11 @@ export function ArchivePeek({ stamp }: Props) {
 
       <div className="toolbar">
         <span className="count-muted">
-          {loading ? "Loading…" : `${total} archive rows`}
+          {loading ? <LoadingStatus /> : `${total} archive rows`}
         </span>
       </div>
 
-      {items.length === 0 && !loading && (
+      {items.length === 0 && !loading && !loadError && (
         <div className="empty">No archive peek rows for this filter.</div>
       )}
 
@@ -290,11 +298,11 @@ export function ArchivePeek({ stamp }: Props) {
             </tr>
           }
           renderRow={(row, _index, rowAttrs) => {
-            const isRejected = lookupByPath(rejected, row.archive_path) != null;
-            const isConfirmed = lookupByPath(confirmed, row.archive_path) != null;
-            const keeper = lookupByPath(keepers, row.archive_path);
+            const isRejected = rejected[archiveKey(row.archive_path)] != null;
+            const isConfirmed = confirmed[archiveKey(row.archive_path)] != null;
+            const keeper = keepers[archiveKey(row.archive_path)];
             return (
-              <tr key={pathKey(row.archive_path)} {...rowAttrs}>
+              <tr key={archiveKey(row.archive_path)} {...rowAttrs}>
                 <td>
                   <Badge
                     tone={row.verdict === "MATCHES_EXTRACTED_FOLDER" ? "ready" : "accent"}
@@ -324,20 +332,20 @@ export function ArchivePeek({ stamp }: Props) {
                       title="Compare archive listing vs extracted folder side by side"
                       onClick={() => setDiffRow(row)}
                     >
-                      Diff
+                      Compare contents
                     </Button>
                   ) : (
                     <span className="count-muted">—</span>
                   )}{" "}
                   {row.verdict === "MATCHES_EXTRACTED_FOLDER" && !isRejected && (
-                    <>
+                    <details className="work-row-options"><summary>File decisions</summary><div>
                       <Button
                         variant="secondary"
                         size="sm"
                         title="Mark this archive safe to delete — extracted folder is a match"
-                        onClick={() => void handleConfirm(row)}
+                        disabled={isConfirmed || keeper === "archive"} onClick={() => void handleConfirm(row)}
                       >
-                        Confirm delete
+                        Approve staging
                       </Button>{" "}
                       <Button
                         variant="secondary"
@@ -358,12 +366,12 @@ export function ArchivePeek({ stamp }: Props) {
                       <Button
                         variant="secondary"
                         size="sm"
-                        title="Keep the archive file and treat the extracted folder as disposable"
+                        title="Protect this archive from staging"
                         onClick={() => void handleKeeper(row, "archive")}
                       >
                         Keep archive
                       </Button>
-                    </>
+                    </div></details>
                   )}
                   {isRejected && <span className="count-muted">Skipped next run</span>}
                 </td>

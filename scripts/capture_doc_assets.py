@@ -1,1110 +1,154 @@
 #!/usr/bin/env python3
-"""Seed demo library + reports and capture README screenshots/videos via Playwright."""
-
+"""Capture the real UI against an isolated fixture library and an isolated API."""
 from __future__ import annotations
 
+import argparse
 import csv
 import json
+import math
 import os
+from pathlib import Path
 import shutil
+import signal
+import socket
+import struct
 import subprocess
 import sys
+import tempfile
 import time
-import urllib.error
-import urllib.request
-from pathlib import Path
+from urllib.request import urlopen
+import wave
+import zipfile
 
-ROOT = Path(__file__).resolve().parent.parent
-STAMP = "20260704_1600"
-LIB = ROOT / "docs" / "demo" / "library"
-SEED_REPORTS = ROOT / "docs" / "demo" / "reports"
-CAPTURE_HOME = ROOT / "docs" / "demo" / "capture_ws"
-REPORTS = CAPTURE_HOME / "dedupe_reports"
-SHOT_DIR = ROOT / "docs" / "assets" / "screenshots"
-VIDEO_DIR = ROOT / "docs" / "assets" / "videos"
-UI_PORT = int(os.environ.get("AUDIOTHECA_CAPTURE_UI_PORT", "5175"))
-API_PORT = int(os.environ.get("AUDIOTHECA_CAPTURE_API_PORT", "8788"))
-UI_URL = f"http://127.0.0.1:{UI_PORT}"
-API_HEALTH = f"http://127.0.0.1:{API_PORT}/api/health"
-VIEWPORT = {"width": 1920, "height": 1080}
-TOKEN = "doc-capture-local-only"
-FIRST_RUN_INIT = 'localStorage.setItem("audiotheca.firstRunComplete", "1");'
-
-SCREENSHOT_PLAN: list[tuple[str, str]] = [
-    ("ui-overview.png", "dashboard"),
-    ("dashboard-gauges.png", "dashboard"),
-    ("scan-panel.png", "scan"),
-    ("investigation-inbox.png", "investigation"),
-    ("duplicates-review.png", "duplicates"),
-    ("restructure-preview.png", "restructure"),
-    ("archives-verdicts.png", "archives"),
-    ("security-malware.png", "security"),
-    ("environment-themes.png", "environment"),
-    ("help-panel.png", "help"),
-    ("scene-renames.png", "scene-renames"),
-    ("scan-audit.png", "scan-audit"),
-    ("skipped-files.png", "skipped"),
-]
-
-VIDEO_CLIPS: list[tuple[str, list[str]]] = [
-    ("first-scan-walkthrough.mp4", ["dashboard", "scan", "dashboard"]),
-    ("scan-phases-and-flow.mp4", ["scan"]),
-    ("investigation-and-vendors.mp4", ["investigation", "vendors"]),
-    ("investigation-lookup.mp4", ["investigation"]),
-    ("restructure-live-staging.mp4", ["restructure"]),
-    ("file-explorer-and-archives.mp4", ["archives"]),
-    ("archive-diff-wizard.mp4", ["archives"]),
-    ("environment-and-spec-catalog.mp4", ["environment"]),
-    ("audio-preview-library.mp4", ["dashboard"]),
-    ("ai-lookup-review.mp4", ["scan"]),
-    ("security-and-space-recovery.mp4", ["security", "space-recovery"]),
-]
-
-REVIEW_TAB_IDS = frozenset(
-    {"investigation", "duplicates", "restructure", "archives", "scene-renames", "scan-audit", "skipped"}
-)
-SYSTEM_TAB_IDS = frozenset({"space-recovery", "security", "environment", "vendors"})
+ROOT = Path(__file__).resolve().parents[1]
 
 
-def _save_screenshot(target: object, path: Path) -> None:
-    """Write PNG via bytes — avoids Windows path quirks with Playwright path=."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    data = target.screenshot()  # type: ignore[union-attr]
-    for attempt in range(4):
+def seed(directory: Path) -> Path:
+    library = directory / "Sound Library"
+    reports = directory / "Application data" / "dedupe_reports"
+    shutil.copytree(ROOT / "docs/demo/library", library)
+    shutil.copytree(ROOT / "docs/demo/reports", reports)
+    for file in reports.glob("*.csv"):
+        with file.open(encoding="utf-8-sig", newline="") as src:
+            records = list(csv.reader(src))
+        for row in records:
+            for ix, value in enumerate(row):
+                if value.lower().replace("\\", "/").startswith("d:/libraries/demo"):
+                    suffix = value.replace("\\", "/")[len("D:/Libraries/demo"):].strip("/")
+                    row[ix] = str(library / suffix)
+                if "redundant.rar" in row[ix]:
+                    row[ix] = row[ix].replace("redundant.rar", "redundant.zip")
+        with file.open("w", newline="", encoding="utf-8") as dst:
+            csv.writer(dst).writerows(records)
+    (library / "b/BetaSounds/DrumKit").mkdir(parents=True, exist_ok=True)
+    synth = library / "a/AcmeAudio/SynthOne"
+    rate = 22050
+    wav = synth / "kick_120bpm_C.wav"
+    with wave.open(str(wav), "wb") as target:
+        target.setparams((1, 2, rate, 0, "NONE", "not compressed"))
+        samples = bytearray()
+        for frame in range(rate * 4):
+            t = frame / rate
+            phase = t % .5
+            pulse = math.exp(-phase * 13)
+            value = int(21500 * pulse * math.sin(2 * math.pi * (58 * t - .09 * math.exp(-phase * 35))))
+            samples.extend(struct.pack("<h", value))
+        target.writeframes(samples)
+    sibling = library / "archives/redundant_extracted"
+    (sibling / "Drums").mkdir(exist_ok=True)
+    shutil.copyfile(wav, sibling / "Drums/Kick.wav")
+    (library / "archives/redundant.rar").unlink(missing_ok=True)
+    with zipfile.ZipFile(library / "archives/redundant.zip", "w", zipfile.ZIP_DEFLATED) as archive:
+        for member in sorted(sibling.rglob("*")):
+            if member.is_file():
+                archive.write(member, member.relative_to(sibling))
+    return library
+
+
+def free_port() -> int:
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        return sock.getsockname()[1]
+
+
+def wait_url(url: str, process: subprocess.Popen) -> None:
+    for _ in range(900):
+        if process.poll() is not None:
+            raise RuntimeError(f"Capture server exited with {process.returncode}")
         try:
-            if path.exists():
-                path.unlink()
-            path.write_bytes(data)
-            return
-        except OSError:
-            if attempt == 3:
-                raise
-            time.sleep(0.4 * (attempt + 1))
-
-
-DEMO_LIB_ROOT = Path("D:/Libraries/demo")
-
-
-def _lib_path(*parts: str) -> str:
-    """Display paths for doc screenshots (canonical demo library layout)."""
-    return str(DEMO_LIB_ROOT.joinpath(*parts))
-
-
-def seed_library() -> None:
-    from seed_demo_library import _write_min_wav
-
-    folders = [
-        LIB / "a" / "AcmeAudio" / "SynthOne",
-        LIB / "a" / "UnknownVendor" / "MysteryPack",
-        LIB / "b" / "BetaSounds" / "DrumKit",
-        LIB / "archives" / "redundant_extracted",
-    ]
-    for folder in folders:
-        folder.mkdir(parents=True, exist_ok=True)
-    (LIB / "a" / "AcmeAudio" / "SynthOne" / "readme.txt").write_text(
-        "Acme Audio SynthOne v2.1\n", encoding="utf-8"
-    )
-    (LIB / "a" / "UnknownVendor" / "MysteryPack" / "product.nfo").write_text(
-        "Unknown product pack\n", encoding="utf-8"
-    )
-    (LIB / "archives" / "redundant.rar").write_bytes(b"PK\x03\x04demo")
-    (LIB / "archives" / "redundant_extracted" / "preset.fxp").write_bytes(b"\x00" * 64)
-    for rel, dur, rate in (
-        ("a/AcmeAudio/SynthOne/kick_120bpm_C.wav", 0.3, 44100),
-        ("a/AcmeAudio/SynthOne/snare_120bpm.wav", 0.2, 48000),
-        ("a/UnknownVendor/MysteryPack/ambience_loop.wav", 1.0, 44100),
-    ):
-        wav_path = LIB / rel
-        if not wav_path.is_file():
-            _write_min_wav(wav_path, duration_s=dur, rate=rate)
-
-
-def _write_csv(path: Path, headers: list[str], rows: list[list[str]]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.writer(handle)
-        writer.writerow(headers)
-        writer.writerows(rows)
-
-
-def seed_reports() -> None:
-    seed_library()
-    SEED_REPORTS.mkdir(parents=True, exist_ok=True)
-
-    summary = "\n".join(
-        [
-            "Engine version: 10.0.0",
-            f"Run: {STAMP}",
-            "DRY_RUN: true",
-            "Scanned: 128 (cache hits: 4, failures: 1)",
-            "Routes planned: 96",
-            "Investigation: 12",
-            "_unknown_vendor: 5",
-            "_ambiguous_product: 3",
-            "_needs_manual: 4",
-            "Quarantined: 0",
-            "Reconciled vendors: 18",
-            "Vendor conflicts: 2",
-            "Nested issues: 1",
-            "Coexistence findings: 3",
-            "Archive peek rows: 6",
-            "Scene archive peeks: 2",
-            "Scene renames planned: 2",
-            "Errors: 0",
-            "Duplicate groups (review): 3",
-            "HIGH confidence: 2",
-            "MEDIUM confidence: 1",
-            "Coverage gaps: 2",
-            "Cache hit paths: 4",
-            "Probe truncations: 0",
-            "Feedback skipped groups: 0",
-        ]
-    )
-    (SEED_REPORTS / f"Run_Summary_{STAMP}.txt").write_text(summary, encoding="utf-8")
-
-    inv_headers = [
-        "Section",
-        "Item Name",
-        "Current Path",
-        "Investigation Bucket",
-        "Reason",
-        "ID Method",
-        "ID Confidence",
-        "Fingerprint",
-        "Size MB",
-        "Planned Destination",
-    ]
-    inv_rows = [
-        [
-            "a",
-            "MysteryPack",
-            _lib_path("a", "UnknownVendor", "MysteryPack"),
-            "_unknown_vendor",
-            "no_vendor_match",
-            "filename",
-            "LOW",
-            "fp-mystery",
-            "240.5",
-            "",
-        ],
-        [
-            "a",
-            "ObscureLib",
-            _lib_path("a", "UnknownVendor", "ObscureLib"),
-            "_unknown_vendor",
-            "no_vendor_match",
-            "nfo",
-            "LOW",
-            "fp-obscure",
-            "88.2",
-            "",
-        ],
-        [
-            "b",
-            "DrumKit",
-            _lib_path("b", "BetaSounds", "DrumKit"),
-            "_ambiguous_product",
-            "multiple_products",
-            "pe_header",
-            "MEDIUM",
-            "fp-drum",
-            "512.0",
-            _lib_path("b", "BetaSounds", "DrumKit"),
-        ],
-    ]
-    _write_csv(SEED_REPORTS / f"Investigation_Breakdown_{STAMP}.csv", inv_headers, inv_rows)
-
-    dup_headers = [
-        "Dedup Key",
-        "Confidence",
-        "Group Kind",
-        "Name Similarity %",
-        "Size Ratio",
-        "Content Check",
-        "Index",
-        "Item Name",
-        "Section",
-        "Full Path",
-        "Vendor",
-        "Size MB",
-        "Recommendation",
-        "Planned Action",
-    ]
-    dup_rows = [
-        [
-            "acme-synthone",
-            "HIGH",
-            "same_product",
-            "98",
-            "1.0",
-            "hash_match",
-            "1",
-            "SynthOne",
-            "a",
-            _lib_path("a", "AcmeAudio", "SynthOne"),
-            "Acme Audio",
-            "120.4",
-            "KEEP",
-            "keep",
-        ],
-        [
-            "acme-synthone",
-            "HIGH",
-            "same_product",
-            "98",
-            "1.0",
-            "hash_match",
-            "2",
-            "SynthOne Copy",
-            "a",
-            _lib_path("a", "AcmeAudio", "SynthOne Copy"),
-            "Acme Audio",
-            "120.4",
-            "DELETE",
-            "delete_candidate",
-        ],
-    ]
-    _write_csv(SEED_REPORTS / f"Duplicate_Review_{STAMP}.csv", dup_headers, dup_rows)
-
-    restructure_headers = [
-        "Section",
-        "Item Name",
-        "Current Path",
-        "Planned Destination",
-        "Vendor",
-        "ID Method",
-        "ID Confidence",
-        "Clean Display Name",
-        "Size MB",
-        "Status",
-        "Investigation Bucket",
-    ]
-    restructure_rows = [
-        [
-            "a",
-            "SynthOne",
-            _lib_path("a", "AcmeAudio", "SynthOne"),
-            _lib_path("a", "Acme Audio", "SynthOne"),
-            "Acme Audio",
-            "nfo",
-            "HIGH",
-            "SynthOne",
-            "120.4",
-            "READY",
-            "",
-        ],
-        [
-            "b",
-            "DrumKit",
-            _lib_path("b", "BetaSounds", "DrumKit"),
-            _lib_path("b", "Beta Sounds", "DrumKit"),
-            "Beta Sounds",
-            "pe_header",
-            "HIGH",
-            "DrumKit",
-            "512.0",
-            "NEEDS REVIEW",
-            "",
-        ],
-    ]
-    _write_csv(SEED_REPORTS / f"Restructure_Plan_{STAMP}.csv", restructure_headers, restructure_rows)
-
-    audit_headers = [
-        "Section",
-        "Item Name",
-        "Current Path",
-        "Vendor",
-        "ID Method",
-        "ID Confidence",
-        "Fingerprint",
-        "Version Key",
-        "Size MB",
-        "Status",
-        "Investigation Bucket",
-        "Planned Destination",
-        "Flags",
-    ]
-    audit_rows = [
-        [
-            "a",
-            "SynthOne",
-            _lib_path("a", "AcmeAudio", "SynthOne"),
-            "Acme Audio",
-            "nfo",
-            "HIGH",
-            "fp-synth",
-            "v2.1",
-            "120.4",
-            "ROUTED",
-            "",
-            _lib_path("a", "Acme Audio", "SynthOne"),
-            "",
-        ],
-        [
-            "a",
-            "MysteryPack",
-            _lib_path("a", "UnknownVendor", "MysteryPack"),
-            "",
-            "filename",
-            "LOW",
-            "fp-mystery",
-            "",
-            "240.5",
-            "INVESTIGATION",
-            "_unknown_vendor",
-            "",
-            "ai_lookup",
-        ],
-    ]
-    _write_csv(SEED_REPORTS / f"Scan_Audit_{STAMP}.csv", audit_headers, audit_rows)
-
-    archive_headers = [
-        "section",
-        "item_name",
-        "item_path",
-        "archive_name",
-        "archive_path",
-        "extracted_folder",
-        "name_similarity",
-        "archive_size_mb",
-        "verdict",
-        "inferred_product",
-    ]
-    archive_rows = [
-        [
-            "archives",
-            "redundant",
-            _lib_path("archives"),
-            "redundant.rar",
-            _lib_path("archives", "redundant.rar"),
-            _lib_path("archives", "redundant_extracted"),
-            "0.95",
-            "48.2",
-            "MATCHES_EXTRACTED_FOLDER",
-            "Demo Pack",
-        ],
-        [
-            "archives",
-            "mystery",
-            _lib_path("archives"),
-            "mystery.7z",
-            _lib_path("archives", "mystery.7z"),
-            "",
-            "0.0",
-            "12.0",
-            "PEEK_ONLY",
-            "Unknown",
-        ],
-    ]
-    _write_csv(SEED_REPORTS / f"Archive_Peek_{STAMP}.csv", archive_headers, archive_rows)
-
-    scene_headers = [
-        "scene_id",
-        "source_path",
-        "proposed_name",
-        "destination_path",
-        "inferred_product",
-        "multipart_diagnosis",
-    ]
-    scene_rows = [
-        [
-            "294335",
-            _lib_path("a", "294335"),
-            "VintageKeys",
-            _lib_path("a", "VintageKeys"),
-            "Vintage Keys",
-            "complete",
-        ],
-    ]
-    _write_csv(SEED_REPORTS / f"Scene_Rename_Plan_{STAMP}.csv", scene_headers, scene_rows)
-
-    _write_csv(
-        SEED_REPORTS / f"Scan_Failures_{STAMP}.csv",
-        ["Section", "Item Name", "Full Path", "Error"],
-        [
-            [
-                "a",
-                "LockedPack",
-                _lib_path("a", "UnknownVendor", "LockedPack"),
-                "Access is denied",
-            ],
-        ],
-    )
-    _write_csv(
-        SEED_REPORTS / f"Coverage_Gaps_{STAMP}.csv",
-        ["Section", "Path", "Name", "Reason", "Detail"],
-        [
-            [
-                "archives",
-                _lib_path("archives", "loose.zip"),
-                "loose.zip",
-                "LOOSE_ARCHIVE",
-                "Top-level archive outside item folder",
-            ],
-        ],
-    )
-    _write_csv(
-        SEED_REPORTS / f"Cache_Hits_{STAMP}.csv",
-        ["Section", "Path", "Name", "Mtime"],
-        [
-            [
-                "a",
-                _lib_path("a", "AcmeAudio", "SynthOne"),
-                "SynthOne",
-                "1710000000.0",
-            ],
-        ],
-    )
-
-    (SEED_REPORTS / f"Skip_Phase_Impact_{STAMP}.json").write_text(
-        json.dumps({"archive_peek": {"count": 1, "detail": "demo skip impact"}}),
-        encoding="utf-8",
-    )
-
-    REPORTS.mkdir(parents=True, exist_ok=True)
-    for old in REPORTS.glob(f"*_{STAMP}.*"):
-        old.unlink(missing_ok=True)
-    for path in SEED_REPORTS.glob(f"*_{STAMP}.*"):
-        shutil.copy2(path, REPORTS / path.name)
-    (REPORTS / ".api_token").write_text(TOKEN, encoding="utf-8")
-
-
-def _api_request(method: str, path: str, *, body: dict | None = None) -> None:
-    import json as json_mod
-
-    url = f"http://127.0.0.1:{API_PORT}{path}"
-    data = json_mod.dumps(body or {}).encode("utf-8") if body is not None else None
-    request = urllib.request.Request(
-        url,
-        data=data,
-        method=method,
-        headers={
-            "Authorization": f"Bearer {TOKEN}",
-            "Content-Type": "application/json",
-        },
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=30) as resp:
-            resp.read()
-    except urllib.error.HTTPError as exc:
-        if exc.code not in {404, 409}:
-            raise
-
-
-def prepare_capture_session() -> None:
-    """Isolated API with demo reports only — no live NAS scan banner."""
-    try:
-        _api_request(
-            "POST",
-            "/api/system/hard-reset",
-            body={"keep_current_api": True, "kill_orphan_engines": True, "clear_artifacts": False},
-        )
-    except (TimeoutError, urllib.error.URLError, OSError):
-        pass
-
-
-def wait_url(url: str, *, timeout_s: float = 90.0) -> None:
-    deadline = time.monotonic() + timeout_s
-    while time.monotonic() < deadline:
-        try:
-            with urllib.request.urlopen(url, timeout=2) as resp:
-                if resp.status == 200:
+            with urlopen(url, timeout=1) as response:
+                if response.status == 200:
                     return
-        except (urllib.error.URLError, TimeoutError, OSError):
-            time.sleep(0.5)
-    raise RuntimeError(f"Timed out waiting for {url}")
+        except OSError:
+            time.sleep(.2)
+    raise RuntimeError(f"Capture server did not become ready at {url}")
 
 
-def start_servers() -> tuple[subprocess.Popen[bytes] | None, subprocess.Popen[bytes] | None]:
-    env = os.environ.copy()
-    env["AUDIOTHECA_HOME"] = str(CAPTURE_HOME)
-    env["AUDIOTHECA_LIBRARY_ROOTS"] = str(LIB)
-    env["AUDIOTHECA_API_TOKEN"] = TOKEN
-    env["AUDIOTHECA_ALLOW_REMOTE_TOKEN_BOOTSTRAP"] = "1"
-    env["AUDIOTHECA_API_PORT"] = str(API_PORT)
-    env["VITE_API_PORT"] = str(API_PORT)
-    env["AUDIOTHECA_NO_RELOAD"] = "1"
-
-    CAPTURE_HOME.mkdir(parents=True, exist_ok=True)
-    REPORTS.mkdir(parents=True, exist_ok=True)
-    (REPORTS / ".api_token").write_text(TOKEN, encoding="utf-8")
-
-    api_proc: subprocess.Popen[bytes] | None = None
-    ui_proc: subprocess.Popen[bytes] | None = None
-
-    try:
-        wait_url(API_HEALTH, timeout_s=3.0)
-    except RuntimeError:
-        api_proc = subprocess.Popen(
-            [sys.executable, "-m", "api.server"],
-            cwd=ROOT,
-            env=env,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-
-    try:
-        wait_url(UI_URL, timeout_s=3.0)
-    except RuntimeError:
-        ui_proc = subprocess.Popen(
-            [
-                "npm",
-                "run",
-                "dev",
-                "--",
-                "--host",
-                "127.0.0.1",
-                f"--port",
-                str(UI_PORT),
-                "--strictPort",
-            ],
-            cwd=ROOT / "ui",
-            env=env,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            shell=True,
-        )
-
-    wait_url(API_HEALTH)
-    wait_url(UI_URL)
-    prepare_capture_session()
-    return api_proc, ui_proc
-
-
-def stop_servers(api_proc: subprocess.Popen[bytes] | None, ui_proc: subprocess.Popen[bytes] | None) -> None:
-    for proc in (ui_proc, api_proc):
-        if proc and proc.poll() is None:
-            proc.terminate()
-            try:
-                proc.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-
-
-def _ffmpeg_available() -> bool:
-    if shutil.which("ffmpeg"):
-        return True
-    try:
-        import imageio_ffmpeg  # noqa: F401
-
-        return True
-    except ImportError:
-        return False
-
-
-def _resolve_ffmpeg() -> str | None:
-    path = shutil.which("ffmpeg")
-    if path:
-        return path
-    try:
-        import imageio_ffmpeg
-
-        return imageio_ffmpeg.get_ffmpeg_exe()
-    except ImportError:
-        return None
-
-
-def _webm_to_mp4(webm: Path, mp4: Path) -> None:
-    if not webm.is_file():
-        return
-    ffmpeg = _resolve_ffmpeg()
-    if ffmpeg:
-        subprocess.run(
-            [
-                ffmpeg,
-                "-y",
-                "-i",
-                str(webm),
-                "-c:v",
-                "libx264",
-                "-pix_fmt",
-                "yuv420p",
-                "-movflags",
-                "+faststart",
-                str(mp4),
-            ],
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        webm.unlink(missing_ok=True)
-    else:
-        mp4.write_bytes(webm.read_bytes())
-        webm.rename(mp4.with_suffix(".webm"))
-
-
-EDGE_PATHS = [
-    Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"))
-    / "Microsoft"
-    / "Edge"
-    / "Application"
-    / "msedge.exe",
-    Path(os.environ.get("ProgramFiles", r"C:\Program Files"))
-    / "Microsoft"
-    / "Edge"
-    / "Application"
-    / "msedge.exe",
-    Path(os.environ.get("ProgramFiles", r"C:\Program Files"))
-    / "Google"
-    / "Chrome"
-    / "Application"
-    / "chrome.exe",
-]
-
-
-def _playwright_browsers_roots() -> list[Path]:
-    """Directories where `playwright install` may place browser builds."""
-    roots: list[Path] = []
-    env_root = os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "").strip()
-    if env_root:
-        roots.append(Path(env_root))
-    if sys.platform == "win32":
-        local = Path(os.environ.get("LOCALAPPDATA", ""))
-        if local:
-            roots.append(local / "ms-playwright")
-        temp = Path(os.environ.get("TEMP", ""))
-        if temp:
-            roots.extend(sorted(temp.glob("cursor-sandbox-cache/*/playwright")))
-    elif sys.platform == "darwin":
-        roots.append(Path.home() / "Library" / "Caches" / "ms-playwright")
-    else:
-        roots.append(Path.home() / ".cache" / "ms-playwright")
-    return roots
-
-
-def _playwright_chromium_path() -> Path | None:
-    """Resolve Playwright-bundled Chromium (avoids Edge channel headless failures on CI)."""
-    env_path = os.environ.get("PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH", "").strip()
-    if env_path and Path(env_path).is_file():
-        return Path(env_path)
-    if sys.platform == "win32":
-        patterns = (
-            "chromium-*/chrome-win64/chrome.exe",
-            "chromium-*/chrome-win/chrome.exe",
-            "chromium_headless_shell-*/chrome-headless-shell-win64/chrome-headless-shell.exe",
-        )
-    elif sys.platform == "darwin":
-        patterns = (
-            "chromium-*/chrome-mac/Chromium.app/Contents/MacOS/Chromium",
-            "chromium_headless_shell-*/chrome-headless-shell-mac/chrome-headless-shell",
-        )
-    else:
-        patterns = (
-            "chromium-*/chrome-linux/chrome",
-            "chromium_headless_shell-*/chrome-headless-shell-linux/chrome-headless-shell",
-        )
-    for root in _playwright_browsers_roots():
-        if not root.is_dir():
-            continue
-        for pattern in patterns:
-            candidates = sorted(root.glob(pattern))
-            if candidates:
-                return candidates[-1]
-    return None
-
-
-def _ensure_playwright_chromium() -> None:
-    """Download bundled Chromium when missing (Playwright default cache path)."""
-    if _playwright_chromium_path() is not None:
-        return
-    print("Installing Playwright Chromium (one-time download)...", flush=True)
-    env = os.environ.copy()
-    if sys.platform == "win32" and not env.get("PLAYWRIGHT_BROWSERS_PATH"):
-        env["PLAYWRIGHT_BROWSERS_PATH"] = str(
-            Path(os.environ.get("LOCALAPPDATA", "")) / "ms-playwright"
-        )
-    subprocess.check_call(
-        [sys.executable, "-m", "playwright", "install", "chromium"],
-        env=env,
-    )
-
-
-def _browser_launch_kwargs() -> dict[str, object]:
-    """Prefer Playwright-bundled Chromium (Edge channel fails headless on some CI hosts)."""
-    _ensure_playwright_chromium()
-    chromium = _playwright_chromium_path()
-    if chromium:
-        return {"headless": True, "executable_path": str(chromium)}
-    return {"headless": True}
-
-
-def capture() -> None:
-    try:
-        from playwright.sync_api import sync_playwright
-    except ImportError:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "playwright"])
-        from playwright.sync_api import sync_playwright
-
-    SHOT_DIR.mkdir(parents=True, exist_ok=True)
-    VIDEO_DIR.mkdir(parents=True, exist_ok=True)
-
-    api_proc, ui_proc = start_servers()
-    launch_kwargs = _browser_launch_kwargs()
-
-    try:
-        with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(**launch_kwargs)
-            context = browser.new_context(viewport=VIEWPORT)
-            context.add_init_script(FIRST_RUN_INIT)
-            page = context.new_page()
-
-            page.goto(UI_URL, wait_until="load")
-            page.wait_for_timeout(1500)
-
-            def select_demo_run() -> None:
-                run_select = page.locator("select.field-input").first
-                run_select.wait_for(state="visible", timeout=15000)
-                run_select.select_option(value=STAMP)
-                page.wait_for_timeout(1200)
-                if page.locator(".process-banner").count():
-                    prepare_capture_session()
-                    page.reload(wait_until="load")
-                    page.wait_for_timeout(1200)
-                    run_select.select_option(value=STAMP)
-                    page.wait_for_timeout(800)
-
-            select_demo_run()
-
-            def dismiss_explorer() -> None:
-                page.keyboard.press("Escape")
-                page.wait_for_timeout(200)
-                page.keyboard.press("Escape")
-                page.wait_for_timeout(200)
-                close_btn = page.get_by_role("button", name="Close", exact=True)
-                if close_btn.count():
-                    close_btn.first.click()
-                    page.wait_for_timeout(400)
-
-            def click_tab(tab_id: str) -> None:
-                _click_tab(page, tab_id)
-
-            def shot(name: str, tab_id: str) -> None:
-                if tab_id == "archives":
-                    dismiss_explorer()
-                click_tab(tab_id)
-                if tab_id == "environment":
-                    page.locator("text=Themes").first.scroll_into_view_if_needed()
-                    page.wait_for_timeout(500)
-                if tab_id == "archives":
-                    page.locator('button.bucket-chip:has-text("All")').click()
-                    page.wait_for_timeout(600)
-                if tab_id == "dashboard":
-                    page.wait_for_timeout(800)
-                out = SHOT_DIR / name
-                if name == "dashboard-gauges.png":
-                    target = page.locator(".dash-grid").first
-                    if not target.count():
-                        target = page.locator(".dash").first
-                    if target.count():
-                        _save_screenshot(target, out)
-                    else:
-                        _save_screenshot(page, out)
-                else:
-                    target = page.locator(".app-shell").first
-                    if target.count():
-                        _save_screenshot(target, out)
-                    else:
-                        _save_screenshot(page, out)
-
-            for filename, tab_id in SCREENSHOT_PLAN:
-                shot(filename, tab_id)
-
-            if os.environ.get("AUDIOTHECA_CAPTURE_VIDEOS_ONLY", "").strip().lower() in {
-                "1",
-                "true",
-                "yes",
-            }:
-                video_clips = VIDEO_CLIPS
-                only_names = os.environ.get("AUDIOTHECA_CAPTURE_VIDEO_NAMES", "").strip()
-                if only_names:
-                    wanted = {n.strip() for n in only_names.split(",") if n.strip()}
-                    video_clips = [(n, t) for n, t in VIDEO_CLIPS if n in wanted]
-                for video_name, tabs in video_clips:
-                    video_dir = VIDEO_DIR / "_tmp"
-                    video_dir.mkdir(parents=True, exist_ok=True)
-                    vctx = browser.new_context(
-                        viewport=VIEWPORT,
-                        record_video_dir=str(video_dir),
-                        record_video_size=VIEWPORT,
-                    )
-                    vctx.add_init_script(FIRST_RUN_INIT)
-                    vpage = vctx.new_page()
-                    vpage.goto(UI_URL, wait_until="load")
-                    vpage.wait_for_timeout(1000)
-                    run_select = vpage.locator("select.field-input").first
-                    run_select.wait_for(state="visible", timeout=15000)
-                    run_select.select_option(value=STAMP)
-                    vpage.wait_for_timeout(800)
-                    for tab_id in tabs:
-                        _click_tab(vpage, tab_id)
-                        vpage.wait_for_timeout(1600)
-                    if "archive-diff" in video_name:
-                        vpage.locator('button.bucket-chip:has-text("All")').click()
-                        vpage.wait_for_timeout(600)
-                        diff_btn = vpage.get_by_role("button", name="Diff", exact=True).first
-                        if diff_btn.count():
-                            diff_btn.click()
-                            vpage.wait_for_timeout(2200)
-                    if "file-explorer" in video_name or "audio-preview" in video_name:
-                        if "audio-preview" in video_name:
-                            wav_dir = str((LIB / "a" / "AcmeAudio" / "SynthOne").resolve())
-                            _open_explorer_at_path(
-                                vpage,
-                                wav_dir,
-                                click_tab=lambda tab_id: _click_tab(vpage, tab_id),
-                            )
-                        else:
-                            vpage.locator("button.top-tab-library").click()
-                            vpage.wait_for_timeout(2000)
-                        vpage.keyboard.press("Escape")
-                    vpage.close()
-                    vctx.close()
-                    webm_files = list(video_dir.glob("*.webm"))
-                    if webm_files:
-                        target = VIDEO_DIR / video_name
-                        _webm_to_mp4(webm_files[0], target)
-                        print(f"  video {video_name}")
-                    shutil.rmtree(video_dir, ignore_errors=True)
-                browser.close()
+def main(only: str = "") -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output", type=Path, default=ROOT / "docs/assets")
+    parser.add_argument("--only", default=only, help="Comma-separated asset stems, or screenshots")
+    parser.add_argument("--serve", type=Path, help="Write private fixture connection details here and serve until stopped")
+    parser.add_argument("--proof", type=Path, help="Write the action and asset validation ledger here")
+    args = parser.parse_args()
+    with tempfile.TemporaryDirectory(prefix="Audiotheca-Demo-", dir="/tmp" if sys.platform != "win32" else None) as tmp:
+        work = Path(tmp)
+        library = seed(work)
+        api_port, ui_port = free_port(), free_port()
+        while ui_port == api_port:
+            ui_port = free_port()
+        settings = dict(os.environ, AUDIOTHECA_HOME=str(work / "Application data"),
+                        AUDIOTHECA_LIBRARY_ROOT=str(library), AUDIOTHECA_LIBRARY_ROOTS=str(library),
+                        AUDIOTHECA_API_HOST="127.0.0.1", AUDIOTHECA_API_PORT=str(api_port),
+                        AUDIOTHECA_NO_RELOAD="1", AUDIOTHECA_AI_LOOKUP_PROVIDER="stub",
+                        AUDIOTHECA_VITE_CACHE=str(work / "vite-cache"),
+                        VITE_API_PORT=str(api_port), VITE_DEFAULT_LIBRARY_ROOT=str(library))
+        for key in ("AUDIOTHECA_API_TOKEN", "AUDIOTHECA_REPORTS_DIR", "AUDIOTHECA_DATA_DIR"):
+            settings.pop(key, None)
+        processes = []
+        try:
+            api = subprocess.Popen([sys.executable, "-c", "from api.server import main; main()"], cwd=ROOT, env=settings, stdout=sys.stderr, stderr=sys.stderr)
+            processes.append(api)
+            # Serve an immutable production build so development edits and HMR cannot enter a recording.
+            dist = work / "web"
+            vite_bin = ["node", "node_modules/vite/bin/vite.js"]
+            subprocess.run([*vite_bin, "build", "--outDir", str(dist)], cwd=ROOT / "ui", env=settings,
+                           stdout=sys.stderr, stderr=sys.stderr, check=True)
+            vite = subprocess.Popen([*vite_bin, "preview", "--outDir", str(dist), "--host", "127.0.0.1",
+                                     "--port", str(ui_port), "--strictPort"], cwd=ROOT / "ui", env=settings,
+                                    stdout=sys.stderr, stderr=sys.stderr)
+            processes.append(vite)
+            origin = f"http://127.0.0.1:{ui_port}"
+            wait_url(f"http://127.0.0.1:{api_port}/api/health", api)
+            wait_url(origin, vite)
+            config = dict(origin=origin, lib=str(library), workspace=str(work), only=args.only)
+            if args.serve:
+                args.serve.write_text(json.dumps(config))
+                print(origin, flush=True)
+                signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+                while all(p.poll() is None for p in processes):
+                    time.sleep(.5)
                 return
-
-            dismiss_explorer()
-            click_tab("archives")
-            page.locator('button.bucket-chip:has-text("All")').click()
-            page.wait_for_timeout(600)
-            diff_btn = page.get_by_role("button", name="Diff", exact=True).first
-            if diff_btn.count():
-                diff_btn.click()
-                page.wait_for_timeout(1200)
-                wizard = page.locator(".archive-diff-wizard").first
-                if wizard.count():
-                    _save_screenshot(wizard, SHOT_DIR / "archive-diff-wizard.png")
-
-            # File explorer screenshot — after archives; close explorer when done
-            dismiss_explorer()
-            click_tab("investigation")
-            page.locator("button.top-tab-library").click()
-            page.wait_for_timeout(1500)
-            explorer = page.locator(".file-explorer-shell").first
-            if explorer.count():
-                _save_screenshot(explorer, SHOT_DIR / "file-explorer.png")
-            else:
-                _save_screenshot(page, SHOT_DIR / "file-explorer.png")
-            dismiss_explorer()
-
-            _capture_extended_screenshots(
-                page,
-                SHOT_DIR,
-                click_tab=click_tab,
-                dismiss_explorer=dismiss_explorer,
-            )
-
-            # Videos — one context per clip
-            for video_name, tabs in VIDEO_CLIPS:
-                video_dir = VIDEO_DIR / "_tmp"
-                video_dir.mkdir(parents=True, exist_ok=True)
-                vctx = browser.new_context(
-                    viewport=VIEWPORT,
-                    record_video_dir=str(video_dir),
-                    record_video_size=VIEWPORT,
-                )
-                vctx.add_init_script(FIRST_RUN_INIT)
-                vpage = vctx.new_page()
-                vpage.goto(UI_URL, wait_until="load")
-                vpage.wait_for_timeout(1000)
-                run_select = vpage.locator("select.field-input").first
-                run_select.wait_for(state="visible", timeout=15000)
-                run_select.select_option(value=STAMP)
-                vpage.wait_for_timeout(800)
-                for tab_id in tabs:
-                    _click_tab(vpage, tab_id)
-                    vpage.wait_for_timeout(1600)
-                if "archive-diff" in video_name:
-                    vpage.locator('button.bucket-chip:has-text("All")').click()
-                    vpage.wait_for_timeout(600)
-                    diff_btn = vpage.get_by_role("button", name="Diff", exact=True).first
-                    if diff_btn.count():
-                        diff_btn.click()
-                        vpage.wait_for_timeout(2200)
-                if "file-explorer" in video_name or "audio-preview" in video_name:
-                    if "audio-preview" in video_name:
-                        wav_dir = str((LIB / "a" / "AcmeAudio" / "SynthOne").resolve())
-                        _open_explorer_at_path(
-                            vpage,
-                            wav_dir,
-                            click_tab=lambda tab_id: _click_tab(vpage, tab_id),
-                        )
-                        wav_btn = vpage.locator(".file-explorer-shell .linkish-btn").filter(
-                            has_text="kick_120bpm"
-                        ).first
-                        if wav_btn.count():
-                            wav_btn.hover()
-                            vpage.wait_for_timeout(2500)
-                    else:
-                        vpage.locator("button.top-tab-library").click()
-                        vpage.wait_for_timeout(2000)
-                    vpage.keyboard.press("Escape")
-                vpage.close()
-                vctx.close()
-                webm_files = list(video_dir.glob("*.webm"))
-                if webm_files:
-                    target = VIDEO_DIR / video_name
-                    _webm_to_mp4(webm_files[0], target)
-                shutil.rmtree(video_dir, ignore_errors=True)
-
-            browser.close()
-    finally:
-        stop_servers(api_proc, ui_proc)
-
-
-def _capture_extended_screenshots(
-    page: object,
-    shot_dir: Path,
-    *,
-    click_tab: object,
-    dismiss_explorer: object,
-) -> None:
-    """1.0.2 panels — investigation lookup, environment sub-panels, audio preview."""
-
-    def _shot_panel(name: str, selector: str) -> None:
-        loc = page.locator(selector).first  # type: ignore[union-attr]
-        if loc.count():
-            loc.scroll_into_view_if_needed()
-            page.wait_for_timeout(600)  # type: ignore[union-attr]
-            _save_screenshot(loc, shot_dir / name)
-            print(f"  {name}")
-        else:
-            print(f"  skip {name} ({selector} not found)", file=sys.stderr)
-
-    dismiss_explorer()  # type: ignore[operator]
-    click_tab("investigation")  # type: ignore[operator]
-    _shot_panel("investigation-lookup.png", ".investigation-lookup-panel")
-
-    dismiss_explorer()  # type: ignore[operator]
-    click_tab("environment")  # type: ignore[operator]
-    for name, heading in (
-        ("environment-spec-catalog.png", "Architecture spec catalog"),
-        ("environment-orchestration.png", "Orchestration tools"),
-        ("environment-cloud-storage.png", "Cloud & storage telemetry"),
-    ):
-        loc = page.locator(f"text={heading}").first  # type: ignore[union-attr]
-        if loc.count():
-            loc.scroll_into_view_if_needed()
-            page.wait_for_timeout(500)  # type: ignore[union-attr]
-            section = page.locator(".reorderable-section").filter(has=loc).first  # type: ignore[union-attr]
-            if section.count():
-                _save_screenshot(section, shot_dir / name)
-                print(f"  {name}")
-            else:
-                _save_screenshot(page, shot_dir / name)  # type: ignore[union-attr]
-                print(f"  {name} (fallback full shell)")
-        else:
-            print(f"  skip {name} (heading not found)", file=sys.stderr)
-
-    dismiss_explorer()  # type: ignore[operator]
-    _capture_audio_preview_shot(page, shot_dir, click_tab=click_tab)
-
-    overlay = page.locator(".drop-zone-overlay").first  # type: ignore[union-attr]
-    if overlay.count():
-        page.evaluate(  # type: ignore[union-attr]
-            """() => {
-              const el = document.querySelector('.drop-zone-overlay');
-              if (!el) return;
-              const dt = new DataTransfer();
-              el.dispatchEvent(
-                new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt }),
-              );
-            }"""
-        )
-        page.wait_for_timeout(400)  # type: ignore[union-attr]
-        shell = page.locator(".file-explorer-shell").first  # type: ignore[union-attr]
-        if shell.count():
-            _save_screenshot(shell, shot_dir / "dropzone-overlay.png")
-            print("  dropzone-overlay.png")
-        else:
-            _save_screenshot(overlay, shot_dir / "dropzone-overlay.png")
-            print("  dropzone-overlay.png (overlay only)")
-    else:
-        print("  skip dropzone-overlay.png (no overlay)", file=sys.stderr)
-
-    dismiss_explorer()  # type: ignore[operator]
-
-
-def _tab_label(tab_id: str) -> str:
-    labels = {
-        "dashboard": "Dashboard",
-        "scan": "Scan",
-        "investigation": "Investigation",
-        "duplicates": "Duplicates",
-        "restructure": "Restructure",
-        "archives": "Archives",
-        "scene-renames": "Scene renames",
-        "scan-audit": "Scan audit",
-        "skipped": "Skipped",
-        "space-recovery": "Space recovery",
-        "security": "Security",
-        "environment": "Environment",
-        "vendors": "Vendors",
-        "help": "Help",
-    }
-    return labels.get(tab_id, tab_id)
-
-
-def _open_explorer_at_path(page: object, path: str, *, click_tab: object) -> None:
-    """Open library explorer at path — dashboard tab avoids review subtree filters."""
-    page.evaluate(  # type: ignore[union-attr]
-        "(path) => sessionStorage.setItem('audiotheca.explorer.lastPath', path)",
-        path,
-    )
-    click_tab("dashboard")  # type: ignore[operator]
-    page.locator("button.top-tab-library").click()  # type: ignore[union-attr]
-    page.wait_for_selector(".file-explorer-shell", timeout=15000)  # type: ignore[union-attr]
-    page.wait_for_selector(  # type: ignore[union-attr]
-        ".file-explorer-shell .file-explorer-table tbody tr",
-        timeout=20000,
-    )
-    page.wait_for_timeout(600)  # type: ignore[union-attr]
-
-
-def _capture_audio_preview_shot(page: object, shot_dir: Path, *, click_tab: object) -> None:
-    """Hover a demo WAV and capture the audio preview strip."""
-    wav_dir = str((LIB / "a" / "AcmeAudio" / "SynthOne").resolve())
-    _open_explorer_at_path(page, wav_dir, click_tab=click_tab)
-    preview = page.locator(".file-explorer-shell .audio-preview-strip").first  # type: ignore[union-attr]
-    if not preview.count():
-        wav_btn = page.locator(".file-explorer-shell .linkish-btn").filter(  # type: ignore[union-attr]
-            has_text="kick_120bpm"
-        ).first
-        if wav_btn.count():
-            wav_btn.hover()
-            page.wait_for_timeout(2500)  # type: ignore[union-attr]
-            preview = page.locator(".file-explorer-shell .audio-preview-strip").first  # type: ignore[union-attr]
-    if preview.count():
-        explorer = page.locator(".file-explorer-shell").first  # type: ignore[union-attr]
-        _save_screenshot(explorer, shot_dir / "audio-preview.png")
-        print("  audio-preview.png")
-    else:
-        print("  skip audio-preview.png (no preview strip)", file=sys.stderr)
-
-
-def _click_tab(page: object, tab_id: str) -> None:
-    if tab_id in REVIEW_TAB_IDS:
-        page.locator('button.top-tab:has-text("Review")').click()  # type: ignore[union-attr]
-        page.wait_for_timeout(400)  # type: ignore[union-attr]
-    elif tab_id in SYSTEM_TAB_IDS:
-        page.locator('button.top-tab:has-text("System")').click()  # type: ignore[union-attr]
-        page.wait_for_timeout(400)  # type: ignore[union-attr]
-    page.locator(f'button.top-tab:has-text("{_tab_label(tab_id)}")').click()  # type: ignore[union-attr]
-    page.wait_for_timeout(900)  # type: ignore[union-attr]
-
-
-def main() -> None:
-    print("Seeding demo library and reports…")
-    seed_reports()
-    print("Capturing screenshots and videos…")
-    capture()
-    print(f"Done. Screenshots: {SHOT_DIR}")
-    print(f"Videos: {VIDEO_DIR}")
+            stage = work / "capture"
+            config.update(output=str(stage))
+            config_file = work / "capture.json"
+            config_file.write_text(json.dumps(config))
+            subprocess.run(["node", "scripts/capture-help.mjs", str(config_file)], cwd=ROOT / "ui", check=True)
+            for folder in ("screenshots", "videos", "gifs"):
+                target = args.output / folder
+                target.mkdir(parents=True, exist_ok=True)
+                for file in sorted((stage / folder).glob("*")):
+                    shutil.copy2(file, target / file.name)
+            if args.proof:
+                shutil.copy2(stage / "capture-proof.json", args.proof)
+        finally:
+            for p in reversed(processes):
+                p.terminate()
+                try:
+                    p.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    p.kill()
+                    p.wait()
 
 
 if __name__ == "__main__":

@@ -1,0 +1,582 @@
+.spatial-studio {
+  display: grid;
+  gap: 0.85rem;
+  max-width: 1440px;
+  margin: 0 auto 2rem;
+  width: 100%;
+}
+.spatial-studio h2,
+.spatial-studio h3,
+.spatial-studio p {
+  margin: 0;
+}
+.studio-heading,
+.studio-tracklist > header,
+.studio-inspector > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+}
+.studio-heading {
+  align-items: flex-end;
+}
+.studio-heading h2 {
+  font-size: clamp(1.7rem, 3.8vw, 2.8rem);
+  letter-spacing: -0.045em;
+  line-height: 1.1;
+}
+.studio-heading p,
+.studio-room-help,
+.studio-library p,
+.studio-tracklist > p {
+  color: var(--text-muted);
+  font-size: 0.86rem;
+}
+.studio-heading p {
+  margin-top: 0.4rem;
+}
+.studio-scene {
+  border: 1px solid var(--border-bright);
+  border-radius: 14px;
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: clamp(275px, 33vw, 460px);
+  background: #23383b;
+}
+.studio-scene canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+.studio-scene-message {
+  color: #eff2e9;
+  padding: 2rem;
+}
+.studio-room-help {
+  margin-top: -0.35rem;
+}
+.studio-transport {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.75rem;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
+.studio-transport output,
+.studio-status,
+.studio-slider output,
+.studio-track b {
+  font-family: var(--mono);
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.studio-seek {
+  flex: 1 1 12rem;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+.spatial-studio input[type="range"] {
+  accent-color: var(--accent);
+  min-width: 0;
+  width: 100%;
+  cursor: pointer;
+}
+.studio-status {
+  color: var(--text-muted);
+}
+.studio-error {
+  color: var(--danger);
+}
+.studio-panels {
+  display: grid;
+  grid-template-columns: minmax(14rem, 0.86fr) minmax(20rem, 1.65fr);
+  gap: 1rem;
+}
+.studio-tracklist,
+.studio-inspector {
+  min-width: 0;
+  background: var(--bg-elevated);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  padding: 1rem;
+}
+.studio-tracklist > header,
+.studio-inspector > header {
+  margin-bottom: 0.75rem;
+}
+.studio-inspector > header > div,
+.studio-switches {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.studio-inspector h3 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.studio-track {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  text-align: left;
+  min-height: 3.3rem;
+  margin-top: 0.35rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  color: var(--text);
+  background: var(--bg-panel);
+}
+.studio-track:hover {
+  background: var(--bg-hover);
+}
+.studio-track[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent-dim);
+}
+.studio-track i {
+  flex: 0 0 0.52rem;
+  width: 0.52rem;
+  height: 1.5rem;
+  border-radius: 12px;
+}
+.studio-track span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.studio-track small {
+  display: block;
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+.studio-track b {
+  color: var(--text-muted);
+  font-weight: normal;
+}
+.studio-wave {
+  display: block;
+  width: 100%;
+  height: 3.8rem;
+  border-radius: 5px;
+  background: #17272b;
+}
+.studio-switches {
+  margin: 0.65rem 0 1rem;
+}
+.studio-switches > :last-child {
+  margin-left: auto;
+}
+.studio-sliders {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem 1.15rem;
+}
+.studio-slider {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.25rem;
+  align-items: baseline;
+  font-size: 0.8rem;
+}
+.studio-slider output {
+  color: var(--text-muted);
+}
+.studio-slider input {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.studio-library,
+.studio-coordinates {
+  border-top: 1px solid var(--border);
+  margin-top: 1rem;
+  padding-top: 0.6rem;
+}
+.spatial-studio summary {
+  cursor: pointer;
+  color: var(--text);
+}
+.spatial-studio details[open] > summary {
+  margin-bottom: 0.7rem;
+}
+.studio-library form {
+  display: flex;
+  gap: 0.35rem;
+  margin: 0.45rem 0;
+}
+.studio-library form input {
+  min-width: 0;
+  width: 100%;
+  padding: 0.45rem 0.65rem;
+}
+.studio-library select {
+  display: block;
+  width: 100%;
+  margin: 0.65rem 0;
+}
+.studio-hidden {
+  display: none;
+}
+@media (max-width: 720px) {
+  .studio-panels {
+    grid-template-columns: 1fr;
+  }
+  .studio-heading {
+    align-items: flex-start;
+  }
+  .studio-scene {
+    height: clamp(230px, 63vw, 375px);
+  }
+}
+@media (max-width: 420px) {
+  .studio-sliders {
+    grid-template-columns: 1fr;
+  }
+}
+
+.studio-project {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.studio-project .studio-status {
+  flex: 1 1 10rem;
+}
+
+/* Arrange time, space and source properties as one console. */
+.spatial-studio {
+  grid-template-columns: minmax(0, 1.85fr) minmax(16rem, 0.8fr);
+  grid-template-areas: "project project" "transport transport" "room inspector" "tracks inspector" "error error";
+  gap: 0.7rem;
+}
+.studio-panels {
+  display: contents;
+}
+.studio-project {
+  grid-area: project;
+  padding: 0.45rem 0;
+  gap: 0.5rem;
+}
+.studio-session-name {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-right: 0.3rem;
+}
+.studio-session-name > span,
+.studio-current-clip,
+.studio-source small,
+.studio-time-ruler,
+.studio-room-top span {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.035em;
+  color: var(--text-muted);
+}
+.studio-session-name input {
+  width: clamp(8.5rem, 17vw, 19rem);
+  background: transparent;
+  color: var(--text);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  border: 1px solid transparent;
+  border-bottom-color: var(--border-bright);
+  padding: 0.25rem 0.3rem;
+}
+.studio-session-name input:hover,
+.studio-session-name input:focus {
+  background: var(--bg-panel);
+  border-color: var(--border-bright);
+}
+.studio-transport {
+  grid-area: transport;
+  border-radius: 0.55rem;
+  background: var(--bg-elevated);
+  padding: 0.65rem;
+}
+.studio-transport > output {
+  order: -1;
+  color: var(--accent);
+  border-right: 1px solid var(--border-bright);
+  padding-right: 0.8rem;
+}
+.studio-room-panel,
+.studio-inspector,
+.studio-tracklist {
+  border-radius: 0.65rem;
+  border: 1px solid var(--border-bright);
+  overflow: hidden;
+  background: var(--bg-panel);
+}
+.studio-room-panel {
+  grid-area: room;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.studio-room-top,
+.studio-tracklist > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+.studio-room-top > div {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+}
+.studio-room-top h3,
+.studio-tracklist > header h3 {
+  font-size: 1rem;
+  line-height: 1.2;
+}
+.studio-room-top button {
+  font-size: 0.78rem;
+}
+.studio-room-panel .studio-scene {
+  border: 0;
+  border-radius: 0;
+  height: clamp(220px, 26vw, 380px);
+}
+.studio-room-panel details.studio-room-help {
+  margin: 0;
+  padding: 0.35rem 0.85rem;
+  border-top: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+.studio-room-help summary {
+  font-size: 0.73rem;
+  color: var(--text-muted);
+}
+.studio-room-help p {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 0.3rem 0;
+}
+.studio-tracklist {
+  grid-area: tracks;
+  padding: 0;
+}
+.studio-tracklist > header {
+  margin: 0;
+}
+.studio-tracklist > header small {
+  display: block;
+  color: var(--text-muted);
+  font: 400 0.67rem var(--mono);
+  margin-top: 0.15rem;
+}
+.studio-lanes {
+  --source-width: clamp(6rem, 12vw, 13rem);
+  background: var(--bg);
+}
+.studio-tracklist .studio-time-ruler,
+.studio-tracklist .studio-track {
+  display: grid;
+  grid-template-columns: var(--source-width) minmax(0, 1fr);
+  align-items: stretch;
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+  gap: 0;
+  padding: 0;
+  min-height: 2.8rem;
+}
+.studio-tracklist .studio-time-ruler {
+  min-height: 1.7rem;
+  border-bottom: 1px solid var(--border);
+}
+.studio-time-ruler > span,
+.studio-time-ruler > div {
+  padding: 0.35rem 0.55rem;
+}
+.studio-time-ruler > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.15rem;
+  background: var(--bg-elevated);
+  border-left: 1px solid var(--border);
+}
+.studio-tracklist .studio-track {
+  position: relative;
+  border-bottom: 1px solid var(--border);
+  min-height: 2.95rem;
+  color: var(--text);
+  background: transparent;
+}
+.studio-tracklist .studio-track[aria-pressed="true"] {
+  background: var(--accent-soft);
+}
+.studio-tracklist .studio-source {
+  display: grid;
+  align-content: center;
+  overflow: hidden;
+  min-width: 0;
+  gap: 0.15rem;
+  padding: 0.32rem 0.48rem 0.32rem 0.58rem;
+  border-left: 3px solid var(--source-color);
+  line-height: 1.15;
+}
+.studio-tracklist .studio-source b {
+  font: 550 0.82rem var(--sans);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  color: var(--text);
+}
+.studio-tracklist .studio-source small {
+  font-size: 0.64rem;
+}
+.studio-tracklist .studio-lane {
+  position: relative;
+  display: block;
+  min-width: 0;
+  border-left: 1px solid var(--border);
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0 calc(25% - 1px),
+    var(--border) calc(25% - 1px) 25%
+  );
+}
+.studio-tracklist .studio-clip {
+  display: block;
+  position: absolute;
+  top: 15%;
+  height: 70%;
+  min-width: 2px;
+  overflow: hidden;
+  border: 1px solid;
+  border-radius: 0.25rem;
+}
+.studio-tracklist .studio-clip canvas {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border-radius: 0;
+}
+.studio-tracklist .studio-play-marker {
+  display: block;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: clamp(0px, var(--playhead), calc(100% - 1px));
+  margin: 0;
+  width: 1px;
+  height: 100%;
+  background: var(--text);
+  border-radius: 0;
+  pointer-events: none;
+}
+.studio-browse-link {
+  padding: 0.5rem 0.85rem 0;
+  font-size: 0.78rem;
+}
+.studio-browse-link a {
+  color: var(--accent);
+}
+.studio-tracklist .studio-library {
+  margin: 0.55rem 0.85rem;
+  padding: 0.45rem 0;
+}
+.studio-tracklist > p {
+  padding: 0.65rem 0.85rem;
+}
+.studio-inspector {
+  grid-area: inspector;
+  padding: 0.85rem;
+  align-self: start;
+}
+.studio-current-clip {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+  text-transform: uppercase;
+}
+.studio-current-clip i {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+}
+.studio-inspector > header {
+  flex-wrap: wrap;
+  padding-bottom: 0.35rem;
+}
+.studio-inspector > header h3 {
+  font-size: clamp(1.05rem, 1.9vw, 1.65rem);
+  line-height: 1.1;
+  letter-spacing: -0.04em;
+}
+.studio-inspector .studio-wave {
+  height: 5.8rem;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 calc(12.5% - 1px),
+      #354348 calc(12.5% - 1px) 12.5%
+    ),
+    #192529;
+}
+.studio-inspector .studio-sliders {
+  grid-template-columns: 1fr;
+  gap: 0.8rem;
+}
+.studio-inspector .studio-switches {
+  flex-wrap: wrap;
+}
+.studio-inspector .studio-coordinates {
+  margin-top: 1rem;
+}
+.spatial-studio > .studio-error {
+  grid-area: error;
+}
+@media (max-width: 860px) {
+  .spatial-studio {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "project" "transport" "room" "tracks" "inspector" "error";
+  }
+  .studio-inspector .studio-sliders {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .studio-room-panel .studio-scene {
+    height: clamp(200px, 49vw, 350px);
+  }
+  .studio-project .studio-status {
+    font-size: 0.65rem;
+  }
+}
+@media (max-width: 440px) {
+  .studio-inspector .studio-sliders {
+    grid-template-columns: 1fr;
+  }
+  .studio-transport > output {
+    border: 0;
+  }
+  .studio-room-top > div {
+    display: grid;
+    gap: 0.1rem;
+  }
+  .studio-project {
+    flex-wrap: wrap;
+  }
+  .studio-session-name {
+    width: 100%;
+  }
+}

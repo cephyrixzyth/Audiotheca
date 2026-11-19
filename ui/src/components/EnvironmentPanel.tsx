@@ -1,3 +1,6 @@
+import { useSearchParams } from "react-router-dom";
+import { WorkIssue, useReviewDecision } from "./ReviewWorkbench";
+import { LoadingStatus } from "../ui/LoadingStatus";
 import { useCallback, useEffect, useState } from "react";
 import {
   compareNodeSyncManifest,
@@ -16,7 +19,7 @@ import {
   validateStagingRoot,
 } from "../api/client";
 import type { EnvironmentDependency, EnvironmentPayload } from "../types";
-import { Button, StatTile } from "../ui";
+import { Button, StatTile, Tabs } from "../ui";
 import { ReorderableSections } from "./ReorderableSections";
 import { ThemeStudioPanel } from "./ThemeStudioPanel";
 import { InstallLifecyclePanel } from "./InstallLifecyclePanel";
@@ -35,11 +38,19 @@ function StatusBadge({ status }: { status: EnvironmentDependency["status"] }) {
 }
 
 export function EnvironmentPanel() {
+  const [params, setParams] = useSearchParams();
+  const groups = [
+    { value: "health", label: "Health & repairs", ids: ["summary", "dependencies", "log"] },
+    { value: "workspace", label: "Workspace setup", ids: ["appearance", "desktop-close", "virtual-paths", "preview-session", "orchestration-tools", "daw-sidecar", "spec-catalog", "install-lifecycle"] },
+    { value: "policy", label: "Storage & policies", ids: ["security-orchestration", "cloud-storage", "mount-events", "manifest"] },
+    { value: "recovery", label: "History & recovery", ids: ["audit-log"] },
+  ];
+  const group = groups.find(item => item.value === params.get("workspace")) ?? groups[0];
+  const { ask, dialog } = useReviewDecision();
   const [env, setEnv] = useState<EnvironmentPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [confirmLive, setConfirmLive] = useState<"repair-all" | "install" | null>(null);
   const [installLog, setInstallLog] = useState<string[]>([]);
   const [manifestJson, setManifestJson] = useState("");
   const [execPath, setExecPath] = useState("C:\\Program Files\\Demo\\run.exe");
@@ -115,7 +126,6 @@ export function EnvironmentPanel() {
       if (live) {
         setInstallLog(lines);
         setMsg(`Install finished: ${res.succeeded ?? 0}/${res.attempted ?? 0} succeeded`);
-        setConfirmLive(null);
         reload();
       } else {
         setInstallLog([`Preview (${res.attempted ?? 0} action(s)):`, ...lines]);
@@ -146,7 +156,6 @@ export function EnvironmentPanel() {
       const attempted = Number(res.attempted ?? 0);
       const succeeded = Number(res.succeeded ?? 0);
       setMsg(live ? `Repair-all finished: ${succeeded}/${attempted} succeeded` : `Dry-run: ${attempted} action(s) queued`);
-      setConfirmLive(null);
       if (live) reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Repair-all failed");
@@ -176,12 +185,11 @@ export function EnvironmentPanel() {
     try {
       const parsed = JSON.parse(manifestJson) as Record<string, unknown>;
       const preview = await importEnvironmentManifest({ manifest: parsed, dry_run: true });
-      if (!window.confirm(`Import manifest?\n\n${JSON.stringify(preview.would_import ?? parsed, null, 2).slice(0, 800)}`)) {
-        return;
-      }
-      await importEnvironmentManifest({ manifest: parsed, dry_run: false, confirm_live: true });
-      setMsg("Manifest imported");
-      reload();
+      ask({title: "Import environment manifest?", detail: "Apply the settings shown in this preview to the local environment.", action: "Import manifest",
+        scope: <pre>{JSON.stringify(preview.would_import ?? parsed, null, 2)}</pre>, accept: async () => {
+          await importEnvironmentManifest({ manifest: parsed, dry_run: false, confirm_live: true });
+          setMsg("Manifest imported"); reload();
+        }});
     } catch (err) {
       setError(err instanceof Error ? err.message : "Import failed — check JSON");
     }
@@ -407,7 +415,7 @@ export function EnvironmentPanel() {
       subtitle: "Immutable security audit and file move ledger (AUD-LOG)",
       fullWidth: true,
       minBodyHeight: 280,
-      content: <AuditLogPanel />,
+      content: <AuditLogPanel initialView="ledger" />,
     },
     {
       id: "install-lifecycle",
@@ -462,39 +470,21 @@ export function EnvironmentPanel() {
                 <Button variant="ghost" disabled={!!busy} onClick={() => void handleInstall(false)}>
                   Preview install
                 </Button>
-                {confirmLive === "install" ? (
-                  <>
-                    <Button variant="primary" disabled={!!busy} onClick={() => void handleInstall(true)}>
-                      Confirm install
-                    </Button>
-                    <Button variant="ghost" onClick={() => setConfirmLive(null)}>
-                      Cancel
-                    </Button>
-                  </>
-                ) : (
-                  <Button variant="primary" disabled={!!busy} onClick={() => setConfirmLive("install")}>
-                    Install missing dependencies
-                  </Button>
-                )}
+                <Button variant="primary" disabled={!!busy} onClick={() => ask({
+                  title: "Install missing dependencies?", detail: "The installer will change tools on this computer. Preview install to inspect the proposed steps.",
+                  scope: env.dependencies.filter(dep => dep.status !== "ok" && (dep.repair_action?.startsWith("pip_") || dep.repair_action === "bundle_7zip_win")).map(dep => dep.name).join(", "),
+                  action: "Confirm install", accept: () => handleInstall(true)
+                })}>Install missing dependencies</Button>
               </>
             )}
             <Button variant="ghost" disabled={!!busy} onClick={() => void handleRepairAll(false)}>
               Preview repair-all
             </Button>
-            {confirmLive === "repair-all" ? (
-              <>
-                <Button variant="primary" disabled={!!busy} onClick={() => void handleRepairAll(true)}>
-                  Confirm live repair-all
-                </Button>
-                <Button variant="ghost" onClick={() => setConfirmLive(null)}>
-                  Cancel
-                </Button>
-              </>
-            ) : (
-              <Button variant="primary" disabled={!!busy} onClick={() => setConfirmLive("repair-all")}>
-                Repair all (live)
-              </Button>
-            )}
+            <Button variant="primary" disabled={!!busy} onClick={() => ask({
+              title: "Repair environment dependencies?", detail: "Apply eligible repairs on this computer.",
+              scope: env.dependencies.filter(dep => dep.status !== "ok" && dep.repair_action).map(dep => dep.name).join(", "),
+              action: "Confirm live repair-all", accept: () => handleRepairAll(true)
+            })}>Repair all (live)</Button>
             <Button variant="ghost" onClick={reload}>
               Refresh
             </Button>
@@ -508,7 +498,7 @@ export function EnvironmentPanel() {
           )}
         </>
       ) : (
-        <p className="count-muted">Loading environment…</p>
+        <LoadingStatus>Loading environment…</LoadingStatus>
       ),
     },
     {
@@ -571,7 +561,7 @@ export function EnvironmentPanel() {
                           variant="primary"
                           size="sm"
                           disabled={busy === dep.id}
-                          onClick={() => void handleRepair(dep, false)}
+                          onClick={() => ask({title: "Repair " + dep.name + "?", detail: dep.repair_action ?? dep.name, action: "Apply repair", accept: () => handleRepair(dep, false)})}
                         >
                           Repair
                         </Button>
@@ -638,28 +628,16 @@ export function EnvironmentPanel() {
   ];
 
   return (
-    <div className="panel environment-panel">
-      <header className="panel-header">
-        <div>
-          <h2>
-            Environment{" "}
-            <span
-              className={`env-badge ${watcherMeta.active ? "env-ok" : watcherMeta.enabled ? "env-degraded" : "env-missing"}`}
-              title="MNT-LSTN library mount watcher"
-            >
-              watcher {watcherMeta.active ? "active" : watcherMeta.enabled ? "idle" : "off"}
-            </span>
-          </h2>
-          <p className="count-muted">
-            Toolchain status, automated repairs, and manifest backup — inspired by UniGet-style dependency dashboards.
-          </p>
-        </div>
-      </header>
-
-      {error && <div className="error">{error}</div>}
-      {msg && <div className="banner dry">{msg}</div>}
-
-      <ReorderableSections layoutId="environment" layout="stack" sections={sections} />
+    <div className="review-workspace environment-panel">
+      {dialog}
+      <Tabs aria-label="Environment tasks" items={groups} value={group.value} onValueChange={value => {
+        setParams(current => { const next = new URLSearchParams(current); next.set("workspace", value); return next; });
+      }} />
+      {group.value === "policy" && <p className="work-neutral">Mount watcher {watcherMeta.active ? "active" : watcherMeta.enabled ? "idle" : "off"}</p>}
+      {error && <WorkIssue message={error} retry={reload} />}
+      {msg && <div className="banner dry" role="status">{msg}</div>}
+      <ReorderableSections key={group.value} layoutId={`environment-${group.value}`} layout="stack"
+        sections={group.ids.flatMap(id => sections.filter(section => section.id === id))} />
     </div>
   );
 }

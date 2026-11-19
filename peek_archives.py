@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import sys
 from datetime import datetime
+from api.paths import report_dir
 from pathlib import Path
 
 from archive_peek import (
@@ -18,7 +19,7 @@ from archive_peek import (
     write_peek_csv,
 )
 
-REPORT_DIR = Path(__file__).resolve().parent / "dedupe_reports"
+REPORT_DIR = report_dir()
 
 
 def _load_coexistence_csv(path: Path) -> list[dict]:

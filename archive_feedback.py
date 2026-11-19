@@ -3,14 +3,21 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import zipfile
+
+from audiotheca.archive_approval import approval_snapshot
+from audiotheca.local_storage import locked, serialized_store, write_json
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
+from api.paths import report_dir
 from pathlib import Path
 
 from api.path_logic import normalize_logical_path
 
-FEEDBACK_VERSION = 2
-FEEDBACK_DIR = Path(__file__).resolve().parent / "dedupe_reports" / "feedback"
+FEEDBACK_VERSION = 3
+FEEDBACK_DIR = report_dir() / "feedback"
 GLOBAL_PATH = FEEDBACK_DIR / "archive_feedback.json"
 HINTS_PATH = FEEDBACK_DIR / "archive_hints.json"
 LEGACY_STAMP = "_legacy"
@@ -26,6 +33,8 @@ REJECT_REASONS = (
 
 def normalize_path(path: str) -> str:
     """Stable feedback key (lowercase, / separators) — no Path.resolve()."""
+    if path.startswith("/") and not path.startswith("//"):
+        return os.path.normpath(path)
     return normalize_logical_path(path)
 
 
@@ -79,10 +88,8 @@ def _pop_stamp_value(
     stamp: str,
     path: str,
 ) -> None:
-    for key in {stamp.strip() or LEGACY_STAMP, LEGACY_STAMP}:
-        bucket = nested.get(key)
-        if bucket and path in bucket:
-            del bucket[path]
+    bucket = nested.get(stamp.strip() or LEGACY_STAMP, {})
+    bucket.pop(path, None)
 
 
 @dataclass
@@ -109,6 +116,7 @@ class ArchiveStore:
     confirmed_deletes: dict[str, dict[str, str]] = field(default_factory=dict)
     keeper_choice: dict[str, dict[str, str]] = field(default_factory=dict)
     multipart_notes: dict[str, dict[str, str]] = field(default_factory=dict)
+    approvals: dict[str, dict[str, dict]] = field(default_factory=dict)
     corrections: list[ArchiveCorrection] = field(default_factory=list)
 
     def to_dict(self) -> dict:
@@ -119,6 +127,7 @@ class ArchiveStore:
             "confirmed_deletes": self.confirmed_deletes,
             "keeper_choice": self.keeper_choice,
             "multipart_notes": self.multipart_notes,
+            "approvals": self.approvals,
             "corrections": [row.to_dict() for row in self.corrections],
         }
 
@@ -134,6 +143,7 @@ def load_store() -> ArchiveStore:
         confirmed_deletes=_migrate_stamp_map(data.get("confirmed_deletes", {})),
         keeper_choice=_migrate_stamp_map(data.get("keeper_choice", {})),
         multipart_notes=_migrate_stamp_map(data.get("multipart_notes", {})),
+        approvals=data.get("approvals", {}),
         corrections=[ArchiveCorrection(**row) for row in data.get("corrections", [])],
     )
 
@@ -142,7 +152,7 @@ def save_store(store: ArchiveStore) -> Path:
     FEEDBACK_DIR.mkdir(parents=True, exist_ok=True)
     store.version = FEEDBACK_VERSION
     store.updated = _now_iso()
-    GLOBAL_PATH.write_text(json.dumps(store.to_dict(), indent=2), encoding="utf-8")
+    write_json(GLOBAL_PATH, store.to_dict())
     export_engine_hints(store)
     return GLOBAL_PATH
 
@@ -169,13 +179,13 @@ def is_delete_confirmed(
     store = store or load_store()
     norm = normalize_path(archive_path)
     if stamp is not None:
-        return norm in _stamp_view(store.confirmed_deletes, stamp)
+        return norm in store.confirmed_deletes.get(stamp or LEGACY_STAMP, {})
     return norm in _flatten_stamp_map(store.confirmed_deletes)
 
 
 def confirmed_paths_for_stamp(stamp: str, store: ArchiveStore | None = None) -> list[str]:
     store = store or load_store()
-    return sorted(_stamp_view(store.confirmed_deletes, stamp).keys())
+    return sorted(store.confirmed_deletes.get(stamp or LEGACY_STAMP, {}))
 
 
 def get_keeper(
@@ -191,6 +201,11 @@ def get_keeper(
     return _flatten_stamp_map(store.keeper_choice).get(norm)
 
 
+def feedback_lock():
+    return locked(GLOBAL_PATH.with_suffix(".lock"))
+
+
+@serialized_store(lambda: GLOBAL_PATH)
 def reject_verdict(
     *,
     archive_path: str,
@@ -221,6 +236,7 @@ def reject_verdict(
     return store
 
 
+@serialized_store(lambda: GLOBAL_PATH)
 def confirm_delete(
     *,
     archive_path: str,
@@ -233,6 +249,13 @@ def confirm_delete(
     norm = normalize_path(archive_path)
     if is_archive_rejected(norm, store, stamp=stamp or None):
         raise ValueError("Archive verdict was rejected - clear rejection before confirming delete")
+    if get_keeper(archive_path, store, stamp=stamp) == "archive":
+        raise ValueError("Choose Keep folder before confirming archive deletion")
+    try:
+        snapshot = approval_snapshot(stamp, Path(archive_path))
+    except (OSError, ValueError, zipfile.BadZipFile, subprocess.SubprocessError, RuntimeError) as exc:
+        snapshot = {"archive": archive_path, "error": str(exc)}
+    store.approvals.setdefault(stamp or LEGACY_STAMP, {})[norm] = snapshot
     _set_stamp_value(store.confirmed_deletes, stamp, norm, stamp or _now_iso())
     store.corrections.append(
         ArchiveCorrection(
@@ -250,6 +273,7 @@ def confirm_delete(
     return store
 
 
+@serialized_store(lambda: GLOBAL_PATH)
 def set_keeper(
     *,
     archive_path: str,
@@ -262,6 +286,8 @@ def set_keeper(
         raise ValueError("keeper must be 'archive' or 'folder'")
     store = load_store()
     norm = normalize_path(archive_path)
+    if keeper == "archive":
+        _pop_stamp_value(store.confirmed_deletes, stamp, norm)
     _set_stamp_value(store.keeper_choice, stamp, norm, keeper)
     store.corrections.append(
         ArchiveCorrection(
@@ -278,6 +304,7 @@ def set_keeper(
     return store
 
 
+@serialized_store(lambda: GLOBAL_PATH)
 def set_multipart_note(
     *,
     archive_path: str,
@@ -311,7 +338,7 @@ def export_engine_hints(store: ArchiveStore | None = None) -> Path:
         "multipart_notes": _flatten_stamp_map(store.multipart_notes),
     }
     FEEDBACK_DIR.mkdir(parents=True, exist_ok=True)
-    HINTS_PATH.write_text(json.dumps(hints, indent=2), encoding="utf-8")
+    write_json(HINTS_PATH, hints)
     return HINTS_PATH
 
 
@@ -320,7 +347,7 @@ def get_state_for_ui(stamp: str) -> dict:
     return {
         "stamp": stamp,
         "rejected_archives": _stamp_view(store.rejected_archives, stamp),
-        "confirmed_deletes": _stamp_view(store.confirmed_deletes, stamp),
+        "confirmed_deletes": store.confirmed_deletes.get(stamp or LEGACY_STAMP, {}),
         "keeper_choice": _stamp_view(store.keeper_choice, stamp),
         "multipart_notes": _stamp_view(store.multipart_notes, stamp),
         "reject_reasons": list(REJECT_REASONS),

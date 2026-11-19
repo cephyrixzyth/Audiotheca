@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 from datetime import datetime, timezone
+from api.paths import report_dir
 from pathlib import Path
 
 import duplicate_feedback as dup_fb
@@ -12,7 +13,7 @@ import restructure_feedback as rst_fb
 import archive_feedback as arch_fb
 import scene_feedback as scene_fb
 
-FEEDBACK_DIR = Path(__file__).resolve().parent / "dedupe_reports" / "feedback"
+FEEDBACK_DIR = report_dir() / "feedback"
 
 UNIFIED_HEADERS = [
     "Module",

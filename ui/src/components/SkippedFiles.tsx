@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { WorkIssue, WorkScope } from "./ReviewWorkbench";
+import { LoadingStatus } from "../ui/LoadingStatus";
+import { useEffect, useState } from "react";
 import {
   compareRuns,
   fetchCacheHits,
@@ -60,6 +62,8 @@ const REASON_LABELS: Record<string, string> = {
 };
 
 export function SkippedFiles({ stamp, runs }: Props) {
+  const [revision, setRevision] = useState(0);
+  const [loadError, setLoadError] = useState("");
   const { query } = useContextSidebar();
   const [view, setView] = useState<SubView>("hub");
   const [reason, setReason] = useState("");
@@ -84,63 +88,26 @@ export function SkippedFiles({ stamp, runs }: Props) {
   const [compareB, setCompareB] = useState(runs[1]?.stamp ?? stamp);
   const [comparison, setComparison] = useState<RunComparison | null>(null);
 
-  const loadHub = useCallback(() => {
-    setLoading(true);
-    Promise.all([
-      fetchSkippedItems(stamp, { reason: reason || undefined, q: query || undefined, limit: 500 }),
-      fetchSkipImpact(stamp),
-    ])
-      .then(([skippedRes, impactRes]) => {
-        setSkipped(skippedRes.items);
-        setSkippedTotal(skippedRes.total);
-        setCounts(skippedRes.counts);
-        setSkipImpact(impactRes.phases);
-      })
-      .finally(() => setLoading(false));
-  }, [stamp, reason, query]);
-
   useEffect(() => {
-    if (view === "hub") loadHub();
-  }, [view, loadHub]);
-
-  useEffect(() => {
-    if (view === "failures") {
-      setLoading(true);
-      fetchScanFailures(stamp, { q: query || undefined, limit: 500 })
-        .then((r) => setFailures(r.items))
-        .finally(() => setLoading(false));
-    } else if (view === "coverage") {
-      setLoading(true);
-      fetchCoverageGaps(stamp, { q: query || undefined, limit: 500 })
-        .then((r) => setGaps(r.items))
-        .finally(() => setLoading(false));
-    } else if (view === "cache") {
-      setLoading(true);
-      fetchCacheHits(stamp, { q: query || undefined, limit: 500 })
-        .then((r) => setCacheHits(r.items))
-        .finally(() => setLoading(false));
-    } else if (view === "nested") {
-      setLoading(true);
-      fetchNestedIssues(stamp, { q: query || undefined, limit: 500 })
-        .then((r) => setNested(r.items))
-        .finally(() => setLoading(false));
-    } else if (view === "coexistence") {
-      setLoading(true);
-      fetchCoexistence(stamp, { q: query || undefined, limit: 500 })
-        .then((r) => setCoexistence(r.items))
-        .finally(() => setLoading(false));
-    } else if (view === "inventory") {
-      setLoading(true);
-      fetchInventory(stamp, { q: query || undefined, limit: 500 })
-        .then((r) => setInventory(r.items))
-        .finally(() => setLoading(false));
-    } else if (view === "truncations") {
-      setLoading(true);
-      fetchProbeTruncations(stamp, { q: query || undefined, limit: 500 })
-        .then((r) => setTruncations(r.items))
-        .finally(() => setLoading(false));
+    let current = true;
+    setLoading(view !== "compare"); setLoadError(""); setSelected(new Set()); setMsg(null);
+    async function load() {
+      const scope = { q: query || undefined, limit: 500 };
+      if (view === "hub") {
+        const [rows, impact] = await Promise.all([fetchSkippedItems(stamp, { ...scope, reason: reason || undefined }), fetchSkipImpact(stamp)]);
+        if (current) { setSkipped(rows.items); setSkippedTotal(rows.total); setCounts(rows.counts); setSkipImpact(impact.phases); }
+      } else if (view === "failures") { const data = await fetchScanFailures(stamp, scope); if (current) setFailures(data.items); }
+      else if (view === "coverage") { const data = await fetchCoverageGaps(stamp, scope); if (current) setGaps(data.items); }
+      else if (view === "cache") { const data = await fetchCacheHits(stamp, scope); if (current) setCacheHits(data.items); }
+      else if (view === "nested") { const data = await fetchNestedIssues(stamp, scope); if (current) setNested(data.items); }
+      else if (view === "coexistence") { const data = await fetchCoexistence(stamp, scope); if (current) setCoexistence(data.items); }
+      else if (view === "inventory") { const data = await fetchInventory(stamp, scope); if (current) setInventory(data.items); }
+      else if (view === "truncations") { const data = await fetchProbeTruncations(stamp, scope); if (current) setTruncations(data.items); }
     }
-  }, [view, stamp, query]);
+    void load().catch((cause: Error) => { if (current) setLoadError(cause.message); })
+      .finally(() => { if (current) setLoading(false); });
+    return () => { current = false; };
+  }, [view, stamp, query, reason, revision]);
 
   function toggleSelect(path: string) {
     setSelected((prev) => {
@@ -199,12 +166,10 @@ export function SkippedFiles({ stamp, runs }: Props) {
   ];
 
   return (
-    <div>
-      <div className="banner dry">
-        Skipped &amp; uncovered files — scan failures, cache hits, coverage gaps, phase skips, and probe
-        depth limits. Select rows to force rescan or queue for investigation.
-      </div>
-
+    <div className="review-workspace">
+      <WorkScope title={subTabs.find(tab => tab.id === view)?.label ?? "Review skipped paths"}
+        detail={subTabs.find(tab => tab.id === view)?.title ?? "Choose a category to inspect scan coverage."} />
+      {loadError && <WorkIssue message={loadError} retry={() => setRevision(v => v + 1)} />}
       <Tabs
         aria-label="Skipped file views"
         value={view}
@@ -256,7 +221,7 @@ export function SkippedFiles({ stamp, runs }: Props) {
       )}
 
       {msg && (
-        <div className="banner" style={{ marginBottom: "0.75rem" }}>
+        <div className="banner" role="status" style={{ marginBottom: "0.75rem" }}>
           {msg}
           <Button variant="secondary" size="sm" style={{ marginLeft: "0.5rem" }} onClick={() => setMsg(null)}>
             Dismiss
@@ -275,9 +240,9 @@ export function SkippedFiles({ stamp, runs }: Props) {
         </div>
       )}
 
-      {loading && <p className="count-muted">Loading…</p>}
+      {loading && <LoadingStatus>Loading…</LoadingStatus>}
 
-      {!loading && view === "hub" && (
+      {!loadError && !loading && view === "hub" && (
         <>
           <p className="count-muted">{skippedTotal.toLocaleString()} items</p>
           <VirtualTable
@@ -318,7 +283,7 @@ export function SkippedFiles({ stamp, runs }: Props) {
         </>
       )}
 
-      {!loading && view === "failures" && (
+      {!loadError && !loading && view === "failures" && (
         <VirtualTable
           items={failures}
           colCount={5}
@@ -352,7 +317,7 @@ export function SkippedFiles({ stamp, runs }: Props) {
         />
       )}
 
-      {!loading && view === "coverage" && (
+      {!loadError && !loading && view === "coverage" && (
         <VirtualTable
           items={gaps}
           colCount={6}
@@ -390,7 +355,7 @@ export function SkippedFiles({ stamp, runs }: Props) {
         />
       )}
 
-      {!loading && view === "cache" && (
+      {!loadError && !loading && view === "cache" && (
         <VirtualTable
           items={cacheHits}
           colCount={4}
@@ -422,7 +387,7 @@ export function SkippedFiles({ stamp, runs }: Props) {
         />
       )}
 
-      {!loading && view === "nested" && (
+      {!loadError && !loading && view === "nested" && (
         <VirtualTable
           items={nested}
           colCount={5}
@@ -451,7 +416,7 @@ export function SkippedFiles({ stamp, runs }: Props) {
         />
       )}
 
-      {!loading && view === "coexistence" && (
+      {!loadError && !loading && view === "coexistence" && (
         <VirtualTable
           items={coexistence}
           colCount={6}
@@ -480,7 +445,7 @@ export function SkippedFiles({ stamp, runs }: Props) {
         />
       )}
 
-      {!loading && view === "inventory" && (
+      {!loadError && !loading && view === "inventory" && (
         <VirtualTable
           items={inventory}
           colCount={6}
@@ -507,7 +472,7 @@ export function SkippedFiles({ stamp, runs }: Props) {
         />
       )}
 
-      {!loading && view === "truncations" && (
+      {!loadError && !loading && view === "truncations" && (
         <VirtualTable
           items={truncations}
           colCount={6}
@@ -541,21 +506,21 @@ export function SkippedFiles({ stamp, runs }: Props) {
       {view === "compare" && (
         <div>
           <div className="toolbar">
-            <LabeledSelect label="Run A" value={compareA} onChange={(e) => setCompareA(e.target.value)}>
+            <LabeledSelect label="Run A" value={compareA} onChange={(e) => { setCompareA(e.target.value); setComparison(null); }}>
               {runs.map((r) => (
                 <option key={r.stamp} value={r.stamp}>
                   {r.stamp}
                 </option>
               ))}
             </LabeledSelect>
-            <LabeledSelect label="Run B" value={compareB} onChange={(e) => setCompareB(e.target.value)}>
+            <LabeledSelect label="Run B" value={compareB} onChange={(e) => { setCompareB(e.target.value); setComparison(null); }}>
               {runs.map((r) => (
                 <option key={r.stamp} value={r.stamp}>
                   {r.stamp}
                 </option>
               ))}
             </LabeledSelect>
-            <Button variant="primary" onClick={handleCompare}>
+            <Button variant="primary" disabled={loading || !compareA || !compareB || compareA === compareB} onClick={handleCompare}>
               Compare
             </Button>
           </div>

@@ -35,6 +35,10 @@ def test_stage_approved_duplicates_uses_inferred_root(tmp_path, monkeypatch):
             )()
         ]
 
+    FakePlan.stamp = stamp
+    monkeypatch.setattr("api.security.library_roots", lambda: [library])
+    FakePlan.duplicate_decisions[0].identities = decisions.approval_identities([keeper, discard])
+
     monkeypatch.setattr(
         "api.duplicate_execute.load_plan",
         lambda _stamp: FakePlan(),
@@ -78,6 +82,7 @@ def test_duplicate_execute_api_returns_result_rows(client, tmp_path, monkeypatch
                     dedup_key="vendor|product",
                     keeper_path=str(section),
                     discard_paths=[str(nested / "discard.txt")],
+                    identities=decisions.approval_identities([str(section), str(nested / "discard.txt")]),
                 )
             ],
         ),

@@ -23,10 +23,8 @@ def _resolve_root_dir() -> str:
 
 
 def _resolve_report_dir() -> Path:
-    home = os.environ.get("AUDIOTHECA_HOME", "").strip()
-    if home:
-        return Path(home) / "dedupe_reports"
-    return Path(__file__).resolve().parent.parent / "dedupe_reports"
+    from api.paths import report_dir
+    return report_dir()
 
 
 ROOT_DIR = _resolve_root_dir()

@@ -43,6 +43,9 @@ def bundled_7z_candidates() -> list[Path]:
             Path("/usr/local/bin"),
         ]
 
+    if sys.platform == "darwin" and getattr(sys, "frozen", False):
+        resources = Path(sys.executable).resolve().parent.parent / "Resources"
+        subdirs.insert(0, resources / "tools" / "7zip")
     if home:
         subdirs.insert(0, Path(home) / "tools" / "7zip")
 

@@ -1,3 +1,4 @@
+import { Dialog } from "../ui/Dialog";
 import { useEffect, useState } from "react";
 import type { DesktopCloseAction } from "../hooks/useDesktopCloseBehavior";
 import { Button } from "../ui";
@@ -23,19 +24,8 @@ export function CloseConfirmDialog({ open, initialAction, onConfirm, onCancel }:
   if (!open) return null;
 
   return (
-    <div
-      className="first-run-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="close-confirm-title"
-      onClick={onCancel}
-    >
-      <div className="first-run-modal" onClick={(e) => e.stopPropagation()}>
-        <header>
-          <h2 id="close-confirm-title">Close Audiotheca?</h2>
-          <p className="count-muted">Choose whether to hide the window or quit the app.</p>
-        </header>
-
+    <Dialog open={open} onOpenChange={value => { if (!value) onCancel(); }}
+      title="Close Audiotheca?" description="Choose whether to hide the window or quit the app.">
         <fieldset className="desktop-close-fieldset">
           <legend className="context-label">When I click the close button</legend>
           <label className="desktop-close-option">
@@ -75,7 +65,6 @@ export function CloseConfirmDialog({ open, initialAction, onConfirm, onCancel }:
             Cancel
           </Button>
         </div>
-      </div>
-    </div>
+    </Dialog>
   );
 }

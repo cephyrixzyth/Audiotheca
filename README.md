@@ -63,7 +63,7 @@ Web UI **1.0.12** ships the full **94-code architecture spec catalog** (waves A�
 | **Security** | Malware heuristics, ClamAV deep scan, quarantine/shred, SHA-256 hash lookup, MEM-SCAN, CTX-PROF elevation gate |
 | **Environment** | Toolchain health & repairs, **theme studio**, mount watcher, **cloud cache / S3** telemetry, **orchestration tools**, **spec catalog** registry, virtual paths, preview session (tempo/pitch/mix) |
 | **System ops** | Space recovery (underscore whitelist, hardlink/bloat plans), Vendors (gaps, harvest, keywords) |
-| **Layout** | Reorderable panels, named layout presets, 18 built-in themes, dashboard before first scan, **⌘K** command palette, hash deep-links, `?run=` persistence |
+| **Layout** | Reorderable panels, named layout presets, 22 illustrated built-in themes, dashboard before first scan, **⌘K** command palette, hash deep-links, `?run=` persistence |
 
 Primary navigation is grouped: **Dashboard** · **Scan** · **Review** · **Library** · **System** · **Help** (not a flat 14-tab row).
 
@@ -88,7 +88,7 @@ Set `AUDIOTHECA_LIBRARY_ROOT` to **your** library path before scanning — never
 
 ## Quick start (Windows)
 
-**Desktop installer (recommended):** download from [GitHub Releases](https://github.com/chrisjrovira/Audiotheca/releases/latest) (Windows `.msi`, NSIS setup, portable zip; macOS `.dmg`; Linux `.AppImage` / `.deb`) or build with `.\scripts\build-installers.ps1` — see [Install guide](docs/INSTALL.md#pre-built-installers).
+**Local installation from source.** Install the Python requirements and the locked UI dependencies using the source setup below. The desktop packaging scripts build platform-specific installers. Check for an asset matching your system before choosing the [release channel](https://github.com/cephyrixzyth/Audiotheca/releases).
 
 **Portable:** extract `Audiotheca-Portable-1.0.12-win64.zip` and run `Run Audiotheca.bat`.
 
@@ -175,28 +175,17 @@ Decisions you make in the UI save under `dedupe_reports/decisions/` and `dedupe_
 
 ## Web UI tour
 
-The top bar uses **grouped navigation**. **Help** is always last.
-
-```
-Dashboard · Scan · Review ▾ · Library · System ▾ · Help
-              │                      │
-              ├ Investigation        ├ Space recovery
-              ├ Duplicates           ├ Security
-              ├ Restructure          ├ Environment
-              ├ Archives             └ Vendors
-              ├ Scene renames
-              ├ Scan audit
-              └ Skipped files
-```
+Use the workspace directory at the left to open Dashboard, Library, Scan, Review, Studio, System or Help. On a phone, open the workspace menu at the top left. Review and System have a second row for their individual tools. The search button opens the command palette, and the appearance menu previews each theme.
 
 ### Primary sections
 
 | Section | What you do there |
 |---------|-------------------|
-| **Dashboard** | Pick a run, route-ready gauges, run compare, reorderable panels; host metrics and environment summary **before your first scan** |
+| **Dashboard** | Open the library or studio, revisit scans and review queues, or choose Run analysis for gauges, comparison and configurable panels |
 | **Scan** | Start jobs, processing flow editor, skippable phases, live WebSocket log, **AI lookup** analyzer |
-| **Library** | Shared file explorer — browse roots, **Pop out** wide panel, dual-pane compare, inline archive listing, **audio preview** strip, **DropZone** overlay |
-| **Help** | Built-in install, workflow, layout, and deploy guides with screenshots and GIFs |
+| **Library** | Browse or compare folders, search across pages, audition an asset and carry its selected source range into a mix |
+| **Studio** | Arrange clips on a timeline, edit source trims, place speakers, mix in a 3D room on desktop or in WebXR, save editable projects and export stereo WAV |
+| **Help** | Searchable offline task guides with screenshots and seekable walkthroughs |
 
 ### Review (sub-tabs)
 
@@ -229,7 +218,7 @@ Dashboard · Scan · Review ▾ · Library · System ▾ · Help
 - **Audio preview (AUTO-AUD)** — hover/select WAV/MP3/FLAC in the explorer; waveform, LUFS/BPM/key badges; tempo sync and pitch from **Environment → Preview session**.
 - **DropZone (DRP-ZONE)** — drag files onto the explorer to route paths through the API.
 - **Reorderable sections** — drag panel headers or ⠿ handles; save named layouts on Dashboard, Scan, and Environment.
-- **Themes** — ◐ switcher in the top bar; full **theme studio** under **Environment**.
+- **Themes** — appearance menu in the top bar; full **theme studio** under **Environment**.
 - **Context sidebar** — search/filter on most data tabs.
 - **Spec catalog API** — `GET /api/spec/catalog` and per-code invoke; browse status in **Environment → Architecture spec catalog**.
 
@@ -239,22 +228,17 @@ Built-in help text also lives in the **Help** tab; full prose docs are in [`docs
 
 ## Screenshots
 
-Place PNG/WebP files under `docs/assets/screenshots/` — see [docs/assets/ASSETS.md](docs/assets/ASSETS.md) for the full checklist and capture commands.
+The media comes from a disposable local library. Reproduce all screenshots and walkthroughs with the capture command after installing the API dependencies, UI dependencies, Playwright Chromium and FFmpeg. [Capture guide](docs/assets/README.md) · [Media index](docs/assets/ASSETS.md)
 
-Re-capture after UI changes (demo API + Playwright):
-
-```powershell
-$env:AUDIOTHECA_CAPTURE_UI_PORT="5175"
-$env:AUDIOTHECA_CAPTURE_API_PORT="8788"
-python scripts/capture_screenshots_only.py   # stills only
-python scripts/build_doc_gifs.py           # GIFs + sync to ui/public/help/
+```sh
+python scripts/capture_doc_assets.py
 ```
 
 ### Dashboard & overview
 
 ![Audiotheca web UI overview](docs/assets/screenshots/ui-overview.png)
 
-*Grouped top nav (Dashboard · Scan · Review · Library · System · Help), run selector, and Dashboard KPIs.*
+*Workspace stations, recent scans and review queues.*
 
 ![Dashboard route-ready gauges](docs/assets/screenshots/dashboard-gauges.png)
 
@@ -314,7 +298,7 @@ python scripts/build_doc_gifs.py           # GIFs + sync to ui/public/help/
 
 ![Security / malware panel](docs/assets/screenshots/security-malware.png)
 
-*Malware heuristics, ClamAV option, quarantine/shred actions, hash lookup, MEM-SCAN.*
+*Security scan setup for the local library.*
 
 ![Environment tab theme studio](docs/assets/screenshots/environment-themes.png)
 
@@ -334,25 +318,25 @@ python scripts/build_doc_gifs.py           # GIFs + sync to ui/public/help/
 
 ![DropZone overlay](docs/assets/screenshots/dropzone-overlay.png)
 
-*Library DropZone (DRP-ZONE) — active overlay while dragging files or paths onto the explorer.*
+*The results of dropping a folder and archive into the library.*
 
 ![Audio preview strip](docs/assets/screenshots/audio-preview.png)
 
-*Library — hover a `.wav` in the explorer for waveform, LUFS, BPM, and key badges.*
+*The library inspector while auditioning a selected WAV.*
 
-![Help tab — last in the tab bar](docs/assets/screenshots/help-panel.png)
+![Audiotheca field guide](docs/assets/screenshots/help-panel.png)
 
-*Help tab (last in the bar) with topic screenshots and walkthrough GIFs.*
+*The offline field guide with a task selected. Open its screenshot or play a walkthrough when needed.*
 
 ---
 
 ## Video walkthroughs
 
-All eleven walkthroughs are in-repo — click to open or download on GitHub:
+The twelve walkthroughs open locally or from GitHub.
 
 | Topic | Video |
 |-------|-------|
-| First scan from install to Dashboard | [first-scan-walkthrough.mp4](docs/assets/videos/first-scan-walkthrough.mp4) |
+| Start a dry scan and read its report | [first-scan-walkthrough.mp4](docs/assets/videos/first-scan-walkthrough.mp4) |
 | Scan phases and processing flow presets | [scan-phases-and-flow.mp4](docs/assets/videos/scan-phases-and-flow.mp4) |
 | Investigation triage and vendor keywords | [investigation-and-vendors.mp4](docs/assets/videos/investigation-and-vendors.mp4) |
 | Investigation lookup (WEB-SPDR / STRIP-DATA) | [investigation-lookup.mp4](docs/assets/videos/investigation-lookup.mp4) |
@@ -360,17 +344,18 @@ All eleven walkthroughs are in-repo — click to open or download on GitHub:
 | File explorer and archive peek | [file-explorer-and-archives.mp4](docs/assets/videos/file-explorer-and-archives.mp4) |
 | Archive diff wizard | [archive-diff-wizard.mp4](docs/assets/videos/archive-diff-wizard.mp4) |
 | Environment orchestration, cloud, spec catalog | [environment-and-spec-catalog.mp4](docs/assets/videos/environment-and-spec-catalog.mp4) |
-| Library audio preview and DropZone | [audio-preview-library.mp4](docs/assets/videos/audio-preview-library.mp4) |
-| AI lookup review during scan | [ai-lookup-review.mp4](docs/assets/videos/ai-lookup-review.mp4) |
+| Audition a library recording | [audio-preview-library.mp4](docs/assets/videos/audio-preview-library.mp4) |
+| Review a local identification suggestion | [ai-lookup-review.mp4](docs/assets/videos/ai-lookup-review.mp4) |
 | Security scan and space recovery | [security-and-space-recovery.mp4](docs/assets/videos/security-and-space-recovery.mp4) |
+| Trim and solo a take in Spatial studio | [spatial-studio-mix.mp4](docs/assets/videos/spatial-studio-mix.mp4) |
 
-Animated previews render inline on GitHub. [Download full video](#download-full-video-links) for higher quality.
+Each animated preview links to the corresponding higher-resolution video.
 
-### First scan from install to Dashboard
+### Start a dry scan and read its report
 
 ![First scan walkthrough](docs/assets/gifs/first-scan-walkthrough.gif)
 
-*Set library root, run a dry scan, read Dashboard KPIs.*
+*Inspect a saved run, start a dry scan and open its completed report.*
 
 [Download full video](docs/assets/videos/first-scan-walkthrough.mp4)
 
@@ -378,7 +363,7 @@ Animated previews render inline on GitHub. [Download full video](#download-full-
 
 ![Scan phases and flow](docs/assets/gifs/scan-phases-and-flow.gif)
 
-*Processing flow editor, skippable phases, live WebSocket progress.*
+*Inspect the processing flow, skip a phase and open the run controls.*
 
 [Download full video](docs/assets/videos/scan-phases-and-flow.mp4)
 
@@ -386,7 +371,7 @@ Animated previews render inline on GitHub. [Download full video](#download-full-
 
 ![Investigation and vendors](docs/assets/gifs/investigation-and-vendors.gif)
 
-*Triage unknown items, add vendor keywords, export feedback.*
+*Inspect an individual unresolved item and open the vendor keyword database.*
 
 [Download full video](docs/assets/videos/investigation-and-vendors.mp4)
 
@@ -394,7 +379,7 @@ Animated previews render inline on GitHub. [Download full video](#download-full-
 
 ![Investigation lookup](docs/assets/gifs/investigation-lookup.gif)
 
-*Investigation lookup panel — anonymization gate, tier badges, confirm/reject flow.*
+*Plan a query and generate local tags from release text.*
 
 [Download full video](docs/assets/videos/investigation-lookup.mp4)
 
@@ -410,7 +395,7 @@ Animated previews render inline on GitHub. [Download full video](#download-full-
 
 ![File explorer and archives](docs/assets/gifs/file-explorer-and-archives.gif)
 
-*Browse panel, archive listing without extract, redundant archive verdicts.*
+*Route a mixed drop and list the nested members of a ZIP.*
 
 [Download full video](docs/assets/videos/file-explorer-and-archives.mp4)
 
@@ -418,7 +403,7 @@ Animated previews render inline on GitHub. [Download full video](#download-full-
 
 ![Archive diff wizard](docs/assets/gifs/archive-diff-wizard.gif)
 
-*Side-by-side archive vs extracted folder — confirm redundant archives without re-scanning.*
+*Compare nested entries and save the choice to keep the archive.*
 
 [Download full video](docs/assets/videos/archive-diff-wizard.mp4)
 
@@ -430,19 +415,19 @@ Animated previews render inline on GitHub. [Download full video](#download-full-
 
 [Download full video](docs/assets/videos/environment-and-spec-catalog.mp4)
 
-### Library audio preview and DropZone
+### Audition a library recording
 
 ![Audio preview library](docs/assets/gifs/audio-preview-library.gif)
 
-*Library explorer — WAV preview strip (waveform, LUFS/BPM/key) and DropZone overlay.*
+*Select a library recording and audition it in the inspector.*
 
 [Download full video](docs/assets/videos/audio-preview-library.mp4)
 
-### AI lookup review during scan
+### Review a local identification suggestion
 
 ![AI lookup review](docs/assets/gifs/ai-lookup-review.gif)
 
-*AI analyzer queue, confirm/reject lookups, cache behavior.*
+*Query the local fixture provider and inspect its identification suggestion.*
 
 [Download full video](docs/assets/videos/ai-lookup-review.mp4)
 
@@ -450,9 +435,19 @@ Animated previews render inline on GitHub. [Download full video](#download-full-
 
 ![Security and space recovery](docs/assets/gifs/security-and-space-recovery.gif)
 
-*Malware heuristics, underscore whitelist, coexistence summary.*
+*Open security scan controls, then inspect recovery report options.*
 
 [Download full video](docs/assets/videos/security-and-space-recovery.mp4)
+
+### Spatial studio
+
+![Selected take in the listening room](docs/assets/screenshots/spatial-studio.png)
+
+![Trim and solo a take](docs/assets/gifs/spatial-studio-mix.gif)
+
+*Import a take, set its trim, solo the track and export the stereo mix from the desktop room.*
+
+[Download full video](docs/assets/videos/spatial-studio-mix.mp4)
 
 Build GIFs from MP4 sources: `python scripts/build_doc_gifs.py`. Capture instructions: [docs/assets/README.md](docs/assets/README.md).
 
@@ -549,6 +544,7 @@ docker pull ghcr.io/chrisjrovira/audiotheca:1.0.12
 
 ```bash
 docker run -d --name audiotheca \
+  -e AUDIOTHECA_PROXY_SECRET="$(openssl rand -hex 32)" \
   -p 4210:80 -p 4211:8787 \
   -v /path/to/appdata:/data \
   -v /path/to/library:/library:ro \

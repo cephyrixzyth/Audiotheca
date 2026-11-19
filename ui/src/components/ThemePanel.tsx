@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { EDITABLE_TOKEN_GROUPS, useTheme } from "../contexts/ThemeContext";
+import { themeArtwork } from "../themes/presets";
 import type { ThemePreset } from "../themes/types";
 import { Button } from "../ui";
 
@@ -30,8 +31,10 @@ function ThemeCard({
       type="button"
       className={`theme-card${active ? " active" : ""}`}
       onClick={onSelect}
+      aria-pressed={active}
       title={theme.description}
     >
+      <img className="room-card-photo" src={`${import.meta.env.BASE_URL}rooms/${themeArtwork(theme)}.webp`} alt="" />
       <ThemeSwatch theme={theme} />
       <span className="theme-card-name">{theme.name}</span>
       {theme.builtIn && <span className="theme-card-badge">Built-in</span>}
@@ -156,7 +159,7 @@ export function ThemePanel() {
       </div>
 
       <div className="theme-grid-scroll">
-        <div className="theme-grid" role="list" aria-label="Theme presets">
+        <div className="theme-grid" role="group" aria-label="Theme presets">
           {themes.map((theme) => (
             <ThemeCard
               key={theme.id}

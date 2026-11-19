@@ -1,3 +1,4 @@
+import { LoadingStatus } from "../ui/LoadingStatus";
 import { useEffect, useMemo, useState } from "react";
 import {
   compareRuns,
@@ -73,7 +74,7 @@ function RunSparkline({ runs }: { runs: RunListItem[] }) {
         return (
           <div key={run.stamp} className="spark-bar-wrap" title={`${run.stamp}: ${run.scanned ?? 0} scanned`}>
             <div className="spark-bar" style={{ height: `${Math.max(4, h)}%` }} />
-            <span className="spark-label">{run.stamp.slice(-4)}</span>
+            <span className="spark-label">{run.stamp.slice(9, 13)}</span>
           </div>
         );
       })}
@@ -108,7 +109,7 @@ export function Dashboard(props: Props) {
   if (props.summaryLoading) {
     return (
       <div className="dash dash-loading">
-        <p className="count-muted">Loading run summary…</p>
+        <LoadingStatus>Loading run summary…</LoadingStatus>
       </div>
     );
   }
@@ -495,7 +496,7 @@ function DashboardRun({
                 {!metrics.psutil && <p className="count-muted">Install psutil for CPU/RAM metrics</p>}
               </div>
             ) : (
-              <p className="count-muted">Loading metrics…</p>
+              <LoadingStatus>Loading metrics…</LoadingStatus>
             )}
             <div className="stat-grid compact" style={{ marginTop: "0.75rem" }}>
               <EnvironmentSummaryWidget onNavigate={() => onNavigate?.("environment")} />

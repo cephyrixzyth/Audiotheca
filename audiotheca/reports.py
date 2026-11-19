@@ -75,7 +75,7 @@ class ReportsMixin:
             "scorecard_json": REPORT_DIR / f"Quality_Scorecard_{self.run_stamp}.json",
         }
 
-        if self.root_dir.exists():
+        if self.root_dir.exists() and (not self.dry_run or getattr(self, "mirror_reports", False)):
             try:
                 share_reports = self.root_dir / "_dedupe_reports"
                 share_reports.mkdir(exist_ok=True)

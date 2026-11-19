@@ -1,4 +1,4 @@
-import { BUILTIN_THEMES, DEFAULT_THEME_ID } from "./presets";
+import { BUILTIN_THEMES, DEFAULT_THEME_ID, themeArtwork } from "./presets";
 import type { ThemeExportBundle, ThemePreset, ThemeTokens } from "./types";
 import { THEME_TOKEN_KEYS } from "./types";
 
@@ -107,6 +107,7 @@ export function duplicateTheme(source: ThemePreset, name: string): ThemePreset {
     name,
     description: source.description ? `Based on ${source.name}` : `Custom theme based on ${source.name}`,
     builtIn: false,
+    artwork: themeArtwork(source),
     tokens: { ...source.tokens },
   };
 }
@@ -144,6 +145,7 @@ function normalizeImportedTheme(theme: ThemePreset): ThemePreset {
     name: theme.name.trim(),
     description: theme.description?.trim() || "Imported theme",
     builtIn: false,
+    artwork: themeArtwork({ id: theme.id ?? "", artwork: theme.artwork }),
     tokens,
   };
 }

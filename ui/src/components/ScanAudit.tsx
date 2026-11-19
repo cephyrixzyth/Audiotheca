@@ -1,3 +1,5 @@
+import { WorkScope, WorkIssue, useReviewDecision } from "./ReviewWorkbench";
+import { LoadingStatus } from "../ui/LoadingStatus";
 import { useEffect, useState } from "react";
 import { correctInvestigation, fetchInvestigationFeedback, fetchScanAudit, fetchScanInsights } from "../api/client";
 import type { ScanAuditItem } from "../types";
@@ -32,6 +34,9 @@ const QUICK_FILTERS = [
 ];
 
 export function ScanAudit({ stamp }: Props) {
+  const { ask, dialog } = useReviewDecision();
+  const [revision, setRevision] = useState(0);
+  const [loadError, setLoadError] = useState("");
   const { query } = useContextSidebar();
   const { filters, setFilter } = useSidebarFilters(STATUS_FILTER_DEFS);
   const status = filters.status ?? "";
@@ -67,7 +72,8 @@ export function ScanAudit({ stamp }: Props) {
   }, [stamp]);
 
   useEffect(() => {
-    setLoading(true);
+    let current = true;
+    setLoadError(""); setLoading(true);
     const timer = setTimeout(() => {
       fetchScanAudit(stamp, {
         status: status || undefined,
@@ -76,17 +82,18 @@ export function ScanAudit({ stamp }: Props) {
         limit: 500,
       })
         .then((res) => {
+          if (!current) return;
           setItems(res.items);
           setTotal(res.total);
         })
-        .finally(() => setLoading(false));
+        .catch((err: Error) => { if (current) { setLoadError(err.message); setItems([]); } })
+        .finally(() => { if (current) setLoading(false); });
     }, query ? 250 : 0);
-    return () => clearTimeout(timer);
-  }, [stamp, status, flags, query]);
+    return () => { current = false; clearTimeout(timer); };
+  }, [stamp, status, flags, query, revision]);
 
   async function handleSetVendor(row: ScanAuditItem) {
-    const vendor = window.prompt("Vendor name:", row.vendor === "UNKNOWN" ? "" : row.vendor)?.trim();
-    if (!vendor) return;
+    ask({title: "Correct vendor", detail: row.current_path, action: "Save vendor", fields: [{ label: "Company name", value: row.vendor === "UNKNOWN" ? "" : row.vendor }], accept: async ([vendor]) => {
     await correctInvestigation(stamp, {
       path: row.current_path,
       action: "set_vendor",
@@ -95,17 +102,17 @@ export function ScanAudit({ stamp }: Props) {
       old_bucket: row.investigation_bucket,
     });
     setMsg(`Vendor override saved for ${row.item_name}`);
+    }});
   }
 
   return (
-    <div>
-      <div className="banner dry">
-        Full scan audit — every folder/archive target. Fix vendors here; overrides apply on the next scan.
-      </div>
-
+    <div className="review-workspace">
+      {dialog}
+      <WorkScope title="Find routes that need attention" detail="Filter the scan by its outcome, inspect the path and vendor evidence, and save corrections for the next scan." />
+      {loadError && <WorkIssue message={loadError} retry={() => setRevision(v => v + 1)} />}
       {insightsStatus === "loading" && (
         <div className="count-muted" style={{ marginBottom: "1rem" }}>
-          Loading scan insights…
+          <LoadingStatus>Loading scan insights…</LoadingStatus>
         </div>
       )}
       {insightsStatus === "error" && (
@@ -115,7 +122,7 @@ export function ScanAudit({ stamp }: Props) {
       )}
       {insightsStatus === "empty" && (
         <div className="count-muted" style={{ marginBottom: "1rem" }}>
-          No tuning suggestions for this run — coverage looks healthy.
+          This run recorded no tuning suggestions.
         </div>
       )}
       {insightsStatus === "ready" &&
@@ -150,6 +157,7 @@ export function ScanAudit({ stamp }: Props) {
                 ? "primary"
                 : "secondary"
             }
+            aria-pressed={Boolean((filter.status && status === filter.status) || (filter.flags && flags === filter.flags))}
             title={filter.title ?? filter.label}
             onClick={() => {
               setFilter("status", filter.status ?? "");
@@ -177,14 +185,14 @@ export function ScanAudit({ stamp }: Props) {
 
       <div className="toolbar">
         <span className="count-muted">
-          {loading ? "Loading…" : `${total.toLocaleString()} audit rows`}
+          {loading ? <LoadingStatus /> : `${total.toLocaleString()} audit rows`}
         </span>
       </div>
 
-      {msg && <div className="banner dry">{msg}</div>}
+      {msg && <div className="banner dry" role="status">{msg}</div>}
 
-      {!loading && items.length === 0 && (
-        <div className="empty">No audit rows — run a scan or open a run with Scan_Audit CSV.</div>
+      {!loading && !loadError && items.length === 0 && (
+        <div className="empty">No audit rows match this view. Choose All rows or open a run with a scan audit.</div>
       )}
 
       {items.length > 0 && (

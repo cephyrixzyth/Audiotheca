@@ -14,6 +14,7 @@ export interface TabItem {
 
 export interface TabsProps {
   items: TabItem[];
+  orientation?: "vertical" | "horizontal";
   value?: string;
   defaultValue?: string;
   onValueChange?: (value: string) => void;
@@ -30,6 +31,7 @@ export function Tabs({
   value,
   defaultValue,
   onValueChange,
+  orientation,
   listClassName,
   triggerClassName,
   rootClassName,
@@ -38,6 +40,7 @@ export function Tabs({
   const panes = items.filter((item) => item.content != null);
   return (
     <RadixTabs.Root
+      orientation={orientation}
       className={rootClassName}
       value={value}
       defaultValue={defaultValue ?? items[0]?.value}
