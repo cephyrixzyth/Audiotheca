@@ -5,6 +5,7 @@ import { fetchSpecCatalog } from "../api/client";
 import { useFileExplorer } from "../contexts/FileExplorerContext";
 import { pathForTab } from "../routes";
 import type { TabId } from "../types";
+import { WorkspaceIcon } from "../ui/WorkspaceIcon";
 import { ALL_TABS } from "./NavTabs";
 import styles from "./CommandPalette.module.css";
 
@@ -224,6 +225,7 @@ export function CommandPalette() {
           <RadixDialog.Title style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>
             Command palette
           </RadixDialog.Title>
+          <div className={styles.queryRow}><WorkspaceIcon name="search" size={20} />
           <input
             ref={inputRef}
             className={styles.input}
@@ -232,13 +234,19 @@ export function CommandPalette() {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKeyDown}
             aria-label="Command search"
-          />
-          <ul ref={listRef} className={styles.list} role="listbox" aria-label="Commands">
+            role="combobox"
+            aria-controls="workspace-commands"
+            aria-expanded={open}
+            aria-autocomplete="list"
+            aria-activedescendant={filtered[active] ? "command-" + filtered[active].id : undefined}
+          /></div>
+          <ul id="workspace-commands" ref={listRef} className={styles.list} role="listbox" aria-label="Commands">
             {filtered.length === 0 ? (
               <li className={styles.empty}>No matches</li>
             ) : (
               filtered.map((cmd, index) => (
                 <li
+                  id={"command-" + cmd.id}
                   key={cmd.id}
                   role="option"
                   aria-selected={index === active}

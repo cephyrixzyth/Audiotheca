@@ -1,3 +1,5 @@
+import { WorkDialog, WorkIssue } from "./ReviewWorkbench";
+import { LoadingStatus } from "../ui/LoadingStatus";
 import { useEffect, useState } from "react";
 
 import {
@@ -18,6 +20,7 @@ interface Props {
   folderPath: string;
   archiveName?: string;
   itemName?: string;
+  onDecision?: () => Promise<void>;
   onClose: () => void;
 }
 
@@ -35,29 +38,32 @@ export function ArchiveDiffWizard({
   folderPath,
   archiveName,
   itemName,
-  onClose,
+  onDecision, onClose,
 }: Props) {
   const [data, setData] = useState<ArchiveDiffResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [revision, setRevision] = useState(0);
+  const [working, setWorking] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   useEffect(() => {
+    let current = true;
     setLoading(true);
     setError(null);
     fetchArchiveDiff(stamp, { archive_path: archivePath, folder_path: folderPath })
-      .then(setData)
-      .catch((err: Error) => setError(err.message || "Failed to load diff"))
-      .finally(() => setLoading(false));
-  }, [stamp, archivePath, folderPath]);
+      .then(next => { if (current) setData(next); })
+      .catch((err: Error) => { if (current) setError(err.message || "Failed to load diff"); })
+      .finally(() => { if (current) setLoading(false); });
+    return () => { current = false; };
+  }, [stamp, archivePath, folderPath, revision]);
 
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
+  async function record(action: () => Promise<void>) {
+    setWorking(true);
+    try { await action(); await onDecision?.(); }
+    catch (cause) { setMsg(cause instanceof Error ? cause.message : "Could not record decision"); }
+    finally { setWorking(false); }
+  }
 
   async function handleReject() {
     await rejectArchiveVerdict(stamp, {
@@ -75,7 +81,7 @@ export function ArchiveDiffWizard({
       archive_name: archiveName ?? row?.archive_name ?? "",
       item_name: itemName ?? row?.item_name ?? "",
     });
-    setMsg("Confirmed safe to delete archive");
+    setMsg("Approved archive for staging");
   }
 
   async function handleKeeper(keeper: "archive" | "folder") {
@@ -91,23 +97,7 @@ export function ArchiveDiffWizard({
   const title = archiveName ?? row?.archive_name ?? archivePath.split(/[/\\]/).pop() ?? "Archive";
 
   return (
-    <div className="file-explorer-backdrop" onClick={onClose} role="presentation">
-      <div
-        className="archive-diff-wizard"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-label="Archive diff wizard"
-      >
-        <header className="archive-diff-header">
-          <div>
-            <h2>Archive diff</h2>
-            <p className="count-muted">{title}</p>
-          </div>
-          <Button variant="ghost" onClick={onClose} title="Close (Esc)">
-            Close
-          </Button>
-        </header>
-
+    <WorkDialog wide title="Compare archive contents" detail={title} close={onClose}>
         <div className="archive-diff-paths">
           <div>
             <span className="label">Archive</span>
@@ -119,19 +109,19 @@ export function ArchiveDiffWizard({
           </div>
         </div>
 
-        {loading && <div className="empty">Loading diff…</div>}
-        {error && <div className="empty">{error}</div>}
+        {loading && <LoadingStatus>Loading diff…</LoadingStatus>}
+        {error && <WorkIssue message={error} retry={() => setRevision(v => v + 1)} />}
 
         {!loading && !error && data && (
           <>
             <div className="archive-diff-summary">
-              <Badge tone={data.verdict_hint === "MATCHES_EXTRACTED_FOLDER" ? "ready" : "accent"}>
-                {data.verdict_hint}
-              </Badge>
+              <Badge tone={data.complete ? "neutral" : "review"}>{data.complete ? "Inventory complete" : "Partial inventory"}</Badge>
               <span className="count-muted">
-                {data.matched.length} matched · {data.only_in_archive.length} only in archive ·{" "}
-                {data.only_on_disk.length} only on disk
+                {data.matched.length} matching paths · {data.checksums_checked ?? 0} file checksums checked · {data.only_in_archive.length} only in archive · {data.only_on_disk.length} only on disk
               </span>
+              {data.report_verdict && <span className="count-muted">Earlier scan: {data.report_verdict}</span>}
+              {data.folder_error && <span className="error">{data.folder_error}</span>}
+              {Boolean(data.different_contents?.length) && <p className="error">Different contents: {data.different_contents?.join(", ")}</p>}
               {data.archive_error && (
                 <span className="count-muted">Archive list: {data.archive_error}</span>
               )}
@@ -144,7 +134,7 @@ export function ArchiveDiffWizard({
                   {data.only_in_archive.length === 0 ? (
                     <li className="count-muted">—</li>
                   ) : (
-                    data.only_in_archive.map((name) => <li key={name}>{name}</li>)
+                    data.only_in_archive.map((name, index) => <li key={`${index}:${name}`}>{name}</li>)
                   )}
                 </ul>
               </section>
@@ -172,30 +162,29 @@ export function ArchiveDiffWizard({
                   {data.only_on_disk.length === 0 ? (
                     <li className="count-muted">—</li>
                   ) : (
-                    data.only_on_disk.map((name) => <li key={name}>{name}</li>)
+                    data.only_on_disk.map((name, index) => <li key={`${index}:${name}`}>{name}</li>)
                   )}
                 </ul>
               </section>
             </div>
 
             <div className="toolbar">
-              <Button variant="secondary" onClick={() => void handleConfirm()}>
-                Confirm delete archive
+              <Button variant="secondary" disabled={working || !data.complete || !data.matched.length || Boolean(data.only_in_archive.length || data.different_contents?.length)} onClick={() => void record(handleConfirm)}>
+                Approve archive for staging
               </Button>
-              <Button variant="secondary" onClick={() => void handleReject()}>
+              <Button variant="secondary" disabled={working} onClick={() => void record(handleReject)}>
                 Not redundant
               </Button>
-              <Button variant="secondary" onClick={() => void handleKeeper("folder")}>
+              <Button variant="secondary" disabled={working} onClick={() => void record(() => handleKeeper("folder"))}>
                 Keep folder
               </Button>
-              <Button variant="secondary" onClick={() => void handleKeeper("archive")}>
+              <Button variant="secondary" disabled={working} onClick={() => void record(() => handleKeeper("archive"))}>
                 Keep archive
               </Button>
-              {msg && <span className="count-muted">{msg}</span>}
+              {msg && <span className="count-muted" role="status">{msg}</span>}
             </div>
           </>
         )}
-      </div>
-    </div>
+    </WorkDialog>
   );
 }

@@ -6,10 +6,12 @@ import csv
 import json
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
+from api.paths import report_dir
+from audiotheca.local_storage import serialized_store, write_json
 from pathlib import Path
 
 FEEDBACK_VERSION = 1
-FEEDBACK_DIR = Path(__file__).resolve().parent / "dedupe_reports" / "feedback"
+FEEDBACK_DIR = report_dir() / "feedback"
 GLOBAL_FEEDBACK_PATH = FEEDBACK_DIR / "duplicate_feedback.json"
 ENGINE_HINTS_PATH = FEEDBACK_DIR / "engine_hints.json"
 
@@ -128,7 +130,7 @@ def load_feedback_store() -> FeedbackStore:
 def save_feedback_store(store: FeedbackStore) -> Path:
     FEEDBACK_DIR.mkdir(parents=True, exist_ok=True)
     store.updated = _now_iso()
-    GLOBAL_FEEDBACK_PATH.write_text(json.dumps(store.to_dict(), indent=2), encoding="utf-8")
+    write_json(GLOBAL_FEEDBACK_PATH, store.to_dict())
     return GLOBAL_FEEDBACK_PATH
 
 
@@ -147,7 +149,7 @@ def save_run_feedback(stamp: str, payload: dict) -> Path:
     FEEDBACK_DIR.mkdir(parents=True, exist_ok=True)
     payload = {**payload, "stamp": stamp, "updated": _now_iso()}
     path = run_feedback_path(stamp)
-    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    write_json(path, payload)
     return path
 
 
@@ -222,6 +224,7 @@ def is_group_rejected(dedup_key: str, paths: list[str], store: FeedbackStore | N
     return False
 
 
+@serialized_store(lambda: GLOBAL_FEEDBACK_PATH)
 def add_rejection(
     dedup_key: str,
     paths: list[str],
@@ -273,6 +276,7 @@ def add_rejection(
     return store
 
 
+@serialized_store(lambda: GLOBAL_FEEDBACK_PATH)
 def add_manual_finding(
     path_a: str,
     path_b: str,
@@ -300,6 +304,7 @@ def add_manual_finding(
     return store
 
 
+@serialized_store(lambda: GLOBAL_FEEDBACK_PATH)
 def sync_keeper_approvals(
     stamp: str,
     decisions: list[KeeperApproval],
@@ -317,6 +322,7 @@ def sync_keeper_approvals(
     return store
 
 
+@serialized_store(lambda: GLOBAL_FEEDBACK_PATH)
 def record_executed_deletes(rows: list[ExecutedDelete]) -> FeedbackStore:
     store = load_feedback_store()
     store.executed_deletes.extend(rows)
@@ -422,5 +428,5 @@ def export_engine_hints(store: FeedbackStore | None = None) -> Path:
             if row.relationship == "duplicate"
         ],
     }
-    ENGINE_HINTS_PATH.write_text(json.dumps(hints, indent=2), encoding="utf-8")
+    write_json(ENGINE_HINTS_PATH, hints)
     return ENGINE_HINTS_PATH

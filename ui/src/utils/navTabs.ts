@@ -8,6 +8,8 @@ export interface TabDef {
 
 export const ALL_TABS: TabDef[] = [
   { id: "dashboard", label: "Dashboard", title: "Run KPIs, trends, and quick links to other tabs" },
+  { id: "library", label: "Library", title: "Find, audition and open sounds from your library" },
+  { id: "studio", label: "Studio", title: "Edit clips and mix in a spatial room" },
   { id: "scan", label: "Scan", title: "Start scans, configure pipeline phases, and watch live progress" },
   { id: "investigation", label: "Investigation", title: "Items the engine could not confidently route — set vendor or bucket" },
   { id: "duplicates", label: "Duplicates", title: "Review suspected duplicate products and pick keepers" },
@@ -41,7 +43,7 @@ export const REVIEW_TAB_IDS: TabId[] = [
 
 export const SYSTEM_TAB_IDS: TabId[] = ["space-recovery", "security", "environment", "vendors"];
 
-export type PrimaryNavId = "dashboard" | "scan" | "review" | "system" | "help";
+export type PrimaryNavId = "library" | "studio" | "dashboard" | "scan" | "review" | "system" | "help";
 
 const TAB_BY_ID = new Map(ALL_TABS.map((t) => [t.id, t]));
 
@@ -55,6 +57,9 @@ export function tabDef(id: TabId): TabDef {
 
 export function primaryNavId(tab: TabId): PrimaryNavId {
   switch (tab) {
+    case "library":
+    case "studio":
+      return tab;
     case "dashboard":
       return "dashboard";
     case "scan":
@@ -93,6 +98,8 @@ export function asSystemTabId(value: string): TabId | null {
 /** Map a primary chrome click to the route tab, keeping the current sub-tab when already in that group. */
 export function tabForPrimaryNav(primary: PrimaryNavId, current: TabId): TabId {
   switch (primary) {
+    case "library":
+    case "studio":
     case "dashboard":
     case "scan":
     case "help":

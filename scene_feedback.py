@@ -5,12 +5,14 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
+from api.paths import report_dir
+from audiotheca.local_storage import serialized_store, write_json
 from pathlib import Path
 
 from api.path_logic import normalize_logical_path
 
 FEEDBACK_VERSION = 2
-FEEDBACK_DIR = Path(__file__).resolve().parent / "dedupe_reports" / "feedback"
+FEEDBACK_DIR = report_dir() / "feedback"
 GLOBAL_PATH = FEEDBACK_DIR / "scene_feedback.json"
 HINTS_PATH = FEEDBACK_DIR / "scene_hints.json"
 LEGACY_STAMP = "_legacy"
@@ -171,7 +173,7 @@ def save_store(store: SceneStore) -> Path:
     FEEDBACK_DIR.mkdir(parents=True, exist_ok=True)
     store.version = FEEDBACK_VERSION
     store.updated = _now_iso()
-    GLOBAL_PATH.write_text(json.dumps(store.to_dict(), indent=2), encoding="utf-8")
+    write_json(GLOBAL_PATH, store.to_dict())
     export_engine_hints(store)
     return GLOBAL_PATH
 
@@ -213,6 +215,7 @@ def get_approved_paths(stamp: str | None = None, store: SceneStore | None = None
     return {normalize_path(path) for path in store.approved_renames.get(key, [])}
 
 
+@serialized_store(lambda: GLOBAL_PATH)
 def approve_rename(*, stamp: str, source_path: str, scene_id: str = "") -> SceneStore:
     store = load_store()
     norm = normalize_path(source_path)
@@ -237,6 +240,7 @@ def approve_rename(*, stamp: str, source_path: str, scene_id: str = "") -> Scene
     return store
 
 
+@serialized_store(lambda: GLOBAL_PATH)
 def clear_approval(*, stamp: str, source_path: str) -> SceneStore:
     store = load_store()
     norm = normalize_path(source_path)
@@ -246,6 +250,7 @@ def clear_approval(*, stamp: str, source_path: str) -> SceneStore:
     return store
 
 
+@serialized_store(lambda: GLOBAL_PATH)
 def reject_rename(
     *,
     source_path: str,
@@ -276,6 +281,7 @@ def reject_rename(
     return store
 
 
+@serialized_store(lambda: GLOBAL_PATH)
 def override_name(
     *,
     source_path: str,
@@ -338,7 +344,7 @@ def export_engine_hints(store: SceneStore | None = None) -> Path:
         "active_approval_stamp": store.active_approval_stamp,
     }
     FEEDBACK_DIR.mkdir(parents=True, exist_ok=True)
-    HINTS_PATH.write_text(json.dumps(hints, indent=2), encoding="utf-8")
+    write_json(HINTS_PATH, hints)
     return HINTS_PATH
 
 

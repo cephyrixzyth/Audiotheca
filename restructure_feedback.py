@@ -5,10 +5,12 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
+from api.paths import report_dir
+from audiotheca.local_storage import serialized_store, write_json
 from pathlib import Path
 
 FEEDBACK_VERSION = 1
-FEEDBACK_DIR = Path(__file__).resolve().parent / "dedupe_reports" / "feedback"
+FEEDBACK_DIR = report_dir() / "feedback"
 GLOBAL_PATH = FEEDBACK_DIR / "restructure_feedback.json"
 HINTS_PATH = FEEDBACK_DIR / "restructure_hints.json"
 
@@ -78,7 +80,7 @@ def load_store() -> RestructureStore:
 def save_store(store: RestructureStore) -> Path:
     FEEDBACK_DIR.mkdir(parents=True, exist_ok=True)
     store.updated = _now_iso()
-    GLOBAL_PATH.write_text(json.dumps(store.to_dict(), indent=2), encoding="utf-8")
+    write_json(GLOBAL_PATH, store.to_dict())
     export_engine_hints(store)
     return GLOBAL_PATH
 
@@ -96,6 +98,7 @@ def get_section_approvals(stamp: str | None = None, store: RestructureStore | No
     return set(store.section_approvals.get(key, []))
 
 
+@serialized_store(lambda: GLOBAL_PATH)
 def set_active_approval_stamp(stamp: str) -> RestructureStore:
     store = load_store()
     store.active_approval_stamp = stamp
@@ -103,6 +106,7 @@ def set_active_approval_stamp(stamp: str) -> RestructureStore:
     return store
 
 
+@serialized_store(lambda: GLOBAL_PATH)
 def apply_dest_override(
     *,
     path: str,
@@ -130,6 +134,7 @@ def apply_dest_override(
     return store
 
 
+@serialized_store(lambda: GLOBAL_PATH)
 def approve_section(*, stamp: str, section: str) -> RestructureStore:
     store = load_store()
     sections = store.section_approvals.setdefault(stamp, [])
@@ -150,6 +155,7 @@ def approve_section(*, stamp: str, section: str) -> RestructureStore:
     return store
 
 
+@serialized_store(lambda: GLOBAL_PATH)
 def clear_section_approval(*, stamp: str, section: str) -> RestructureStore:
     store = load_store()
     sections = store.section_approvals.get(stamp, [])
@@ -186,7 +192,7 @@ def export_engine_hints(store: RestructureStore | None = None) -> Path:
         "active_approval_stamp": store.active_approval_stamp,
     }
     FEEDBACK_DIR.mkdir(parents=True, exist_ok=True)
-    HINTS_PATH.write_text(json.dumps(hints, indent=2), encoding="utf-8")
+    write_json(HINTS_PATH, hints)
     return HINTS_PATH
 
 

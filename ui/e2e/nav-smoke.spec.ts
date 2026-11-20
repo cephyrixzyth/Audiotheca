@@ -10,6 +10,9 @@ import { test, expect } from "@playwright/test";
 
 const TAB_PATHS: string[] = [
   "/dashboard",
+  "/studio",
+  "/library",
+  "/review/deep-identify",
   "/scan",
   "/review/investigation",
   "/review/duplicates",
@@ -46,13 +49,13 @@ for (const path of TAB_PATHS) {
 
 test("top navigation drives the router", async ({ page }) => {
   await page.goto("/#/dashboard");
-  await page.getByRole("button", { name: "Scan", exact: true }).click();
+  await page.getByRole("tab", { name: "Scan", exact: true }).click();
   await expect(page).toHaveURL(/#\/scan(\?|$)/);
-  await page.getByRole("button", { name: "Review", exact: true }).click();
+  await page.getByRole("tab", { name: "Review", exact: true }).click();
   await expect(page).toHaveURL(/#\/review\//);
-  await page.getByRole("button", { name: "System", exact: true }).click();
+  await page.getByRole("tab", { name: "System", exact: true }).click();
   await expect(page).toHaveURL(/#\/system\//);
-  await page.getByRole("button", { name: "Help", exact: true }).click();
+  await page.getByRole("tab", { name: "Help", exact: true }).click();
   await expect(page).toHaveURL(/#\/help(\?|$)/);
 });
 
@@ -90,9 +93,9 @@ test("selected run is deep-linked via ?run= and survives tab changes", async ({ 
   // Deep-linking a specific run + tab selects that run in the toolbar.
   await page.goto("/#/review/duplicates?run=20260704_1300");
   await expect(page).toHaveURL(/#\/review\/duplicates\?run=20260704_1300/);
-  await expect(page.locator("select.field-input").first()).toHaveValue("20260704_1300");
+  await expect(page.getByRole("combobox", {name: "Run", exact: true})).toHaveValue("20260704_1300");
 
   // Changing tabs preserves the run param.
-  await page.getByRole("button", { name: "Scan audit", exact: true }).click();
+  await page.getByRole("tab", { name: "Scan audit", exact: true }).click();
   await expect(page).toHaveURL(/run=20260704_1300/);
 });

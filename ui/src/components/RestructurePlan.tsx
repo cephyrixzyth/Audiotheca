@@ -1,3 +1,5 @@
+import { useReviewDecision, WorkIssue, WorkScope } from "./ReviewWorkbench";
+import { LoadingStatus } from "../ui/LoadingStatus";
 import { useEffect, useMemo, useState } from "react";
 import {
   approveRestructureSection,
@@ -24,6 +26,9 @@ interface Props {
 
 export function RestructurePlan({ stamp }: Props) {
   const libraryRoot = useLibraryRoot();
+  const { ask, dialog } = useReviewDecision();
+  const [readError, setReadError] = useState("");
+  const [revision, setRevision] = useState(0);
   const { query } = useContextSidebar();
   const [items, setItems] = useState<RestructureItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -51,7 +56,8 @@ export function RestructurePlan({ stamp }: Props) {
   }, [stamp]);
 
   useEffect(() => {
-    setLoading(true);
+    let current = true;
+    setReadError(""); setLoading(true);
     const timer = setTimeout(() => {
       fetchRestructure(stamp, {
         status: status || undefined,
@@ -59,13 +65,15 @@ export function RestructurePlan({ stamp }: Props) {
         limit: 500,
       })
         .then((res) => {
+          if (!current) return;
           setItems(res.items);
           setTotal(res.total);
         })
-        .finally(() => setLoading(false));
+        .catch((err: Error) => { if (current) { setReadError(err.message); setItems([]); } })
+        .finally(() => { if (current) setLoading(false); });
     }, query ? 250 : 0);
-    return () => clearTimeout(timer);
-  }, [stamp, status, query]);
+    return () => { current = false; clearTimeout(timer); };
+  }, [stamp, status, query, revision]);
 
   const sections = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -82,11 +90,7 @@ export function RestructurePlan({ stamp }: Props) {
   }
 
   async function handleOverride(row: RestructureItem) {
-    const dest = window.prompt(
-      "Relative destination (e.g. a/Vendor/Product):",
-      destOverrides[row.current_path] ?? row.planned_destination,
-    )?.trim();
-    if (!dest) return;
+    ask({ title: "Edit destination", detail: row.current_path, action: "Save destination", fields: [{ label: "Relative destination", value: destOverrides[row.current_path] ?? row.planned_destination }], accept: async ([dest]) => {
     const res = await overrideRestructureDest(stamp, {
       path: row.current_path,
       destination: dest,
@@ -95,6 +99,7 @@ export function RestructurePlan({ stamp }: Props) {
     });
     setDestOverrides(res.state.path_dest_overrides ?? {});
     setMsg(`Destination override saved for ${row.item_name}`);
+    }});
   }
 
   async function handleExecute(dryRun: boolean, confirmLive = false) {
@@ -120,33 +125,26 @@ export function RestructurePlan({ stamp }: Props) {
   }
 
   return (
-    <div>
-      <div className="banner dry">
-        Approve sections here for CLI or UI execute. Destination overrides apply on the next scan.
-      </div>
-
-      <div className="toolbar" style={{ marginBottom: "0.5rem" }}>
+    <div className="review-workspace">
+      {dialog}
+      <WorkScope title="Move approved sections" detail="Review the source and planned destination below. Section approval covers every READY route in that section of this run, including rows outside the current filter.">
         <Button
           variant="secondary"
           title="Simulate moves for approved sections without changing disk"
-          onClick={() => void handleExecute(true)}
+          onClick={() => void handleExecute(true).catch((err: Error) => setMsg(err.message))}
         >
           Dry-run approved sections
         </Button>
         <Button
-          variant="primary"
+          variant="danger"
           title="Apply READY moves in approved sections on the library share"
-          onClick={() => {
-            if (window.confirm("Move READY items in approved sections on disk?")) {
-              void handleExecute(false, true);
-            }
-          }}
+          onClick={() => ask({title: "Move approved sections?", detail: "This applies the saved approvals for run " + stamp + " on disk.", scope: <pre>{approvedSections.join(", ")}</pre>, writesFiles: true, action: "Move approved sections", accept: () => handleExecute(false, true)})}
           disabled={approvedSections.length === 0}
         >
           Execute approved ({approvedSections.length} sections)
         </Button>
-      </div>
-
+      </WorkScope>
+      {readError && <WorkIssue message={readError} retry={() => setRevision(v => v + 1)} />}
       {sections.length > 0 && (
         <div className="toolbar" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
           {sections.map(([section, count]) => {
@@ -160,7 +158,7 @@ export function RestructurePlan({ stamp }: Props) {
                     ? `Section ${section} is approved for live execute`
                     : `Approve all READY routes in section ${section}`
                 }
-                onClick={() => void handleApproveSection(section)}
+                disabled={approved} onClick={() => void handleApproveSection(section).catch((err: Error) => setMsg(err.message))}
               >
                 {approved ? "✓ " : ""}Section {section} ({count})
               </Button>
@@ -182,7 +180,7 @@ export function RestructurePlan({ stamp }: Props) {
           <option value="DEST EXISTS (merge)">DEST EXISTS (merge)</option>
         </LabeledSelect>
         <span className="count-muted">
-          {loading ? "Loading…" : `${total.toLocaleString()} routes`}
+          {loading ? <LoadingStatus /> : `${total.toLocaleString()} routes`}
           {approvedSections.length ? ` · ${approvedSections.length} sections approved` : ""}
         </span>
       </div>
@@ -199,7 +197,7 @@ export function RestructurePlan({ stamp }: Props) {
         />
       )}
 
-      {!loading && items.length === 0 && (
+      {!loading && !readError && items.length === 0 && (
         <div className="empty">No restructure routes match your filters.</div>
       )}
 

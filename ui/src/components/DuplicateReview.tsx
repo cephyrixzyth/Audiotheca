@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useReviewDecision, WorkScope, WorkIssue } from "./ReviewWorkbench";
+import { LoadingStatus } from "../ui/LoadingStatus";
+import { useEffect, useRef, useState } from "react";
 import {
   addManualDuplicate,
   downloadDecisionsDownload,
@@ -59,16 +61,23 @@ function confidenceTone(confidence: string): BadgeTone {
 }
 
 export function DuplicateReview({ stamp }: Props) {
+  const { ask, dialog } = useReviewDecision();
+  const [revision, setRevision] = useState(0);
+  const [loadError, setLoadError] = useState("");
   const libraryRoot = useLibraryRoot();
-  const { query } = useContextSidebar();
+  const { queue, updateQueue } = useContextSidebar();
+  const { query, offset, confidence, hideRejected, showReferenceExtras } = queue;
+  const previousQuery = useRef(query);
   const [groups, setGroups] = useState<DuplicateGroup[]>([]);
   const [total, setTotal] = useState(0);
-  const [confidence, setConfidence] = useState("HIGH");
   const [loading, setLoading] = useState(true);
   const [keepers, setKeepers] = useState<Record<string, string>>({});
   const [rejections, setRejections] = useState<DuplicateRejection[]>([]);
   const [manualFindings, setManualFindings] = useState<ManualDuplicateFinding[]>([]);
   const [rejectReasons, setRejectReasons] = useState<string[]>([]);
+  const [dirty, setDirty] = useState(false);
+  const [decisionsReady, setDecisionsReady] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [savedCount, setSavedCount] = useState(0);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
@@ -76,8 +85,6 @@ export function DuplicateReview({ stamp }: Props) {
   const [manualA, setManualA] = useState("");
   const [manualB, setManualB] = useState("");
   const [manualNote, setManualNote] = useState("");
-  const [hideRejected, setHideRejected] = useState(true);
-  const [showReferenceExtras, setShowReferenceExtras] = useState(false);
   const [referenceExtraKeys, setReferenceExtraKeys] = useState<Set<string>>(new Set());
   const [referenceExtraGroups, setReferenceExtraGroups] = useState(0);
   const [executeResults, setExecuteResults] = useState<ExecuteResultRow[]>([]);
@@ -116,6 +123,7 @@ export function DuplicateReview({ stamp }: Props) {
       setReferenceExtraGroups(engineExtras.length);
       return;
     }
+    let cancelled = false;
     fetchReferenceConfig(stamp)
       .then((config) => {
         if (config.configured && config.reference_roots.length) {
@@ -128,53 +136,90 @@ export function DuplicateReview({ stamp }: Props) {
         });
       })
       .then((res) => {
-        if (!res) return;
+        if (cancelled || !res) return;
         setReferenceExtraKeys(new Set(res.items.map((item) => item.dedup_key)));
         setReferenceExtraGroups(res.reference_extra_groups);
       })
       .catch(() => undefined);
+    return () => { cancelled = true; };
   }, [stamp, showReferenceExtras, libraryRoot, groups]);
 
   useEffect(() => {
+    let current = true;
+    setDecisionsReady(false); setDirty(false);
     fetchDecisions(stamp).then((res) => {
+      if (!current) return;
       const chosen = res.keepers ?? res.decisions ?? {};
-      if (Object.keys(chosen).length) setKeepers(chosen);
+      setKeepers(chosen);
+      setSavedCount(Object.keys(chosen).length);
+      setDecisionsReady(true);
       setRejections(res.rejections ?? []);
       setManualFindings(res.manual_findings ?? []);
       setRejectReasons(res.reject_reasons ?? Object.keys(REJECT_LABELS));
-    });
-  }, [stamp]);
+    }).catch((e: Error) => { if (current) setLoadError(e.message); });
+    return () => { current = false; };
+  }, [stamp, revision]);
 
   useEffect(() => {
-    setLoading(true);
+    let current = true;
+    setLoadError(""); setLoading(true);
+    const queryChanged = previousQuery.current !== query;
+    previousQuery.current = query;
     const timer = setTimeout(() => {
       fetchDuplicates(stamp, {
         confidence: confidence || undefined,
         q: query || undefined,
-        limit: 100,
+        limit: 100, offset,
       })
         .then((res) => {
+          if (!current) return;
+          if (offset && offset >= res.total) {
+            updateQueue({ offset: Math.max(0, Math.floor((res.total - 1) / 100) * 100) });
+          }
           setGroups(res.groups);
           setTotal(res.total);
         })
-        .finally(() => setLoading(false));
-    }, query ? 250 : 0);
-    return () => clearTimeout(timer);
-  }, [stamp, confidence, query]);
+        .catch((err: Error) => {
+          if (current) {
+            setGroups([]);
+            setTotal(0);
+            setLoadError(err.message);
+          }
+        })
+        .finally(() => { if (current) setLoading(false); });
+    }, query && queryChanged ? 250 : 0);
+    return () => { current = false; clearTimeout(timer); };
+  }, [stamp, confidence, query, offset, updateQueue, revision]);
 
   function pickKeeper(dedupKey: string, path: string) {
-    setKeepers((prev) => ({ ...prev, [dedupKey]: path }));
+    setKeepers((prev) => {
+      const next = { ...prev };
+      if (next[dedupKey] === path) delete next[dedupKey];
+      else next[dedupKey] = path;
+      return next;
+    });
+    setDirty(true);
     setSaveMsg(null);
   }
 
   async function handleSave() {
-    const res = await saveDecisions(stamp, keepers);
-    setSavedCount(res.count);
-    setSaveMsg(`Saved ${res.count} keeper decisions`);
+    setSaving(true);
+    try {
+      const res = await saveDecisions(stamp, keepers);
+      setSavedCount(res.count);
+      setDirty(Boolean(res.unresolved?.length));
+      setSaveMsg(res.unresolved?.length
+        ? `Saved ${res.count}. Review missing or changed groups: ${res.unresolved.join(", ")}`
+        : `Saved ${res.count} keeper decisions`);
+    } catch (err) {
+      setSaveMsg(err instanceof Error ? err.message : "Could not save decisions");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleReject(group: DuplicateGroup, reason: string) {
-    const note = window.prompt("Optional note — why is this a bad match?") ?? "";
+    ask({ title: REJECT_LABELS[reason] ?? reason, detail: group.dedup_key, action: "Save rejection", fields: [{ label: "Review note (optional)", optional: true }], accept: async ([note]) => {
     const fingerprint = dedupKeyFingerprint(group.dedup_key);
     await rejectDuplicateGroup(stamp, {
       dedup_key: group.dedup_key,
@@ -198,7 +243,9 @@ export function DuplicateReview({ stamp }: Props) {
       delete next[group.dedup_key];
       return next;
     });
+    setDirty(true);
     setActionMsg(`Marked "${group.dedup_key}" as bad match — engine will skip on next scan`);
+    }});
   }
 
   async function handlePreviewDeletes() {
@@ -216,19 +263,12 @@ export function DuplicateReview({ stamp }: Props) {
     setExecuteResults(duplicateExecuteRows(res.results ?? [], true));
     setExecuteSummary({ staged: res.staged, failed: res.failed });
     setActionMsg(
-      `Preview: ${res.staged} discard(s) would move to _delete-canidates` +
+      `Preview: ${res.staged} copies would move to staging` +
         (res.failed ? ` (${res.failed} failed)` : ""),
     );
   }
 
   async function handleStageDeletes() {
-    if (
-      !window.confirm(
-        "Move approved discards to _delete-canidates on the library share? This is reversible if you act before emptying that folder.",
-      )
-    ) {
-      return;
-    }
     const res: DuplicateExecuteResponse = await executeDuplicateStaging(stamp, {
       dry_run: false,
       confirm_live: true,
@@ -243,7 +283,7 @@ export function DuplicateReview({ stamp }: Props) {
     setExecuteDryRun(false);
     setExecuteResults(duplicateExecuteRows(res.results ?? [], false));
     setExecuteSummary({ staged: res.staged, failed: res.failed });
-    setActionMsg(`Staged ${res.staged} discard(s) to _delete-canidates`);
+    setActionMsg(`Staged ${res.staged} copies in the configured staging folder`);
   }
 
   async function handleManualSubmit() {
@@ -339,23 +379,58 @@ export function DuplicateReview({ stamp }: Props) {
   const decidedCount = Object.keys(keepers).length;
 
   return (
-    <div>
+    <div className="review-workspace">
+      {dialog}
+      <WorkScope title="Choose which copy to keep" detail="Compare each group and save one keeper. Preview the saved plan to see the other copies that would move to staging.">
+        <Button
+          variant="primary"
+          disabled={!dirty || !decisionsReady || saving}
+          title="Persist keeper choices to approved.json for staging"
+          onClick={() => void handleSave()}
+        >
+          Save decisions
+        </Button>
+        <Button
+          variant="secondary"
+          disabled={!decisionsReady || dirty || savedCount === 0 || saving}
+          title="Simulate moving non-keeper copies to _delete-canidates"
+          onClick={() => void handlePreviewDeletes().catch((err: Error) => setActionMsg(err.message))}
+        >
+          Preview deletes
+        </Button>
+        <Button
+          variant="danger"
+          disabled={!decisionsReady || dirty || savedCount === 0 || saving}
+          title="Move non-keeper duplicates to _delete-canidates on disk"
+          onClick={() => ask({title: "Stage duplicate copies?", detail: `Saved decisions for ${savedCount} groups in run ${stamp} apply, including groups outside this page. Their chosen keepers stay in place.`,
+            scope: <><strong>Library</strong><p>{libraryRoot || "Configured library root"}</p><p>Preview staging to inspect the destination for each copy.</p></>, writesFiles: true, action: "Stage copies", accept: handleStageDeletes})}
+        >
+          Stage deletes
+        </Button>
+      </WorkScope>
+      {loadError && <WorkIssue message={loadError} retry={() => setRevision(v => v + 1)} />}
+      {total > 100 && <nav className="toolbar" aria-label="Duplicate group pages">
+        <Button variant="secondary" disabled={!offset} onClick={() => updateQueue({ offset: offset - 100 })}>Previous</Button>
+        <span>{offset + 1}–{Math.min(offset + 100, total)} of {total} groups</span>
+        <Button variant="secondary" disabled={offset + 100 >= total} onClick={() => updateQueue({ offset: offset + 100 })}>Next</Button>
+      </nav>}
       <div className="toolbar">
         <LabeledSelect
           label="Confidence"
           labelTitle="Filter duplicate groups by engine confidence score"
           value={confidence}
-          onChange={(e) => setConfidence(e.target.value)}
+          onChange={(e) => updateQueue({ confidence: e.target.value, offset: 0 })}
         >
           <option value="">All</option>
           <option value="HIGH">HIGH</option>
           <option value="MEDIUM">MEDIUM</option>
+          <option value="LOW">LOW</option>
         </LabeledSelect>
         <label className="checkbox-label" title="Hide groups you marked as bad matches">
           <input
             type="checkbox"
             checked={hideRejected}
-            onChange={(e) => setHideRejected(e.target.checked)}
+            onChange={(e) => updateQueue({ hideRejected: e.target.checked })}
           />
           Hide bad matches
         </label>
@@ -364,40 +439,18 @@ export function DuplicateReview({ stamp }: Props) {
           className={`bucket-chip ${showReferenceExtras ? "active" : ""}`.trim()}
           title="Show duplicate groups that also exist under configured reference library roots"
           aria-pressed={showReferenceExtras}
-          onClick={() => setShowReferenceExtras((v) => !v)}
+          onClick={() => updateQueue({ showReferenceExtras: !showReferenceExtras })}
         >
           Reference extras
           {showReferenceExtras && referenceExtraGroups > 0 ? ` (${referenceExtraGroups})` : ""}
         </button>
         <span className="count-muted">
           {loading
-            ? "Loading…"
+            ? <LoadingStatus />
             : `${total} groups · ${decidedCount} keepers · ${rejections.length} rejected · ${manualFindings.length} manual`}
         </span>
-        <Button
-          variant="primary"
-          disabled={decidedCount === 0}
-          title="Persist keeper choices to approved.json for staging"
-          onClick={() => void handleSave()}
-        >
-          Save decisions
-        </Button>
-        <Button
-          variant="secondary"
-          disabled={decidedCount === 0}
-          title="Simulate moving non-keeper copies to _delete-canidates"
-          onClick={() => void handlePreviewDeletes()}
-        >
-          Preview deletes
-        </Button>
-        <Button
-          variant="danger"
-          disabled={decidedCount === 0}
-          title="Move non-keeper duplicates to _delete-canidates on disk"
-          onClick={() => void handleStageDeletes()}
-        >
-          Stage deletes
-        </Button>
+      </div>
+      <details className="work-disclosure"><summary>Find similar items and export feedback</summary><div className="toolbar">
         <Button
           variant="ghost"
           title="Report a duplicate pair the engine missed — feeds next-scan tuning"
@@ -429,10 +482,10 @@ export function DuplicateReview({ stamp }: Props) {
             approved.json
           </Button>
         )}
-      </div>
+      </div></details>
 
-      {saveMsg && <div className="banner dry">{saveMsg}</div>}
-      {actionMsg && <div className="banner review">{actionMsg}</div>}
+      {saveMsg && <div className="banner dry" role="status">{saveMsg}</div>}
+      {actionMsg && <div className="banner review" role="status">{actionMsg}</div>}
       {nearMsg && <div className="banner dry">{nearMsg}</div>}
 
       {nearGroups.length > 0 && (
@@ -489,13 +542,13 @@ export function DuplicateReview({ stamp }: Props) {
             Note
             <input value={manualNote} onChange={(e) => setManualNote(e.target.value)} placeholder="Why these are dupes" />
           </label>
-          <Button variant="primary" onClick={() => void handleManualSubmit()}>
+          <Button variant="primary" disabled={!manualA.trim() || !manualB.trim()} onClick={() => void handleManualSubmit().catch((err: Error) => setActionMsg(err.message))}>
             Submit finding
           </Button>
         </div>
       )}
 
-      {!loading && filteredGroups.length === 0 && (
+      {!loadError && !loading && filteredGroups.length === 0 && (
         <div className="empty">
           {showReferenceExtras
             ? "No reference-extra duplicate groups for configured library roots."
@@ -543,11 +596,12 @@ export function DuplicateReview({ stamp }: Props) {
                   <Button
                     variant="secondary"
                     size="sm"
-                    active={isKeeper}
+                    disabled={!decisionsReady || saving || rejected}
+                    active={isKeeper} aria-pressed={isKeeper} aria-label={`${isKeeper ? "Clear keeper" : "Keep"} ${member.item_name} at ${member.full_path}`}
                     onClick={() => pickKeeper(group.dedup_key, member.full_path)}
-                    title="Mark as keeper"
+                    title={isKeeper ? "Clear keeper choice" : "Mark as keeper"}
                   >
-                    {isKeeper ? "KEEP" : "keep?"}
+                    {isKeeper ? "Keeper" : "Keep copy"}
                   </Button>
                   <div>
                     <div>

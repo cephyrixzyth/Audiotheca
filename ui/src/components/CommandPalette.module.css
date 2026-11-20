@@ -91,3 +91,8 @@
   color: var(--ui-fg-dim);
   font-family: var(--mono);
 }
+
+.queryRow { display: flex; align-items: center; gap: .65rem; border-bottom: 1px solid var(--border); padding: .3rem 1rem; color: var(--accent); }
+.queryRow .input { width: 100%; border: 0; background: transparent; padding: .8rem 0; border-radius: 0; }
+.item { min-height: 39px; }
+.panel { border-radius: 13px; }

@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
+import os
 from pathlib import Path
 
 from api.execute_paths import validate_execute_path
-from api.decisions import ApprovedPlan, load_plan
+from api.decisions import approval_identities, decision_lock, load_plan
 from api.path_logic import logical_path_from_parts, logical_path_parts
 from audiotheca.config import IGNORE_BINS, INVESTIGATION_BUCKETS
-from audiotheca.transaction_ledger import guarded_move, new_batch_id
-from duplicate_feedback import ExecutedDelete, record_executed_deletes
+from audiotheca.transaction_ledger import committed_discards, guarded_move, new_batch_id
+from duplicate_feedback import ExecutedDelete, is_group_rejected, record_executed_deletes
 
 SECTION_BINS = frozenset("abcdefghijklmnopqrstuvwxyz=")
 # Wrapper dirs under library root — not section bins (e.g. _software, _audio)
@@ -53,6 +56,11 @@ def stage_approved_duplicates(
     dry_run: bool = True,
     root: str | None = None,
 ) -> dict:
+    with decision_lock():
+        return _stage(stamp, dry_run=dry_run, root=root)
+
+
+def _stage(stamp: str, *, dry_run: bool, root: str | None) -> dict:
     plan = load_plan(stamp)
     if not plan or not plan.duplicate_decisions:
         return {
@@ -86,13 +94,48 @@ def stage_approved_duplicates(
             "results": [],
         }
 
+    if plan.stamp != stamp:
+        return {"ok": False, "error": "Plan belongs to another run", "results": []}
     delete_dir = library_root / "_delete-canidates"
+    if delete_dir.is_symlink():
+        return {"ok": False, "error": "Staging directory is a link", "results": []}
+    paths = [Path(p).resolve() for row in plan.duplicate_decisions for p in [row.keeper_path, *row.discard_paths]]
+    distinct = set(paths)
+    if len(distinct) < len(paths) or any(parent in distinct for path in paths for parent in path.parents):
+        return {"ok": False, "error": "Overlapping keeper and discard paths. Review the plan.", "staged": 0, "results": []}
+    reserved = set()
     results: list[dict] = []
     executed_rows: list[ExecutedDelete] = []
     batch_id = new_batch_id()
 
     for decision in plan.duplicate_decisions:
+        members = [decision.keeper_path, *decision.discard_paths]
+        error = None
+        revision = hashlib.sha256(json.dumps([decision.dedup_key, decision.identities, decision.keeper_path],
+                                             sort_keys=True).encode()).hexdigest()
+        receipts = committed_discards(stamp, revision)
+        locations = {p: receipts[p]["dst"] if p in receipts and not os.path.lexists(p) else p for p in members}
+        verified = approval_identities(locations.values())
+        expected = dict(decision.identities)
+        for p, location in locations.items():
+            if p != location and p in expected:
+                expected[p] = [*receipts[p]["object_id"], expected[p][2]]
+        current = {p: verified.get(location) for p, location in locations.items()}
+        if is_group_rejected(decision.dedup_key, members):
+            error = "Group has been rejected"
+        elif any(not Path(p).resolve().is_relative_to(library_root.resolve()) or
+                 Path(p).resolve() == library_root.resolve() or Path(p).resolve().is_relative_to(delete_dir.resolve())
+                 for p in members):
+            error = "Group member outside the selected library or already staged"
+        elif not decision.identities or current != expected:
+            error = "Group member is missing, changed, or lacks approved identity. Review and save again."
+        if error:
+            results.extend({"dedup_key": decision.dedup_key, "path": p, "ok": False, "error": error}
+                           for p in decision.discard_paths)
+            continue
         for discard in decision.discard_paths:
+            if locations[discard] != discard:
+                continue
             src, path_err = validate_execute_path(discard, must_exist=True)
             if path_err or src is None:
                 results.append({
@@ -104,13 +147,14 @@ def stage_approved_duplicates(
                 continue
 
             dst = delete_dir / src.name
-            if dst.exists():
+            if dst.exists() or dst in reserved:
                 stem = src.name
                 suffix = 1
-                while dst.exists():
+                while dst.exists() or dst in reserved:
                     dst = delete_dir / f"{stem}_{suffix}"
                     suffix += 1
 
+            reserved.add(dst)
             if dry_run:
                 results.append({
                     "dedup_key": decision.dedup_key,
@@ -126,7 +170,8 @@ def stage_approved_duplicates(
                     batch_id=batch_id,
                     op="stage_duplicate",
                     dry_run=False,
-                    meta={"dedup_key": decision.dedup_key, "stamp": stamp},
+                    expected_identity=decision.identities[discard][2],
+                    meta={"dedup_key": decision.dedup_key, "stamp": stamp, "plan_revision": revision},
                 )
                 if ok:
                     results.append({
@@ -157,12 +202,12 @@ def stage_approved_duplicates(
                 )
             )
 
-    if executed_rows:
+    if executed_rows and not dry_run:
         record_executed_deletes(executed_rows)
 
     ok_count = sum(1 for row in results if row.get("ok"))
     return {
-        "ok": ok_count > 0,
+        "ok": ok_count > 0 and ok_count == len(results),
         "dry_run": dry_run,
         "library_root": str(library_root),
         "delete_dir": str(delete_dir),

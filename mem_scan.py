@@ -18,26 +18,31 @@ def scan_process(pid: int) -> dict[str, Any]:
 
     try:
         proc = psutil.Process(pid)
-    except psutil.NoSuchProcess:
-        return {"pid": pid, "scanned": False, "error": "process_not_found"}
+    except (psutil.NoSuchProcess, psutil.AccessDenied) as exc:
+        return {"pid": pid, "scanned": False, "error": type(exc).__name__, "suspicious_regions": []}
 
-    suspicious: list[str] = []
-    mem = proc.memory_info()
-    if mem.rss > 2 * 1024**3:
-        suspicious.append("high_rss")
-    try:
-        for conn in proc.net_connections(kind="inet"):
-            if conn.raddr:
-                suspicious.append(f"outbound:{conn.raddr.ip}:{conn.raddr.port}")
-    except (psutil.AccessDenied, psutil.ZombieProcess):
-        pass
-
-    return {
-        "pid": pid,
-        "scanned": True,
-        "name": proc.name(),
-        "rss_mb": round(mem.rss / (1024**2), 1),
-        "threads": proc.num_threads(),
-        "suspicious_regions": suspicious[:20],
-        "mode": "psutil",
-    }
+    result = {"pid": pid, "scanned": True, "mode": "psutil", "suspicious_regions": []}
+    unavailable = {}
+    for field, read in (
+        ("name", proc.name), ("threads", proc.num_threads),
+        ("rss_mb", lambda: round(proc.memory_info().rss / (1024**2), 1)),
+        ("connections", lambda: proc.net_connections(kind="inet")),
+    ):
+        try:
+            value = read()
+        except (psutil.NoSuchProcess, psutil.AccessDenied) as exc:
+            unavailable[field] = type(exc).__name__
+            continue
+        if field == "connections":
+            result["suspicious_regions"].extend(
+                f"outbound:{conn.raddr.ip}:{conn.raddr.port}" for conn in value if conn.raddr
+            )
+        else:
+            result[field] = value
+    if result.get("rss_mb", 0) > 2048:
+        result["suspicious_regions"].insert(0, "high_rss")
+    result["suspicious_regions"] = result["suspicious_regions"][:20]
+    if unavailable:
+        result["unavailable"] = unavailable
+        result["scanned"] = len(unavailable) < 4
+    return result

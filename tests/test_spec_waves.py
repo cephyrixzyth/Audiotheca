@@ -137,4 +137,8 @@ def test_version_sync_blocked_in_air_gap(client, monkeypatch, tmp_path):
     catalog = tmp_path / "cat.json"
     catalog.write_text(json.dumps({"products": {}}), encoding="utf-8")
     res = client.post("/api/installations/manifest/sync", json={"url": catalog.as_uri()})
-    assert res.status_code == 502
+    assert res.status_code == 400
+    uploaded = client.post("/api/installations/manifest/sync", json={"catalog": {"products": {}}})
+    assert uploaded.status_code == 200
+    remote = client.post("/api/installations/manifest/sync", json={"url": "https://example.com/catalog.json"})
+    assert remote.status_code == 502

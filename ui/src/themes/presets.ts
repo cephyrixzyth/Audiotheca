@@ -11,13 +11,40 @@ function t(partial: Omit<ThemeTokens, "mono" | "sans"> & { mono?: string; sans?:
   };
 }
 
-export const DEFAULT_THEME_ID = "audiotheca-green";
+export const DEFAULT_THEME_ID = "tape-room";
+
+const rooms = [
+  { id: "tape-room", name: "Tape Room", description: "Copper reels, honey meters and walnut.", bg: "#181817", panel: "#242421", text: "#fcf6ea", muted: "#c7c2b7", accent: "#ff9a63" },
+  { id: "patch-bay", name: "Patch Bay", description: "A mint phosphor trace on graphite.", bg: "#0d1815", panel: "#182923", text: "#edf9ed", muted: "#b5cbbd", accent: "#83efb1" },
+  { id: "paper-archive", name: "Paper Archive", description: "Cream index cards, red tabs and daylight.", bg: "#f3ecdf", panel: "#fffaf0", text: "#30291f", muted: "#665846", accent: "#903e21" },
+  { id: "listening-room", name: "Listening Room", description: "Cobalt acoustic panels in a midnight room.", bg: "#0d1424", panel: "#17243a", text: "#eff4ff", muted: "#bac9e5", accent: "#9fc7ff" },
+];
+
+function roomPresets(): ThemePreset[] {
+  return rooms.map(({ id, name, description, bg, panel, text, muted, accent }) => {
+    const mix = (a: string, percent: number, b: string) => `color-mix(in srgb, ${a} ${percent}%, ${b})`;
+    const light = id === "paper-archive";
+    const success = light ? "#27653d" : "#9edba8";
+    const warning = light ? "#815300" : "#f1c575";
+    return { id, name, description, builtIn: true, tokens: t({
+      bg, bgPanel: panel, bgElevated: panel, bgHover: mix(panel, 90, text),
+      border: mix(panel, 76, muted), borderBright: mix(panel, 52, muted),
+      text, textMuted: muted, textDim: mix(muted, 88, panel), accent,
+      accentContrast: light ? "#fff9f1" : bg, accentDim: mix(accent, 76, bg),
+      accentSoft: mix(accent, 14, panel), accentGlow: mix(accent, 24, "transparent"),
+      success, ready: success, warning, review: warning, danger: light ? "#a42a29" : "#ffaaa1",
+      scrollbarTrack: bg, scrollbarThumb: mix(panel, 57, muted), scrollbarThumbHover: muted,
+      bodyGlow: mix(accent, 6, "transparent")
+    }) };
+  });
+}
 
 export const BUILTIN_THEMES: ThemePreset[] = [
+  ...roomPresets(),
   {
     id: "audiotheca-green",
     name: "Audiotheca Green",
-    description: "Default dark studio palette with mint accent.",
+    description: "Original dark studio palette with mint accent.",
     builtIn: true,
     tokens: t({
       bg: "#080b0a",
@@ -573,3 +600,11 @@ export const BUILTIN_THEMES: ThemePreset[] = [
     }),
   },
 ];
+
+const coverIds = new Set(BUILTIN_THEMES.map(theme => theme.id));
+
+export function themeArtwork(theme: Pick<ThemePreset, "id" | "artwork">): string {
+  if (coverIds.has(theme.id)) return theme.id;
+  if (theme.artwork && coverIds.has(theme.artwork)) return theme.artwork;
+  return DEFAULT_THEME_ID;
+}

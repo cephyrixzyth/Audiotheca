@@ -12,7 +12,7 @@ For a step-by-step **first run on another machine**, see **[Testing Guide](TESTI
 
 End users do **not** need Python, Node, or Rust when using release installers — the Tauri app bundles API + engine sidecars.
 
-**Download:** [GitHub Releases (latest)](https://github.com/chrisjrovira/Audiotheca/releases/latest) — Windows `.msi`, NSIS setup, portable zip; macOS `.dmg` (Intel + Apple Silicon); Linux `.AppImage` and `.deb` (built on each release tag via GitHub Actions).
+**Local builds.** Build the platform you need from the source checkout, or use a package whose version and platform you have independently verified. The local Audiotheca studio build was qualified on Apple Silicon. Windows, Linux, Intel macOS and Docker qualification are tracked separately.
 
 **No GitHub Actions quota?** Build locally:
 

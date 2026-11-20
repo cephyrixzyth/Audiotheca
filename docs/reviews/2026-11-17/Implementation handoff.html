@@ -1,0 +1,530 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Audiotheca implementation handoff</title><style>
+:root{color-scheme:light;--ink:#18242a;--muted:#53646a;--link:#095a60;--line:#ced7d6;--paper:#fffefa}
+*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:20px}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:system-ui,-apple-system,sans-serif;font-size:16px;line-height:1.64}
+.layout{max-width:1430px;margin:auto;display:grid;grid-template-columns:minmax(205px,250px) minmax(0,930px);gap:clamp(30px,5vw,76px);justify-content:center;padding:0 4vw}
+aside{padding-top:64px}nav{position:sticky;top:32px;padding:0 20px 0 0;max-height:calc(100vh - 48px);overflow:auto}
+nav summary{cursor:pointer;font-weight:720;color:#293e42;margin-bottom:10px}nav ol{list-style:none;margin:0;padding:0}nav li{border-bottom:1px solid #e0e6e1;padding:9px 0}
+nav li a{display:block;color:var(--muted);font-size:14px;line-height:1.42;text-decoration:none}
+nav li a:hover,nav li a:focus-visible{color:var(--link);text-decoration:underline}
+main{min-width:0;padding:50px 0 90px}
+h1,h2,h3{line-height:1.22;letter-spacing:-.024em;text-wrap:balance}
+h1{font-family:Georgia,serif;font-weight:600;font-size:clamp(36px,4.2vw,58px);margin:0 0 8px;color:#173e44}
+h1+p{color:var(--muted);margin:0 0 28px}
+h2{font-size:clamp(25px,2.4vw,34px);margin:60px 0 15px;border-top:2px solid #749999;padding-top:22px}
+h3{font-size:22px;margin:39px 0 12px}p{margin:12px 0}p,li{overflow-wrap:anywhere}
+a{color:var(--link);text-underline-offset:3px}a:focus-visible,summary:focus-visible,.table-scroll:focus-visible{outline:2px solid #b95216;outline-offset:3px}
+code{font: .89em ui-monospace,Menlo,monospace;background:#edf1ed;padding:.09em .25em;border-radius:.2em}
+.table-scroll{max-width:100%;overflow:auto;margin:20px 0;scrollbar-width:thin}
+table{border-collapse:collapse;width:100%;font-size:14px;line-height:1.55}th,td{vertical-align:top;padding:12px 13px;text-align:left;border:1px solid var(--line)}th{background:#e6efeb;color:#233c3e}tr:nth-child(even) td{background:#f7f8f3}td:first-child{font-weight:620;width:21%}
+ol,ul{padding-inline-start:23px}main li{margin:12px 0}strong{font-weight:690}
+@media(max-width:880px){.layout{display:block;padding:0 6vw}aside{padding-top:16px}nav{position:static;border-bottom:1px solid var(--line);padding:0 0 10px}nav summary{margin:0}
+nav ol{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 15px}nav li a{font-size:13px}
+main{padding-top:24px}h2{margin-top:40px}.table-scroll table{min-width:630px}}
+@media(max-width:460px){nav ol{display:block}table{font-size:13px}main{font-size:15px}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+@media print{aside{display:none}.layout{display:block;padding:0}main{padding:0}body{font:10pt Georgia,serif;color:#121212}.table-scroll{overflow:visible}table{font-size:8pt}h2,h3{break-after:avoid}h2{margin-top:24px}h3{margin-top:15px}tr{break-inside:avoid}a{color:inherit}}
+
+/* handoff */
+pre{background:#eef3ef;padding:15px;max-width:100%;overflow:auto;line-height:1.5;font-size:14px}
+pre code{padding:0;background:transparent;white-space:pre}
+blockquote{margin:20px 0;border-left:4px solid #458080;padding:5px 18px;background:#f2f6f2}
+nav details.handoff-details{margin:2px 0}nav details.handoff-details summary{font-size:13px;font-weight:550;color:var(--muted)}
+nav details.handoff-details ul{list-style:none;padding:0 0 0 10px}nav details.handoff-details li{padding:5px 0;border:0}
+</style></head><body><div class="layout"><aside><nav aria-label="Review sections"><details open><summary>Contents</summary><ol><li><a href="#first-assignment-to-paste-into-another-session">First assignment to paste into another session</a></li><li><a href="#set-up-and-read-the-evidence">Set up and read the evidence</a></li><li><a href="#follow-one-file-through-the-application">Follow one file through the application</a></li><li><a href="#first-patch-in-detail-f02-archive-keeper-protection">First patch in detail · F02 archive keeper protection</a></li><li><a href="#next-patches-for-file-safety-and-durable-state">Next patches for file safety and durable state</a><details class="handoff-details"><summary>7 findings</summary><ul><li><a href="#f01-reverse-moves-without-losing-intervening-edits">F01 · Reverse moves without losing intervening edits</a></li><li><a href="#f03-revalidate-a-duplicate-group-at-execute-time">F03 · Revalidate a duplicate group at execute time</a></li><li><a href="#f04-verify-hardlink-candidates-again-when-the-script-runs">F04 · Verify hardlink candidates again when the script runs</a></li><li><a href="#f05-require-evidence-for-the-entire-folder-before-unattended-staging">F05 · Require evidence for the entire folder before unattended staging</a></li><li><a href="#f06-give-a-run-a-stable-identity-from-cli-launch-to-browser-readback">F06 · Give a run a stable identity from CLI launch to browser readback</a></li><li><a href="#f07-put-user-data-in-one-durable-writable-app-home">F07 · Put user data in one durable, writable app home</a></li><li><a href="#f08-keep-comparison-keys-separate-from-execution-paths">F08 · Keep comparison keys separate from execution paths</a></li></ul></details></li><li><a href="#remaining-defect-assignments">Remaining defect assignments</a><details class="handoff-details"><summary>1 findings</summary><ul><li><a href="#five-related-defects-with-small-patch-boundaries">Five related defects with small patch boundaries</a></li></ul></details></li><li><a href="#finish-the-features-already-in-the-catalog">Finish the features already in the catalog</a></li><li><a href="#new-capabilities-and-their-dependencies">New capabilities and their dependencies</a></li><li><a href="#cleanup-with-compatibility-checkpoints">Cleanup with compatibility checkpoints</a></li><li><a href="#sequence-and-completion-record">Sequence and completion record</a></li></ol></details></nav></aside><main><h1 id="audiotheca-implementation-handoff">Audiotheca implementation handoff</h1>
+<p><strong>For the engineer or coding agent taking the next patch · reviewed November 17, 2026 · baseline <code>ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb</code></strong></p>
+<p>Start with <strong>F02, archive keeper protection</strong>. It has a small fixture, a visible user decision, and two independent routes to a file move. This handoff provides a first assignment you can paste into a new session, a runnable acceptance suite, and a patch plan for everything in the review. Read the original finding when you need its evidence or commit-pinned source links. <a href="Engineering%20review.html">Engineering review</a> · <a href="run_review_checks.py">Portable acceptance checks</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/tree/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb">Reviewed source</a></p>
+<h2 id="first-assignment-to-paste-into-another-session">First assignment to paste into another session</h2>
+<blockquote>
+<p>Work on Audiotheca finding F02. Make a user's “Keep archive” choice protect that archive in the review API and in generated cleanup plans. Inspect <code>archive_feedback.py</code>, <code>api/archive_execute.py</code>, <code>gen_archive_delete_candidates.py</code>, the archive routes in <code>api/routers/runs.py</code>, and both archive review components. Start by running the handoff checks selected by <code>archive_keeper_preview or generated_archive_plan</code> in a disposable checkout. Preserve the existing confirmation requirement, rejection handling, run scoping, library-root checks, multipart handling and staging-directory compatibility. Implement the decision table below. Add a repository regression test that verifies the surviving file bytes after a real stage in a temporary library. Check the contents of a newly generated cleanup plan. Report which entry points passed, what happened after changing the decision, and any remaining risk from already-exported scripts. Finish this patch before starting the undo or schema migrations.</p>
+</blockquote>
+<p>The <strong>input</strong> is a confirmed <code>pack.zip</code>, its verified extracted sibling, and a change of keeper preference. The <strong>output to inspect</strong> is the exact list of source paths proposed for movement and the bytes left in both locations. A green status banner, an HTTP 200 response or an updated JSON preference alone leaves the main defect untested.</p>
+<h2 id="set-up-and-read-the-evidence">Set up and read the evidence</h2>
+<p>Use a disposable checkout and Python 3.13 for comparability with the verified baseline. Point the local paths in the commands at your checkout and at the directory containing this handoff. The runner copies current Python source into a new temporary directory. That includes uncommitted Python edits seen by Git. It gives the application its own library and data home. A checked-in Python module that writes relative to its own location therefore writes into the disposable copy. Tests generate their own small CSV, ZIP, directory and file fixtures.</p>
+<pre><code class="language-sh">git clone https://github.com/cephyrixzyth/Audiotheca.git Audiotheca-baseline
+cd Audiotheca-baseline
+git switch --detach ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb
+python3.13 -m venv .venv
+. .venv/bin/activate
+python -m pip install -r requirements.txt
+</code></pre>
+<pre><code class="language-sh"># Set this to the directory containing the delivered Python file.
+review_dir=&quot;/path/to/Audiotheca review&quot;
+python &quot;$review_dir/run_review_checks.py&quot; --repo &quot;$PWD&quot;
+python &quot;$review_dir/run_review_checks.py&quot; --repo &quot;$PWD&quot; -k 'archive_keeper_preview or generated_archive_plan'
+</code></pre>
+<p>On Windows, use <code>py -3.13 -m venv .venv</code> and run commands with <code>.\.venv\Scripts\python.exe</code>. The runner uses Git and the selected Python environment. It prints the target HEAD and a digest of the copied Python inputs. Use the same invocation against a proposed fix and record both outputs. Windows behavior of the generated PowerShell script requires a separate Windows test.</p>
+<p><strong>Verified handoff baseline:</strong> 17 checks collected on macOS arm64. <strong>3 controls passed and 14 acceptance cases failed</strong> at an assertion. These are new contract checks for known defects. The original repository's Python suite had 639 passes and two failures in its standard environment. Keep those two counts separate. The SHA-256 of the Python inputs copied by the handoff runner at the reviewed revision was <code>72819b6241705845df9d7405716a04a71588fc7e04f2c6e336f64c1d0bf19470</code>. <a href="run_review_checks.py">Acceptance code</a></p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Review table"><table>
+<thead>
+<tr>
+<th>Finding</th>
+<th>Runner selection after <code>-k</code></th>
+<th>Result on the reviewed revision</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>F01</td>
+<td><code>undo</code></td>
+<td>Ordinary reversal preserved the original bytes. Collision reversal overwrote a later take. A subsequent preview counted an already-undone move.</td>
+</tr>
+<tr>
+<td>F02</td>
+<td><code>archive_keeper_preview or generated_archive_plan</code></td>
+<td>Both keeper previews were inverted. The standalone generator included the archive marked keep.</td>
+</tr>
+<tr>
+<td>F03</td>
+<td><code>duplicate_staging_plan</code></td>
+<td>Valid plan passed. Missing keeper and rejected group each still yielded one eligible discard.</td>
+</tr>
+<tr>
+<td>F06</td>
+<td><code>two_scans_keep_distinct_ids</code></td>
+<td>Two successful CLI scans returned just one distinct run ID in API readback.</td>
+</tr>
+<tr>
+<td>F07</td>
+<td><code>archive_choice_isolated_by_app_home</code></td>
+<td>A fresh interpreter using home A saw its saved selection. An interpreter using home B also saw A's selection. The packaged restart check in the original review demonstrates the other failure mode, loss of selections.</td>
+</tr>
+<tr>
+<td>F09</td>
+<td><code>save_filtered_group_501</code></td>
+<td>Saving the last group in a 501-group fixture returned a count of zero.</td>
+</tr>
+<tr>
+<td>F10</td>
+<td><code>nested_change_invalidates_section</code></td>
+<td>The unchanged control hit the cache. Editing a nested file still returned the old snapshot.</td>
+</tr>
+<tr>
+<td>F11</td>
+<td><code>archive_diff</code></td>
+<td>Flat, distinct names compared correctly. Two archive members sharing a basename collapsed to one.</td>
+</tr>
+<tr>
+<td>F12</td>
+<td><code>polling_survives_event_eviction</code></td>
+<td>Client consumed three retained events, a fourth arrived, and the next response contained no new event.</td>
+</tr>
+<tr>
+<td>F13</td>
+<td><code>dry_run_leaves_library_tree_unchanged</code></td>
+<td>The CLI exited successfully and produced a local summary. It also added files under the scanned library.</td>
+</tr>
+</tbody>
+</table></div>
+<p>A missing dependency or import error means the test did not reach its assertion. If a future patch intentionally changes the API to return a conflict status, update the test adapter to verify that documented status, reason and file state. If helper names change, keep the scenario and move the assertion to the new public boundary. For a patch intended to fix one row, the selected controls and regression cases should pass. Other rows may still reproduce their original failures.</p>
+<h2 id="follow-one-file-through-the-application">Follow one file through the application</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Review table"><table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Entry, data and durable output</th>
+<th>Consequence for an implementation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Scan</td>
+<td><code>main.py</code> and <code>python -m audiotheca scan</code> reach the engine. <code>DeduplicationEngine</code> gathers items, groups duplicates and creates report paths. CLI and packaged processes have their own imports and globals.</td>
+<td>Pass the run identity and selected root explicitly across process boundaries. Tests that monkeypatch only an API module cannot prove the child uses the same values. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/audiotheca/cli.py#L45">Scan entry</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/audiotheca/engine.py#L88">Engine construction</a></td>
+</tr>
+<tr>
+<td>Persist and read reports</td>
+<td>CSV and summary files live under the report directory. SQLite import reads them by stamp. Several UI reads can use CSV even after an import.</td>
+<td>Preserve the CSV contract and compare it with the SQLite path on the same fixture. A passing insert test proves only the import step. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/audiotheca/job_store.py#L207">Import</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/api/report_loader.py#L244">Duplicate reader</a></td>
+</tr>
+<tr>
+<td>Review</td>
+<td>React submits a keeper by group key and full path. The API builds a plan, syncs feedback and writes an approval file. Archive preferences and confirmations have a separate store.</td>
+<td>Trace applicable writes and the store that execute actually reads. In particular, updating feedback alone leaves an older duplicate-plan JSON available for execution. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/api/decisions.py#L68">Plan construction</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/api/routers/runs.py#L749">Decision endpoint</a></td>
+</tr>
+<tr>
+<td>Preview and stage</td>
+<td>Preview and live share most decision branches. Live paths call <code>guarded_move</code> and append ledger records. The generated archive and hardlink PowerShell workflows are separate implementations.</td>
+<td>Verify CLI, review API and exported plans separately. Compare the source and destination values at the last decision before a file move. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/api/duplicate_execute.py#L94">Stage loop</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/gen_archive_delete_candidates.py#L51">Independent archive plan</a></td>
+</tr>
+<tr>
+<td>Recover and display history</td>
+<td>The ledger folds pending and committed records. Undo walks committed entries in reverse. History also falls back to feedback rows for some actions.</td>
+<td>An undo fix must survive reopening the ledger, retain partial progress and keep history consistent with what is still on disk. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/audiotheca/transaction_ledger.py#L67">Ledger reader</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/feedback_export.py#L232">History projection</a></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="first-patch-in-detail-f02-archive-keeper-protection">First patch in detail · F02 archive keeper protection</h2>
+<p><strong>Trace.</strong> In <code>ArchivePeek.tsx</code>, the control labelled <strong>Keep folder</strong> explains that the archive can be deleted later. <code>ArchiveDiffWizard.tsx</code> offers the same choice. The API saves <code>"folder"</code> or <code>"archive"</code> keyed by run and path. The staging loop iterates confirmed paths and skips the row when <code>keeper == "folder"</code>. The exporter's <code>load_matches()</code> starts instead from CSV verdicts and checks for rejection. It can select a protected archive without consulting its keeper. Its generated script embeds concrete paths, so later changes to the UI cannot edit a previously exported script. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/ui/src/components/ArchivePeek.tsx#L350">Labels</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/ui/src/components/ArchiveDiffWizard.tsx#L81">Wizard choice</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/archive_feedback.py#L253">Preference write</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/api/archive_execute.py#L69">Staging branch</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/gen_archive_delete_candidates.py#L150">Generated path list</a></p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Review table"><table>
+<thead>
+<tr>
+<th>Input state for the current archive and run</th>
+<th>Expected decision and visible result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Rejected, under any keeper setting</td>
+<td>Exclude from execution. Show the rejection reason when a row is requested explicitly.</td>
+</tr>
+<tr>
+<td>Keep archive, including after a previous confirmation</td>
+<td>Exclude the archive and its parts. Preserve the extracted copy. Clear or invalidate the stale delete confirmation.</td>
+</tr>
+<tr>
+<td>Keep folder, current verified sibling, no delete confirmation</td>
+<td>Display the preference. A review candidate can remain visible. Live execution still needs explicit approval.</td>
+</tr>
+<tr>
+<td>Keep folder, current verified sibling, confirmed</td>
+<td>Preview lists the archive parts and their destinations. Live moves exactly that set to staging. The extracted folder and its bytes survive.</td>
+</tr>
+<tr>
+<td>Existing run, explicit confirmation, no keeper ever selected</td>
+<td>Preserve the documented interpretation of “Confirm delete” as approving the redundant archive, provided the current sibling and inventory can be verified. If the evidence is missing, surface a review-required result.</td>
+</tr>
+<tr>
+<td>Preference changes after preview, or multipart membership changes</td>
+<td>Invalidate the earlier plan. Show which path or decision changed. A newly appearing part must not silently join an already approved batch.</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Implementation order</strong></p>
+<ol>
+<li>Seed a real ZIP and extracted sibling with identical sample bytes. Write an archive-peek CSV for the same stamp. Use lowercase paths to isolate the keeper logic from F08. A separate mixed-case test is required for F08.</li>
+<li>Make candidate selection honor an explicit keep-archive veto before expanding multipart names. Pass the run stamp and original path when reading feedback. At the feedback write boundary, supersede contradictory confirmation state. Preserve the historical correction log for display.</li>
+<li>Reuse that decision in the generator. It may continue to identify candidates for <em>review</em>. Make the generated executable rows distinguish explicitly approved moves from unapproved candidates. An exported script containing fixed paths should verify its plan revision, or be generated from freshly revalidated approvals at execution time. Mark older exports stale in the migration instructions.</li>
+<li>Check both API routes and both UI controls. Preserve the JSON fields consumed by the current results panel. In a disposable live-stage test verify source disappearance, staged bytes, surviving folder bytes, part count and exact ledger destinations. Include two unrelated archives with the same basename and a rejected part.</li>
+<li>Run the three supplied F02 assertions and the repository archive/execute tests. In a throwaway experiment, changing just the staging branch made <strong>both API checks pass and left the generator check failing</strong>. That narrow change is insufficient. The experiment did not qualify live staging or PowerShell execution.</li>
+</ol>
+<h2 id="next-patches-for-file-safety-and-durable-state">Next patches for file safety and durable state</h2>
+<h3 id="f01-reverse-moves-without-losing-intervening-edits">F01 · Reverse moves without losing intervening edits</h3>
+<p>Read <code>guarded_move → log_move → commit_move → _load_entries → rollback_batch</code>, then read <code>execute_history</code>. The committed row currently remembers source, destination and directory status. A path existing at the expected location proves only that something occupies it. A prior successful reversal is also invisible to the current folding logic. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/audiotheca/transaction_ledger.py#L32">Recorded fields</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/audiotheca/transaction_ledger.py#L92">Reversal</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/tests/test_transaction_ledger.py#L8">Existing success test</a></p>
+<p><strong>First slice.</strong> Reject an occupied restore target for files and directories in preview and at execution. Return the conflict per path, leave both contents intact, and make the existing clean round trip pass. Serialize competing operations for the same entries and choose a no-overwrite move primitive appropriate to the filesystem. A separate existence check followed by an overwriting rename still has a race.</p>
+<p><strong>Durable slice.</strong> Add append-only reversal intent and terminal outcome keyed by original entry and batch. On restart fold them before choosing eligible rows. For an old entry with insufficient identity evidence, recognize a conflict or request manual reconciliation. A duplicate rollback request after success should report zero additional moves. Preserve old committed history. A successful move followed by a failed ledger write is an ambiguous state that needs a new disk check before replay.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Review table"><table>
+<thead>
+<tr>
+<th>Original location</th>
+<th>Staged location</th>
+<th>Expected handling on undo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Vacant</td>
+<td>Matches the recorded object</td>
+<td>Preview eligibility, reverse once, verify recovered object, record reversal.</td>
+</tr>
+<tr>
+<td>Occupied</td>
+<td>Present</td>
+<td>Preserve both and report conflict, including if the occupied target is a directory.</td>
+</tr>
+<tr>
+<td>Present</td>
+<td>Vacant</td>
+<td>Respect a recorded reversal. With only a pending intent, verify identity and reconcile.</td>
+</tr>
+<tr>
+<td>Vacant</td>
+<td>Vacant, or staged identity changed</td>
+<td>Report missing or changed data. Leave the operation open for review.</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Proof.</strong> Run the three F01 checks. Then add a two-entry batch with one conflict, retry after resolving it, and reopen the ledger in a second process. Also exercise a cross-device failure and a directory tree where child operations were committed individually. Never infer that every row succeeded from a batch returning <code>ok: true</code>.</p>
+<h3 id="f03-revalidate-a-duplicate-group-at-execute-time">F03 · Revalidate a duplicate group at execute time</h3>
+<p>Read <code>build_plan_from_decisions</code>, <code>add_rejection</code>, the CLI's <code>_cmd_execute</code>, and <code>stage_approved_duplicates</code>. An approval is an earlier statement of intent. The same library may have been edited in the meantime. The planner's initial membership check cannot establish that the keeper still exists at execution time. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/api/decisions.py#L68">Saved decision</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/duplicate_feedback.py#L225">Rejection persistence</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/audiotheca/cli.py#L93">Imported-plan entry</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/api/duplicate_execute.py#L94">Execution</a></p>
+<p><strong>Patch contract.</strong> Validate the current run, library identity, keeper, rejection state and all members before moving any member of that group. Record sufficient identity at approval to distinguish a replacement at the same path. Check the full plan for keeper/other-group overlap, case aliases and directory ancestry. An inexpensive signature may reject a changed file quickly. Where equality justifies a removal, require content evidence appropriate to the whole object. Preserve version-coexist and reference-library decisions as distinct review cases.</p>
+<p><strong>State changes.</strong> Saving a new choice, clearing a choice or rejecting a group invalidates the old executable revision. At live execute, compare the revision immediately before mutation and record the actual per-member outcome. A group with a missing keeper has zero eligible discards. A failure during the third move retains receipts for the first two and reports the third as unresolved. Replay must consult those receipts.</p>
+<p><strong>Proof.</strong> Use the provided valid/missing/rejected cases. Add keeper replaced at the same name, keeper inside a discard directory, overlapping groups, old imported plan with missing identity and a single group with two discards where one is unavailable. Run <code>tests/test_duplicate_execute.py</code> and <code>tests/test_duplicate_feedback.py</code>. Check both preview and a live fixture. A 200 response with a count alone cannot establish which copy survived.</p>
+<h3 id="f04-verify-hardlink-candidates-again-when-the-script-runs">F04 · Verify hardlink candidates again when the script runs</h3>
+<p>Follow the SHA-256 field from <code>build_link_plan</code> into <code>write_hardlink_script</code>. It disappears before the generated function accepts its parameters. Comparing the new link and its keeper after linking compares two names for the same object. A useful negative fixture changes four bytes of the duplicate while leaving its length the same. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/space_recovery.py#L195">Plan records</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/space_recovery.py#L264">Generated script</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/tests/test_space_recovery.py#L1">Existing test location</a></p>
+<p><strong>Patch contract.</strong> Embed the approved digest and verify the keeper plus retained duplicate backup before retiring the backup. Handle an existing backup as a conflict. Verify file identity/link count where supported and restore the original on failure. Never discard the backup when identity or volume capability is uncertain. Concurrent editing during the operation requires an exclusive handle or equivalent protection before removing the last independent copy.</p>
+<p><strong>Windows acceptance.</strong> Use two initially identical disposable files on a hardlink-capable volume. Generate the plan, change only the duplicate, run the generated script and read both streams back. Repeat with a changed keeper, locked file, pre-existing backup and cross-volume destination. The unchanged pair should share a file ID after success. A text assertion against the generated PowerShell is a useful generator test. It leaves native file behavior unverified.</p>
+<h3 id="f05-require-evidence-for-the-entire-folder-before-unattended-staging">F05 · Require evidence for the entire folder before unattended staging</h3>
+<p>The scanner compares up to three ranked files per member. The automatic branch translates a high-confidence <code>MATCH</code> into an action on a whole product folder. Identical filenames, archive bytes, version labels or acoustic similarity can support review with different strengths. Only complete equivalence supports unattended disposal. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/audiotheca/dedupe.py#L234">Sample selection</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/audiotheca/engine.py#L917">Automatic decision</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/audiotheca/content_hash.py#L53">Hash selection</a></p>
+<p><strong>Patch sequence.</strong> Keep fast candidate generation. Introduce an explicit result for sampled agreement. At the automatic-stage boundary, compare complete relative member paths, file kinds, lengths and full digests. Include empty directories if restoring directory structure is promised. Distinguish unreadable, changed while reading and cancelled from equal. Retain reviewed candidates when verification is expensive.</p>
+<p><strong>Proof.</strong> Use directories with identical top three payloads and different small presets, extra empty directories, equal contents under different paths, and a member changing during hashing. Record the files and bytes actually compared. For an exact pair, exercise the normal automatic decision with disposable contents and read both the result row and staged tree. A fix may leave the sampler fast when the action gate performs the complete check.</p>
+<h3 id="f06-give-a-run-a-stable-identity-from-cli-launch-to-browser-readback">F06 · Give a run a stable identity from CLI launch to browser readback</h3>
+<p>The producer assigns a minute stamp. The job runner searches recent summary mtimes, the API and report loader use minute-shaped regexes, SQLite clears old rows by stamp, and approvals, exports and URL parameters reuse that stamp. Increasing timestamp precision in just the writer can make a successful scan invisible. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/audiotheca/engine.py#L96">Producer</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/api/job_runner.py#L559">Child correlation</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/api/report_loader.py#L38">Discovery</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/api/security.py#L452">Validator</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/audiotheca/job_store.py#L200">Import replacement</a></p>
+<p><strong>Migration order.</strong> Add a type/parser accepting both existing stamps and a strictly specified unique new ID. Introduce one run manifest containing ID, display time, root identity, job ID, completion state and report members. The CLI allocates the ID before writing. API-launched jobs pass the same ID to the child. Return the completed manifest or a machine-readable completion event. Publish the manifest after its files are closed. Use the ID for joins and the timestamp for presentation and chronological ordering.</p>
+<p><strong>Compatibility matrix.</strong> Old CLI <code>--stamp</code>, old <code>?run=</code> links, copied <code>Run_Summary_*.txt</code> archives, old decisions, targeted re-import, failed child and no-summary child must all have defined outcomes. Inspect <code>gen_archive_delete_candidates.py</code> and ancillary export scripts for independent regexes. Keep a deliberate import of the same completed run idempotent. Two independently launched scans must never share approvals.</p>
+<p><strong>Proof.</strong> The supplied test freezes the old producer's clock, completes two normal CLI scans and reads the count through the real API. Add a job-runner test that puts an unrelated recent summary beside the actual child output. Test a missing optional report in the second run and a legacy seeded URL. Record the two IDs, per-run paths, imported row counts and selected run in the browser.</p>
+<h3 id="f07-put-user-data-in-one-durable-writable-app-home">F07 · Put user data in one durable, writable app home</h3>
+<p>Make an inventory of writable paths before moving any file. Include archive, duplicate, investigation, restructure, scene and vendor feedback, engine hints, exports, engine logging, job store and cache. Several modules calculate path constants when imported. Two one-file processes can load the same source at different extraction paths. The packaging regression is then invisible to a single-process unit test. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/api/paths.py#L9">Home resolver</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/archive_feedback.py#L13">Feedback location</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/audiotheca/engine.py#L155">Engine log</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/scripts/build_sidecars.py#L168">One-file build</a></p>
+<p><strong>Migration order.</strong> Prefer the configured home for every new write. Detect an old store and a new store independently. Copy and validate before switching reads, retain the source for recovery, and make repeat migrations idempotent. When two homes have conflicting decisions, preserve provenance, prioritize explicit operator resolution for executable decisions, and keep exports readable. Atomic replacement prevents torn files. Coordinating the full read-modify-write sequence also prevents two reviewers from losing one another's updates.</p>
+<p><strong>Proof.</strong> Test A → A across two processes, A → B isolation, old-only, new-only, both stores, malformed legacy JSON and read-only install directory. Build the API sidecar, save a keeper, terminate it, restart with the same home and read the same feedback endpoint. The handoff's two-home test exercises the shared-source case. Passing it does not establish frozen restart retention.</p>
+<h3 id="f08-keep-comparison-keys-separate-from-execution-paths">F08 · Keep comparison keys separate from execution paths</h3>
+<p>Store the exact validated original path, operator-visible spelling, root identity and comparison key in a decision record. The current normalized map cannot recover spelling after normalization. Scoped feedback migration also merges legacy keys into later runs. Couple F08 with X05 below before making historical decisions executable. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/archive_feedback.py#L36">Legacy maps</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/archive_feedback.py#L176">Keys replayed</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/api/path_logic.py#L101">Lowercased key</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/api/execute_paths.py#L10">Native execution validation</a></p>
+<p><strong>Migration cases.</strong> A v2 key that maps to exactly one member of the bound run can be shown as a recovered suggestion. An ambiguous match, an entry outside the current library or an absent member stays unresolved. Preserve both files on a case-sensitive filesystem where <code>Pack.zip</code> and <code>pack.zip</code> coexist. On Windows, preserve display spelling and resolve equivalence according to the target volume. Moving to another root should trigger a fresh binding.</p>
+<p><strong>Proof.</strong> Use a mixed-case root, an archive with mixed-case member names, two case-distinct native files on a suitable volume, a legacy slash-normalized Windows record, and a multi-root library. Inspect the actual path sent to the staging function. Simply suppressing a validation error can cause the wrong file to move.</p>
+<h2 id="remaining-defect-assignments">Remaining defect assignments</h2>
+<p>Each row gives the change to make, one easy way to accidentally leave the defect open, and a concrete check. IDs match the numbered findings in the review. Where a check needs a native platform or a real deployment, record that separately from local results.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Review table"><table>
+<thead>
+<tr>
+<th>ID and change</th>
+<th>Implementation detail</th>
+<th>Acceptance and existing test location</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>F09 · Save all reviewed groups and isolate UI state by run</strong></td>
+<td>Query for the submitted keys across the complete run. If using SQLite, implement the equivalent CSV-only path for old reports. Report any rejected keys explicitly. In React reset keepers, last execution, errors and counts on stamp change, invalidate in-flight reads, and allow saving an empty decision set. A simple larger limit will fail again.</td>
+<td>Search for the 501st group, select a keeper, save, reload, clear it, and save again. Switch to another run before an older request resolves. Both data and controls should reflect the active run. Use the handoff F09 case, <code>tests/test_duplicate_execute.py</code> and the seeded browser suite. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/api/decisions.py#L74">Group lookup</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/ui/src/components/DuplicateReview.tsx#L138">State load</a></td>
+</tr>
+<tr>
+<td><strong>F10 · Correct cache hits and coverage</strong></td>
+<td>The regular cache trusts a product directory mtime. The incremental cache independently trusts the enclosing section mtime. Fix both or one can hide the other's correction. Carry target paths into coverage-gap detection on cache hits. Include scanner options and rule/schema versions in invalidation. Start with correctness, then measure the network traversal cost of the chosen signature.</td>
+<td>Compare full, warm and forced-full output on the same synthetic tree after nested edit, rename, deletion and changed scan options. Compare discovered items, sizes, coverage gaps and errors. Add cache controls to <code>tests/test_phase_i_j_k.py</code> and <code>tests/test_coverage.py</code>. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/audiotheca/scan.py#L70">Item cache</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/audiotheca/engine.py#L544">Section shortcut</a></td>
+</tr>
+<tr>
+<td><strong>F11 · Preserve archive hierarchy and completeness</strong></td>
+<td>Represent each relative member path and its multiplicity. Normalize a single wrapper directory only when both inventories justify that alignment. Decide how to handle directories, duplicate names and platform-specific case. Carry listing limits and read errors into the result and distinguish a historical scan hint from current evidence.</td>
+<td>Compare a nested real ZIP and extracted directory, two same-basename members, wrapper folder, empty archive, changed contents and a capped listing. Read the diff API and wizard. A truncated listing must never authorize verified equality. Run the handoff checks and <code>tests/test_archive_diff.py</code>. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/api/archive_diff.py#L41">Comparison</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/api/archive_diff.py#L105">API inputs</a></td>
+</tr>
+<tr>
+<td><strong>F12 · Give job events absolute cursors</strong></td>
+<td>The API exposes the current retained list length as total and the client reuses it as the next offset. Use a monotonic per-job sequence. Include oldest available, next cursor and whether the client missed history. Reconcile WebSocket replay with polling. Count only events that participate in replay.</td>
+<td>At capacity three, consume 0–2, add 3, and receive 3 exactly once. Test a gap of two retention windows, repeated polls, reconnect, job switch and the terminal event. Extend the supplied API test with a browser reconnection case. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/api/routers/jobs.py#L75">Polling response</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/ui/src/components/ScanPanel.tsx#L392">Client offset</a></td>
+</tr>
+<tr>
+<td><strong>F13 · Default dry-run writes only to appdata</strong></td>
+<td>The directory is created while computing output paths. Skipping the final copy still leaves a library change. Gate both creation and mirroring on an explicit output choice. A user may want an opt-in share copy for colleagues. Reflect that choice in CLI help and scan summary.</td>
+<td>Compare relative paths and bytes before and after a default dry scan. Assert appdata contains the run. Test opt-in mirroring, an unwritable share and an already-present legacy report folder. Use the supplied CLI case. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/audiotheca/reports.py#L78">Directory creation</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/audiotheca/reports.py#L676">Copy operation</a></td>
+</tr>
+<tr>
+<td><strong>F14 · Handle process exit and denied metrics</strong></td>
+<td>Handle process construction and each metric call. If the process disappears while sampling, return a stable partial or unavailable result. Avoid collecting the same failing property again while formatting the response.</td>
+<td>Inject access denial at RSS, then process exit at name and thread count. Exercise a real readable current process and both repository PID-0 tests. Verify the API returns structured state and the panel renders it. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/mem_scan.py#L18">Process inspection</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/tests/test_wave_r.py#L28">API test</a></td>
+</tr>
+<tr>
+<td><strong>F15 · Fix smoke selectors and seed CI</strong></td>
+<td>Main and secondary navigation use accessible tab roles. Fix the locators in the test, select the run by accessible label, seed both bundled run fixtures into appdata and configure the demo root. Keep a separate empty-home onboarding test. Set up clean servers for CI so a previous developer instance cannot supply unrelated reports.</td>
+<td>The pin's shipped suite was 18/20. Changing only the two scenarios' tab-role locators made them pass. Run all 20 under the revised CI environment plus a fresh-home smoke. Preserve keyboard navigation and hash deep links. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/ui/e2e/nav-smoke.spec.ts#L47">Selectors</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/ui/playwright.config.ts#L17">Server startup</a></td>
+</tr>
+<tr>
+<td><strong>F16 · Make advertised installation channels usable</strong></td>
+<td>At review time public release discovery returned no tags or releases. Docker's all-in-one example omitted a required proxy secret. Refresh both facts before changing published copy. Lead with a verified source path or the actual released assets. Update the container example and test with a fresh data volume.</td>
+<td>In a clean environment follow the exact published instructions, open the UI, run a sample scan and read feedback after restart. Verify the asset's name, digest, target architecture and version. A successful build workflow alone cannot verify its public availability. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/README.md#L91">Installer path</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/deploy/unraid/entrypoint.sh#L10">Container requirement</a></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="five-related-defects-with-small-patch-boundaries">Five related defects with small patch boundaries</h3>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Review table"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Trace and proposed patch</th>
+<th>Discriminating test</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>X01 · False CLI staging success</strong></td>
+<td>The engine writes a CSV success and increments a counter before inspecting the movement result. Emit a result after movement and track approved intent and successful execution separately. The existing restructure action already checks the returned boolean. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/audiotheca/engine.py#L1003">Stage reporting</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/audiotheca/engine.py#L1231">Neighboring result handling</a></td>
+<td>Force one <code>safe_move</code> failure among two approved disposable entries. Assert the source remains, the failure row names it, the success counter is one, and the next phase does not silently omit the failed row from reporting.</td>
+</tr>
+<tr>
+<td><strong>X02 · Truncated restructure execution</strong></td>
+<td><code>execute_approved_sections</code> reads one 100,000-row page and discards total. Query by approved section or continue in a stable order until exhausted. Freeze the plan revision used for the traversal. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/api/restructure_execute.py#L29">First-page limit</a></td>
+<td>Put the first eligible row immediately beyond the boundary. Check a second case with one eligible row on each side. Preview and live on fixtures agree on unique IDs and outcome totals.</td>
+</tr>
+<tr>
+<td><strong>X03 · Local manifests fail in air-gap mode</strong></td>
+<td><code>sync_catalog_from_url</code> applies the outbound check even to local file input. Implement a user-selected file import feeding the same JSON/schema validator. Keep the network path governed by outbound policy. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/version_verify.py#L225">Manifest loader</a></td>
+<td>Import an existing local catalog with air gap on and off, reject malformed JSON consistently, and verify the HTTP client was never called for the local fixture. Run <code>tests/test_phase2_features.py::test_manifest_sync_local</code>.</td>
+</tr>
+<tr>
+<td><strong>X04 · Late audio responses overwrite the current selection</strong></td>
+<td>Use request cancellation or a generation token for peaks, analysis and error/loading state. Key the response by selected path or file identity. Clear old playback state immediately on selection changes. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/ui/src/components/AudioPreviewStrip.tsx#L54">Effects</a></td>
+<td>Select A then B. Resolve B first and A last. B's peaks, tempo, key and loading state must stay visible, including when A errors or the component unmounts.</td>
+</tr>
+<tr>
+<td><strong>X05 · Legacy confirmations leak into new runs</strong></td>
+<td>Treat unscoped historical entries as suggestions to reconcile. Keep them visible in a migration/history view, but require current-run membership and a fresh decision before executing. Reject and keep-archive vetoes need explicit rules for old stores. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/archive_feedback.py#L36">Legacy conversion</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/archive_feedback.py#L59">Merged view</a></td>
+<td>Load flat v1 feedback, then inspect two fresh stamps. Neither may execute a migrated unscoped confirmation. Confirm in stamp A and verify only A can stage it. Preserve the original for recovery.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="finish-the-features-already-in-the-catalog">Finish the features already in the catalog</h2>
+<p>The catalog is an inventory. A feature earns a stronger completion claim when its normal entry point produces the named user outcome. These are proposed slices that fit the existing architecture. Each row identifies the prerequisites and the artifact a reviewer should examine.</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Review table"><table>
+<thead>
+<tr>
+<th>Work item and prerequisite</th>
+<th>Implementation slice</th>
+<th>What the next reviewer should see</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>E01 · Undo from the UI</strong> after F01/F03</td>
+<td>Add a batch action to the ledger/history view. Fetch the rollback <em>preview</em>, show restore paths and conflicts, require explicit live confirmation, then refresh history from storage. Keep dry-run rows ineligible.</td>
+<td>A browser fixture stages one file, restarts, finds the batch and restores the file. A second fixture creates an intervening file and displays a resolvable conflict. Attach the before/after tree and API payload. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/ui/src/components/AuditLogPanel.tsx#L15">Ledger surface</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/api/routers/tools.py#L293">Rollback route</a></td>
+</tr>
+<tr>
+<td><strong>E02 · Archive integrity levels</strong> alongside F11</td>
+<td>Define response fields for format, method, coverage, outcome and incomplete reason. Map ZIP full reads, RAR headers and unsupported/unchecked branches explicitly. Cap work and propagate timeouts.</td>
+<td>Valid and truncated examples of each supported format produce distinguishable values. The UI never labels a header-only result as proof of member integrity. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/archive_crc.py#L82">Format dispatch</a></td>
+</tr>
+<tr>
+<td><strong>E03 · Browser and desktop drops</strong></td>
+<td>Browser users can paste or pick an allowed library path. Desktop uses native drop events that can supply a real path. Route the returned per-item action into the explorer or inspector. Keep remote-browser filesystem paths distinct from server paths.</td>
+<td>Test a native desktop folder, a text path, an ordinary browser file without a path, and a multi-item drop. Each ends at an actionable view or explains the suitable next action. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/ui/src/components/DropZoneOverlay.tsx#L22">Input</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/api/routers/browse.py#L223">Inspection output</a></td>
+</tr>
+<tr>
+<td><strong>E04 · Large-library browse/search</strong> after F06/F10</td>
+<td>Add resumable page/cursor requests, stable sort keys and exact or explicitly partial totals. Index by library identity and run. Show freshness and offer a bounded live refresh for changed folders.</td>
+<td>A tail item is reachable in a directory larger than the initial list cap. Cold and warm search agree after rename. Record time to first page and bytes read on a representative NAS separately from local timing. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/api/browse_api.py#L104">Listing</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/api/browse_api.py#L198">Search</a></td>
+</tr>
+<tr>
+<td><strong>E05 · Acoustic review quality</strong> alongside F05</td>
+<td>Persist backend, algorithm version, fingerprint coverage and duration. Grouped results should explain exact, estimated or uncomparable states. Keep byte-level cleanup dependent on independent equality evidence.</td>
+<td>Use identical audio, transcodes, short clips, alternate mixes and closely related performances. Record candidate pairs and false positives by backend. A missing decoder must produce a visible capability state. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/audiotheca/acoustic_near_dupe.py#L14">Comparison</a></td>
+</tr>
+<tr>
+<td><strong>E06 · Preview format support</strong> alongside X04</td>
+<td>Share capability detection among stream, waveform, loudness, tags and fingerprint endpoints. For RF64 parse chunk headers and seek over audio payloads with bounded reads. Display missing metrics explicitly and include measurement duration.</td>
+<td>A format-by-operation matrix filled by fixtures for PCM WAV, RF64, FLAC and MP3, including a short or silent clip. Compare the UI badge with actual backend support. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/audio_analyze.py#L53">Partial results</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/audiotheca/rf64.py#L52">Header path</a></td>
+</tr>
+<tr>
+<td><strong>E07 · DAW integration</strong> after choosing one host workflow</td>
+<td>Export and build the JUCE template, then implement one end-user command with connection status, timeout and host-safe threading. First usable slice could audition one linked library item. Treat blueprint export and a working plugin as separate milestones.</td>
+<td>Plugin validator output, one Windows VST3 and macOS AU/VST3 host-load result and a real selection-to-audition trace. Validate degraded behavior with the Audiotheca API stopped. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/daw_side.py#L257">Build wrapper</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/plugins/daw_side/template/Source/PluginEditor.cpp#L3">Current UI</a></td>
+</tr>
+<tr>
+<td><strong>E08 · Native helper parity</strong></td>
+<td>Resolve both documented override names and development binaries. Define supported digest algorithms and consistent errors. Compare native versus Python walk results on permissions, symlinks, depth, file sizes and deterministic ordering.</td>
+<td>A parity table using the same fixture and explicit binary path. Show that the main scanner actually invokes the helper before attributing a scan performance gain to it. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/audiotheca/sidecar_tools.py#L19">Discovery</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/sidecars/rolling_hash/src/main.rs#L22">Digest routine</a></td>
+</tr>
+<tr>
+<td><strong>E09 · Cloud and S3 inventory</strong></td>
+<td>First decide whether the UI promises a sample or a complete index. A sample needs explicit coverage. A durable index needs pagination, continuation checkpoints, duplicate handling and restart recovery. Persist no credentials in the index.</td>
+<td>A fixture with more than 100 objects yields either a correctly labelled sample or all pages. Interrupt between pages, retry, and verify count and unique keys. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/s3_conn.py#L91">Current page request</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/cld_cache.py#L100">Cache summary</a></td>
+</tr>
+<tr>
+<td><strong>E10 · AI-assisted identification</strong></td>
+<td>Show active provider, local versus external operation, source evidence and whether the result came from cache. Use the existing human confirmation path. Include provider/version in cache invalidation when a result depends on it.</td>
+<td>Exercise default stub, missing configuration, deterministic fake provider timeout, cached result and rejection on rescan. Separately qualify any external provider a release explicitly advertises. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/audiotheca/ai_lookup/engine.py#L27">Provider resolution</a></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="new-capabilities-and-their-dependencies">New capabilities and their dependencies</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Review table"><table>
+<thead>
+<tr>
+<th>Proposed work</th>
+<th>Build on</th>
+<th>First deliverable and completion evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>N01 · Versioned execution plan</strong></td>
+<td>F02, F03, F06–F08</td>
+<td>Persist run, library, member identities, expected destinations and decision revision. Return a reviewable manifest. On changed input, return the changed rows and invalidate live execution. Prove an old preview cannot move files after one keeper changes.</td>
+</tr>
+<tr>
+<td><strong>N02 · Interrupted-operation recovery</strong></td>
+<td>F01, F07, N01</td>
+<td>List pending operations after restart. Compare both filesystem locations with recorded identity, classify eligible actions, and expose ambiguous rows for operator review. Fault-inject before and after move/commit and retain a per-row receipt.</td>
+</tr>
+<tr>
+<td><strong>N03 · Library identity and write destinations</strong></td>
+<td>F06–F08, F13</td>
+<td>Show the chosen library, writable appdata and optional report mirror before scan and before execute. Two identically named products on separate libraries must retain separate approvals. Test remount and offline root states.</td>
+</tr>
+<tr>
+<td><strong>N04 · Resumable review queue</strong></td>
+<td>F09, N01</td>
+<td>Persist filter, cursor and explicit decisions per run. Support keep-both and clearing the last choice. A fresh browser session restores saved decisions and the next unreviewed group after page 5.</td>
+</tr>
+<tr>
+<td><strong>N05 · Evidence beside recommendations</strong></td>
+<td>F05, F11, E05</td>
+<td>Surface exactly what matched and what remains unknown. Link the operator to differing members or audio audition. Verify that sampled agreement and complete byte equality produce different labels and available actions.</td>
+</tr>
+<tr>
+<td><strong>N06 · Resumable NAS indexing</strong></td>
+<td>F06, F10, F12, E04</td>
+<td>Save completed directory units, timestamps, inputs and skipped reasons. Disconnect during a scan, remount, resume and compare with a fresh complete inventory. Publish the dataset size, cache state and timing methodology with any throughput claim.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="cleanup-with-compatibility-checkpoints">Cleanup with compatibility checkpoints</h2>
+<div class="table-scroll" tabindex="0" role="region" aria-label="Review table"><table>
+<thead>
+<tr>
+<th>Order</th>
+<th>Patch and reason</th>
+<th>Before removing the old implementation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>C01 · Historical extractor</strong></td>
+<td>Search for callers of <code>scripts/extract_engine_mixins.py</code>. Its hard-coded slices describe a historical monolith. Retire the active command or bind archival use to the original input digest and output to a separate path.</td>
+<td>Verify no build or maintainer task invokes it, run import/CLI smoke and check that new instructions no longer direct users to overwrite current modules. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/scripts/extract_engine_mixins.py#L60">Historical slices</a></td>
+</tr>
+<tr>
+<td><strong>C02 · Copied imports</strong></td>
+<td>Tackle one API router or mixin per patch. Determine which imports are re-exported, monkeypatched by tests or needed by PyInstaller. Keep explicit compatibility exports.</td>
+<td>Record the set of OpenAPI path-and-method pairs and diff both directions, run that router's tests and start the frozen API. Equal route counts can conceal a removed route replaced by another. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/api/routers/jobs.py#L11">Candidate import block</a></td>
+</tr>
+<tr>
+<td><strong>C03 · Feedback persistence</strong></td>
+<td>Centralize path resolution and coordinated writes, then migrate stores individually. Keep schemas, exports and stamp scoping readable across versions.</td>
+<td>Run old/new/merged fixtures, concurrent writers and packaged restart before removing legacy readers. This work shares the data-home migration in F07. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/duplicate_feedback.py#L122">Store I/O</a></td>
+</tr>
+<tr>
+<td><strong>C04 · Separate decisions from movement</strong></td>
+<td>Extract the duplicate decision and motion result first. Drive CSV, API counters and history from the same result. Then apply the pattern to restructure and archive staging.</td>
+<td>Keep legacy CLI arguments and packaged entry points working. Compare actual paths, return statuses and CSVs between old/new fixtures, including a failed move. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/audiotheca/engine.py#L1003">First extraction</a></td>
+</tr>
+<tr>
+<td><strong>C05 · UI client and large panels</strong></td>
+<td>Split domain calls behind existing exports. Preserve session handling, retry behavior, credentials, ticket creation, cancellation and error rendering. Extract run-scoped state before lazy-loading routes.</td>
+<td>Compare routes and keyboard behavior, inspect requests after session expiry and run all browser tests. Measure the production bundle and route load before claiming a speed win. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/ui/src/api/client.ts#L71">Shared request path</a></td>
+</tr>
+<tr>
+<td><strong>C06 · Report schema</strong></td>
+<td>Create old/current golden files and the same query corpus for CSV and SQLite. Test stable ordering, totals, fallback and partially written runs. Then consolidate conversion functions incrementally.</td>
+<td>Diff normalized domain rows field by field. Preserve exact original paths in execution records while keeping presentation masking intact. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/api/report_loader.py#L174">CSV reader</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/audiotheca/job_store.py#L215">SQLite mapping</a></td>
+</tr>
+<tr>
+<td><strong>C07 · Duplicate help assets</strong></td>
+<td>Start with the 32 exact duplicates identified in the review. Generate app help bytes from a canonical source in the packaging step. Verify filename and case as well as content.</td>
+<td>Build with an empty output directory, resolve the HTML help references, and open built-in help offline in the packaged app. Keep GitHub README media links working. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/scripts/build_doc_gifs.py#L1">Asset workflow</a></td>
+</tr>
+<tr>
+<td><strong>C08 · Dependency roles and release metadata</strong></td>
+<td>Separate runtime, optional analyses, tests and packaging dependencies while preserving the current installer entry point. Generate human-facing versions from designated engine and application sources.</td>
+<td>Build the web UI and both sidecars from clean environments, verify app health/version, and inspect the actual published asset names when a release is issued. Keep dependency installation independently fatal in CI. <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/requirements.txt#L1">Current dependency file</a> · <a href="https://github.com/cephyrixzyth/Audiotheca/blob/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb/.github/workflows/ci.yml#L33">Dependency step</a></td>
+</tr>
+</tbody>
+</table></div>
+<p>Preserve the historical staging spelling <code>_delete-canidates</code> in readers and recovery records. Introducing a corrected spelling requires explicit handling when a library already contains one or both directories. A display-only wording change can ship separately.</p>
+<h2 id="sequence-and-completion-record">Sequence and completion record</h2>
+<ol>
+<li><strong>Protect files.</strong> Start with F02 and cover both staging routes. Follow with F01, F03, F04 and F05. Include X01 when touching CLI outcome reporting. Gate release advice about live cleanup on filesystem assertions for these cases.</li>
+<li><strong>Preserve state.</strong> Coordinate F06, F07, F08, X05 and F13. Land dual-format readers before enabling a new writer. Keep legacy approvals reviewable and bind live operations to a verified current library.</li>
+<li><strong>Finish operator workflows.</strong> Land F09–F12, X02–X04, F14 and F15. Add E01 only after undo is safe. Then deliver N01–N05 in dependency order. Qualify F16 for each advertised packaging channel.</li>
+<li><strong>Reduce maintenance cost.</strong> Do narrowly scoped C01/C02 independently when evidence supports it. Sequence the remaining cleanup with the features they support. Optional native, audio, cloud and DAW work each needs its own fixtures and platform checks.</li>
+</ol>
+<p>Use this record when handing off a finished patch. It lets a new agent resume without reconstructing an earlier conversation.</p>
+<pre><code class="language-text">Finding ID and checkout HEAD
+User action and expected surviving data
+Entry points changed and persisted fields affected
+Baseline command, assertions reached and observed values
+Post-fix command, exact outcomes and relevant positive controls
+Before/after files, decisions, report IDs or cursor sequence
+Compatibility fixture and restart/retry result
+Native or external checks still open, with the precise environment needed
+Next independent work item
+</code></pre>
+<p><strong>Scope of the evidence.</strong> This handoff was exercised on macOS arm64 against the pinned source with installed Python dependencies. The regression runner covers 17 focused cases. Other rows specify additional work and future acceptance tests. Windows PowerShell semantics, release publication, Linux and Windows desktop packaging, a complete Tauri bundle, real NAS performance, DAW hosts and live provider accounts require their named environments. The temporary branch-condition experiment supplies a diagnostic comparison. The deliverables are a review and implementation kit.</p></main></div><script>if(matchMedia("(max-width:880px)").matches)document.querySelector("nav details").open=false;</script></body></html>

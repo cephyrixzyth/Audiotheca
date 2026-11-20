@@ -1,3 +1,5 @@
+import { useReviewDecision, WorkIssue, WorkScope } from "./ReviewWorkbench";
+import { LoadingStatus } from "../ui/LoadingStatus";
 import { useEffect, useMemo, useState } from "react";
 import {
   approveSceneRename,
@@ -25,6 +27,9 @@ interface Props {
 }
 
 export function SceneRenames({ stamp }: Props) {
+  const { ask, dialog } = useReviewDecision();
+  const [readError, setReadError] = useState("");
+  const [revision, setRevision] = useState(0);
   const { query } = useContextSidebar();
   const [items, setItems] = useState<SceneRenameItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,11 +59,14 @@ export function SceneRenames({ stamp }: Props) {
   }, [stamp]);
 
   useEffect(() => {
-    setLoading(true);
+    let current = true;
+    setReadError(""); setLoading(true);
     fetchSceneRenames(stamp)
-      .then(setItems)
-      .finally(() => setLoading(false));
-  }, [stamp]);
+      .then(rows => { if (current) setItems(rows); })
+      .catch((err: Error) => { if (current) setReadError(err.message); })
+      .finally(() => { if (current) setLoading(false); });
+    return () => { current = false; };
+  }, [stamp, revision]);
 
   async function handleApprove(row: SceneRenameItem) {
     try {
@@ -89,9 +97,7 @@ export function SceneRenames({ stamp }: Props) {
 
   async function handleOverride(row: SceneRenameItem) {
     const current = lookupByPath(overrides, row.source_path) ?? row.proposed_name;
-    const proposed = window.prompt("Proposed folder name:", current)?.trim();
-    if (!proposed) return;
-    try {
+    ask({ title: "Edit folder name", detail: row.source_path, action: "Save folder name", fields: [{ label: "Proposed folder name", value: current }], accept: async ([proposed]) => {
       const res = await overrideSceneName(stamp, {
         source_path: row.source_path,
         proposed_name: proposed,
@@ -100,9 +106,7 @@ export function SceneRenames({ stamp }: Props) {
       });
       setOverrides(res.state.name_overrides ?? {});
       setMsg(`Name override saved for ${row.scene_id}`);
-    } catch (err) {
-      setMsg(err instanceof Error ? err.message : "Override failed");
-    }
+    }});
   }
 
   async function handleMissingPart01(row: SceneRenameItem) {
@@ -160,41 +164,32 @@ export function SceneRenames({ stamp }: Props) {
     );
   }, [items, query, overrides]);
 
-  if (loading) return <div className="count-muted">Loading scene renames…</div>;
+  if (loading) return <LoadingStatus>Loading scene renames…</LoadingStatus>;
+  if (readError) return <WorkIssue message={readError} retry={() => setRevision(v => v + 1)} />;
   if (items.length === 0) return <div className="empty">No scene rename plans for this run.</div>;
-  if (visibleItems.length === 0) {
-    return <div className="empty">No scene renames match your search.</div>;
-  }
 
   return (
-    <div>
-      <div className="banner dry">
-        Approve renames here, then dry-run execute. Live renames require explicit confirmation.
-      </div>
-
-      <div className="toolbar">
+    <div className="review-workspace">
+      {dialog}
+      <WorkScope title="Rename approved folders" detail="Compare the scene ID and source folder with the proposed product name. Approvals apply across the current run.">
         <Button
           variant="secondary"
           title="Simulate approved scene folder renames without moving disk"
-          onClick={() => void handleExecute(true)}
+          onClick={() => void handleExecute(true).catch((err: Error) => setMsg(err.message))}
         >
           Dry-run approved
         </Button>
         <Button
-          variant="primary"
+          variant="danger"
           title="Rename approved scene-hash folders to product names on disk"
-          onClick={() => {
-            if (window.confirm("Apply approved scene renames on disk? This moves folders.")) {
-              void handleExecute(false);
-            }
-          }}
+          onClick={() => ask({title: "Rename approved folders?", detail: "This applies the saved approvals for run " + stamp + " on disk.", scope: <pre>{approved.join("\n")}</pre>, writesFiles: true, action: "Rename approved folders", accept: () => handleExecute(false)})}
           disabled={approved.length === 0}
         >
           Execute approved ({approved.length})
         </Button>
-        {msg && <span className="count-muted">{msg}</span>}
-      </div>
-
+      </WorkScope>
+      {visibleItems.length === 0 && <p className="empty">No scene renames match this search. Saved approvals are listed in the execution confirmation.</p>}
+      {msg && <p role="status" className="banner dry">{msg}</p>}
       {executeResults.length > 0 && (
         <ExecuteResultsPanel
           title="Scene rename execute results"

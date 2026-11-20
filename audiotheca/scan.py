@@ -36,6 +36,7 @@ from investigation_feedback import (
 from progress import PhaseProgress, tqdm_bar
 from vendor_db import VENDOR_DATABASE
 
+from audiotheca.incremental_scan import tree_signature
 from audiotheca.config import *  # noqa: F403
 from audiotheca.binary_arch import inspect_binary, merge_arch_flags
 from audiotheca.helpers import _archive_stem, _limit_walk, _squash, _walk_depth
@@ -45,7 +46,7 @@ from audiotheca.platform_routing import off_lane, os_status_label, platform_flag
 
 class ScanMixin:
     # ------------------------------------------------------------------
-    # Scan cache (keyed by path + dir mtime; busted on every version bump)
+    # Scan cache (keyed by path + recursive metadata signature; busted on every version bump)
     # ------------------------------------------------------------------
 
     def _load_cache(self) -> dict:
@@ -53,7 +54,7 @@ class ScanMixin:
         try:
             with open(cache_path, encoding="utf-8") as handle:
                 data = json.load(handle)
-            if data.get("engine") == CACHE_SCHEMA:
+            if data.get("engine") == CACHE_SCHEMA and data.get("options") == self.scan_options.to_dict():
                 return data.get("items", {})
         except (OSError, json.JSONDecodeError, ValueError):
             pass
@@ -63,26 +64,23 @@ class ScanMixin:
         try:
             REPORT_DIR.mkdir(parents=True, exist_ok=True)
             with open(REPORT_DIR / "scan_cache.json", "w", encoding="utf-8") as handle:
-                json.dump({"engine": CACHE_SCHEMA, "items": self.scan_cache}, handle)
+                json.dump({"engine": CACHE_SCHEMA, "options": self.scan_options.to_dict(), "items": self.scan_cache}, handle)
         except OSError as exc:
             self.logger.warning("Could not save scan cache: %s", exc)
 
     def _get_scan_info(self, path: Path) -> tuple[dict, bool]:
         key = str(path)
-        try:
-            mtime = path.stat().st_mtime
-        except OSError:
-            mtime = None
+        signature = tree_signature(path)
 
         cached = self.scan_cache.get(key)
-        if cached and mtime is not None and cached.get("mtime") == mtime:
+        if cached and signature is not None and cached.get("signature") == signature:
             self._inc("cache_hits")
             return cached["info"], True
 
         info = self._scan_tree(path)
-        if mtime is not None:
+        if signature is not None and signature == tree_signature(path):
             with self._lock:
-                self.scan_cache[key] = {"mtime": mtime, "info": info}
+                self.scan_cache[key] = {"signature": signature, "info": info}
         return info, False
 
     # ------------------------------------------------------------------

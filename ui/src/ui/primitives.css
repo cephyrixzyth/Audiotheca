@@ -22,7 +22,7 @@
 
   /* Radius scale */
   --ui-radius-sm: 4px;
-  --ui-radius-md: 6px;
+  --ui-radius-md: 7px;
   --ui-radius-lg: 10px;
   --ui-radius-pill: 999px;
 
@@ -36,8 +36,8 @@
 
   /* Type scale (rem) */
   --ui-fs-xs: 0.72rem;
-  --ui-fs-sm: 0.78rem;
-  --ui-fs-md: 0.85rem;
+  --ui-fs-sm: 0.82rem;
+  --ui-fs-md: 0.9rem;
   --ui-fs-lg: 1rem;
   --ui-fs-xl: 1.35rem;
 

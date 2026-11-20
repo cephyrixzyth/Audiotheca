@@ -30,9 +30,13 @@ jobs:
           cache: npm
           cache-dependency-path: ui/package-lock.json
 
+      - name: Install locked UI dependencies
+        working-directory: ui
+        run: npm ci
+
       - name: npm audit
         working-directory: ui
-        run: npm ci && npm run audit:deps
+        run: npm run audit:deps
         continue-on-error: true
 
       - name: UI unit tests
@@ -42,3 +46,10 @@ jobs:
       - name: UI build
         working-directory: ui
         run: npm run build
+
+
+      - name: Browser regressions
+        working-directory: ui
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:e2e

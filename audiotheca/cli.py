@@ -49,6 +49,7 @@ def _resolve_stamp(args: argparse.Namespace) -> str | None:
 def _cmd_scan(args: argparse.Namespace) -> int:
     dry_run = DRY_RUN if args.dry_run is None else args.dry_run
     engine = DeduplicationEngine(root_dir=args.root, dry_run=dry_run, max_workers=MAX_WORKERS)
+    engine.mirror_reports = args.mirror_reports
     result = engine.run()
     if result == "stopped":
         return 2
@@ -106,6 +107,9 @@ def _cmd_execute(args: argparse.Namespace) -> int:
             return 1
         data = json.loads(plan_path.read_text(encoding="utf-8"))
         plan_stamp = str(data.get("stamp", stamp))
+        if plan_stamp != stamp:
+            print("Imported plan belongs to another run", file=sys.stderr)
+            return 1
         plan = decisions.ApprovedPlan(
             stamp=plan_stamp,
             created=data.get("created", ""),
@@ -136,10 +140,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     scan = sub.add_parser("scan", help="Run full library scan (default: dry-run)")
     _add_root_and_mode(scan)
+    scan.add_argument("--mirror-reports", action="store_true", help="Also write report copies in the library during a dry scan")
     scan.set_defaults(handler=_cmd_scan)
 
     report = sub.add_parser("report", help="Import reports to SQLite or open a report file")
-    report.add_argument("--stamp", help="Run stamp (YYYYMMDD_HHMM)")
+    report.add_argument("--stamp", help="Run ID shown in the report list")
     report.add_argument("--job", choices=["latest"], help="Use latest job or run summary")
     report.add_argument(
         "--import-only",
@@ -159,7 +164,7 @@ def build_parser() -> argparse.ArgumentParser:
     report.set_defaults(handler=_cmd_report)
 
     execute = sub.add_parser("execute", help="Execute an approved duplicate staging plan")
-    execute.add_argument("--stamp", help="Run stamp (YYYYMMDD_HHMM)")
+    execute.add_argument("--stamp", help="Run ID shown in the report list")
     execute.add_argument("--job", choices=["latest"], help="Use latest job or run summary")
     execute.add_argument("--plan", help="Path to approved plan JSON (default: decisions/approved_{stamp}.json)")
     _add_root_and_mode(execute)

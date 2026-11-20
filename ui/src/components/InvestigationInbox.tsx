@@ -1,3 +1,5 @@
+import { useReviewDecision, WorkIssue, WorkScope } from "./ReviewWorkbench";
+import { LoadingStatus } from "../ui/LoadingStatus";
 import { useEffect, useMemo, useState } from "react";
 import {
   bulkAddVendorGaps,
@@ -49,6 +51,8 @@ function confidenceTierTone(confidence: string): BadgeTone {
 }
 
 export function InvestigationInbox({ stamp }: Props) {
+  const { ask, dialog } = useReviewDecision();
+  const [revision, setRevision] = useState(0);
   const { query } = useContextSidebar();
   const [view, setView] = useState<"list" | "groups">("groups");
   const [items, setItems] = useState<InvestigationItem[]>([]);
@@ -91,6 +95,7 @@ export function InvestigationInbox({ stamp }: Props) {
   }, [stamp]);
 
   useEffect(() => {
+    let current = true;
     setLoading(true);
     setError(null);
     const timer = setTimeout(() => {
@@ -102,11 +107,12 @@ export function InvestigationInbox({ stamp }: Props) {
           limit: 150,
         })
           .then((res) => {
+            if (!current) return;
             setGroups(res.groups);
             setTotal(res.total);
           })
-          .catch((err: Error) => setError(err.message))
-          .finally(() => setLoading(false));
+          .catch((err: Error) => { if (current) setError(err.message); })
+          .finally(() => { if (current) setLoading(false); });
       } else {
         fetchInvestigation(stamp, {
           bucket: bucket || undefined,
@@ -114,15 +120,16 @@ export function InvestigationInbox({ stamp }: Props) {
           limit: 500,
         })
           .then((res) => {
+            if (!current) return;
             setItems(res.items);
             setTotal(res.total);
           })
-          .catch((err: Error) => setError(err.message))
-          .finally(() => setLoading(false));
+          .catch((err: Error) => { if (current) setError(err.message); })
+          .finally(() => { if (current) setLoading(false); });
       }
     }, query ? 250 : 0);
-    return () => clearTimeout(timer);
-  }, [stamp, bucket, query, view]);
+    return () => { current = false; clearTimeout(timer); };
+  }, [stamp, bucket, query, view, revision]);
 
   const resolvedSet = new Set(
     (feedback?.resolved_paths ?? []).map((p) => pathKey(p)),
@@ -169,22 +176,21 @@ export function InvestigationInbox({ stamp }: Props) {
   }
 
   async function handleSetVendor(row: InvestigationItem) {
-    const vendor = window.prompt("Vendor / company name:", "")?.trim();
-    if (!vendor) return;
-    const keywords = window.prompt("Keywords (comma-separated, optional):", row.item_name)?.trim();
+    ask({ title: "Assign vendor", detail: row.current_path, action: "Save correction", fields: [{ label: "Company name" }, { label: "Keywords (optional, comma-separated)", optional: true, value: row.item_name }], accept: async ([vendor, keywords]) => {
     await apply(row, "set_vendor", vendor, {
       reason: "vendor_known",
       keywords: keywords ? keywords.split(",").map((k) => k.trim()).filter(Boolean) : [],
     });
+    }});
   }
 
   async function handleGroupSetVendor(group: InvestigationGroup) {
-    const vendor = window.prompt("Vendor for group:", group.group_key.replace(/\./g, " "))?.trim();
-    if (!vendor) return;
+    ask({ title: "Assign vendor to group", detail: `${group.paths.length} paths in ${group.group_key}`, action: "Save correction", fields: [{ label: "Company name", value: group.group_key.replace(/\./g, " ") }], accept: async ([vendor]) => {
     await bulkApply(group.paths, "set_vendor", vendor, {
       reason: "vendor_known",
       keywords: [group.group_key.toLowerCase(), vendor.toLowerCase()],
     });
+    }});
   }
 
   async function handleGroupAddVendorDb(group: InvestigationGroup) {
@@ -203,9 +209,7 @@ export function InvestigationInbox({ stamp }: Props) {
   }
 
   async function handleNewBucket(row: InvestigationItem) {
-    const name = newBucket.trim() || window.prompt("New bucket name (e.g. _awaiting_license):", "")?.trim();
-    if (!name) return;
-    const desc = window.prompt("Bucket description:", "User-defined bucket") ?? "";
+    ask({ title: "Create review bucket", detail: row.current_path, action: "Save correction", fields: [{ label: "Bucket name", value: newBucket }, { label: "Description (optional)", optional: true }], accept: async ([name, desc]) => {
     await correctInvestigation(stamp, {
       path: row.current_path,
       action: "reassign_bucket",
@@ -219,18 +223,19 @@ export function InvestigationInbox({ stamp }: Props) {
       setNewBucket("");
       setMsg(`Created bucket ${name} and assigned ${row.item_name}`);
     });
+    }});
   }
 
   async function handleLinkParent(row: InvestigationItem) {
-    const parent = window.prompt("Parent product path:", "")?.trim();
-    if (!parent) return;
+    ask({ title: "Link parent product", detail: row.current_path, action: "Save correction", fields: [{ label: "Parent product path" }], accept: async ([parent]) => {
     await apply(row, "link_parent", parent, { reason: "is_component" });
+    }});
   }
 
   async function handleGroupLinkParent(group: InvestigationGroup) {
-    const parent = window.prompt("Parent path for all items in group:", "")?.trim();
-    if (!parent) return;
+    ask({ title: "Link group to parent", detail: `${group.paths.length} paths in ${group.group_key}`, action: "Save correction", fields: [{ label: "Parent product path" }], accept: async ([parent]) => {
     await bulkApply(group.paths, "link_parent", parent, { reason: "is_component" });
+    }});
   }
 
   async function handleResolved(row: InvestigationItem) {
@@ -238,9 +243,7 @@ export function InvestigationInbox({ stamp }: Props) {
   }
 
   async function handleAddVendor() {
-    const company = window.prompt("Company name:", "")?.trim();
-    if (!company) return;
-    const keywords = window.prompt("Keywords (comma-separated):", "")?.trim();
+    ask({ title: "Add vendor feedback", detail: `Save a vendor correction for run ${stamp}.`, action: "Save correction", fields: [{ label: "Company name" }, { label: "Keywords (optional, comma-separated)", optional: true }], accept: async ([company, keywords]) => {
     await correctInvestigation(stamp, {
       path: "",
       action: "add_vendor",
@@ -251,6 +254,7 @@ export function InvestigationInbox({ stamp }: Props) {
       setFeedback(res.state);
       setMsg(`Added vendor ${company} to feedback`);
     });
+    }});
   }
 
   function rowStatus(row: InvestigationItem) {
@@ -263,7 +267,9 @@ export function InvestigationInbox({ stamp }: Props) {
   }
 
   return (
-    <div>
+    <div className="review-workspace">
+      {dialog}
+      <WorkScope title={view === "groups" ? "Resolve matching prefixes" : "Resolve one item at a time"} detail={view === "groups" ? "Bulk corrections apply to every path in a prefix group. Switch to All items when only one path needs a different vendor or parent." : "Inspect the evidence for each path and record its vendor, parent product or review bucket."} />
       <div className="toolbar">
         <Tabs
           aria-label="Investigation view"
@@ -283,7 +289,7 @@ export function InvestigationInbox({ stamp }: Props) {
           ]}
         />
         <span className="count-muted">
-          {loading ? "Loading…" : `${total.toLocaleString()} ${view === "groups" ? "groups" : "items"}`}
+          {loading ? <LoadingStatus /> : `${total.toLocaleString()} ${view === "groups" ? "groups" : "items"}`}
           {feedback ? ` · ${feedback.corrections.length} corrections` : ""}
         </span>
         <Button
@@ -306,10 +312,10 @@ export function InvestigationInbox({ stamp }: Props) {
         <div className="banner dry">{BUCKET_HINTS[bucket]}</div>
       )}
 
-      {msg && <div className="banner dry">{msg}</div>}
-      {error && <div className="error">{error}</div>}
+      {msg && <div className="banner dry" role="status">{msg}</div>}
+      {error && <WorkIssue message={error} retry={() => setRevision(v => v + 1)} />}
 
-      <InvestigationLookupPanel />
+      <details className="work-disclosure"><summary>Look up vendor evidence</summary><InvestigationLookupPanel /></details>
 
       {!loading && view === "groups" && groups.length === 0 && !error && (
         <div className="empty">No investigation groups match your filters.</div>
@@ -343,7 +349,7 @@ export function InvestigationInbox({ stamp }: Props) {
               {...rowAttrs}
             >
               <td>
-                <strong>{group.group_key}</strong>
+                <Button size="sm" variant="ghost" aria-pressed={selectedGroup === group.group_key} onClick={() => setSelectedGroup(group.group_key)}>{group.group_key}</Button>
               </td>
               <td>{group.count}</td>
               <td>
@@ -363,7 +369,7 @@ export function InvestigationInbox({ stamp }: Props) {
                     title="Add this prefix to vendor_overrides.json so future scans recognize the vendor"
                     onClick={(e) => {
                       e.stopPropagation();
-                      void handleGroupAddVendorDb(group);
+                      void handleGroupAddVendorDb(group).catch((err: Error) => setError(err.message));
                     }}
                   >
                     Add to DB

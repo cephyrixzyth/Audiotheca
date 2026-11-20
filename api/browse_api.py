@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import base64
+import hashlib
+import json
 import os
+from functools import lru_cache
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import HTTPException
@@ -18,7 +23,64 @@ IGNORE_DIR_NAMES = {
     "node_modules",
 }
 
-MAX_DIR_SCAN = 10_000
+def _revision(*values) -> str:
+    return hashlib.sha256(json.dumps(values, sort_keys=True).encode()).hexdigest()
+
+
+def _cursor(scope: str, position) -> str:
+    return base64.urlsafe_b64encode(json.dumps([scope, position]).encode()).decode()
+
+
+def _resume(token: str, scope: str):
+    if not token:
+        return None
+    try:
+        identity, position = json.loads(base64.urlsafe_b64decode(token))
+    except (ValueError, TypeError, UnicodeError) as exc:
+        raise HTTPException(400, "Invalid browse cursor") from exc
+    if identity != scope:
+        raise HTTPException(409, "Folder, run or search changed. Refresh to start again.")
+    return position
+
+
+@lru_cache(maxsize=32)
+def _directory_index(folder: Path, scope: str, version: tuple[int, ...]):
+    """Cache names and file types only. A directory rename invalidates its parent's index."""
+    rows = []
+    skipped = 0
+    with os.scandir(folder) as scan:
+        for item in scan:
+            if item.name in IGNORE_DIR_NAMES:
+                continue
+            try:
+                rows.append((item.name, item.is_dir(follow_symlinks=False)))
+            except OSError:
+                skipped += 1
+    rows.sort(key=lambda row: (not row[1], row[0].casefold(), row[0]))
+    return rows, skipped
+
+
+def _index(folder: Path, scope: str):
+    stat = folder.stat()
+    version = (stat.st_dev, stat.st_ino, stat.st_mtime_ns, stat.st_ctime_ns)
+    rows, skipped = _directory_index(folder, scope, version)
+    return rows, skipped, version
+
+
+def _entry(folder: Path, name: str, is_dir: bool):
+    path = folder / name
+    size = None
+    if not is_dir:
+        try:
+            size = path.lstat().st_size
+        except OSError:
+            pass
+    return {"name": name, "path": str(path), "is_dir": is_dir, "size": size}
+
+
+def _observed_at() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
 
 
 def archive_suffix(path: Path) -> str:
@@ -52,82 +114,54 @@ def _resolve_browse_target(raw: str) -> Path:
     raise HTTPException(status_code=404, detail=f"path not found: {path}")
 
 
-def list_directory(path: str = "", *, limit: int = 500) -> dict[str, object]:
+def list_directory(path: str = "", *, limit: int = 500, cursor: str = "", stamp: str = "", folders_only: bool = False) -> dict[str, object]:
+    roots = security.library_roots()
+    scope = _revision([str(root) for root in roots], stamp)
+    parent = None
+    skipped = 0
+    target_path = ""
     if not path.strip():
-        roots = security.library_roots()
-        entries = [
-            {
-                "name": root.name or str(root),
-                "path": str(root),
-                "is_dir": True,
-                "size": None,
-            }
-            for root in roots
-        ]
-        return {"path": "", "parent": None, "entries": entries[:limit]}
-
-    target = _resolve_browse_target(path)
-    if not target.is_dir():
-        parent = str(target.parent) if target.parent != target else None
-        try:
-            size = target.stat().st_size
-        except OSError:
-            size = None
-        return {
-            "path": str(target),
-            "parent": parent,
-            "entries": [
-                {
-                    "name": target.name,
-                    "path": str(target),
-                    "is_dir": False,
-                    "size": size,
-                }
-            ],
-        }
-
-    parent: str | None
-    try:
-        parent = str(target.parent) if target.parent != target else None
-        if parent and not any(
-            security.is_path_under(Path(parent), root) or is_logical_path_under(parent, root)
-            for root in security.library_roots()
+        entries = [{"name": root.name or str(root), "path": str(root), "is_dir": True, "size": None} for root in roots]
+        entries.sort(key=lambda row: (row["name"].casefold(), row["path"]))
+        version = [row["path"] for row in entries]
+        total = len(entries)
+    else:
+        target = _resolve_browse_target(path)
+        target_path = str(target)
+        if target.parent != target and any(
+            security.is_path_under(target.parent, root) or is_logical_path_under(target.parent, root) for root in roots
         ):
-            parent = None
-    except OSError:
-        parent = None
-
-    entries: list[dict[str, object]] = []
-    rows: list[os.DirEntry[str]] = []
-    try:
-        with os.scandir(target) as scan:
-            for row in scan:
-                if row.name in IGNORE_DIR_NAMES:
-                    continue
-                rows.append(row)
-                if len(rows) >= MAX_DIR_SCAN:
-                    break
-    except OSError as exc:
-        raise HTTPException(status_code=500, detail=f"Cannot read directory: {exc}") from exc
-
-    rows.sort(key=lambda row: (not row.is_dir(follow_symlinks=False), row.name.lower()))
-    for row in rows[:limit]:
-        try:
-            is_dir = row.is_dir(follow_symlinks=False)
-            size = None if is_dir else row.stat(follow_symlinks=False).st_size
-        except OSError:
-            is_dir = row.is_dir(follow_symlinks=False)
-            size = None
-        entries.append(
-            {
-                "name": row.name,
-                "path": str(Path(row.path)),
-                "is_dir": is_dir,
-                "size": size,
-            }
-        )
-
-    return {"path": str(target), "parent": parent, "entries": entries}
+            parent = str(target.parent)
+        if target.is_dir():
+            try:
+                rows, skipped, version = _index(target, scope)
+            except OSError as exc:
+                raise HTTPException(500, f"Cannot read directory: {exc}") from exc
+            if folders_only:
+                rows = [row for row in rows if row[1]]
+            total = len(rows)
+            entries = None
+        else:
+            entries = [] if folders_only else [_entry(target.parent, target.name, False)]
+            version = target_path
+            total = len(entries)
+    page_scope = _revision(scope, target_path, version, folders_only)
+    start = _resume(cursor, page_scope)
+    if start is None:
+        start = 0
+    if type(start) is not int or start < 0 or start > total:
+        raise HTTPException(400, "Invalid page offset")
+    end = min(start + limit, total)
+    if entries is None:
+        entries = [_entry(target, name, directory) for name, directory in rows[start:end]]
+    else:
+        entries = entries[start:end]
+    return {
+        "path": target_path, "parent": parent, "entries": entries,
+        "total": total, "partial": bool(skipped), "skipped": skipped,
+        "next_cursor": _cursor(page_scope, end) if end < total else None,
+        "observed_at": _observed_at(),
+    }
 
 
 def list_archive_contents(path: str, *, limit: int = 200) -> dict[str, object]:
@@ -173,101 +207,118 @@ def list_directory_enriched(
     *,
     stamp: str = "",
     limit: int = 500,
+    cursor: str = "",
 ) -> dict[str, object]:
-    data = list_directory(path, limit=limit)
+    data = list_directory(path, limit=limit, stamp=stamp, cursor=cursor)
     entries = data.get("entries")
     if stamp and isinstance(entries, list):
         data["entries"] = enrich_entries(entries, stamp)
     return data
 
 
-def list_tree_children(path: str = "", *, limit: int = 500) -> dict[str, object]:
-    """Return immediate subdirectories for lazy folder-tree loading."""
-    data = list_directory(path, limit=limit)
-    entries = data.get("entries")
-    children: list[dict[str, object]] = []
-    if isinstance(entries, list):
-        children = [entry for entry in entries if entry.get("is_dir")]
-    return {
-        "path": data.get("path", path),
-        "parent": data.get("parent"),
-        "children": children[:limit],
-    }
+def list_tree_children(path: str = "", *, limit: int = 500, cursor: str = "") -> dict[str, object]:
+    result = list_directory(path, limit=limit, cursor=cursor, folders_only=True)
+    result["children"] = result.pop("entries")
+    return result
 
 
 def search_library_paths(
-    query: str,
-    *,
-    root: str = "",
-    limit: int = 200,
-    max_scan: int = 20_000,
+    query: str, *, root: str = "", limit: int = 200, max_scan: int = 20_000,
+    cursor: str = "", stamp: str = "",
 ) -> dict[str, object]:
-    """Instant path/name search under a library root (Everything-style)."""
-    q = query.strip().lower()
+    """Visit a bounded page of the live tree. Resume from an indexed ancestor stack."""
+    q = query.strip().casefold()
     if len(q) < 2:
-        raise HTTPException(status_code=400, detail="query must be at least 2 characters")
-
+        raise HTTPException(400, "query must be at least 2 characters")
     roots = security.library_roots()
     if root.strip():
-        start = security.assert_library_path(root, must_exist=True, label="root")
-        if not start.is_dir():
-            raise HTTPException(status_code=400, detail="root must be a directory")
-        search_roots = [start]
+        root_path = security.assert_library_path(root, must_exist=True, label="root")
+        if not root_path.is_dir():
+            raise HTTPException(400, "root must be a directory")
+        bases = [root_path]
     else:
-        search_roots = list(roots)
-
-    matches: list[dict[str, object]] = []
-    scanned = 0
-    for base in search_roots:
-        if scanned >= max_scan or len(matches) >= limit:
-            break
+        # Avoid duplicate hits when a child and its parent are both configured.
+        bases = [base for base in dict.fromkeys(roots) if not any(other in base.parents for other in roots)]
+    library_scope = _revision([str(path) for path in roots], stamp)
+    scope = _revision(library_scope, [str(path) for path in bases], q)
+    state = _resume(cursor, scope)
+    base_ix, frames, scanned, skipped = (0, [], 0, 0) if state is None else _search_position(state, len(bases))
+    before = scanned
+    matches = []
+    # Frames contain directory entry indices and directory revisions. Only traverse
+    # directories obtained from the server index, never paths supplied in a token.
+    stack = []
+    def push(folder: Path, saved=None):
+        nonlocal skipped
         try:
-            for dirpath, dirnames, filenames in os.walk(base):
-                dirnames[:] = [d for d in dirnames if d not in IGNORE_DIR_NAMES]
-                # Match folders
-                for name in list(dirnames):
-                    scanned += 1
-                    if scanned > max_scan or len(matches) >= limit:
-                        break
-                    if q in name.lower():
-                        full = Path(dirpath) / name
-                        matches.append(
-                            {
-                                "name": name,
-                                "path": str(full),
-                                "is_dir": True,
-                                "size": None,
-                            }
-                        )
-                for name in filenames:
-                    scanned += 1
-                    if scanned > max_scan or len(matches) >= limit:
-                        break
-                    if q not in name.lower() and q not in str(Path(dirpath) / name).lower().replace("\\", "/"):
-                        continue
-                    full = Path(dirpath) / name
-                    try:
-                        size = full.stat().st_size
-                    except OSError:
-                        size = None
-                    matches.append(
-                        {
-                            "name": name,
-                            "path": str(full),
-                            "is_dir": False,
-                            "size": size,
-                        }
-                    )
-                if scanned >= max_scan or len(matches) >= limit:
-                    break
+            if folder.is_symlink():
+                raise OSError("Directory became a symbolic link")
+            rows, omitted, version = _index(folder, library_scope)
         except OSError:
-            continue
+            if saved:
+                raise HTTPException(409, "Search folder changed. Restart the search.")
+            skipped += 1
+            return
+        revision = _revision(version)
+        index = 0
+        if saved:
+            index, expected = saved
+            if expected != revision or index > len(rows):
+                raise HTTPException(409, "Search folder changed. Restart the search.")
+        else:
+            skipped += omitted
+        stack.append([folder, rows, index, revision])
 
+    for frame in frames:
+        if not stack:
+            folder = bases[base_ix]
+        else:
+            folder, rows, index, _ = stack[-1]
+            if index == 0 or not rows[index - 1][1]:
+                raise HTTPException(400, "Invalid folder cursor")
+            folder = folder / rows[index - 1][0]
+        push(folder, frame)
+    while base_ix < len(bases):
+        if not stack:
+            push(bases[base_ix])
+            if not stack:
+                base_ix += 1
+                continue
+        folder, rows, pos, _ = stack[-1]
+        if pos == len(rows):
+            stack.pop()
+            if not stack:
+                base_ix += 1
+            continue
+        if scanned - before >= max_scan or len(matches) >= limit:
+            break
+        name, directory = rows[pos]
+        stack[-1][2] += 1
+        scanned += 1
+        path = folder / name
+        if q in name.casefold() or (not directory and q in path.as_posix().casefold()):
+            matches.append(_entry(folder, name, directory))
+        if directory:
+            push(path)
+    more = base_ix < len(bases)
+    position = [base_ix, [[frame[2], frame[3]] for frame in stack], scanned, skipped]
     return {
-        "query": query.strip(),
-        "root": root.strip() or None,
-        "scanned": scanned,
-        "count": len(matches),
-        "truncated": scanned >= max_scan or len(matches) >= limit,
-        "entries": matches[:limit],
+        "query": query.strip(), "root": root.strip() or None,
+        "scanned": scanned, "count": len(matches), "entries": matches,
+        "truncated": more or bool(skipped), "skipped": skipped,
+        "next_cursor": _cursor(scope, position) if more else None, "observed_at": _observed_at(),
     }
+
+
+def _search_position(state, roots_count):
+    try:
+        base, frames, scanned, skipped = state
+        if not (type(base) is int and 0 <= base < roots_count and isinstance(frames, list)
+                and type(scanned) is int and scanned >= 0 and type(skipped) is int and skipped >= 0):
+            raise ValueError
+        for index, version in frames:
+            if type(index) is not int or index < 0 or not isinstance(version, str):
+                raise ValueError
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(400, "Invalid search cursor") from exc
+    return base, frames, scanned, skipped

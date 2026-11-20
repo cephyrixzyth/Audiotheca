@@ -1,3 +1,6 @@
+import "./LibraryWorkspace.css";
+import { LibraryAssetIcon, type AssetKind } from "./LibraryAssetIcon";
+import { LoadingStatus } from "../ui/LoadingStatus";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   browseDirectoryEnriched,
@@ -8,9 +11,23 @@ import {
   lookupAcoustId,
   openInExplorer,
   type BrowseEntry,
+  type DirectoryPage,
+  type SearchPage,
 } from "../api/client";
-import { useExplorerPathDrag } from "../contexts/FileExplorerContext";
-import { Badge, Button, DropdownMenu, VirtualTable, type DropdownItem, type VirtualRowAttrs } from "../ui";
+import { useLocation, useNavigate } from "react-router-dom";
+import {
+  useFileExplorer,
+  useExplorerPathDrag,
+} from "../contexts/FileExplorerContext";
+import {
+  Badge,
+  Button,
+  DropdownMenu,
+  VirtualTable,
+  type DropdownItem,
+  type VirtualRowAttrs,
+} from "../ui";
+import { explorerBreadcrumbs } from "../utils/explorerBreadcrumbs";
 import { formatAcoustIdResult } from "../utils/acoustId";
 import { isPeBinaryFile } from "../utils/peName";
 import { AudioPreviewStrip, isAuditionableFile } from "./AudioPreviewStrip";
@@ -27,11 +44,25 @@ function isArchiveName(name: string): boolean {
   return ARCHIVE_EXT.test(name);
 }
 
+function assetKind(entry: BrowseEntry): AssetKind {
+  return entry.is_dir
+    ? "folder"
+    : isAuditionableFile(entry.name)
+      ? "audio"
+      : isArchiveName(entry.name)
+        ? "archive"
+        : "file";
+}
+function lastSegment(path: string) {
+  return path.split(/[/\\]/).filter(Boolean).pop() || "Library locations";
+}
+
 function formatSize(size: number | null | undefined): string {
   if (size == null) return "—";
   if (size < 1024) return `${size} B`;
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-  if (size < 1024 * 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  if (size < 1024 * 1024 * 1024)
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
   return `${(size / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
@@ -73,28 +104,10 @@ function saveLastPath(path: string): void {
   }
 }
 
-function pathSegments(fullPath: string): { label: string; path: string }[] {
-  if (!fullPath) return [];
-  const sep = fullPath.includes("\\") ? "\\" : "/";
-  const parts = fullPath.split(/[/\\]/).filter(Boolean);
-  const crumbs: { label: string; path: string }[] = [];
-  let acc = "";
-  for (let i = 0; i < parts.length; i += 1) {
-    const part = parts[i];
-    if (i === 0 && /^[a-zA-Z]:/.test(part)) {
-      acc = part.endsWith(":") || part.endsWith(":\\") ? part : `${part}${sep}`;
-      if (!acc.endsWith(sep) && /^[a-zA-Z]:$/.test(part)) acc = `${part}${sep}`;
-    } else {
-      acc = acc ? `${acc}${sep}${part}` : part;
-    }
-    crumbs.push({ label: part.replace(/\\$/, ""), path: acc });
-  }
-  return crumbs;
-}
-
 function isUnderSubtree(path: string, subtreeRoot: string | null): boolean {
   if (!subtreeRoot?.trim()) return true;
-  const norm = (p: string) => p.replace(/\\/g, "/").toLowerCase().replace(/\/+$/, "");
+  const norm = (p: string) =>
+    p.replace(/\\/g, "/").toLowerCase().replace(/\/+$/, "");
   const child = norm(path);
   const root = norm(subtreeRoot);
   return child === root || child.startsWith(`${root}/`);
@@ -109,15 +122,26 @@ type PeHintPayload = {
   capabilities?: Array<{ id: string; severity: string; description: string }>;
 };
 
-function PeHintBanner({ result, busy }: { result: PeHintPayload | null; busy: boolean }) {
+function PeHintBanner({
+  result,
+  busy,
+}: {
+  result: PeHintPayload | null;
+  busy: boolean;
+}) {
   if (busy) return <p className="count-muted">PE capability hints…</p>;
   if (!result) return null;
   const caps = result.capabilities ?? [];
   return (
-    <div className="banner dry explorer-pe-hint" style={{ marginTop: "0.75rem" }}>
+    <div
+      className="banner dry explorer-pe-hint"
+      style={{ marginTop: "0.75rem" }}
+    >
       <strong>PE capability hints</strong>
       {result.error ? <p className="count-muted">{result.error}</p> : null}
-      {result.engine && !result.error ? <p className="count-muted">Engine: {result.engine}</p> : null}
+      {result.engine && !result.error ? (
+        <p className="count-muted">Engine: {result.engine}</p>
+      ) : null}
       {!result.error && (
         <div className="pe-cap-cell">
           {caps.length === 0
@@ -125,7 +149,13 @@ function PeHintBanner({ result, busy }: { result: PeHintPayload | null; busy: bo
             : caps.slice(0, 8).map((cap) => (
                 <Badge
                   key={cap.id}
-                  tone={cap.severity === "high" ? "high" : cap.severity === "medium" ? "medium" : "ready"}
+                  tone={
+                    cap.severity === "high"
+                      ? "high"
+                      : cap.severity === "medium"
+                        ? "medium"
+                        : "ready"
+                  }
                   title={cap.description}
                 >
                   {cap.id}
@@ -145,6 +175,7 @@ type ContextMenuState = {
 
 interface PaneProps {
   paneId: string;
+  workspace?: boolean;
   initialPath: string;
   stamp: string | null;
   subtreeRoot: string | null;
@@ -157,6 +188,7 @@ interface PaneProps {
 
 function ExplorerPane({
   paneId,
+  workspace = false,
   initialPath,
   stamp,
   subtreeRoot,
@@ -166,6 +198,9 @@ function ExplorerPane({
   onPathChange,
   onRequestDiff,
 }: PaneProps) {
+  const navigate = useNavigate();
+  const { close, panelOpen } = useFileExplorer();
+  const [kindFilter, setKindFilter] = useState<AssetKind | "all">("all");
   const [currentPath, setCurrentPath] = useState(initialPath);
   const [parent, setParent] = useState<string | null>(null);
   const [entries, setEntries] = useState<BrowseEntry[]>([]);
@@ -174,12 +209,20 @@ function ExplorerPane({
   const [archiveEntries, setArchiveEntries] = useState<string[] | null>(null);
   const [archiveError, setArchiveError] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
-  const [hoverAuditionPath, setHoverAuditionPath] = useState<string | null>(null);
+  const [hoverAuditionPath, setHoverAuditionPath] = useState<string | null>(
+    null,
+  );
   const [selectedEntry, setSelectedEntry] = useState<BrowseEntry | null>(null);
+  const auditionTrim = useRef({ path: "", start: 0, end: 1 });
   const [pathQuery, setPathQuery] = useState("");
   const [libraryHits, setLibraryHits] = useState<BrowseEntry[] | null>(null);
+  const [dirPage, setDirPage] = useState<DirectoryPage | null>(null);
+  const [searchPage, setSearchPage] = useState<SearchPage | null>(null);
+  const searchSequence = useRef(0);
   const [librarySearching, setLibrarySearching] = useState(false);
-  const [librarySearchError, setLibrarySearchError] = useState<string | null>(null);
+  const [librarySearchError, setLibrarySearchError] = useState<string | null>(
+    null,
+  );
   const [facetType, setFacetType] = useState<string>("");
   const [facetBuckets, setFacetBuckets] = useState<{
     type: Array<{ value: string; count: number }>;
@@ -208,17 +251,23 @@ function ExplorerPane({
     if (!libraryHits && q) {
       rows = entries.filter(
         (entry) =>
-          entry.name.toLowerCase().includes(q) || entry.path.toLowerCase().replace(/\\/g, "/").includes(q),
+          entry.name.toLowerCase().includes(q) ||
+          entry.path.toLowerCase().replace(/\\/g, "/").includes(q),
       );
     }
     if (facetType) {
       const token = facetType.toLowerCase();
       rows = rows.filter(
-        (entry) => entry.is_dir || entry.name.toLowerCase().includes(token) || entry.path.toLowerCase().includes(token),
+        (entry) =>
+          entry.is_dir ||
+          entry.name.toLowerCase().includes(token) ||
+          entry.path.toLowerCase().includes(token),
       );
     }
-    return rows;
-  }, [entries, pathQuery, libraryHits, facetType]);
+    return kindFilter === "all"
+      ? rows
+      : rows.filter((entry) => assetKind(entry) === kindFilter);
+  }, [entries, pathQuery, libraryHits, facetType, kindFilter]);
 
   async function loadFacets() {
     if (!currentPath) {
@@ -241,33 +290,48 @@ function ExplorerPane({
     }
   }
 
-  async function runLibrarySearch() {
+  function clearSearch() {
+    searchSequence.current += 1;
+    setSearchPage(null);
+    setLibraryHits(null);
+    setLibrarySearching(false);
+    setLibrarySearchError(null);
+  }
+
+  async function runLibrarySearch(cursor = "") {
     const q = pathQuery.trim();
     if (q.length < 2) {
       setLibrarySearchError("Type at least 2 characters to search the library");
       return;
     }
+    const seq = ++searchSequence.current;
     setLibrarySearching(true);
     setLibrarySearchError(null);
     try {
       const searchRoot = subtreeRoot?.trim() || currentPath || "";
-      const data = await browseSearch(q, searchRoot, 200);
-      setLibraryHits(data.entries);
-      if (!data.entries.length) setLibrarySearchError("No path matches");
+      const data = await browseSearch(q, searchRoot, 200, cursor, stamp ?? "");
+      if (seq !== searchSequence.current) return;
+      setSearchPage(data);
+      setLibraryHits((prior) =>
+        cursor ? [...(prior ?? []), ...data.entries] : data.entries,
+      );
     } catch (err) {
-      setLibraryHits([]);
-      setLibrarySearchError(err instanceof Error ? err.message : String(err));
+      if (seq === searchSequence.current)
+        setLibrarySearchError(err instanceof Error ? err.message : String(err));
     } finally {
-      setLibrarySearching(false);
+      if (seq === searchSequence.current) setLibrarySearching(false);
     }
   }
 
-  useEffect(() => () => {
-    if (hoverTimer.current) clearTimeout(hoverTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    },
+    [],
+  );
 
   const loadDir = useCallback(
-    async (path: string) => {
+    async (path: string, cursor = "", selectFile = false) => {
       if (subtreeRoot && path && !isUnderSubtree(path, subtreeRoot)) {
         setError(`Path is outside the tab subtree (${subtreeRoot})`);
         return;
@@ -275,25 +339,41 @@ function ExplorerPane({
       const seq = ++loadSeq.current;
       setLoading(true);
       setError(null);
-      setArchiveEntries(null);
-      setArchiveError(null);
+      if (!cursor) {
+        searchSequence.current += 1;
+        setLibrarySearching(false);
+        setSearchPage(null);
+        setDirPage(null);
+        setArchiveEntries(null);
+        setArchiveError(null);
         setLibraryHits(null);
         setLibrarySearchError(null);
         setSelectedEntry(null);
+        setKindFilter("all");
         setFacetType("");
         setFacetBuckets({ type: [], bpm: [], key: [] });
         setPeHint(null);
         setPeHintBusy(false);
         setAcoustIdMsg(null);
+      }
       try {
-        const data = await browseDirectoryEnriched(path, stamp ?? "");
+        const data = await browseDirectoryEnriched(path, stamp ?? "", cursor);
         if (seq !== loadSeq.current) return;
         const resolved = data.path || path;
         setCurrentPath(resolved);
         saveLastPath(resolved);
         onPathChange?.(resolved);
         setParent(data.parent);
-        setEntries(data.entries);
+        setDirPage(data);
+        setEntries((prior) =>
+          cursor ? [...prior, ...data.entries] : data.entries,
+        );
+        if (selectFile) {
+          const selected = data.entries.find(
+            (item) => !item.is_dir && item.path === path,
+          );
+          setSelectedEntry(selected ?? null);
+        }
       } catch (err) {
         if (seq !== loadSeq.current) return;
         setError(err instanceof Error ? err.message : String(err));
@@ -305,7 +385,7 @@ function ExplorerPane({
   );
 
   useEffect(() => {
-    void loadDir(initialPath);
+    void loadDir(initialPath, "", true);
   }, [initialPath, loadDir]);
 
   useEffect(() => {
@@ -319,11 +399,14 @@ function ExplorerPane({
 
   async function openEntry(entry: BrowseEntry) {
     if (entry.is_dir) {
+      setPathQuery("");
       await loadDir(entry.path);
       return;
     }
     if (isArchiveName(entry.name)) {
       const seq = ++loadSeq.current;
+      clearSearch();
+      setDirPage(null);
       setLoading(true);
       setArchiveError(null);
       try {
@@ -362,7 +445,10 @@ function ExplorerPane({
       const data = (await fetchPeHints(path)) as PeHintPayload;
       setPeHint(data);
     } catch (err) {
-      setPeHint({ ok: false, error: err instanceof Error ? err.message : String(err) });
+      setPeHint({
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
     } finally {
       setPeHintBusy(false);
     }
@@ -379,7 +465,13 @@ function ExplorerPane({
     }
   }
 
-  const crumbs = useMemo(() => pathSegments(currentPath), [currentPath]);
+  const crumbs = useMemo(
+    () =>
+      explorerBreadcrumbs(currentPath).filter((crumb) =>
+        treeRoots.some((root) => isUnderSubtree(crumb.path, root.path)),
+      ),
+    [currentPath, treeRoots],
+  );
 
   const contextItems: DropdownItem[] = contextMenu
     ? [
@@ -411,7 +503,8 @@ function ExplorerPane({
               },
             ]
           : []),
-        ...(!contextMenu.entry.is_dir && isAuditionableFile(contextMenu.entry.name)
+        ...(!contextMenu.entry.is_dir &&
+        isAuditionableFile(contextMenu.entry.name)
           ? [
               {
                 id: "acoustid",
@@ -435,7 +528,12 @@ function ExplorerPane({
   return (
     <div className="file-explorer-pane" data-pane={paneId}>
       <nav className="file-explorer-breadcrumbs" aria-label="Current path">
-        <Button variant="ghost" size="sm" title="Library roots" onClick={() => void loadDir("")}>
+        <Button
+          variant="ghost"
+          size="sm"
+          title="Library roots"
+          onClick={() => void loadDir("")}
+        >
           Roots
         </Button>
         {crumbs.map((crumb, index) => (
@@ -457,10 +555,44 @@ function ExplorerPane({
 
       <div className="file-explorer-body">
         {showTree && (
-          <FileExplorerTree roots={treeRoots} selectedPath={currentPath} onSelect={(p) => void loadDir(p)} />
+          <aside
+            className="library-location-rail"
+            aria-label="Library locations"
+          >
+            <div className="library-rail-heading">
+              <h3>Locations</h3>
+              <span>{treeRoots.length}</span>
+            </div>
+            <FileExplorerTree
+              roots={treeRoots}
+              selectedPath={currentPath}
+              onSelect={(p) => {
+                setPathQuery("");
+                void loadDir(p);
+              }}
+            />
+            <div className="library-drop-block">
+              <h4>Open a path</h4>{" "}
+              <DropZoneOverlay
+                receiveDesktopDrops={!workspace || !panelOpen}
+                onOpen={(row) => {
+                  setPathQuery("");
+                  void loadDir(row.path, "", row.action !== "browse");
+                }}
+              />
+            </div>
+          </aside>
         )}
 
         <div className="file-explorer-main">
+          <header className="library-location-title">
+            <div>
+              <h3>
+                {libraryHits ? "Search results" : lastSegment(currentPath)}
+              </h3>
+              {currentPath && <span title={currentPath}>{currentPath}</span>}
+            </div>
+          </header>
           <div className="file-explorer-toolbar">
             <Button
               variant="secondary"
@@ -469,7 +601,7 @@ function ExplorerPane({
               title="Go to parent folder"
               onClick={() => parent && void loadDir(parent)}
             >
-              ↑ Up
+              Up
             </Button>
             {archiveEntries && (
               <Button
@@ -486,13 +618,12 @@ function ExplorerPane({
               <input
                 type="search"
                 value={pathQuery}
-                placeholder="Filter folder · Search library…"
+                placeholder="Filter names or search below this folder"
                 aria-label="Search paths"
                 title="Type to filter this folder instantly. Press Enter or Search for recursive library search."
                 onChange={(e) => {
                   setPathQuery(e.target.value);
-                  setLibraryHits(null);
-                  setLibrarySearchError(null);
+                  clearSearch();
                 }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
@@ -501,8 +632,7 @@ function ExplorerPane({
                   }
                   if (e.key === "Escape") {
                     setPathQuery("");
-                    setLibraryHits(null);
-                    setLibrarySearchError(null);
+                    clearSearch();
                   }
                 }}
               />
@@ -523,8 +653,7 @@ function ExplorerPane({
                 title="Clear search filter"
                 onClick={() => {
                   setPathQuery("");
-                  setLibraryHits(null);
-                  setLibrarySearchError(null);
+                  clearSearch();
                 }}
               >
                 Clear
@@ -541,7 +670,33 @@ function ExplorerPane({
             </Button>
           </div>
 
-          {(facetBuckets.type.length > 0 || facetBuckets.bpm.length > 0 || facetBuckets.key.length > 0) && (
+          {workspace && !archiveEntries && (
+            <div className="library-kind-filter" aria-label="File types">
+              {(["all", "audio", "folder", "archive", "file"] as const).map(
+                (kind) => (
+                  <button
+                    type="button"
+                    key={kind}
+                    aria-pressed={kindFilter === kind}
+                    onClick={() => setKindFilter(kind)}
+                  >
+                    {
+                      {
+                        all: "All",
+                        audio: "Audio",
+                        folder: "Folders",
+                        archive: "Archives",
+                        file: "Other",
+                      }[kind]
+                    }
+                  </button>
+                ),
+              )}
+            </div>
+          )}
+          {(facetBuckets.type.length > 0 ||
+            facetBuckets.bpm.length > 0 ||
+            facetBuckets.key.length > 0) && (
             <div className="explorer-facet-groups">
               <button
                 type="button"
@@ -572,25 +727,98 @@ function ExplorerPane({
             </div>
           )}
 
-          {loading && <p className="count-muted">Loading…</p>}
+          {loading && <LoadingStatus>Loading…</LoadingStatus>}
           {error && <div className="error">{error}</div>}
           {archiveError && <div className="error">{archiveError}</div>}
-          {librarySearchError && <p className="count-muted">{librarySearchError}</p>}
-          {libraryHits && (
-            <p className="count-muted">
-              Library search: {libraryHits.length} hit{libraryHits.length === 1 ? "" : "s"}
-            </p>
+          {librarySearchError && (
+            <p className="count-muted">{librarySearchError}</p>
+          )}
+          {!archiveEntries && !libraryHits && dirPage && (
+            <div className="explorer-page-controls">
+              <span role="status">
+                {entries.length} of {dirPage.total ?? entries.length} items
+                {dirPage.partial ? ` · ${dirPage.skipped} unavailable` : ""}
+                {dirPage.observed_at && (
+                  <>
+                    {" "}
+                    · Checked{" "}
+                    <time
+                      dateTime={dirPage.observed_at}
+                      title={dirPage.observed_at}
+                    >
+                      {new Date(dirPage.observed_at).toLocaleTimeString()}
+                    </time>
+                  </>
+                )}
+              </span>
+              {dirPage.next_cursor && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={loading}
+                  onClick={() =>
+                    void loadDir(currentPath, dirPage.next_cursor!)
+                  }
+                >
+                  Load more items
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={loading}
+                onClick={() => void loadDir(currentPath)}
+              >
+                Refresh folder
+              </Button>
+            </div>
+          )}
+          {libraryHits && searchPage && (
+            <div className="explorer-page-controls">
+              <span role="status">
+                {libraryHits.length} matches · {searchPage.scanned} entries
+                checked
+                {searchPage.next_cursor
+                  ? " · Search incomplete"
+                  : searchPage.skipped
+                    ? " · Partial results"
+                    : " · Search complete"}
+                {searchPage.skipped
+                  ? ` · ${searchPage.skipped} unavailable`
+                  : ""}
+              </span>
+              {searchPage.next_cursor && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={librarySearching}
+                  onClick={() => void runLibrarySearch(searchPage.next_cursor!)}
+                >
+                  Continue search
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={librarySearching}
+                onClick={() => void runLibrarySearch()}
+              >
+                Refresh search
+              </Button>
+            </div>
           )}
           {!libraryHits && pathQuery.trim() && !loading && !archiveEntries && (
             <p className="count-muted">
-              Folder filter: {filteredEntries.length}/{entries.length}
+              Folder filter · {filteredEntries.length} of {entries.length}{" "}
+              loaded items
             </p>
           )}
 
           {!loading && archiveEntries && (
             <div className="file-explorer-list">
               <p className="count-muted">
-                Archive contents ({archiveEntries.length} entries) — listed without extracting
+                Archive contents ({archiveEntries.length} entries) — listed
+                without extracting
               </p>
               <ul className="archive-entry-list">
                 {archiveEntries.map((name, index) => (
@@ -606,6 +834,11 @@ function ExplorerPane({
               colCount={4}
               estimateSize={40}
               tableClassName="data-table file-explorer-table"
+              emptyMessage={
+                pathQuery || kindFilter !== "all"
+                  ? "No files match these filters."
+                  : "This location is empty."
+              }
               header={
                 <tr>
                   <th>Name</th>
@@ -620,8 +853,13 @@ function ExplorerPane({
                   entry={entry}
                   rowAttrs={rowAttrs}
                   selected={selectedEntry?.path === entry.path}
-                  autoAudition={hoverAuditionPath === entry.path && isAuditionableFile(entry.name)}
-                  onHover={(active) => setHoverAuditionDebounced(active ? entry.path : null)}
+                  autoAudition={
+                    hoverAuditionPath === entry.path &&
+                    isAuditionableFile(entry.name)
+                  }
+                  onHover={(active) =>
+                    setHoverAuditionDebounced(active ? entry.path : null)
+                  }
                   onSelect={() => setSelectedEntry(entry)}
                   onOpen={() => void openEntry(entry)}
                   onContextMenu={(e) => {
@@ -633,36 +871,134 @@ function ExplorerPane({
               )}
             />
           )}
-
-          {selectedEntry && !selectedEntry.is_dir && isAuditionableFile(selectedEntry.name) && (
-            <div className="explorer-spot-preview" aria-label="Spot preview">
-              <div className="explorer-spot-meta">
-                <strong title={selectedEntry.path}>{selectedEntry.name}</strong>
-                <span className="count-muted">{formatSize(selectedEntry.size)}</span>
-              </div>
-              <AudioPreviewStrip path={selectedEntry.path} name={selectedEntry.name} autoPlay={false} />
-            </div>
-          )}
-          {selectedEntry && !selectedEntry.is_dir && isPeBinaryFile(selectedEntry.name) && (
-            <div className="explorer-spot-preview" aria-label="PE capability hints">
-              <div className="explorer-spot-meta">
-                <strong title={selectedEntry.path}>{selectedEntry.name}</strong>
-                <span className="count-muted">{formatSize(selectedEntry.size)}</span>
+        </div>
+        <aside className="library-asset-inspector" aria-label="Asset inspector">
+          <h3>Inspector</h3>
+          <div className="library-inspector-title">
+            <LibraryAssetIcon
+              kind={selectedEntry ? assetKind(selectedEntry) : "folder"}
+              large
+            />
+            <strong title={selectedEntry?.path || currentPath}>
+              {selectedEntry?.name || lastSegment(currentPath)}
+            </strong>
+            <span>{selectedEntry ? assetKind(selectedEntry) : "Location"}</span>
+          </div>
+          {selectedEntry ? (
+            <>
+              {isAuditionableFile(selectedEntry.name) &&
+                !selectedEntry.is_dir && (
+                  <div
+                    className="explorer-spot-preview"
+                    aria-label="Spot preview"
+                  >
+                    <AudioPreviewStrip
+                      key={selectedEntry.path}
+                      path={selectedEntry.path}
+                      name={selectedEntry.name}
+                      onTrimChange={(start, end) => {
+                        auditionTrim.current = {
+                          path: selectedEntry.path,
+                          start,
+                          end,
+                        };
+                      }}
+                    />
+                    <Button
+                      variant="primary"
+                      onClick={() => {
+                        const params = new URLSearchParams({
+                          path: selectedEntry.path,
+                        });
+                        if (stamp) params.set("run", stamp);
+                        close();
+                        navigate(
+                          { pathname: "/studio", search: params.toString() },
+                          {
+                            state: {
+                              studioImport: crypto.randomUUID(),
+                              sourceTrim:
+                                auditionTrim.current.path === selectedEntry.path
+                                  ? [
+                                      auditionTrim.current.start,
+                                      auditionTrim.current.end,
+                                    ]
+                                  : undefined,
+                            },
+                          },
+                        );
+                      }}
+                    >
+                      Add to mix
+                    </Button>
+                  </div>
+                )}
+              <dl>
+                <dt>File size</dt>
+                <dd>{formatSize(selectedEntry.size)}</dd>
+                {selectedEntry.vendor && (
+                  <>
+                    <dt>Vendor</dt>
+                    <dd>{selectedEntry.vendor}</dd>
+                  </>
+                )}
+                {selectedEntry.status && (
+                  <>
+                    <dt>Audit</dt>
+                    <dd>{selectedEntry.status}</dd>
+                  </>
+                )}
+              </dl>
+              <details className="library-location-details">
+                <summary>Full path</summary>
+                <p>{selectedEntry.path}</p>
                 <Button
-                  variant="ghost"
                   size="sm"
+                  variant="ghost"
+                  onClick={() => void copyPath(selectedEntry.path)}
+                >
+                  Copy path
+                </Button>
+              </details>
+              {!!selectedEntry.is_dir && (
+                <Button onClick={() => void openEntry(selectedEntry)}>
+                  Browse folder
+                </Button>
+              )}
+              {!selectedEntry.is_dir && isArchiveName(selectedEntry.name) && (
+                <Button onClick={() => void openEntry(selectedEntry)}>
+                  List archive
+                </Button>
+              )}
+              {!selectedEntry.is_dir && isPeBinaryFile(selectedEntry.name) && (
+                <Button
                   disabled={peHintBusy}
-                  title="Capa-lite PE capability hints (pefile heuristics)"
                   onClick={() => void handlePeHints(selectedEntry.path)}
                 >
-                  {peHintBusy ? "PE hints…" : "PE hints"}
+                  Inspect binary
                 </Button>
-              </div>
-            </div>
+              )}
+            </>
+          ) : (
+            <>
+              <dl>
+                <dt>Loaded items</dt>
+                <dd>{entries.length}</dd>
+                <dt>Audio files</dt>
+                <dd>
+                  {entries.filter((e) => assetKind(e) === "audio").length}
+                </dd>
+                <dt>Folders</dt>
+                <dd>{entries.filter((e) => e.is_dir).length}</dd>
+              </dl>
+              <p className="library-inspector-hint">
+                Select a file to inspect its details or audition audio.
+              </p>
+            </>
           )}
           <PeHintBanner result={peHint} busy={peHintBusy} />
-          {acoustIdMsg ? <p className="count-muted">{acoustIdMsg}</p> : null}
-        </div>
+          {acoustIdMsg && <p role="status">{acoustIdMsg}</p>}
+        </aside>
       </div>
 
       {contextMenu && (
@@ -709,11 +1045,15 @@ function ExplorerRow({
   rowAttrs?: VirtualRowAttrs;
 }) {
   const drag = useExplorerPathDrag(entry.path);
-  const auditLabel = [entry.vendor, entry.status, entry.investigation_bucket].filter(Boolean).join(" · ");
+  const auditLabel = [entry.vendor, entry.status, entry.investigation_bucket]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <tr
-      className={[entry.is_dir ? "dir-row" : "", selected ? "selected" : ""].filter(Boolean).join(" ")}
+      className={[entry.is_dir ? "dir-row" : "", selected ? "selected" : ""]
+        .filter(Boolean)
+        .join(" ")}
       onClick={onSelect}
       onDoubleClick={onOpen}
       onContextMenu={onContextMenu}
@@ -725,6 +1065,7 @@ function ExplorerRow({
     >
       <td>
         <div className="explorer-name-cell">
+          <LibraryAssetIcon kind={assetKind(entry)} />
           <button
             type="button"
             className="linkish-btn"
@@ -751,11 +1092,24 @@ function ExplorerRow({
             {entry.name}
           </button>
           {!entry.is_dir && isAuditionableFile(entry.name) && (
-            <AudioPreviewStrip path={entry.path} name={entry.name} autoPlay={autoAudition} compact />
+            <AudioPreviewStrip
+              path={entry.path}
+              name={entry.name}
+              autoPlay={autoAudition}
+              compact
+            />
           )}
         </div>
       </td>
-      <td>{entry.is_dir ? "Folder" : isArchiveName(entry.name) ? "Archive" : "File"}</td>
+      <td className="library-type-cell">
+        {assetKind(entry) === "audio"
+          ? entry.name.split(".").pop()?.toUpperCase()
+          : entry.is_dir
+            ? "Folder"
+            : isArchiveName(entry.name)
+              ? "Archive"
+              : "File"}
+      </td>
       <td>{formatSize(entry.size)}</td>
       <td className="explorer-audit-cell">{auditLabel || "—"}</td>
     </tr>
@@ -764,6 +1118,7 @@ function ExplorerRow({
 
 interface Props {
   initialPath: string;
+  fullPage?: boolean;
   secondaryPath?: string | null;
   dualPane?: boolean;
   stamp?: string | null;
@@ -777,6 +1132,7 @@ interface Props {
 
 export function FileExplorerPanel({
   initialPath,
+  fullPage = false,
   secondaryPath = null,
   dualPane = false,
   stamp = null,
@@ -788,39 +1144,60 @@ export function FileExplorerPanel({
   onClose,
 }: Props) {
   const [treeRoots, setTreeRoots] = useState<BrowseEntry[]>([]);
+  const { openPath } = useFileExplorer();
+  const [compare, setCompare] = useState(false);
+  const [compareStart, setCompareStart] = useState("");
   const [primaryPath, setPrimaryPath] = useState(initialPath);
-  const [secondaryCurrentPath, setSecondaryCurrentPath] = useState(secondaryPath ?? "");
-  const [diffPair, setDiffPair] = useState<{ archivePath: string; folderPath: string } | null>(
-    null,
+  const [secondaryCurrentPath, setSecondaryCurrentPath] = useState(
+    secondaryPath ?? "",
   );
+  const [diffPair, setDiffPair] = useState<{
+    archivePath: string;
+    folderPath: string;
+  } | null>(null);
 
   useEffect(() => {
-    void browseDirectoryEnriched("", stamp ?? "").then((data) =>
-      setTreeRoots(data.entries.filter((e) => e.is_dir)),
-    );
+    let active = true;
+    void browseDirectoryEnriched("", stamp ?? "")
+      .then((data) => {
+        if (active) setTreeRoots(data.entries.filter((e) => e.is_dir));
+      })
+      .catch(() => {
+        if (active) setTreeRoots([]);
+      });
+    return () => {
+      active = false;
+    };
   }, [stamp]);
 
   useEffect(() => {
+    if (fullPage) return;
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape" && !pinned) onClose();
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose, pinned]);
+  }, [onClose, pinned, fullPage]);
 
   const shellClass = [
     "file-explorer-shell",
-    pinned ? "pinned" : "modal",
+    fullPage ? "route-explorer" : pinned ? "pinned" : "modal",
     popOut ? "popout" : "",
-    dualPane && secondaryPath ? "dual-pane" : "",
+    (dualPane && secondaryPath) || compare ? "dual-pane" : "",
   ]
     .filter(Boolean)
     .join(" ");
 
   return (
     <div
-      className={pinned ? "file-explorer-dock" : `file-explorer-backdrop${popOut ? " popout-mode" : ""}`}
-      onClick={pinned ? undefined : onClose}
+      className={
+        fullPage
+          ? "library-workspace"
+          : pinned
+            ? "file-explorer-dock"
+            : `file-explorer-backdrop${popOut ? " popout-mode" : ""}`
+      }
+      onClick={pinned || fullPage ? undefined : onClose}
       role="presentation"
     >
       {diffPair && stamp && (
@@ -834,84 +1211,165 @@ export function FileExplorerPanel({
       <aside
         className={shellClass}
         onClick={(e) => e.stopPropagation()}
-        role="dialog"
+        role={fullPage ? "region" : "dialog"}
         aria-label="Library explorer"
       >
-        <header className="file-explorer-header">
-          <div>
-            <h2>Library explorer</h2>
-            {subtreeRoot && (
-              <p className="count-muted" title="Subtree filter for current tab">
-                Filtered to: {subtreeRoot}
-              </p>
-            )}
-          </div>
-          <DropZoneOverlay />
-          <div className="file-explorer-header-actions">
+        {fullPage ? (
+          <div className="library-view-tools">
+            <div className="library-view-mode">
+              <Button
+                size="sm"
+                active={!compare}
+                aria-pressed={!compare}
+                onClick={() => setCompare(false)}
+              >
+                Browse
+              </Button>
+              <Button
+                size="sm"
+                active={compare}
+                aria-pressed={compare}
+                onClick={() => {
+                  setCompareStart(primaryPath || treeRoots[0]?.path || "");
+                  setCompare(true);
+                }}
+              >
+                Compare folders
+              </Button>
+            </div>
             <Button
-              variant="secondary"
               size="sm"
-              active={popOut}
-              title={popOut ? "Standard width panel" : "Pop out wide explorer"}
-              onClick={onTogglePopOut}
+              variant="ghost"
+              disabled={!primaryPath && !treeRoots.length}
+              onClick={() => openPath(primaryPath || treeRoots[0].path)}
             >
-              {popOut ? "Standard" : "Pop out"}
+              Open as panel
             </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              active={pinned}
-              title={pinned ? "Unpin panel (closes on backdrop click)" : "Pin panel docked on the right"}
-              onClick={onTogglePin}
-            >
-              {pinned ? "Unpin" : "Pin"}
-            </Button>
-            <Button variant="secondary" size="sm" onClick={onClose} title="Close explorer (Esc)">
-              Close
-            </Button>
-          </div>
-        </header>
-
-        {dualPane && secondaryPath ? (
-          <div className="file-explorer-dual">
-            <ExplorerPane
-              paneId="primary"
-              initialPath={initialPath}
-              stamp={stamp}
-              subtreeRoot={subtreeRoot ?? null}
-              treeRoots={treeRoots}
-              showTree
-              peerPath={secondaryCurrentPath}
-              onPathChange={setPrimaryPath}
-              onRequestDiff={(archivePath, folderPath) =>
-                setDiffPair({ archivePath, folderPath })
-              }
-            />
-            <ExplorerPane
-              paneId="secondary"
-              initialPath={secondaryPath}
-              stamp={stamp}
-              subtreeRoot={subtreeRoot ?? null}
-              treeRoots={treeRoots}
-              showTree={false}
-              peerPath={primaryPath}
-              onPathChange={setSecondaryCurrentPath}
-              onRequestDiff={(archivePath, folderPath) =>
-                setDiffPair({ archivePath, folderPath })
-              }
-            />
           </div>
         ) : (
+          <header className="file-explorer-header">
+            <div>
+              <h2>Library explorer</h2>
+              {subtreeRoot && (
+                <p
+                  className="count-muted"
+                  title="Subtree filter for current tab"
+                >
+                  Filtered to: {subtreeRoot}
+                </p>
+              )}
+            </div>
+            <div className="file-explorer-header-actions">
+              <Button
+                variant="secondary"
+                size="sm"
+                active={popOut}
+                title={
+                  popOut ? "Standard width panel" : "Pop out wide explorer"
+                }
+                onClick={onTogglePopOut}
+              >
+                {popOut ? "Standard" : "Pop out"}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                active={pinned}
+                title={
+                  pinned
+                    ? "Unpin panel (closes on backdrop click)"
+                    : "Pin panel docked on the right"
+                }
+                onClick={onTogglePin}
+              >
+                {pinned ? "Unpin" : "Pin"}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={onClose}
+                title="Close explorer (Esc)"
+              >
+                Close
+              </Button>
+            </div>
+          </header>
+        )}
+
+        <div
+          className={
+            (dualPane && secondaryPath) || compare
+              ? "file-explorer-dual"
+              : "file-explorer-single"
+          }
+        >
           <ExplorerPane
-            paneId="single"
-            initialPath={initialPath}
+            workspace={fullPage}
+            paneId={
+              (dualPane && secondaryPath) || compare ? "primary" : "single"
+            }
+            initialPath={
+              initialPath ||
+              (fullPage && treeRoots.length === 1 ? treeRoots[0].path : "")
+            }
             stamp={stamp}
             subtreeRoot={subtreeRoot ?? null}
             treeRoots={treeRoots}
             showTree
+            onPathChange={setPrimaryPath}
+            peerPath={
+              (dualPane && secondaryPath) || compare
+                ? secondaryCurrentPath
+                : null
+            }
+            onRequestDiff={
+              stamp
+                ? (archivePath, folderPath) =>
+                    setDiffPair({ archivePath, folderPath })
+                : undefined
+            }
           />
-        )}
+          {((dualPane && secondaryPath) || compare) && (
+            <ExplorerPane
+              workspace={fullPage}
+              paneId="secondary"
+              initialPath={secondaryPath ?? compareStart}
+              stamp={stamp}
+              subtreeRoot={subtreeRoot ?? null}
+              treeRoots={treeRoots}
+              showTree={false}
+              onPathChange={setSecondaryCurrentPath}
+              peerPath={primaryPath}
+              onRequestDiff={
+                stamp
+                  ? (archivePath, folderPath) =>
+                      setDiffPair({ archivePath, folderPath })
+                  : undefined
+              }
+            />
+          )}
+        </div>
       </aside>
     </div>
+  );
+}
+
+export function LibraryWorkspace({ stamp }: { stamp?: string | null }) {
+  const { search } = useLocation();
+  const [last] = useState(() => {
+    try {
+      return sessionStorage.getItem(LAST_PATH_KEY) ?? "";
+    } catch {
+      return "";
+    }
+  });
+  const initial = new URLSearchParams(search).get("path") || last;
+  return (
+    <FileExplorerPanel
+      fullPage
+      initialPath={initial}
+      stamp={stamp}
+      onClose={() => undefined}
+    />
   );
 }

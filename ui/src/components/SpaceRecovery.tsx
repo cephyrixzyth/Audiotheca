@@ -1,3 +1,4 @@
+import { WorkScope, WorkIssue } from "./ReviewWorkbench";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   addUnderscoreVendors,
@@ -11,7 +12,7 @@ import {
   spaceRecoveryReportDownload,
 } from "../api/client";
 import type { CoexistenceItem, JobSnapshot } from "../types";
-import { Button, Kpi, LabeledSelect, VirtualTable } from "../ui";
+import { Button, Kpi, LabeledSelect, Tabs, VirtualTable } from "../ui";
 import { PathLink } from "./PathLink";
 
 interface Props {
@@ -27,6 +28,7 @@ interface UnderscoreRow {
 }
 
 export function SpaceRecovery({ stamp }: Props) {
+  const [view, setView] = useState("findings");
   const [summary, setSummary] = useState<Record<string, unknown> | null>(null);
   const [underscore, setUnderscore] = useState<UnderscoreRow[]>([]);
   const [whitelistCount, setWhitelistCount] = useState(0);
@@ -50,14 +52,14 @@ export function SpaceRecovery({ stamp }: Props) {
         setUnderscore(res.items);
         setWhitelistCount(res.whitelisted_count);
       })
-      .catch(() => setUnderscore([]));
+      .catch((err: Error) => { setUnderscore([]); setError(err.message); });
     fetchCoexistence(stamp, { issue_type: issueFilter, limit: 100 })
       .then((res) => {
         setCoexistence(res.items);
         setCoexistenceTotal(res.total);
       })
-      .catch(() => {
-        setCoexistence([]);
+      .catch((err: Error) => {
+        setError(err.message); setCoexistence([]);
         setCoexistenceTotal(0);
       });
   }, [stamp, issueFilter]);
@@ -179,15 +181,12 @@ export function SpaceRecovery({ stamp }: Props) {
   }
 
   return (
-    <div>
-      <h2 style={{ marginTop: 0 }}>Space recovery</h2>
-      <p className="count-muted" style={{ marginBottom: "1.25rem" }}>
-        Reclaim disk from deep installers, archive siblings, and merge routes. Whitelist `_`-prefixed vendor
-        folders so the engine scans them.
-      </p>
-
-      {error && <div className="error">{error}</div>}
-      {msg && <div className="banner dry" style={{ marginBottom: "0.75rem" }}>{msg}</div>}
+    <div className="review-workspace">
+      <Tabs value={view} onValueChange={setView} aria-label="Recovery tasks" items={[
+        {value: "findings", label: "Review findings"}, {value: "reports", label: "Recovery reports"}, {value: "coverage", label: "Scan exclusions"},
+      ]}/>
+      {error && <WorkIssue message={error} retry={reload} />}
+      {msg && <div className="banner dry" role="status" style={{ marginBottom: "0.75rem" }}>{msg}</div>}
       {job && (
         <div className="count-muted" style={{ marginBottom: "0.75rem" }}>
           Rescan job {job.job_id} · {job.status}
@@ -195,8 +194,8 @@ export function SpaceRecovery({ stamp }: Props) {
         </div>
       )}
 
-      <section style={{ marginBottom: "1.5rem" }}>
-        <h3>Coexistence summary</h3>
+      {view === "reports" && <section>
+        <WorkScope title="Estimate recovery opportunities" detail="Counts describe findings in the selected run. Download the generated reports to inspect hardlinks and potential space savings." />
         <div className="kpi-grid" style={{ marginBottom: "1rem" }}>
           <Kpi label="Total findings" value={Number(summary?.total ?? 0).toLocaleString()} />
           <Kpi
@@ -244,9 +243,9 @@ export function SpaceRecovery({ stamp }: Props) {
             ))}
           </div>
         )}
-      </section>
+      </section>}
 
-      <section style={{ marginBottom: "1.5rem" }}>
+      {view === "coverage" && <section>
         <div className="toolbar">
           <h3 style={{ margin: 0 }}>Underscore vendor folders</h3>
           <span className="count-muted">
@@ -321,11 +320,11 @@ export function SpaceRecovery({ stamp }: Props) {
             </tr>
           )}
         />
-      </section>
+      </section>}
 
-      <section>
+      {view === "findings" && <section>
+        <WorkScope title="Inspect files that coexist" detail="Review the installer, archive or extracted folder and its suggested action. Open a path to inspect the files." />
         <div className="toolbar">
-          <h3 style={{ margin: 0 }}>Coexistence queue</h3>
           <LabeledSelect
             label="Issue type"
             value={issueFilter}
@@ -370,7 +369,7 @@ export function SpaceRecovery({ stamp }: Props) {
             </tr>
           )}
         />
-      </section>
+      </section>}
     </div>
   );
 }

@@ -97,3 +97,65 @@ def test_browse_enriched_without_stamp(browse_client):
     res = client.get("/api/browse/enriched", params={"path": str(vendor)})
     assert res.status_code == 200
     assert "readme.txt" in [row["name"] for row in res.json()["entries"]]
+
+
+def test_paged_directory_and_tree_keep_stable_folder_order(browse_client):
+    client, _, vendor = browse_client
+    for name in ("Alpha", "Shelf one", "Shelf two"):
+        (vendor / name).mkdir()
+    for route, field in (("/api/browse", "entries"), ("/api/browse/enriched", "entries"), ("/api/browse/tree", "children")):
+        params = {"path": str(vendor), "limit": 2}
+        rows = []
+        while True:
+            page = client.get(route, params=params).json()
+            rows.extend(page[field])
+            if not page["next_cursor"]:
+                break
+            params["cursor"] = page["next_cursor"]
+        names = [row["name"] for row in rows]
+        assert names[:3] == ["Alpha", "Shelf one", "Shelf two"]
+        assert len(rows) == page["total"] == len(set(names))
+        assert page["partial"] is False
+
+
+def test_mutating_directory_invalidates_page(browse_client):
+    client, _, vendor = browse_client
+    (vendor / "alpha").touch()
+    params = {"path": str(vendor), "limit": 1}
+    token = client.get("/api/browse", params=params).json()["next_cursor"]
+    (vendor / "alpha").rename(vendor / "updated")
+    assert client.get("/api/browse", params={**params, "cursor": token}).status_code == 409
+    assert client.get("/api/browse", params={**params, "limit": 8}).json()["entries"][-1]["name"] == "updated"
+
+
+def test_bounded_search_resumes_and_refreshes_after_nested_rename(browse_client):
+    from api.browse_api import search_library_paths
+    client, root, vendor = browse_client
+    for index in range(8):
+        (vendor / f"clip-{index:02d}.wav").touch()
+    cursor = ""
+    result = []
+    scanned = 0
+    while True:
+        page = search_library_paths("clip", root=str(root), max_scan=2, limit=1, cursor=cursor)
+        assert 0 < page["scanned"] - scanned <= 2
+        scanned = page["scanned"]
+        result.extend(x["name"] for x in page["entries"])
+        cursor = page["next_cursor"]
+        if not cursor:
+            break
+    assert result == [f"clip-{index:02d}.wav" for index in range(8)]
+    (vendor / "clip-07.wav").rename(vendor / "new-name.wav")
+    assert search_library_paths("new-name", root=str(root))["count"] == 1
+    assert search_library_paths("clip", root=str(root))["count"] == 7
+    response = client.get("/api/browse/search", params={"q": "clip", "root": str(root), "limit": 1}).json()
+    assert client.get("/api/browse/search", params={"q": "other", "root": str(root), "cursor": response["next_cursor"]}).status_code == 409
+
+
+def test_drop_mixed_paths_keep_individual_routes(browse_client, tmp_path):
+    client, _, vendor = browse_client
+    wav = vendor / "take.wav"
+    wav.write_bytes(b"RIFF" + bytes(5000))
+    response = client.post("/api/explorer/drop", json={"paths": [str(vendor), str(wav), str(vendor / "missing"), str(tmp_path)]})
+    assert response.status_code == 200
+    assert [row["action"] for row in response.json()["routed"]] == ["browse", "audition", "error", "error"]

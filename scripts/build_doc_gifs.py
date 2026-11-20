@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert docs walkthrough MP4s to optimized GIFs for GitHub README and Help tab."""
+"""Convert docs walkthrough MP4s to optimized GIFs for the documentation."""
 
 from __future__ import annotations
 
@@ -11,36 +11,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 VIDEO_DIR = ROOT / "docs" / "assets" / "videos"
 GIF_DIR = ROOT / "docs" / "assets" / "gifs"
-SHOT_DIR = ROOT / "docs" / "assets" / "screenshots"
-HELP_PUBLIC = ROOT / "ui" / "public" / "help"
-
-GIF_WIDTH = 1280
-GIF_FPS = 10
-
-# Screenshots copied into ui/public/help/ for the in-app Help tab.
-HELP_SCREENSHOTS = [
-    "ui-overview.png",
-    "dashboard-gauges.png",
-    "scan-panel.png",
-    "investigation-inbox.png",
-    "investigation-lookup.png",
-    "duplicates-review.png",
-    "restructure-preview.png",
-    "file-explorer.png",
-    "audio-preview.png",
-    "dropzone-overlay.png",
-    "archives-verdicts.png",
-    "archive-diff-wizard.png",
-    "security-malware.png",
-    "environment-themes.png",
-    "environment-spec-catalog.png",
-    "environment-orchestration.png",
-    "environment-cloud-storage.png",
-    "help-panel.png",
-    "scene-renames.png",
-    "scan-audit.png",
-    "skipped-files.png",
-]
+GIF_WIDTH = 1000
+GIF_FPS = 7
 
 
 def _ffmpeg() -> str:
@@ -62,7 +34,7 @@ def _mp4_to_gif(ffmpeg: str, source: Path, output: Path) -> None:
     filter_chain = (
         f"fps={GIF_FPS},scale={GIF_WIDTH}:-1:flags=lanczos,"
         "split[s0][s1];[s0]palettegen=stats_mode=diff:max_colors=256[p];"
-        "[s1][p]paletteuse=dither=bayer:bayer_scale=5"
+        "[s1][p]paletteuse=dither=bayer:bayer_scale=4"
     )
     subprocess.run(
         [
@@ -82,19 +54,6 @@ def _mp4_to_gif(ffmpeg: str, source: Path, output: Path) -> None:
     )
 
 
-def _sync_help_assets() -> None:
-    HELP_PUBLIC.mkdir(parents=True, exist_ok=True)
-    for name in HELP_SCREENSHOTS:
-        src = SHOT_DIR / name
-        if src.is_file():
-            shutil.copy2(src, HELP_PUBLIC / name)
-            print(f"Help screenshot: {name}")
-    if GIF_DIR.is_dir():
-        for gif in sorted(GIF_DIR.glob("*.gif")):
-            shutil.copy2(gif, HELP_PUBLIC / gif.name)
-            print(f"Help gif: {gif.name}")
-
-
 def main() -> None:
     ffmpeg = _ffmpeg()
     GIF_DIR.mkdir(parents=True, exist_ok=True)
@@ -109,8 +68,7 @@ def main() -> None:
         size_mb = out.stat().st_size / (1024 * 1024)
         print(f"  -> {size_mb:.1f} MB")
 
-    _sync_help_assets()
-    print(f"Done. GIFs in {GIF_DIR}, help assets in {HELP_PUBLIC}")
+    print(f"Done. GIFs in {GIF_DIR}")
 
 
 if __name__ == "__main__":

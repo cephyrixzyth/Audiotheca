@@ -1,3 +1,4 @@
+import { Link, useLocation } from "react-router-dom";
 import { Badge, VirtualTable } from "../ui";
 import { PathLink } from "./PathLink";
 
@@ -38,6 +39,8 @@ export function ExecuteResultsPanel({
   okDryRunLabel,
   okLiveLabel,
 }: Props) {
+  const location = useLocation();
+  const recoveryParams = new URLSearchParams(location.search); recoveryParams.set("workspace", "recovery");
   if (!results.length) return null;
 
   const okCount = staged ?? results.filter((row) => row.ok).length;
@@ -47,11 +50,12 @@ export function ExecuteResultsPanel({
     <section className="execute-results-panel panel-inset" aria-label={title}>
       <header className="execute-results-header">
         <h3>{title}</h3>
-        <span className="count-muted">
-          {dryRun ? "Dry run" : "Live"} · {okCount} ok
+        <span className="count-muted" role="status">
+          {dryRun ? "Preview" : "Completed"} · {okCount} {dryRun ? "planned" : "applied"}
           {failCount ? ` · ${failCount} failed` : ""}
         </span>
       </header>
+      {!dryRun && okCount > 0 && <Link to={{pathname: "/system/environment", search: recoveryParams.toString()}}>View history and restore options</Link>}
       <VirtualTable
         items={results}
         colCount={4}
@@ -59,10 +63,10 @@ export function ExecuteResultsPanel({
         tableClassName="data-table compact execute-results-table"
         header={
           <tr>
-            <th>Path</th>
+            <th>Source</th>
             <th>Action</th>
             <th>Status</th>
-            <th>Detail</th>
+            <th>Destination or reason</th>
           </tr>
         }
         renderRow={(row, _index, rowAttrs) => (

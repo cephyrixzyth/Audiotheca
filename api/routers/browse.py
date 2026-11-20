@@ -68,42 +68,49 @@ MIME_BY_EXT = {
 @router.get("/api/browse")
 def browse_directory(
     path: str = Query(default=""),
-    limit: int = Query(default=500, le=2000),
+    limit: int = Query(default=500, ge=1, le=2000),
+    cursor: str = Query(default="", max_length=65536),
 ) -> dict[str, object]:
     from api.browse_api import list_directory
 
-    return list_directory(path, limit=limit)
+    return list_directory(path, limit=limit, cursor=cursor)
 
 @router.get("/api/browse/enriched")
 def browse_directory_enriched(
     path: str = Query(default=""),
     stamp: str = Query(default=""),
-    limit: int = Query(default=500, le=2000),
+    limit: int = Query(default=500, ge=1, le=2000),
+    cursor: str = Query(default="", max_length=65536),
 ) -> dict[str, object]:
     from api.browse_api import list_directory_enriched
 
     if stamp.strip():
         security.validate_stamp(stamp)
-    return list_directory_enriched(path, stamp=stamp.strip(), limit=limit)
+    return list_directory_enriched(path, stamp=stamp.strip(), limit=limit, cursor=cursor)
 
 @router.get("/api/browse/tree")
 def browse_tree(
     path: str = Query(default=""),
-    limit: int = Query(default=500, le=2000),
+    limit: int = Query(default=500, ge=1, le=2000),
+    cursor: str = Query(default="", max_length=65536),
 ) -> dict[str, object]:
     from api.browse_api import list_tree_children
 
-    return list_tree_children(path, limit=limit)
+    return list_tree_children(path, limit=limit, cursor=cursor)
 
 @router.get("/api/browse/search")
 def browse_search(
     q: str = Query(..., min_length=2, description="Path/name substring"),
     root: str = Query(default="", description="Optional library subtree root"),
-    limit: int = Query(default=200, le=1000),
+    limit: int = Query(default=200, ge=1, le=1000),
+    cursor: str = Query(default="", max_length=65536),
+    stamp: str = Query(default=""),
 ) -> dict[str, object]:
     from api.browse_api import search_library_paths
 
-    return search_library_paths(q, root=root, limit=limit)
+    if stamp:
+        security.validate_stamp(stamp)
+    return search_library_paths(q, root=root, stamp=stamp, limit=limit, cursor=cursor)
 
 @router.get("/api/browse/facets")
 def browse_facets(
@@ -232,16 +239,25 @@ def explorer_drop(body: dict = Body(default_factory=dict)) -> dict[str, object]:
 
     routed: list[dict[str, object]] = []
     for raw in paths_raw:
-        target = security.assert_library_path(str(raw), label="path")
-        suffix = target.suffix.lower()
-        if target.is_dir():
-            routed.append({"path": str(target), "action": "browse", "kind": "directory"})
-        elif suffix in {".msi", ".exe", ".pkg", ".dmg", ".zip"}:
-            routed.append({"path": str(target), "action": "installer_inspect", "result": inspect_installer(target)})
-        elif suffix in {".dll", ".bin", ".dat", ".fxp", ".vst3"} or target.stat().st_size > 4096:
-            routed.append({"path": str(target), "action": "carve_strings", "result": carve_strings(target, limit=80)})
-        else:
-            routed.append({"path": str(target), "action": "path_accepted", "kind": suffix or "file"})
+        try:
+            target = security.assert_library_path(str(raw), must_exist=True, label="path")
+        except HTTPException as exc:
+            routed.append({"path": str(raw), "action": "error", "error": exc.detail})
+            continue
+        try:
+            suffix = target.suffix.lower()
+            if target.is_dir():
+                routed.append({"path": str(target), "action": "browse", "kind": "directory"})
+            elif suffix in MIME_BY_EXT:
+                routed.append({"path": str(target), "action": "audition", "kind": "audio"})
+            elif suffix in {".msi", ".exe", ".pkg", ".dmg", ".zip"}:
+                routed.append({"path": str(target), "action": "installer_inspect", "result": inspect_installer(target)})
+            elif suffix in {".dll", ".bin", ".dat", ".fxp", ".vst3"} or target.stat().st_size > 4096:
+                routed.append({"path": str(target), "action": "carve_strings", "result": carve_strings(target, limit=80)})
+            else:
+                routed.append({"path": str(target), "action": "path_accepted", "kind": suffix or "file"})
+        except OSError as exc:
+            routed.append({"path": str(target), "action": "error", "error": str(exc)})
     security.audit("explorer_drop", count=len(routed))
     return {"ok": True, "routed": routed, "count": len(routed)}
 

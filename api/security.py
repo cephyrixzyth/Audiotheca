@@ -27,7 +27,7 @@ from api.path_logic import (
 from api.paths import report_dir, workspace_root
 from audiotheca.config import ROOT_DIR as DEFAULT_LIBRARY_ROOT
 
-STAMP_RE = re.compile(r"^\d{8}_\d{4}$")
+from audiotheca.run_identity import STAMP_RE
 TOKEN_PATH = report_dir() / ".api_token"
 ROOTS_CONFIG_PATH = report_dir() / ".library_roots.json"
 AUDIT_LOG_PATH = report_dir() / "security_audit.jsonl"

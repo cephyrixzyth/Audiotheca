@@ -34,6 +34,7 @@ export interface ThemePreset {
   description: string;
   tokens: ThemeTokens;
   builtIn?: boolean;
+  artwork?: string;
 }
 
 export interface ThemeExportBundle {

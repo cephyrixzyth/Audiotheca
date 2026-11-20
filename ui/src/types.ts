@@ -136,6 +136,11 @@ export interface ArchiveDiffEntry {
 }
 
 export interface ArchiveDiffResponse {
+  complete?: boolean;
+  folder_error?: string | null;
+  different_contents?: string[];
+  checksums_checked?: number;
+  report_verdict?: string | null;
   stamp: string;
   archive_path: string;
   folder_path: string;
@@ -316,6 +321,7 @@ export interface CustomBucketResult {
 }
 
 export interface ProgressEvent {
+  sequence?: number;
   type: string;
   ts?: string;
   phase?: string;
@@ -483,6 +489,8 @@ export interface RunComparison {
 }
 
 export type TabId =
+  | "library"
+  | "studio"
   | "dashboard"
   | "scan"
   | "investigation"

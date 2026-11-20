@@ -6,11 +6,12 @@ import json
 import sqlite3
 import threading
 from datetime import datetime, timezone
+from api.paths import report_dir
 from pathlib import Path
 
 from audiotheca.ai_lookup.disambiguation import LookupResult
 
-_DEFAULT_DIR = Path(__file__).resolve().parent.parent.parent / "dedupe_reports" / "ai_lookup_cache"
+_DEFAULT_DIR = report_dir() / "ai_lookup_cache"
 
 
 class LookupCache:

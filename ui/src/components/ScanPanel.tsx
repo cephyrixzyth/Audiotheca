@@ -291,6 +291,7 @@ function formatLogEvent(e: ProgressEvent): LogLine {
 }
 
 export function ScanPanel({ onRunComplete }: Props) {
+  const [workspace, setWorkspace] = useState<"setup" | "monitor" | "diagnostics" | "all">("setup");
   const libraryRoot = useLibraryRoot();
   const { query: sidebarQuery } = useContextSidebar();
   const [root, setRoot] = useState(libraryRoot);
@@ -318,6 +319,7 @@ export function ScanPanel({ onRunComplete }: Props) {
   const logRef = useRef<HTMLDivElement | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const wsLiveRef = useRef(false);
+  const activeStream = useRef("");
   const eventsOffsetRef = useRef(0);
 
   useEffect(() => {
@@ -392,21 +394,21 @@ export function ScanPanel({ onRunComplete }: Props) {
       const after = reset ? 0 : eventsOffsetRef.current;
       try {
         const res = await fetchJobEvents(jobId, after);
-        eventsOffsetRef.current = res.total;
-        if (reset) {
-          setEvents((prev) =>
-            dedupeProgressEvents([
-              ...prev,
-              ...res.events.filter((e) => e.type !== "system_metrics"),
-            ]).slice(-500),
-          );
-        } else if (res.events.length) {
-          for (const event of res.events) {
-            applyEvent(event);
-          }
+        if (activeStream.current !== jobId) return;
+        if (res.missed && eventsOffsetRef.current < (res.oldest ?? 0)) {
+          setError("Earlier log events expired. Showing the retained history.");
+          eventsOffsetRef.current = res.oldest ?? 0;
         }
+        for (const event of res.events) {
+          if (event.sequence != null) {
+            if (event.sequence < eventsOffsetRef.current) continue;
+            eventsOffsetRef.current = event.sequence + 1;
+          }
+          applyEvent(event);
+        }
+        eventsOffsetRef.current = Math.max(eventsOffsetRef.current, res.next_cursor ?? res.total);
       } catch {
-        if (reset) setEvents([]);
+        // The next poll can retry from the last delivered event.
       }
     },
     [applyEvent],
@@ -414,28 +416,42 @@ export function ScanPanel({ onRunComplete }: Props) {
 
   const connectWs = useCallback(
     (jobId: string) => {
+      activeStream.current = jobId;
       wsRef.current?.close();
       void (async () => {
         const url = await jobEventsUrl(jobId);
+        if (activeStream.current !== jobId) return;
         const ws = new WebSocket(url);
         wsRef.current = ws;
         ws.onopen = () => {
+          if (wsRef.current !== ws || activeStream.current !== jobId) return;
           setError(null);
           wsLiveRef.current = true;
           void pullEvents(jobId, eventsOffsetRef.current === 0);
         };
         ws.onmessage = (msg) => {
+          if (wsRef.current !== ws || activeStream.current !== jobId) return;
           const event = JSON.parse(msg.data) as ProgressEvent;
+          if (event.sequence != null) {
+            if (event.sequence < eventsOffsetRef.current) return;
+            if (event.sequence > eventsOffsetRef.current) {
+              void pullEvents(jobId);
+              return;
+            }
+            eventsOffsetRef.current = event.sequence + 1;
+          }
           applyEvent(event);
         };
         ws.onerror = () => {
+          if (wsRef.current !== ws) return;
           wsLiveRef.current = false;
           setError("WebSocket disconnected — polling progress via API");
         };
         ws.onclose = () => {
+          if (wsRef.current !== ws) return;
           wsLiveRef.current = false;
         };
-      })();
+      })().catch(() => { if (activeStream.current === jobId) wsLiveRef.current = false; });
     },
     [applyEvent, pullEvents],
   );
@@ -470,7 +486,7 @@ export function ScanPanel({ onRunComplete }: Props) {
           setReferenceDedupe(true);
         }
       }
-      if (resetEvents) {
+      if (resetEvents || activeStream.current !== active.job_id) {
         const cached = loadCachedJobEvents(active.job_id);
         eventsOffsetRef.current = 0;
         setEvents(cached);
@@ -521,7 +537,7 @@ export function ScanPanel({ onRunComplete }: Props) {
       .catch(() => undefined);
   }, [attachActiveJob]);
 
-  useEffect(() => () => wsRef.current?.close(), []);
+  useEffect(() => () => { activeStream.current = ""; wsRef.current?.close(); wsRef.current = null; }, []);
 
   useEffect(() => {
     if (job?.job_id) saveCachedJobEvents(job.job_id, events);
@@ -559,6 +575,7 @@ export function ScanPanel({ onRunComplete }: Props) {
         },
       });
       setJob(snapshot);
+      setWorkspace("monitor");
       setLiveConfirmOpen(false);
       setLiveConfirmText("");
       eventsOffsetRef.current = 0;
@@ -1092,12 +1109,22 @@ export function ScanPanel({ onRunComplete }: Props) {
     ],
   );
 
+  const groups = {
+    setup: ["paths", "flow", "controls"],
+    monitor: ["controls", "phase-progress", "status", "log"],
+    diagnostics: ["process-diagnostics", "ai-analyzer"],
+  };
+  const panels = workspace === "all" ? scanSections : groups[workspace].flatMap(id => scanSections.filter(section => section.id === id));
+
   return (
-    <div>
-      <div className="banner dry">
-        Default scans are <strong>dry-run</strong> (no filesystem changes). Enable <strong>Staging day</strong> for
-        live moves with explicit confirmation. Configure the processing flow below before starting.
-      </div>
+    <div className="scan-workspace">
+      <nav className="home-switch" aria-label="Scan workspaces">
+        {([["setup", "Setup"], ["monitor", "Activity"], ["diagnostics", "Diagnostics"], ["all", "All panels"]] as const).map(([id, label]) =>
+          <button key={id} aria-pressed={workspace === id} onClick={() => setWorkspace(id)}>{label}</button>)}
+      </nav>
+      {workspace === "setup" && <div className="scan-mode-note">
+        <strong>Dry run by default</strong><span>Scans write a local report. Staging day requires confirmation before moving library files.</span>
+      </div>}
 
       {completedSummary && (
         <div className="banner" style={{ marginBottom: "0.75rem" }}>
@@ -1113,7 +1140,7 @@ export function ScanPanel({ onRunComplete }: Props) {
         </div>
       )}
 
-      <ReorderableSections layoutId="scan" layout="stack" sections={scanSections} />
+      <ReorderableSections key={workspace} layoutId={workspace === "all" ? "scan" : `scan-${workspace}`} layout="stack" sections={panels} />
     </div>
   );
 }

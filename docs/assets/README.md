@@ -1,108 +1,23 @@
-# Documentation media assets
+# Documentation media
 
-This folder holds **screenshots and walkthrough videos** referenced from the [main README](../../README.md) and other guides.
+The help reader and documentation share the PNG, MP4 and GIF files in this directory. Vite serves them under `/help/` in development and copies their exact bytes into the desktop and web distributions at build time. The reader loads media only when someone opens it. Walkthroughs have native playback controls.
 
-> **Tip:** Use a consistent library root label in screenshots (for example `D:\Libraries\_audio`) and blur or crop anything you do not want in public docs.
+## Capture real workflows
 
-## Folder layout
+Install the API dependencies from the repository requirements and the UI dependencies from the lockfile. Install FFmpeg on the path. Install the matching Playwright Chromium and recording helper from the UI directory.
 
-```
-docs/assets/
-├── README.md          ← this file
-├── ASSETS.md          ← checklist of every required file
-├── screenshots/       ← PNG or WebP stills
-├── videos/            ← MP4 walkthroughs (source)
-└── gifs/              ← optimized GIFs for GitHub README + Help tab
-```
-
-## Quick capture
-
-```powershell
-# Seed demo library + reports (no servers)
-python scripts/seed_demo_library.py
-
-# Stills only (API + UI must be running on capture ports)
-$env:AUDIOTHECA_CAPTURE_UI_PORT="5175"
-$env:AUDIOTHECA_CAPTURE_API_PORT="8788"
-python scripts/capture_screenshots_only.py
-
-# GIFs + copy to ui/public/help/
-python scripts/build_doc_gifs.py
+```sh
+cd ui
+npm ci
+npx playwright install chromium
+cd ..
+python scripts/capture_doc_assets.py --proof capture-proof.json
 ```
 
-Full automated pipeline (starts servers, records videos): `python scripts/capture_doc_assets.py`
+The command starts a temporary API and Vite preview on separate loopback ports, builds an immutable production UI, creates its own application data and library, and runs Chromium through the steps listed in the [media index](ASSETS.md). It generates a playable drum recording, creates a ZIP with matching nested content and rewrites sample report paths to the temporary folders. The restructure walkthrough moves one of those temporary folders. The capture uses a local identification provider.
 
-## Screenshots to capture
+Use `--output /path/to/output` to keep a separate set of media, or `--only audio-preview-library` to reproduce a single workflow. Use `--only screenshots` for stills or `--only walkthroughs` for MP4/GIF pairs. Inputs and output files are staged separately, and the destination is updated after the selected workflow checks pass. If Playwright's browser is installed in a non-default location, set `PLAYWRIGHT_BROWSERS_PATH` to that directory.
 
-Capture at **1920×1080** or your usual monitor size. Save as PNG (lossless UI text) or WebP (smaller repo size).
+Screenshots are 1440 × 900. The silent H.264 walkthroughs are 1280 × 800 at 16 frames per second. GIFs use a 1000-pixel width and 7 frames per second. To re-encode the GIFs from the canonical MP4s, run `python scripts/build_doc_gifs.py`. The HTML reader uses the MP4 so playback can be paused, scrubbed and replayed.
 
-### Core (in README today)
-
-| File | What to show | When to capture |
-|------|----------------|-----------------|
-| `screenshots/ui-overview.png` | Grouped top nav, sidebar, Dashboard with a loaded run | After a completed dry-run |
-| `screenshots/dashboard-gauges.png` | Route-ready / identification gauges and run compare | Same run as above |
-| `screenshots/scan-panel.png` | Scan tab: processing flow editor, phase toggles, AI lookup | During or right after a dry-run |
-| `screenshots/investigation-inbox.png` | Investigation tab with bucket filter and corrected rows | After triage session |
-| `screenshots/duplicates-review.png` | Duplicate group with keeper selected | When duplicate CSV has groups |
-| `screenshots/restructure-preview.png` | Restructure routes with destination preview | Dry-run with restructure plan |
-| `screenshots/scene-renames.png` | Scene renames tab with hash → product proposals | Demo run with scene plan |
-| `screenshots/scan-audit.png` | Scan audit table with ID methods | Same demo run |
-| `screenshots/skipped-files.png` | Skipped tab — failures, gaps, cache hits | Same demo run |
-| `screenshots/file-explorer.png` | **Library** button — tree, optional audio preview on WAV | Click Library from top bar |
-| `screenshots/archives-verdicts.png` | Archives tab with peek verdicts | After archive peek phase |
-| `screenshots/archive-diff-wizard.png` | Diff modal — archive vs extracted folder | Archives → Diff on a pair |
-| `screenshots/security-malware.png` | Security tab: scan controls and findings | Optional demo folder |
-| `screenshots/environment-themes.png` | Environment → theme studio | Any theme selected |
-| `screenshots/help-panel.png` | Help tab (last primary tab) with a topic open | Default install |
-
-### 1.0.5 additions (shipped; re-capture at 1.0.12 when refreshing media)
-
-| File | What to show |
-|------|----------------|
-| `screenshots/investigation-lookup.png` | Investigation → **Investigation lookup** (WEB-SPDR / TAG-GEN / NFO-PARSE) |
-| `screenshots/environment-spec-catalog.png` | Environment → **Architecture spec catalog** (94 codes, done counts) |
-| `screenshots/environment-orchestration.png` | Environment → **Orchestration tools** panel |
-| `screenshots/environment-cloud-storage.png` | Environment → **Cloud & storage telemetry** |
-| `screenshots/audio-preview.png` | Library → select demo `.wav`; waveform + LUFS/BPM/key badges |
-| `screenshots/dropzone-overlay.png` | Library → drag files to show DropZone overlay |
-
-## Videos to record
-
-Record at **1080p**, 30 fps, with brief on-screen captions if helpful. Keep each video focused on one workflow (3–8 minutes).
-
-| File | Topic | Suggested script |
-|------|--------|------------------|
-| `videos/first-scan-walkthrough.mp4` | Install → set library root → first dry-run → read Dashboard | Match [Testing guide](../TESTING.md) |
-| `videos/scan-phases-and-flow.mp4` | Processing flow presets, skipping phases, reading WebSocket log | Scan tab deep dive |
-| `videos/investigation-and-vendors.mp4` | Investigation corrections → Vendors keywords → rescan | Triage unknown items |
-| `videos/restructure-live-staging.mp4` | Preview routes → section approval → **confirm live** guardrails | Stage 1 rollout only |
-| `videos/file-explorer-and-archives.mp4` | Library explorer, archive list without extract, redundant verdicts | Explorer + Archives |
-| `videos/archive-diff-wizard.mp4` | Diff wizard — archive vs extracted sibling | Archives tab |
-| `videos/ai-lookup-review.mp4` | Scan tab AI analyzer, confirm/reject lookup, cache | After unknown targets queue |
-| `videos/security-and-space-recovery.mp4` | Malware heuristics, underscore whitelist, coexistence summary | System tabs |
-
-Optional 1.0.5+ topics (see [ASSETS.md](ASSETS.md)): Environment orchestration/spec catalog (`environment-and-spec-catalog.mp4`), investigation lookup (`investigation-lookup.mp4`), audio preview + DropZone (`audio-preview-library.mp4`).
-
-## GIFs for GitHub README
-
-GitHub renders GIFs inline but not MP4. After recording or rebuilding MP4s, run:
-
-```powershell
-python scripts/build_doc_gifs.py
-```
-
-This writes optimized GIFs to `gifs/` (~1280px wide, 10 fps) and copies screenshots + GIFs to `ui/public/help/` for the in-app Help tab.
-
-## Adding files to the repo
-
-1. Place stills under `screenshots/` and MP4s under `videos/` using the exact names in [ASSETS.md](ASSETS.md).
-2. Run `python scripts/build_doc_gifs.py` to regenerate GIFs and sync Help tab assets.
-3. Re-open [README.md](../../README.md) — embed new images and add captions.
-
-## Related documentation
-
-- [User Guide](../USER_GUIDE.md) — day-to-day workflows
-- [Feature Guide](../FEATURE_GUIDE.md) — scan phases and reports
-- [Spec catalog](../SPEC_CATALOG.md) — 94-code registry
-- [Testing Guide](../TESTING.md) — smoke-test checklist for captures
+[Application guide](../USER_GUIDE.md) · [Media index](ASSETS.md)

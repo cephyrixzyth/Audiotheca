@@ -6,12 +6,14 @@ import json
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from api.paths import report_dir
+from audiotheca.local_storage import serialized_store, write_json
 from pathlib import Path
 
 from audiotheca.config import KEYWORD_BLOCKLIST
 from vendor_db import VENDOR_DATABASE
 
-FEEDBACK_DIR = Path(__file__).resolve().parent.parent / "dedupe_reports" / "feedback"
+FEEDBACK_DIR = report_dir() / "feedback"
 OVERRIDES_PATH = FEEDBACK_DIR / "vendor_overrides.json"
 BUCKET_OVERRIDES_PATH = FEEDBACK_DIR / "bucket_overrides.json"
 
@@ -69,10 +71,11 @@ def save_user_vendors(vendors: list[UserVendor]) -> Path:
         "updated": _now_iso(),
         "vendors": [row.to_dict() for row in vendors],
     }
-    OVERRIDES_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    write_json(OVERRIDES_PATH, payload)
     return OVERRIDES_PATH
 
 
+@serialized_store(lambda: OVERRIDES_PATH)
 def add_user_vendor(
     company: str,
     keywords: list[str],
@@ -94,7 +97,7 @@ def add_user_vendor(
 def sync_bucket_overrides(custom_buckets: dict[str, str]) -> Path:
     FEEDBACK_DIR.mkdir(parents=True, exist_ok=True)
     payload = {"version": 1, "updated": _now_iso(), "custom_buckets": custom_buckets}
-    BUCKET_OVERRIDES_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    write_json(BUCKET_OVERRIDES_PATH, payload)
     return BUCKET_OVERRIDES_PATH
 
 

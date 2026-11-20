@@ -7,9 +7,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useFileExplorer } from "../contexts/FileExplorerContext";
 import type { TabId } from "../types";
-import { Button, LabeledSelect } from "../ui";
+import { LabeledSelect } from "../ui";
 
 export interface SidebarFilterDef {
   key: string;
@@ -18,7 +17,37 @@ export interface SidebarFilterDef {
   options: { value: string; label: string }[];
 }
 
+interface DuplicateQueue {
+  query: string;
+  confidence: string;
+  offset: number;
+  hideRejected: boolean;
+  showReferenceExtras: boolean;
+}
+
+const defaultQueue: DuplicateQueue = {
+  query: "", confidence: "HIGH", offset: 0, hideRejected: true, showReferenceExtras: false,
+};
+
+function readQueue(stamp: string): DuplicateQueue {
+  try {
+    const value = JSON.parse(localStorage.getItem(`audiotheca.duplicateQueue.${stamp}`) ?? "null");
+    if (!value) return defaultQueue;
+    return {
+      query: typeof value.query === "string" ? value.query : "",
+      confidence: ["", "HIGH", "MEDIUM", "LOW"].includes(value.confidence) ? value.confidence : "HIGH",
+      offset: Number.isSafeInteger(value.offset) && value.offset >= 0 && value.offset % 100 === 0 ? value.offset : 0,
+      hideRejected: value.hideRejected !== false,
+      showReferenceExtras: value.showReferenceExtras === true,
+    };
+  } catch {
+    return defaultQueue;
+  }
+}
+
 interface ContextSidebarState {
+  queue: DuplicateQueue;
+  updateQueue: (patch: Partial<DuplicateQueue>) => void;
   query: string;
   setQuery: (q: string) => void;
   tab: TabId;
@@ -31,17 +60,43 @@ const ContextSidebarCtx = createContext<ContextSidebarState | null>(null);
 
 export function ContextSidebarProvider({
   tab,
+  stamp,
   children,
 }: {
   tab: TabId;
+  stamp: string;
   children: ReactNode;
 }) {
-  const [query, setQuery] = useState("");
+  const [plainQuery, setPlainQuery] = useState("");
+  const saved = useMemo(() => readQueue(stamp), [stamp]);
+  const [edited, setEdited] = useState<{ stamp: string; queue: DuplicateQueue } | null>(null);
+  const queue = edited?.stamp === stamp ? edited.queue : saved;
+
+  useEffect(() => {
+    if (!edited?.stamp) return;
+    try {
+      localStorage.setItem(`audiotheca.duplicateQueue.${edited.stamp}`, JSON.stringify(edited.queue));
+    } catch {
+      // The queue remains usable when persistent browser storage is unavailable.
+    }
+  }, [edited]);
+
+  const updateQueue = useCallback((patch: Partial<DuplicateQueue>) => {
+    setEdited(previous => ({
+      stamp, queue: { ...(previous?.stamp === stamp ? previous.queue : saved), ...patch },
+    }));
+  }, [stamp, saved]);
+
+  const query = tab === "duplicates" ? queue.query : plainQuery;
+  const setQuery = useCallback((next: string) => {
+    if (tab === "duplicates") updateQueue({ query: next, offset: 0 });
+    else setPlainQuery(next);
+  }, [tab, updateQueue]);
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [filterDefs, setFilterDefs] = useState<SidebarFilterDef[]>([]);
 
   useEffect(() => {
-    setQuery("");
+    setPlainQuery("");
     setFilters({});
     setFilterDefs([]);
   }, [tab]);
@@ -63,8 +118,8 @@ export function ContextSidebarProvider({
   }, []);
 
   const value = useMemo(
-    () => ({ query, setQuery, tab, filters, setFilter, registerFilters }),
-    [query, tab, filters, setFilter, registerFilters],
+    () => ({ query, setQuery, tab, filters, setFilter, registerFilters, queue, updateQueue }),
+    [query, setQuery, tab, filters, setFilter, registerFilters, queue, updateQueue],
   );
   return (
     <ContextSidebarCtx.Provider value={value}>
@@ -89,17 +144,6 @@ export function useSidebarFilters(defs: SidebarFilterDef[]) {
   }, [registerFilters, defs]);
   return { filters, setFilter };
 }
-
-const TAB_EXPLORER_HINTS: Partial<Record<TabId, string>> = {
-  investigation: "Browse library roots while reviewing inbox items.",
-  duplicates: "Open paths from duplicate groups in the explorer.",
-  restructure: "Preview destination folders before staging moves.",
-  archives: "Dual-pane compare archive listing vs extracted folder.",
-  "scan-audit": "Jump to flagged paths on disk.",
-  skipped: "Inspect skipped paths that need manual review.",
-  security: "Locate quarantined or flagged files.",
-  "scene-renames": "Verify scene folders before rename export.",
-};
 
 const SEARCH_TABS = new Set<TabId>([
   "scan",
@@ -132,18 +176,12 @@ const TAB_HINTS: Partial<Record<TabId, string>> = {
   "space-recovery": "Use Space Recovery panel filters.",
 };
 
-export function ContextSidebar({ stamp }: { stamp?: string }) {
+export function ContextSidebar() {
   const { query, setQuery, tab, filters, setFilter } = useContextSidebar();
   const filterDefs = useContext(SidebarDefsCtx);
-  const { openAtRoots, openDualPane, setPopOut } = useFileExplorer();
-
+  if (!SEARCH_TABS.has(tab) && !filterDefs.length) return null;
   return (
-    <aside className="context-sidebar">
-      <div className="context-sidebar-brand">
-        <strong>Audiotheca</strong>
-        <span className="count-muted">Library dedupe &amp; routing</span>
-      </div>
-
+    <section className="context-sidebar filter-line" aria-label="View filters">
       {SEARCH_TABS.has(tab) && (
         <div className="context-field">
           <label className="context-field" htmlFor="context-sidebar-search">
@@ -158,9 +196,6 @@ export function ContextSidebar({ stamp }: { stamp?: string }) {
               title={TAB_HINTS[tab] ?? "Context search for the active tab"}
             />
           </label>
-          {TAB_HINTS[tab] ? (
-            <p className="count-muted context-placeholder">{TAB_HINTS[tab]}</p>
-          ) : null}
         </div>
       )}
 
@@ -189,40 +224,6 @@ export function ContextSidebar({ stamp }: { stamp?: string }) {
         </div>
       )}
 
-      {stamp && tab !== "scan" && (
-        <label className="context-field">
-          <span className="context-label">Active run</span>
-          <input type="text" className="field-input" value={stamp} readOnly title="Selected report stamp" />
-        </label>
-      )}
-
-      <div className="context-sidebar-section">
-        <span className="context-label">Library explorer</span>
-        {TAB_EXPLORER_HINTS[tab] && <p className="count-muted context-explorer-hint">{TAB_EXPLORER_HINTS[tab]}</p>}
-        <div className="file-explorer-sidebar-controls">
-          <Button variant="secondary" block onClick={openAtRoots}>
-            Browse library roots
-          </Button>
-          <Button
-            variant="secondary"
-            block
-            onClick={() => {
-              setPopOut(true);
-              openAtRoots();
-            }}
-          >
-            Pop out wide explorer
-          </Button>
-          <Button
-            variant="secondary"
-            block
-            title="Compare archive vs extracted folder side-by-side"
-            onClick={() => openDualPane("", "")}
-          >
-            Dual-pane compare
-          </Button>
-        </div>
-      </div>
-    </aside>
+    </section>
   );
 }

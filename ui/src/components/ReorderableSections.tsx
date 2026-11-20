@@ -945,12 +945,13 @@ export function ReorderableSections({
   const presetNames = listPresets();
 
   return (
-    <div className={`reorderable-layout${dragId ? " is-reordering" : ""}`}>
+    <div className={`reorderable-layout${layoutOpen ? " layout-editing" : ""}${dragId ? " is-reordering" : ""}`}>
       <div className="layout-toolbar">
         <Button
           variant="ghost"
           size="sm"
           active={layoutOpen}
+          aria-expanded={layoutOpen}
           title="Show or hide layout customization tools"
           onClick={() => setLayoutOpen((open) => !open)}
         >

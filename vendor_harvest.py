@@ -14,6 +14,8 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from html.parser import HTMLParser
+from api.paths import report_dir
+from audiotheca.local_storage import serialized_store, write_json
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
@@ -23,7 +25,7 @@ from audiotheca.config import KEYWORD_BLOCKLIST
 from audiotheca.vendor_overrides import add_user_vendor, load_user_vendors
 from vendor_db import VENDOR_DATABASE
 
-FEEDBACK_DIR = Path(__file__).resolve().parent / "dedupe_reports" / "feedback"
+FEEDBACK_DIR = report_dir() / "feedback"
 CANDIDATES_PATH = FEEDBACK_DIR / "vendor_harvest_candidates.json"
 
 USER_AGENT = "Audiotheca-VendorHarvest/1.0 (+local library organizer)"
@@ -575,7 +577,7 @@ def run_harvest(
 ) -> dict:
     from api.security import validate_harvest_urls
 
-    urls = validate_harvest_urls([url.strip() for url in urls if url.strip()])
+    urls = list(dict.fromkeys(validate_harvest_urls([url.strip() for url in urls if url.strip()])))
     known = _known_vendor_set()
     all_candidates: list[HarvestCandidate] = []
     results: list[HarvestResult] = []
@@ -589,22 +591,36 @@ def run_harvest(
             if row.already_known and not include_known:
                 continue
             all_candidates.append(row)
-            known.add(row.company.lower())
+    return _merge_harvest(urls, default_category, all_candidates, results)
+
+
+@serialized_store(lambda: CANDIDATES_PATH)
+def _merge_harvest(urls, default_category, all_candidates, results) -> dict:
 
     store = load_candidates()
-    existing_ids = {row["harvest_id"] for row in store.get("candidates", [])}
-    existing_keys = {
-        (row["company"].lower(), row["source_url"])
-        for row in store.get("candidates", [])
-        if row.get("status") == "pending"
-    }
+    pending = {}
+    reviewed = set()
+    for saved in store.setdefault("candidates", []):
+        key = saved["company"].strip().casefold()
+        if saved.get("status") == "pending":
+            pending.setdefault(key, saved)
+        else:
+            reviewed.update((key, u) for u in saved.get("sources", [saved["source_url"]]))
     added = 0
     for row in all_candidates:
-        dedupe_key = (row.company.lower(), row.source_url)
-        if dedupe_key in existing_keys:
+        key = row.company.strip().casefold()
+        if (key, row.source_url) in reviewed:
             continue
-        store.setdefault("candidates", []).append(row.to_dict())
-        existing_keys.add(dedupe_key)
+        if key in pending:
+            existing = pending[key]
+            sources = existing.setdefault("sources", [existing["source_url"]])
+            if row.source_url not in sources:
+                sources.append(row.source_url)
+            continue
+        saved = row.to_dict()
+        saved["sources"] = [row.source_url]
+        store["candidates"].append(saved)
+        pending[key] = saved
         added += 1
 
     store["updated"] = _now_iso()
@@ -637,7 +653,7 @@ def load_candidates() -> dict:
 def save_candidates(data: dict) -> Path:
     FEEDBACK_DIR.mkdir(parents=True, exist_ok=True)
     data["version"] = 1
-    CANDIDATES_PATH.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    write_json(CANDIDATES_PATH, data)
     return CANDIDATES_PATH
 
 
@@ -649,6 +665,7 @@ def list_pending_candidates(*, include_known: bool = True) -> list[dict]:
     return sorted(rows, key=lambda r: (r.get("already_known", False), r.get("company", "")))
 
 
+@serialized_store(lambda: CANDIDATES_PATH)
 def approve_candidates(harvest_ids: list[str]) -> dict:
     store = load_candidates()
     approved: list[dict] = []
@@ -667,6 +684,7 @@ def approve_candidates(harvest_ids: list[str]) -> dict:
     return {"ok": True, "approved": approved, "count": len(approved)}
 
 
+@serialized_store(lambda: CANDIDATES_PATH)
 def reject_candidates(harvest_ids: list[str]) -> dict:
     store = load_candidates()
     count = 0

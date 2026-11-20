@@ -1,3 +1,4 @@
+import * as Dialog from "@radix-ui/react-dialog";
 import { useCallback, useEffect, useState } from "react";
 import {
   fetchEnvironment,
@@ -51,7 +52,7 @@ export function FirstRunWizard({ onNavigate, onComplete }: Props) {
   async function saveRoot() {
     const trimmed = libraryRoot.trim();
     if (!trimmed) {
-      setError("Enter your audio library path (e.g. D:\\Library\\_audio).");
+      setError("Enter the path to your audio library folder.");
       return;
     }
     setBusy(true);
@@ -90,25 +91,33 @@ export function FirstRunWizard({ onNavigate, onComplete }: Props) {
   }
 
   return (
-    <div className="first-run-overlay" role="dialog" aria-modal="true" aria-labelledby="first-run-title">
-      <div className="first-run-modal">
+    <Dialog.Root open onOpenChange={open => { if (!open && !busy) finish(); }}>
+      <Dialog.Portal>
+      <Dialog.Overlay className="setup-scrim" />
+      <Dialog.Content className="setup-window" onInteractOutside={event => event.preventDefault()}>
+        <div className="setup-photo"><img alt="" src={import.meta.env.BASE_URL + "rooms/library.webp"} /></div>
+        <div className="setup-content">
+        <ol className="setup-steps" aria-label="Setup progress">
+          {["Library", "Tools", "Ready"].map((label, index) => <li key={label} aria-current={step === index ? "step" : undefined}>{label}</li>)}
+        </ol>
         <header>
-          <h2 id="first-run-title">Welcome to Audiotheca</h2>
-          <p className="count-muted">Quick setup — you can change these later in Environment and Scan.</p>
+          <Dialog.Title>Welcome to Audiotheca</Dialog.Title>
+          <Dialog.Description>Choose a library to scan, or open the studio to mix local audio.</Dialog.Description>
         </header>
 
-        {error && <div className="error">{error}</div>}
+        {error && <div className="error" role="alert">{error}</div>}
 
         {step === 0 && (
           <section>
-            <h3>1. Library root</h3>
+            <h3>Library folder</h3>
             <p className="count-muted">Where is your audio/plugin library? Scans and live moves stay under this path.</p>
             <input
               className="field-input"
               type="text"
               value={libraryRoot}
               onChange={(e) => setLibraryRoot(e.target.value)}
-              placeholder="D:\YourLibrary\_software\_audio"
+              placeholder="/Volumes/Audio Library"
+              aria-label="Library root"
               spellCheck={false}
             />
             <div className="env-actions" style={{ marginTop: "0.75rem" }}>
@@ -118,13 +127,14 @@ export function FirstRunWizard({ onNavigate, onComplete }: Props) {
               <Button variant="ghost" onClick={() => setStep(1)}>
                 Skip for now
               </Button>
+              <Button variant="secondary" onClick={() => { onNavigate("studio"); finish(); }}>Open spatial studio</Button>
             </div>
           </section>
         )}
 
         {step === 1 && (
           <section>
-            <h3>2. Dependencies</h3>
+            <h3>Installed tools</h3>
             <p className="count-muted">
               {depsHealthy === true
                 ? "Toolchain looks healthy."
@@ -159,7 +169,7 @@ export function FirstRunWizard({ onNavigate, onComplete }: Props) {
 
         {step === 2 && (
           <section>
-            <h3>3. Ready</h3>
+            <h3>Choose where to start</h3>
             <p className="count-muted">
               Open the Scan tab for a dry-run, or Help for install paths, Docker, and staged live rollout.
             </p>
@@ -189,7 +199,9 @@ export function FirstRunWizard({ onNavigate, onComplete }: Props) {
           </section>
         )}
       </div>
-    </div>
+      </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
 

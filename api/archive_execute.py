@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 from pathlib import Path
+import subprocess
+import zipfile
 
 import archive_feedback as arch_fb
 from archive_peek import multipart_key
 from api.duplicate_execute import infer_library_root
 from api.execute_paths import validate_execute_path
 from audiotheca.transaction_ledger import guarded_move, new_batch_id
-from gen_archive_delete_candidates import expand_multipart_set
+from audiotheca.archive_approval import approval_snapshot
 
 
 def stage_confirmed_archives(
@@ -18,8 +20,15 @@ def stage_confirmed_archives(
     dry_run: bool = True,
     root: str | None = None,
 ) -> dict:
+    with arch_fb.feedback_lock():
+        return _stage(stamp, dry_run=dry_run, root=root)
+
+
+def _stage(stamp: str, *, dry_run: bool, root: str | None, approved_keys: set[str] | None = None) -> dict:
     store = arch_fb.load_store()
     confirmed = arch_fb.confirmed_paths_for_stamp(stamp, store)
+    if approved_keys is not None:
+        confirmed = [key for key in confirmed if key in approved_keys]
     if not confirmed:
         return {
             "ok": False,
@@ -37,7 +46,10 @@ def stage_confirmed_archives(
     results: list[dict] = []
     batch_id = new_batch_id()
 
-    for archive_path_str in confirmed:
+    reserved: set[Path] = set()
+    for key in confirmed:
+        saved = store.approvals.get(stamp, {}).get(key, {})
+        archive_path_str = saved.get("archive", key)
         if arch_fb.is_archive_rejected(archive_path_str, store, stamp=stamp):
             results.append({
                 "path": archive_path_str,
@@ -56,7 +68,7 @@ def stage_confirmed_archives(
             continue
 
         if library_root is None:
-            library_root = infer_library_root(archive_path)
+            library_root = Path(saved["root"]) if saved.get("root") else infer_library_root(archive_path)
 
         if library_root is None:
             results.append({
@@ -67,11 +79,11 @@ def stage_confirmed_archives(
             continue
 
         keeper = arch_fb.get_keeper(archive_path_str, store, stamp=stamp)
-        if keeper == "folder":
+        if keeper == "archive":
             results.append({
                 "path": archive_path_str,
                 "ok": False,
-                "error": "keeper preference is extracted folder",
+                "error": "keeper preference protects archive",
             })
             continue
 
@@ -83,24 +95,32 @@ def stage_confirmed_archives(
             })
             continue
 
-        delete_dir = library_root / "_delete-canidates"
-        for part_path in expand_multipart_set(archive_path):
-            validated_part, part_err = validate_execute_path(str(part_path), must_exist=True)
-            if part_err or validated_part is None:
-                results.append({
-                    "path": str(part_path),
-                    "ok": False,
-                    "error": part_err or "invalid path",
-                })
-                continue
-            part_path = validated_part
+        try:
+            current = approval_snapshot(stamp, archive_path)
+            if current != saved:
+                raise ValueError("Archive approval is missing or changed. Review and confirm again.")
+            parts = [Path(p) for p in current["parts"]]
+            delete_dir = library_root / "_delete-canidates"
+            if delete_dir.is_symlink() or not delete_dir.resolve().is_relative_to(library_root.resolve()):
+                raise ValueError("Staging directory is outside selected library")
+            for part_path in parts:
+                checked, error = validate_execute_path(str(part_path), must_exist=True)
+                if error or checked is None or not checked.resolve().is_relative_to(library_root.resolve()):
+                    raise ValueError(error or "Archive is outside selected library")
+                if checked.resolve().is_relative_to(delete_dir.resolve()):
+                    raise ValueError("Archive is already staged")
+                if arch_fb.is_archive_rejected(str(part_path), store, stamp=stamp) or arch_fb.get_keeper(str(part_path), store, stamp=stamp) == "archive":
+                    raise ValueError(f"Protected archive part: {part_path}")
+        except (OSError, ValueError, zipfile.BadZipFile, subprocess.SubprocessError, RuntimeError) as exc:
+            results.append({"path": archive_path_str, "ok": False, "error": str(exc)})
+            continue
+        for part_path in parts:
             dst = delete_dir / part_path.name
-            if dst.exists():
-                stem = part_path.stem
-                suffix = 1
-                while dst.exists():
-                    dst = delete_dir / f"{stem}_{suffix}{part_path.suffix}"
-                    suffix += 1
+            suffix = 1
+            while dst.exists() or dst in reserved:
+                dst = delete_dir / f"{part_path.stem}_{suffix}{part_path.suffix}"
+                suffix += 1
+            reserved.add(dst)
 
             if dry_run:
                 results.append({
@@ -116,6 +136,7 @@ def stage_confirmed_archives(
                     dst,
                     batch_id=batch_id,
                     op="stage_archive",
+                    expected_identity=current["parts"][str(part_path)],
                     dry_run=False,
                     meta={"stamp": stamp},
                 )

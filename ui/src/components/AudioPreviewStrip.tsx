@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fetchAudioAnalyze, fetchAudioWaveform, lookupAcoustId, mediaStreamUrl } from "../api/client";
+import {
+  fetchAudioAnalyze,
+  fetchAudioWaveform,
+  lookupAcoustId,
+  mediaStreamUrl,
+} from "../api/client";
 import { channelMixGains } from "../audioMix";
 import {
   playbackRateForBpm,
@@ -19,6 +24,7 @@ type Props = {
   name: string;
   autoPlay?: boolean;
   compact?: boolean;
+  onTrimChange?: (start: number, end: number) => void;
 };
 
 type ChannelMixer = {
@@ -31,8 +37,16 @@ type ChannelMixer = {
 };
 
 /** AUTO-AUD, WAV-TRIM, TMP-SYNC, KEY-PITCH, MIX-MATX preview strip. */
-export function AudioPreviewStrip({ path, name, autoPlay = false, compact = false }: Props) {
+export function AudioPreviewStrip({
+  path,
+  name,
+  autoPlay = false,
+  compact = false,
+  onTrimChange,
+}: Props) {
   const { session } = usePreviewSession();
+  const [inspect, setInspect] = useState(false);
+  const inspectMetadata = !compact || inspect || autoPlay;
   const [peaks, setPeaks] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -51,9 +65,26 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
   const channelMixerRef = useRef<ChannelMixer | null>(null);
   const pendingAudioContextRef = useRef<AudioContext | null>(null);
 
+  const generation = useRef(0);
+  const playRequest = useRef(0);
+  const owner = useRef(Symbol("audition"));
+  const auditionRange = useRef({ start: trimStart, end: trimEnd });
+  const [playError, setPlayError] = useState("");
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  useEffect(() => {
+    auditionRange.current = { start: trimStart, end: trimEnd };
+    onTrimChange?.(trimStart, trimEnd);
+  }, [onTrimChange, trimStart, trimEnd]);
   const isWav = /\.(wav|wave)$/i.test(name);
 
   useEffect(() => {
+    const request = ++generation.current;
+    const current = () => generation.current === request;
+    setPeaks([]);
+    setPlayError("");
+    setDuration(0);
+    setCurrentTime(0);
     setAssetBpm(undefined);
     setAssetKey(undefined);
     setAssetLufs(undefined);
@@ -61,29 +92,50 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
     setBpmSource(undefined);
     setKeySource(undefined);
     setVendorHints([]);
+    if (!inspectMetadata) return;
     if (isWav) {
       setLoading(true);
-      void fetchAudioWaveform(path, 32)
-        .then((data) => setPeaks((data.peaks as number[]) ?? []))
-        .catch(() => setPeaks([]))
-        .finally(() => setLoading(false));
+      void fetchAudioWaveform(path, compact ? 32 : 128)
+        .then((data) => {
+          if (current()) setPeaks((data.peaks as number[]) ?? []);
+        })
+        .catch(() => {
+          if (current()) setPeaks([]);
+        })
+        .finally(() => {
+          if (current()) setLoading(false);
+        });
     } else {
       setPeaks([]);
       setLoading(false);
     }
     void fetchAudioAnalyze(path)
       .then((data) => {
+        if (!current()) return;
         const bpm = data.bpm as { bpm?: number; source?: string } | undefined;
         const key = data.key as { key?: string; source?: string } | undefined;
-        const loudness = data.loudness as { measured_lufs?: number; engine?: string } | undefined;
-        const lufsNorm = data.lufs_norm as { measured_lufs?: number; target_lufs?: number; engine?: string } | undefined;
+        const loudness = data.loudness as
+          { measured_lufs?: number; engine?: string } | undefined;
+        const lufsNorm = data.lufs_norm as
+          | { measured_lufs?: number; target_lufs?: number; engine?: string }
+          | undefined;
         const bpmFromDefault = bpm?.source === "default";
-        setAssetBpm(typeof bpm?.bpm === "number" && !bpmFromDefault ? bpm.bpm : undefined);
-        setAssetKey(typeof key?.key === "string" && key.key ? key.key : undefined);
-        setBpmSource(typeof bpm?.source === "string" && !bpmFromDefault ? bpm.source : undefined);
+        setAssetBpm(
+          typeof bpm?.bpm === "number" && !bpmFromDefault ? bpm.bpm : undefined,
+        );
+        setAssetKey(
+          typeof key?.key === "string" && key.key ? key.key : undefined,
+        );
+        setBpmSource(
+          typeof bpm?.source === "string" && !bpmFromDefault
+            ? bpm.source
+            : undefined,
+        );
         setKeySource(typeof key?.source === "string" ? key.source : undefined);
         const lufs = loudness?.measured_lufs ?? lufsNorm?.measured_lufs;
-        setAssetLufs(typeof lufs === "number" ? Math.round(lufs * 10) / 10 : undefined);
+        setAssetLufs(
+          typeof lufs === "number" ? Math.round(lufs * 10) / 10 : undefined,
+        );
         setLoudnessEngine(
           typeof loudness?.engine === "string"
             ? loudness.engine
@@ -93,13 +145,19 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
         );
         const bwf = data.bwf as { vendor_hints?: string[] } | undefined;
         const sfx = data.sfx_map as { vendor_hints?: string[] } | undefined;
-        const hints = [...(bwf?.vendor_hints ?? []), ...(sfx?.vendor_hints ?? [])].filter(
+        const hints = [
+          ...(bwf?.vendor_hints ?? []),
+          ...(sfx?.vendor_hints ?? []),
+        ].filter(
           (hint): hint is string => typeof hint === "string" && hint.length > 0,
         );
         setVendorHints([...new Set(hints)]);
       })
       .catch(() => undefined);
-  }, [path, isWav]);
+    return () => {
+      generation.current++;
+    };
+  }, [path, isWav, compact, inspectMetadata]);
 
   useEffect(() => {
     setTrimStart(session.trimStart);
@@ -117,74 +175,98 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
     setAcoustIdBusy(false);
   }, [path]);
 
-  useEffect(() => () => {
-    audioRef.current?.pause();
-    audioRef.current = null;
-    const mixer = channelMixerRef.current;
-    channelMixerRef.current = null;
-    if (mixer) {
-      mixer.source.disconnect();
-      mixer.splitter.disconnect();
-      mixer.gains.forEach((gain) => gain.disconnect());
-      mixer.merger.disconnect();
-      void mixer.context.close();
-    }
-    const pendingContext = pendingAudioContextRef.current;
-    pendingAudioContextRef.current = null;
-    if (pendingContext) void pendingContext.close();
-  }, [path]);
-
-  const applyChannelMix = useCallback((audio: HTMLAudioElement) => {
-    let mixer = channelMixerRef.current;
-    if (!mixer && session.mixChannel !== "stereo") {
-      const AudioContextClass = window.AudioContext;
-      if (!AudioContextClass) return;
-      const context = pendingAudioContextRef.current ?? new AudioContextClass();
-      pendingAudioContextRef.current = null;
-      try {
-        const source = context.createMediaElementSource(audio);
-        const splitter = context.createChannelSplitter(2);
-        const merger = context.createChannelMerger(2);
-        const gains = Array.from({ length: 4 }, () => context.createGain());
-        const routes: Array<[number, number, number]> = [
-          [0, 0, 0], // left input → left output
-          [1, 1, 0], // right input → left output
-          [2, 0, 1], // left input → right output
-          [3, 1, 1], // right input → right output
-        ];
-        source.connect(splitter);
-        for (const [index, channel, output] of routes) {
-          splitter.connect(gains[index], channel);
-          gains[index].connect(merger, 0, output);
-        }
-        merger.connect(context.destination);
-        mixer = { audio, context, source, splitter, merger, gains };
-        channelMixerRef.current = mixer;
-      } catch {
-        void context.close();
-        return;
+  useEffect(
+    () => () => {
+      playRequest.current++;
+      audioRef.current?.pause();
+      audioRef.current = null;
+      const mixer = channelMixerRef.current;
+      channelMixerRef.current = null;
+      if (mixer) {
+        mixer.source.disconnect();
+        mixer.splitter.disconnect();
+        mixer.gains.forEach((gain) => gain.disconnect());
+        mixer.merger.disconnect();
+        void mixer.context.close();
       }
-    }
-    if (!mixer || mixer.audio !== audio) return;
-    channelMixGains(session.mixChannel).forEach((value, index) => {
-      mixer!.gains[index].gain.setTargetAtTime(value, mixer!.context.currentTime, 0.01);
-    });
-    if (mixer.context.state === "suspended") void mixer.context.resume().catch(() => undefined);
-  }, [session.mixChannel]);
+      const pendingContext = pendingAudioContextRef.current;
+      pendingAudioContextRef.current = null;
+      if (pendingContext) void pendingContext.close();
+    },
+    [path],
+  );
 
-  const applyMix = useCallback((audio: HTMLAudioElement) => {
-    applyChannelMix(audio);
-    const rate = playbackRateForBpm(assetBpm, session.projectBpm, session.tempoSync);
-    let effectiveRate = rate;
-    if (!session.tempoSync && session.pitchShiftSemitones !== 0) {
-      effectiveRate *= 2 ** (session.pitchShiftSemitones / 12);
-    }
-    audio.playbackRate = Math.max(0.25, Math.min(4, effectiveRate));
-    audio.preservesPitch = session.tempoSync;
-  }, [applyChannelMix, assetBpm, session]);
+  const applyChannelMix = useCallback(
+    (audio: HTMLAudioElement) => {
+      let mixer = channelMixerRef.current;
+      if (!mixer && session.mixChannel !== "stereo") {
+        const AudioContextClass = window.AudioContext;
+        if (!AudioContextClass) return;
+        const context =
+          pendingAudioContextRef.current ?? new AudioContextClass();
+        pendingAudioContextRef.current = null;
+        try {
+          const source = context.createMediaElementSource(audio);
+          const splitter = context.createChannelSplitter(2);
+          const merger = context.createChannelMerger(2);
+          const gains = Array.from({ length: 4 }, () => context.createGain());
+          const routes: Array<[number, number, number]> = [
+            [0, 0, 0], // left input → left output
+            [1, 1, 0], // right input → left output
+            [2, 0, 1], // left input → right output
+            [3, 1, 1], // right input → right output
+          ];
+          source.connect(splitter);
+          for (const [index, channel, output] of routes) {
+            splitter.connect(gains[index], channel);
+            gains[index].connect(merger, 0, output);
+          }
+          merger.connect(context.destination);
+          mixer = { audio, context, source, splitter, merger, gains };
+          channelMixerRef.current = mixer;
+        } catch {
+          void context.close();
+          return;
+        }
+      }
+      if (!mixer || mixer.audio !== audio) return;
+      channelMixGains(session.mixChannel).forEach((value, index) => {
+        mixer!.gains[index].gain.setTargetAtTime(
+          value,
+          mixer!.context.currentTime,
+          0.01,
+        );
+      });
+      if (mixer.context.state === "suspended")
+        void mixer.context.resume().catch(() => undefined);
+    },
+    [session.mixChannel],
+  );
+
+  const applyMix = useCallback(
+    (audio: HTMLAudioElement) => {
+      applyChannelMix(audio);
+      const rate = playbackRateForBpm(
+        assetBpm,
+        session.projectBpm,
+        session.tempoSync,
+      );
+      let effectiveRate = rate;
+      if (!session.tempoSync && session.pitchShiftSemitones !== 0) {
+        effectiveRate *= 2 ** (session.pitchShiftSemitones / 12);
+      }
+      audio.playbackRate = Math.max(0.25, Math.min(4, effectiveRate));
+      audio.preservesPitch = session.tempoSync;
+    },
+    [applyChannelMix, assetBpm, session],
+  );
 
   const play = useCallback(async () => {
-    if (session.mixChannel !== "stereo" && !channelMixerRef.current && !pendingAudioContextRef.current) {
+    if (
+      session.mixChannel !== "stereo" &&
+      !channelMixerRef.current &&
+      !pendingAudioContextRef.current
+    ) {
       try {
         const AudioContextClass = window.AudioContext;
         if (AudioContextClass) {
@@ -197,7 +279,13 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
       }
     }
     // Always mint a fresh ticketed URL — tickets expire with TTL.
+    const playback = ++playRequest.current;
+    window.dispatchEvent(
+      new CustomEvent("audiotheca:audition", { detail: owner.current }),
+    );
+    setPlayError("");
     const url = await mediaStreamUrl(path);
+    if (playback !== playRequest.current) return;
     const audio = audioRef.current ?? new Audio();
     if (!audioRef.current) audio.crossOrigin = "anonymous";
     if (audio.src !== url) {
@@ -206,12 +294,18 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
     audioRef.current = audio;
     applyMix(audio);
     audio.onloadedmetadata = () => {
-      if (audio.duration && trimStart > 0) {
-        audio.currentTime = audio.duration * trimStart;
+      if (Number.isFinite(audio.duration)) setDuration(audio.duration);
+      if (audio.duration && auditionRange.current.start > 0) {
+        audio.currentTime = audio.duration * auditionRange.current.start;
       }
     };
     audio.ontimeupdate = () => {
-      if (audio.duration && trimEnd < 1 && audio.currentTime >= audio.duration * trimEnd) {
+      setCurrentTime(audio.currentTime);
+      if (
+        audio.duration &&
+        auditionRange.current.end < 1 &&
+        audio.currentTime >= audio.duration * auditionRange.current.end
+      ) {
         audio.pause();
         setPlaying(false);
       }
@@ -219,36 +313,49 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
     audio.onended = () => setPlaying(false);
     audio.onpause = () => setPlaying(false);
     await audio.play();
-    setPlaying(true);
-  }, [applyMix, path, session.mixChannel, trimEnd, trimStart]);
+    if (audioRef.current === audio && playRequest.current === playback)
+      setPlaying(true);
+  }, [applyMix, path, session.mixChannel]);
 
   const stop = useCallback(() => {
+    playRequest.current++;
     audioRef.current?.pause();
     if (audioRef.current) audioRef.current.currentTime = 0;
     setPlaying(false);
   }, []);
 
+  useEffect(() => {
+    const stopOther = (event: Event) => {
+      if ((event as CustomEvent).detail !== owner.current) stop();
+    };
+    window.addEventListener("audiotheca:audition", stopOther);
+    return () => window.removeEventListener("audiotheca:audition", stopOther);
+  }, [stop]);
   async function handleAcoustIdLookup() {
+    const request = generation.current;
     setAcoustIdBusy(true);
     setAcoustIdMsg(null);
     try {
       const res = await lookupAcoustId({ path });
-      setAcoustIdMsg(formatAcoustIdResult(res));
+      if (generation.current === request)
+        setAcoustIdMsg(formatAcoustIdResult(res));
     } catch (err) {
-      setAcoustIdMsg(err instanceof Error ? err.message : String(err));
+      if (generation.current === request)
+        setAcoustIdMsg(err instanceof Error ? err.message : String(err));
     } finally {
-      setAcoustIdBusy(false);
+      if (generation.current === request) setAcoustIdBusy(false);
     }
   }
 
+  const playRef = useRef(play);
   useEffect(() => {
-    if (autoPlay && !playing && !session.autoAuditionMuted) {
-      void play().catch(() => undefined);
-    }
-    if ((!autoPlay || session.autoAuditionMuted) && playing) {
-      stop();
-    }
-  }, [autoPlay, play, playing, session.autoAuditionMuted, stop]);
+    playRef.current = play;
+  }, [play]);
+  useEffect(() => {
+    if (!autoPlay || session.autoAuditionMuted) return;
+    void playRef.current().catch(() => undefined);
+    return stop;
+  }, [path, autoPlay, session.autoAuditionMuted, stop]);
 
   useEffect(() => {
     if (audioRef.current) applyMix(audioRef.current);
@@ -256,14 +363,15 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
 
   if (!isAuditionableFile(name)) return null;
 
-  const visiblePeaks = peaks.slice(
-    Math.floor(trimStart * peaks.length),
-    Math.max(Math.floor(trimStart * peaks.length) + 1, Math.ceil(trimEnd * peaks.length)),
-  );
+  const visiblePeaks = peaks;
   const hasBadges = assetLufs != null || Boolean(assetBpm) || Boolean(assetKey);
 
   return (
-    <div className={`audio-preview-strip ${compact ? "compact" : ""}`}>
+    <div
+      className={`audio-preview-strip ${compact ? "compact" : ""}`}
+      onPointerEnter={() => setInspect(true)}
+      onFocusCapture={() => setInspect(true)}
+    >
       <button
         type="button"
         className="icon-btn audio-play-btn hvr-hl"
@@ -272,7 +380,10 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
         onClick={(e) => {
           e.stopPropagation();
           if (playing) stop();
-          else void play().catch(() => undefined);
+          else
+            void play().catch((err) =>
+              setPlayError(err instanceof Error ? err.message : String(err)),
+            );
         }}
       >
         {playing ? "■" : "▶"}
@@ -286,13 +397,22 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
           onClick={(e) => {
             e.stopPropagation();
             const rect = e.currentTarget.getBoundingClientRect();
-            const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-            if (e.shiftKey) setTrimEnd(ratio);
-            else setTrimStart(ratio);
+            const ratio = Math.max(
+              0,
+              Math.min(1, (e.clientX - rect.left) / rect.width),
+            );
+            if (e.shiftKey) setTrimEnd(Math.max(trimStart + 0.001, ratio));
+            else setTrimStart(Math.min(trimEnd - 0.001, ratio));
           }}
         >
           {loading ? (
-            <rect x="0" y="0.4" width="100%" height="0.2" className="waveform-loading" />
+            <rect
+              x="0"
+              y="0.4"
+              width="100%"
+              height="0.2"
+              className="waveform-loading"
+            />
           ) : (
             visiblePeaks.map((peak, index) => (
               <rect
@@ -301,26 +421,85 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
                 y={0.5 - peak / 2}
                 width={0.9}
                 height={Math.max(0.05, peak)}
+                opacity={
+                  index / visiblePeaks.length < trimStart ||
+                  index / visiblePeaks.length > trimEnd
+                    ? 0.2
+                    : 1
+                }
                 className="waveform-bar"
               />
             ))
           )}
         </svg>
       )}
+      {!compact && (
+        <div className="library-preview-trim">
+          <span>
+            {duration
+              ? currentTime.toFixed(2) + " / " + duration.toFixed(2) + " s"
+              : "Audition range"}
+          </span>
+          <label>
+            In{" "}
+            <input
+              aria-label="Audition trim in"
+              type="range"
+              min={0}
+              max={trimEnd - 0.001}
+              step="0.001"
+              value={trimStart}
+              onChange={(e) => setTrimStart(Number(e.target.value))}
+            />
+            {Math.round(trimStart * 100)}%
+          </label>
+          <label>
+            Out{" "}
+            <input
+              aria-label="Audition trim out"
+              type="range"
+              min={trimStart + 0.001}
+              max={1}
+              step="0.001"
+              value={trimEnd}
+              onChange={(e) => setTrimEnd(Number(e.target.value))}
+            />
+            {Math.round(trimEnd * 100)}%
+          </label>
+        </div>
+      )}
+      {playError && (
+        <span role="alert" className="error">
+          {playError}
+        </span>
+      )}
       {compact && hasBadges && (
         <span className="audio-preview-badges">
           {assetLufs != null ? (
-            <Badge tone="ready" title={loudnessEngine ? `Loudness engine: ${loudnessEngine}` : "Integrated loudness"}>
+            <Badge
+              tone="ready"
+              title={
+                loudnessEngine
+                  ? `Loudness engine: ${loudnessEngine}`
+                  : "Integrated loudness"
+              }
+            >
               {assetLufs} LUFS
             </Badge>
           ) : null}
           {assetBpm ? (
-            <Badge tone="accent" title={bpmSource ? `BPM source: ${bpmSource}` : "BPM"}>
+            <Badge
+              tone="accent"
+              title={bpmSource ? `BPM source: ${bpmSource}` : "BPM"}
+            >
               {assetBpm} BPM
             </Badge>
           ) : null}
           {assetKey ? (
-            <Badge tone="review" title={keySource ? `Key source: ${keySource}` : "Key"}>
+            <Badge
+              tone="review"
+              title={keySource ? `Key source: ${keySource}` : "Key"}
+            >
               {assetKey}
             </Badge>
           ) : null}
@@ -329,17 +508,30 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
       {!compact && (
         <span className="count-muted audio-preview-meta">
           {assetLufs != null ? (
-            <Badge tone="ready" title={loudnessEngine ? `Loudness engine: ${loudnessEngine}` : "Integrated loudness"}>
+            <Badge
+              tone="ready"
+              title={
+                loudnessEngine
+                  ? `Loudness engine: ${loudnessEngine}`
+                  : "Integrated loudness"
+              }
+            >
               {assetLufs} LUFS
             </Badge>
           ) : null}
           {assetBpm ? (
-            <Badge tone="accent" title={bpmSource ? `BPM source: ${bpmSource}` : "BPM"}>
+            <Badge
+              tone="accent"
+              title={bpmSource ? `BPM source: ${bpmSource}` : "BPM"}
+            >
               {assetBpm} BPM
             </Badge>
           ) : null}
           {assetKey ? (
-            <Badge tone="review" title={keySource ? `Key source: ${keySource}` : "Key"}>
+            <Badge
+              tone="review"
+              title={keySource ? `Key source: ${keySource}` : "Key"}
+            >
               {assetKey}
             </Badge>
           ) : null}
@@ -348,8 +540,12 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
               {hint}
             </Badge>
           ))}
-          {session.tempoSync && assetBpm ? ` ${assetBpm}→${session.projectBpm}bpm` : null}
-          {!session.tempoSync && session.pitchShiftSemitones !== 0 ? ` ${session.pitchShiftSemitones}st` : null}
+          {session.tempoSync && assetBpm
+            ? ` ${assetBpm}→${session.projectBpm}bpm`
+            : null}
+          {!session.tempoSync && session.pitchShiftSemitones !== 0
+            ? ` ${session.pitchShiftSemitones}st`
+            : null}
           {session.mixChannel !== "stereo" ? ` ${session.mixChannel}` : null}
         </span>
       )}
@@ -364,7 +560,9 @@ export function AudioPreviewStrip({ path, name, autoPlay = false, compact = fals
           >
             {acoustIdBusy ? "AcoustID…" : "AcoustID"}
           </Button>
-          {acoustIdMsg ? <span className="count-muted">{acoustIdMsg}</span> : null}
+          {acoustIdMsg ? (
+            <span className="count-muted">{acoustIdMsg}</span>
+          ) : null}
         </span>
       )}
     </div>

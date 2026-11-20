@@ -12,7 +12,11 @@ def workspace_root() -> Path:
     if home := os.environ.get("AUDIOTHECA_HOME"):
         return Path(home)
     if getattr(sys, "frozen", False):
-        return Path.cwd()
+        if sys.platform == "darwin":
+            return Path.home() / "Library/Application Support/Audiotheca"
+        if sys.platform == "win32":
+            return Path(os.environ.get("LOCALAPPDATA", Path.home())) / "Audiotheca"
+        return Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share")) / "audiotheca"
     return Path(__file__).resolve().parent.parent
 
 

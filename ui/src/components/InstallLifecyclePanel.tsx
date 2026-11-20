@@ -1,3 +1,4 @@
+import { LoadingStatus } from "../ui/LoadingStatus";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   checkInstallationVersion,
@@ -7,6 +8,7 @@ import {
   refreshVersionManifest,
   saveInstallationPreset,
   syncVersionManifestCatalog,
+  importManifestCatalog,
   upsertInstallation,
 } from "../api/client";
 import { Button } from "../ui";
@@ -328,6 +330,20 @@ export function InstallLifecyclePanel() {
           <Button variant="ghost" disabled={busy || !catalogUrl.trim()} onClick={() => void handleSyncCatalog()}>
             Sync catalog
           </Button>
+          <label className="context-field">Import local catalog
+            <input type="file" accept=".json,application/json" disabled={busy} onChange={async (event) => {
+              const file = event.currentTarget.files?.[0];
+              event.currentTarget.value = "";
+              if (!file) return;
+              setBusy(true); setError(null);
+              try {
+                const res = await importManifestCatalog(JSON.parse(await file.text()));
+                setMsg(`Imported ${res.merged} products from ${file.name}`);
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "Catalog import failed");
+              } finally { setBusy(false); }
+            }} />
+          </label>
         </div>
       </div>
 
@@ -504,7 +520,7 @@ export function InstallationSummaryWidget({ onNavigate }: { onNavigate?: () => v
   }, []);
 
   if (!summary) {
-    return <p className="count-muted">Loading installations…</p>;
+    return <LoadingStatus>Loading installations…</LoadingStatus>;
   }
 
   return (

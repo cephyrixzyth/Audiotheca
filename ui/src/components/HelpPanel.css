@@ -1,0 +1,194 @@
+.manual {
+  --manual-rule: var(--border, #687285);
+  color: var(--text);
+  container-type: inline-size;
+  max-width: 96rem;
+  margin-inline: auto;
+}
+.manual-intro {
+  margin: 0;
+  color: var(--text-muted);
+}
+.manual-layout {
+  display: grid;
+  grid-template-columns: minmax(13rem, 1fr) minmax(0, 2.5fr);
+  align-items: start;
+  gap: clamp(0.8rem, 2vw, 2rem);
+}
+.manual-index,
+.manual-reader {
+  border: 1px solid var(--manual-rule);
+  border-radius: var(--radius, 0.65rem);
+  background: var(--panel, var(--bg));
+}
+.manual-index {
+  max-height: min(70vh, 50rem);
+  overflow: auto;
+  padding: 1rem;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.manual-index > label {
+  display: block;
+  font-weight: 650;
+  margin-bottom: 0.4rem;
+}
+.manual-index input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 2.5rem;
+  padding: 0.48rem 0.65rem;
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid var(--manual-rule);
+  border-radius: 0.35rem;
+  font: inherit;
+}
+.manual-count {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.82rem;
+}
+.manual-index section {
+  margin-top: 1.2rem;
+}
+.manual-index h3,
+.manual-group {
+  margin: 0 0 0.45rem;
+  color: var(--text-muted);
+  font-size: 0.79rem;
+  font-weight: 700;
+}
+.manual-index ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.manual-index button {
+  display: block;
+  width: 100%;
+  padding: 0.55rem 0.65rem;
+  border: 0;
+  border-inline-start: 3px solid transparent;
+  border-radius: 0.25rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: start;
+  font: inherit;
+  font-size: 0.91rem;
+  line-height: 1.35;
+}
+.manual-index button[aria-current],
+.manual-index button:hover {
+  background: color-mix(in srgb, var(--accent) 13%, var(--panel, var(--bg)));
+}
+.manual-index button[aria-current] {
+  border-inline-start-color: var(--accent);
+  font-weight: 700;
+}
+.manual-reader {
+  min-width: 0;
+  padding: clamp(1rem, 3.4vw, 3.25rem);
+}
+.manual-reader h3 {
+  margin: 0 0 0.55rem;
+  max-width: 24ch;
+  font-size: clamp(1.5rem, 3vw, 2.55rem);
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+}
+.manual-intro {
+  margin: 0 0 1.6rem;
+  max-width: 56ch;
+  font-size: 1.05rem;
+  line-height: 1.55;
+}
+.manual-steps {
+  padding-inline-start: 1.5em;
+  margin: 0 0 1.5rem;
+  max-width: 66ch;
+}
+.manual-steps li {
+  padding: 0.8rem 0 0.8rem 0.35rem;
+  border-top: 1px solid var(--manual-rule);
+  line-height: 1.65;
+}
+.manual-steps li::marker {
+  font-family: var(--font-mono, monospace);
+  font-weight: 700;
+}
+.manual-open,
+.manual-media-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  box-sizing: border-box;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--manual-rule);
+  border-radius: 0.35rem;
+  text-decoration: none;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+  color: inherit;
+  background: transparent;
+}
+.manual-open {
+  border-color: var(--accent);
+}
+.manual-open:hover,
+.manual-media-actions button:hover {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.manual :is(button, input, a):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.manual-media {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--manual-rule);
+}
+.manual-media-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.manual figure {
+  margin: 1rem 0 0;
+}
+.manual figure :is(img, video) {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 0.35rem;
+  background: var(--bg);
+}
+.manual figcaption {
+  margin-top: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+@container (max-width: 760px) {
+  .manual-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .manual-index {
+    max-height: 14rem;
+  }
+  .manual-reader h3 {
+    scroll-margin-block-start: 5rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .manual *,
+  .manual *::before,
+  .manual *::after {
+    animation: none !important;
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}

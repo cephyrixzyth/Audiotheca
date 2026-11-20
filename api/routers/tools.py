@@ -266,9 +266,12 @@ def sync_installation_manifest(body: dict = Body(default_factory=dict)) -> dict[
     import version_verify as vv
 
     url = str(body.get("url") or "").strip()
-    if not url:
-        raise HTTPException(status_code=400, detail="url is required")
-    result = vv.sync_catalog_from_url(url)
+    if "catalog" in body:
+        result = vv.merge_catalog(body["catalog"], source="local_file")
+    elif url.startswith(("https://", "http://")):
+        result = vv.sync_catalog_from_url(url)
+    else:
+        raise HTTPException(status_code=400, detail="Choose a local JSON file or supply an HTTP(S) catalog URL")
     if not result.get("ok"):
         raise HTTPException(status_code=502, detail=str(result.get("error") or "sync failed"))
     return result
@@ -302,7 +305,12 @@ async def rollback_transaction_batch(body: dict = Body(...)) -> dict[str, object
     if not dry_run:
         _require_ctx_permission("live_execute")
     security.audit("transaction_rollback", batch_id=batch_id, dry_run=dry_run)
-    return await asyncio.to_thread(rollback_batch, batch_id, dry_run=dry_run)
+    ids = body.get("entry_ids")
+    if ids is not None and (not isinstance(ids, list) or not all(isinstance(i, str) for i in ids)):
+        raise HTTPException(status_code=400, detail="entry_ids must be a list of ledger IDs")
+    from path_mask import mask_payload
+    result = await asyncio.to_thread(rollback_batch, batch_id, dry_run=dry_run, entry_ids=set(ids) if ids is not None else None)
+    return mask_payload(result)
 
 @router.post("/api/tools/phonetic-search")
 def tools_phonetic_search(body: dict = Body(default_factory=dict)) -> dict[str, object]:

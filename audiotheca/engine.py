@@ -8,7 +8,9 @@ import shutil
 import threading
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
+from datetime import datetime, timezone
+from audiotheca.run_identity import new_stamp, STAMP_RE
+from audiotheca.local_storage import write_json
 from pathlib import Path
 
 from archive_peek import (
@@ -51,7 +53,7 @@ from audiotheca.deep_identify import find_renamed_archive_dupes, needs_deep_iden
 from audiotheca.helpers import _archive_stem, _limit_walk, _squash, _walk_depth
 from audiotheca.incremental_scan import (
     cached_section_items,
-    section_unchanged,
+    tree_signature,
     update_section_cache,
 )
 from audiotheca.verification import run_verification
@@ -93,8 +95,9 @@ class DeduplicationEngine(
         self._paths: dict[str, Path] | None = None
         self.routes = self._compile_routes()
         self._setup_logging()
-        self.run_stamp = datetime.now().strftime("%Y%m%d_%H%M")
-        self.scan_cache = self._load_cache()
+        self.run_stamp = os.environ.get("AUDIOTHECA_RUN_ID") or new_stamp()
+        if not STAMP_RE.fullmatch(self.run_stamp):
+            raise ValueError("Invalid AUDIOTHECA_RUN_ID")
 
         self.quarantine_dir = self.root_dir / "_non_pc_quarantine"
         self.investigate_dir = self.root_dir / "_requiresinvestigation"
@@ -124,6 +127,7 @@ class DeduplicationEngine(
         self.verification_findings: list[dict] = []
         self.quality_scorecard: dict = {}
         self.scan_options: ScanOptions = load_scan_options()
+        self.scan_cache = self._load_cache()
         self.io_throttle_ms = 0
         self._seven_zip = find_7z()
         self.action_mode = "preview"
@@ -153,8 +157,9 @@ class DeduplicationEngine(
     # ------------------------------------------------------------------
 
     def _setup_logging(self) -> None:
+        REPORT_DIR.mkdir(parents=True, exist_ok=True)
         logging.basicConfig(
-            filename=str(Path(__file__).resolve().parent.parent / "dedupe_engine.log"),
+            filename=str(REPORT_DIR / "dedupe_engine.log"),
             level=logging.INFO,
             format="%(asctime)s | %(levelname)s | %(message)s",
             force=True,
@@ -212,7 +217,7 @@ class DeduplicationEngine(
             print(" (plan only — Stage 2)")
         print(f"  Duplicate groups:   {len(self.duplicate_groups)} ({high_dupes} HIGH)")
         print("=" * 60)
-        return self._confirm("Proceed with live filesystem changes?")
+        return self._confirm("Proceed with duplicate staging, restructure and empty-directory purge?")
 
     def _resolve_action_mode(self) -> str:
         if self.dry_run:
@@ -491,6 +496,12 @@ class DeduplicationEngine(
             inv_hints_path = export_investigation_hints()
             self.logger.info("Engine hints refreshed: %s, %s", hints_path, inv_hints_path)
             self._print_summary(report_paths)
+            write_json(REPORT_DIR / f"Run_Manifest_{self.run_stamp}.json", {
+                "stamp": self.run_stamp, "finished": datetime.now(timezone.utc).isoformat(),
+                "root": str(self.root_dir.resolve()), "job_id": os.environ.get("AUDIOTHECA_JOB_ID"),
+                "state": "stopped" if self._stopped_by_user else "failed" if run_failed else "complete",
+                "reports": sorted({path.name for path in paths.values() if path.parent == REPORT_DIR and path.is_file()}),
+            })
         if self._stopped_by_user:
             return "stopped"
         if run_failed:
@@ -536,12 +547,14 @@ class DeduplicationEngine(
                     bin_targets.setdefault(section, []).append(item)
             bin_progress.finish(f"{len(payloads):,} ad-hoc targets")
         else:
+            section_signatures = {}
             section_cache = self.scan_cache.get("sections") or {}
             incremental_hits = 0
             for category_bin in category_bins:
                 log_step("get_software_targets", f"Resolving bin {category_bin.name}")
                 bin_progress.pulse(detail=f"Starting {category_bin.name}…")
-                if self.scan_options.incremental_scan and section_unchanged(category_bin, section_cache):
+                if self.scan_options.incremental_scan:
+                    section_signatures[category_bin] = tree_signature(category_bin)
                     cached = cached_section_items(category_bin, section_cache)
                     if cached:
                         for item in cached:
@@ -550,7 +563,7 @@ class DeduplicationEngine(
                             item["section_incremental"] = True
                             incremental_results.append(item)
                         incremental_hits += len(cached)
-                        bin_targets[category_bin.name] = []
+                        bin_targets[category_bin.name] = [item["path"] for item in cached]
                         bin_progress.update(1, detail=f"{category_bin.name}: {len(cached)} cached (unchanged)")
                         continue
                 targets = self.get_software_targets(category_bin)
@@ -639,8 +652,8 @@ class DeduplicationEngine(
                 self.scan_cache["sections"] = {}
             for category_bin in category_bins:
                 items = section_items.get(category_bin.name, [])
-                if items:
-                    update_section_cache(self.scan_cache, category_bin, items)
+                if items and section_signatures.get(category_bin):
+                    update_section_cache(self.scan_cache, category_bin, items, before_scan=section_signatures[category_bin])
 
         all_items: list[dict] = []
 
@@ -841,6 +854,7 @@ class DeduplicationEngine(
                     print(f"  [{idx}] {item['original_name']} ({size_mb:.1f} MB) in {item['source_bin']}{rec}")
 
         items_to_delete: list[dict] = []
+        automatic_keepers = {}
         if self.scan_options.skip("duplicates"):
             skipped_groups = len(dupe_candidates)
             self._record_skip_impact(
@@ -921,7 +935,9 @@ class DeduplicationEngine(
 
                 if self.action_mode == "auto":
                     if assessment.get("content_check") == "MATCH":
-                        items_to_delete.extend(candidates)
+                        for candidate in candidates:
+                            automatic_keepers[Path(candidate["path"])] = keep["path"]
+                            items_to_delete.append(candidate)
                     continue
 
                 if self.action_mode == "item":
@@ -1000,34 +1016,11 @@ class DeduplicationEngine(
                 ref_progress.finish(f"{added} reference-extra groups")
         self._checkpoint("duplicates", "Phase 2 - Duplicate review")
 
-        if items_to_delete:
-            if not self.dry_run:
-                self.delete_candidates_dir.mkdir(exist_ok=True)
-            for item in items_to_delete:
-                status = "[DRY RUN] Would stage" if self.dry_run else "Staged for deletion"
-                csv_writer.writerow(
-                    [
-                        status,
-                        item["original_name"],
-                        item["source_bin"],
-                        self.delete_candidates_dir.name,
-                        "Confirmed duplicate",
-                        item["company"] or "Unknown",
-                    ]
-                )
-                self._inc("duplicates_confirmed")
-                if not self.dry_run:
-                    dst = self.delete_candidates_dir / item["original_name"]
-                    if dst.exists():
-                        stem = item["original_name"]
-                        suffix = 1
-                        while dst.exists():
-                            dst = self.delete_candidates_dir / f"{stem}_{suffix}"
-                            suffix += 1
-                    self.safe_move(item["path"], dst)
+        # Keep proposed discards out of other move plans, including a failed or declined stage.
+        # The staging receipts below explicitly report each failed verification or move.
+        delete_paths = {item["path"] for item in items_to_delete}
 
         restructure_progress = PhaseProgress("Phase 3 - Restructure plan", len(all_items), "item")
-        delete_paths = {entry["path"] for entry in items_to_delete}
         conflict_bases = {c["base_name"] for c in self.vendor_conflicts}
         confirmed_bases = self._confirmed_base_vendors(all_items)
         confirmed_paths = self._confirmed_base_paths(all_items)
@@ -1153,13 +1146,13 @@ class DeduplicationEngine(
                     ]
                 )
                 self._inc("routed")
-        elif not self.scan_options.skip("restructure_live") and self._print_live_preflight():
-            self._execute_restructure(csv_writer)
-        elif self.scan_options.skip("restructure_live"):
-            print("[!] Phase 3 live restructure skipped (scan options).")
+        elif not self._print_live_preflight():
+            print("[!] Duplicate staging, restructure and empty-directory purge declined.")
+            return
         else:
-            print("[!] Phase 3 restructure skipped (declined at pre-flight).")
-            self.logger.info("Phase 3 restructure skipped at pre-flight.")
+            self._stage_duplicate_candidates(items_to_delete, automatic_keepers, csv_writer)
+            if not self.scan_options.skip("restructure_live"):
+                self._execute_restructure(csv_writer)
         self._checkpoint("restructure_live", "Phase 3 - Restructure moves")
 
         if not self.dry_run and not self.scan_options.skip("purge"):
@@ -1194,6 +1187,32 @@ class DeduplicationEngine(
                 lambda category_bin, dry_run=False: _purge_bin(category_bin, dry_run=dry_run),
                 lambda category_bin: f"Purge empty dirs under {category_bin.name}/",
             )
+
+    def _stage_duplicate_candidates(self, items_to_delete, automatic_keepers, csv_writer) -> None:
+        for item in items_to_delete:
+            src = Path(item["path"])
+            reason = "Confirmed duplicate"
+            verified_identity = None
+            if src in automatic_keepers:
+                from audiotheca.file_integrity import content_identity
+
+                keep = Path(automatic_keepers[src])
+                try:
+                    verified_identity = content_identity(keep)
+                    if verified_identity != content_identity(src):
+                        raise ValueError("complete contents differ")
+                except (ValueError, OSError) as exc:
+                    csv_writer.writerow(["Review required", item["original_name"], item["source_bin"],
+                                         "", str(exc), item["company"] or "Unknown"])
+                    continue
+            dst = self.delete_candidates_dir / item["original_name"]
+            moved = self.dry_run or (self.safe_move(src, dst, expected_identity=verified_identity)
+                                     if verified_identity else self.safe_move(src, dst))
+            if moved:
+                self._inc("duplicates_confirmed")
+            status = "[DRY RUN] Would stage" if self.dry_run else "Staged for deletion" if moved else "Stage failed"
+            csv_writer.writerow([status, item["original_name"], item["source_bin"], self.delete_candidates_dir.name,
+                                 reason, item["company"] or "Unknown"])
 
     def _apply_restructure_entry(self, entry: dict, csv_writer, *, dry_run: bool = False) -> None:
         if dry_run:

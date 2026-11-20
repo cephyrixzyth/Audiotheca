@@ -7,6 +7,9 @@ from pathlib import Path
 
 from api import report_loader
 from api.paths import report_dir
+from api.execute_paths import validate_execute_path
+from audiotheca.file_integrity import content_identity
+from audiotheca.local_storage import write_json, locked
 from duplicate_feedback import (
     KeeperApproval,
     load_run_feedback,
@@ -24,6 +27,7 @@ class DuplicateDecision:
     discard_paths: list[str] = field(default_factory=list)
     confidence: str = ""
     group_kind: str = ""
+    identities: dict[str, list] = field(default_factory=dict)
 
 
 @dataclass
@@ -61,8 +65,35 @@ def load_plan(stamp: str) -> ApprovedPlan | None:
 
 def save_plan(plan: ApprovedPlan) -> Path:
     path = _plan_path(plan.stamp)
-    path.write_text(json.dumps(plan.to_dict(), indent=2), encoding="utf-8")
+    with decision_lock():
+        write_json(path, plan.to_dict())
     return path
+
+
+def save_review_decisions(stamp: str, choices: dict[str, str]):
+    with decision_lock():
+        plan = build_plan_from_decisions(stamp, choices)
+        path = _plan_path(stamp)
+        write_json(path, plan.to_dict())
+        return plan, path
+
+
+def decision_lock():
+    return locked(DECISIONS_DIR / ".review.lock")
+
+
+def approval_identities(paths) -> dict[str, list]:
+    identities = {}
+    for raw in paths:
+        item, error = validate_execute_path(raw, must_exist=True)
+        if error or item is None or Path(raw).is_symlink():
+            return {}
+        try:
+            info = item.stat()
+            identities[raw] = [info.st_dev, info.st_ino, content_identity(item)]
+        except (OSError, ValueError):
+            return {}
+    return identities
 
 
 def build_plan_from_decisions(
@@ -70,7 +101,7 @@ def build_plan_from_decisions(
     decisions: dict[str, str],
 ) -> ApprovedPlan:
     """decisions maps dedup_key -> keeper_path chosen in UI."""
-    groups, _ = report_loader.load_duplicates(stamp, limit=500)
+    groups, _ = report_loader.load_duplicates(stamp, keys=set(decisions), limit=len(decisions))
     group_map = {group.dedup_key: group for group in groups}
     rows: list[DuplicateDecision] = []
 
@@ -85,7 +116,8 @@ def build_plan_from_decisions(
             DuplicateDecision(
                 dedup_key=dedup_key,
                 keeper_path=keeper_path,
-                discard_paths=[p for p in member_paths if p != keeper_path],
+                discard_paths=sorted(p for p in member_paths if p != keeper_path),
+                identities=approval_identities(member_paths),
                 confidence=group.confidence,
                 group_kind=group.group_kind,
             )
@@ -119,7 +151,7 @@ def load_run_review_state(stamp: str) -> dict:
     plan = load_plan(stamp)
     run_feedback = load_run_feedback(stamp)
     keepers = {row.dedup_key: row.keeper_path for row in plan.duplicate_decisions} if plan else {}
-    if not keepers:
+    if plan is None:
         keepers = run_feedback.get("keepers", {})
     return {
         "stamp": stamp,

@@ -19,7 +19,7 @@ enum ApiProcess {
 }
 
 struct ApiChild(Mutex<Option<ApiProcess>>);
-struct ApiPort(Mutex<u16>);
+struct ApiPort(Option<u16>);
 struct AppHome(PathBuf);
 
 fn portable_home_from_config(exe_dir: &Path) -> Option<PathBuf> {
@@ -99,6 +99,13 @@ fn sidecar_env(
 }
 
 fn engine_resource_path(app: &tauri::App) -> Option<PathBuf> {
+    let executable_name = format!("audiotheca-engine{}", std::env::consts::EXE_SUFFIX);
+    if let Ok(current) = std::env::current_exe() {
+        let sibling = current.with_file_name(executable_name);
+        if sibling.is_file() {
+            return Some(sibling);
+        }
+    }
     let resource = app.path().resource_dir().ok()?;
     for dir in [resource.clone(), resource.join("binaries")] {
         if let Ok(entries) = std::fs::read_dir(dir) {
@@ -117,18 +124,18 @@ fn can_bind(port: u16) -> bool {
     TcpListener::bind(("127.0.0.1", port)).is_ok()
 }
 
-fn pick_api_port() -> u16 {
+fn pick_api_port() -> Option<u16> {
     // Prefer a free port without killing foreign listeners on 8787–8797.
     for port in API_PORT_MIN..=API_PORT_MAX {
         if can_bind(port) {
             if port != API_PORT_MIN {
                 eprintln!("[audiotheca] Port {API_PORT_MIN} busy — using {port} for API");
             }
-            return port;
+            return Some(port);
         }
     }
-    eprintln!("[audiotheca] Warning: no free API port in {API_PORT_MIN}-{API_PORT_MAX}; defaulting to {API_PORT_MIN}");
-    API_PORT_MIN
+    eprintln!("[audiotheca] No free API port in {API_PORT_MIN}-{API_PORT_MAX}");
+    None
 }
 
 fn spawn_api_server(app: &tauri::App, root: &Path, port: u16) -> Option<ApiProcess> {
@@ -219,9 +226,10 @@ fn stop_api_server(state: &ApiChild) {
 }
 
 #[tauri::command]
-fn api_base_url(port: State<ApiPort>) -> String {
-    let api_port = *port.0.lock().unwrap_or_else(|e| e.into_inner());
-    format!("http://127.0.0.1:{api_port}/api")
+fn api_base_url(port: State<ApiPort>) -> Result<String, String> {
+    port.0
+        .map(|number| format!("http://127.0.0.1:{number}/api"))
+        .ok_or_else(|| format!("Ports {API_PORT_MIN}–{API_PORT_MAX} are occupied. Close another instance and reopen Audiotheca."))
 }
 
 #[tauri::command]
@@ -327,8 +335,8 @@ pub fn run() {
             append_startup_log(&root, "Audiotheca desktop starting");
             app.manage(AppHome(root.clone()));
             let api_port = pick_api_port();
-            app.manage(ApiPort(Mutex::new(api_port)));
-            let child = spawn_api_server(app, &root, api_port);
+            app.manage(ApiPort(api_port));
+            let child = api_port.and_then(|port| spawn_api_server(app, &root, port));
             app.manage(ApiChild(Mutex::new(child)));
 
             #[cfg(desktop)]

@@ -22,6 +22,8 @@ SITE_FILES = {
     "/changes.html": "changes.html",
     "/assets/theme.css": "theme.css",
     "/assets/hub.js": "hub.js",
+    "/assets/cover.webp": "cover.webp",
+    "/favicon.png": "favicon.png",
 }
 DOC_FILES = {
     "README.md": ROOT / "README.md",

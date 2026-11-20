@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { helpMedia } from "./helpMedia";
 
 const host = process.env.TAURI_DEV_HOST;
 
@@ -7,8 +8,9 @@ const apiPort = process.env.VITE_API_PORT || "8787";
 const apiTarget = `http://127.0.0.1:${apiPort}`;
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), helpMedia()],
   clearScreen: false,
+  cacheDir: process.env.AUDIOTHECA_VITE_CACHE,
   envPrefix: ["VITE_", "TAURI_"],
   test: {
     environment: "node",

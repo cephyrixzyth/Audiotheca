@@ -364,7 +364,7 @@ class RoutingMixin:
                 return item
         return None
 
-    def safe_move(self, src: Path, dst: Path) -> bool:
+    def safe_move(self, src: Path, dst: Path, *, expected_identity: str | None = None) -> bool:
         from audiotheca.transaction_ledger import guarded_move, new_batch_id
 
         if self.dry_run:
@@ -384,6 +384,7 @@ class RoutingMixin:
             final_dst,
             batch_id=batch_id,
             op="safe_move",
+            expected_identity=expected_identity,
             dry_run=False,
         )
         if not ok:

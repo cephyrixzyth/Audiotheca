@@ -12,7 +12,9 @@ import type { TabId } from "./types";
  */
 export const TAB_TO_PATH: Record<TabId, string> = {
   dashboard: "/dashboard",
+  library: "/library",
   scan: "/scan",
+  studio: "/studio",
   investigation: "/review/investigation",
   duplicates: "/review/duplicates",
   restructure: "/review/restructure",

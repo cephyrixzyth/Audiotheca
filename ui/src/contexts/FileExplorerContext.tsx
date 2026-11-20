@@ -1,12 +1,19 @@
 import {
   createContext,
+  lazy,
+  Suspense,
   useCallback,
   useContext,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
-import { FileExplorerPanel } from "../components/FileExplorer";
+import { LoadingStatus } from "../ui/LoadingStatus";
+const FileExplorerPanel = lazy(() =>
+  import("../components/FileExplorer").then((module) => ({
+    default: module.FileExplorerPanel,
+  })),
+);
 
 const LAST_PATH_KEY = "audiotheca.explorer.lastPath";
 const PINNED_KEY = "audiotheca.explorer.pinned";
@@ -23,6 +30,7 @@ type Ctx = {
   close: () => void;
   togglePin: () => void;
   setPopOut: (enabled: boolean) => void;
+  panelOpen: boolean;
   pinned: boolean;
   popOut: boolean;
   dualPane: boolean;
@@ -63,7 +71,11 @@ type ProviderProps = {
   subtreeRoot?: string | null;
 };
 
-export function FileExplorerProvider({ children, stamp = "", subtreeRoot = null }: ProviderProps) {
+export function FileExplorerProvider({
+  children,
+  stamp = "",
+  subtreeRoot = null,
+}: ProviderProps) {
   const [path, setPath] = useState<string | null>(null);
   const [secondaryPath, setSecondaryPath] = useState<string | null>(null);
   const [dualPane, setDualPane] = useState(false);
@@ -94,9 +106,12 @@ export function FileExplorerProvider({ children, stamp = "", subtreeRoot = null 
     setSecondaryPath(null);
   }, []);
 
-  const openDualPane = useCallback((left: string, right: string) => {
-    openPath(left, { secondary: right, dualPane: true });
-  }, [openPath]);
+  const openDualPane = useCallback(
+    (left: string, right: string) => {
+      openPath(left, { secondary: right, dualPane: true });
+    },
+    [openPath],
+  );
 
   const close = useCallback(() => {
     setPath(null);
@@ -125,31 +140,46 @@ export function FileExplorerProvider({ children, stamp = "", subtreeRoot = null 
       close,
       togglePin,
       setPopOut,
+      panelOpen: path != null,
       pinned,
       popOut,
       dualPane,
       stamp: stamp || null,
       subtreeRoot,
     }),
-    [openPath, openAtRoots, openDualPane, close, togglePin, pinned, popOut, dualPane, stamp, subtreeRoot],
+    [
+      openPath,
+      openAtRoots,
+      openDualPane,
+      close,
+      togglePin,
+      path,
+      pinned,
+      popOut,
+      dualPane,
+      stamp,
+      subtreeRoot,
+    ],
   );
 
   return (
     <FileExplorerContext.Provider value={value}>
       {children}
       {path != null && (
-        <FileExplorerPanel
-          initialPath={path}
-          secondaryPath={secondaryPath}
-          dualPane={dualPane}
-          stamp={stamp || null}
-          subtreeRoot={subtreeRoot}
-          pinned={pinned}
-          popOut={popOut}
-          onTogglePopOut={() => setPopOut((v) => !v)}
-          onTogglePin={togglePin}
-          onClose={close}
-        />
+        <Suspense fallback={<LoadingStatus>Opening library…</LoadingStatus>}>
+          <FileExplorerPanel
+            initialPath={path}
+            secondaryPath={secondaryPath}
+            dualPane={dualPane}
+            stamp={stamp || null}
+            subtreeRoot={subtreeRoot}
+            pinned={pinned}
+            popOut={popOut}
+            onTogglePopOut={() => setPopOut((v) => !v)}
+            onTogglePin={togglePin}
+            onClose={close}
+          />
+        </Suspense>
       )}
     </FileExplorerContext.Provider>
   );

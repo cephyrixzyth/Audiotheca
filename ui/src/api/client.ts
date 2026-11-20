@@ -1,4 +1,4 @@
-import { getApiBase, getWsBase, isTauri } from "../platform";
+import { getApiBase, getWsBase, isTauri, updateLibraryRoot } from "../platform";
 import type {
   ArchiveDiffResponse,
   ArchivePeekResponse,
@@ -56,7 +56,7 @@ async function ensureAuth(): Promise<void> {
     // Localhost / Tauri bearer bootstrap (never bake the long-lived token into the UI bundle).
     const res = await fetch(await apiUrl("/auth/token"), { credentials: "include" });
     if (!res.ok) {
-      throw new Error("Failed to obtain API auth — is the API running on 127.0.0.1:8787?");
+      throw new Error("Could not establish a session with the local library service.");
     }
     const data = (await res.json()) as { token: string };
     cachedToken = data.token;
@@ -334,12 +334,13 @@ export function fetchInvestigation(
 
 export function fetchDuplicates(
   stamp: string,
-  params: { confidence?: string; q?: string; limit?: number },
+  params: { confidence?: string; q?: string; limit?: number; offset?: number },
 ): Promise<{ groups: DuplicateGroup[]; total: number }> {
   const qs = new URLSearchParams();
   if (params.confidence) qs.set("confidence", params.confidence);
   if (params.q) qs.set("q", params.q);
   if (params.limit) qs.set("limit", String(params.limit));
+  if (params.offset) qs.set("offset", String(params.offset));
   return getJson(`/runs/${stamp}/duplicates?${qs}`);
 }
 
@@ -544,7 +545,7 @@ export function fetchDecisions(stamp: string): Promise<{
 export function saveDecisions(
   stamp: string,
   decisions: Record<string, string>,
-): Promise<{ ok: boolean; count: number; path: string }> {
+): Promise<{ ok: boolean; count: number; path: string; unresolved?: string[] }> {
   return postJson(`/runs/${stamp}/decisions`, { decisions });
 }
 
@@ -726,6 +727,7 @@ export function testVendorKeyword(
 }
 
 export interface HarvestCandidate {
+  sources?: string[];
   harvest_id: string;
   company: string;
   keywords: string[];
@@ -802,7 +804,7 @@ export function fetchJob(jobId: string): Promise<JobSnapshot> {
 export function fetchJobEvents(
   jobId: string,
   after = 0,
-): Promise<{ events: ProgressEvent[]; total: number; after: number }> {
+): Promise<{ events: ProgressEvent[]; total: number; after: number; oldest?: number; missed?: boolean; next_cursor?: number }> {
   return getJson(`/jobs/${jobId}/events?after=${after}`);
 }
 
@@ -924,6 +926,23 @@ export function fetchAuditLog(tail = 200): Promise<{ entries: Array<Record<strin
 
 export function fetchTransactionLedger(limit = 200): Promise<{ entries: Array<Record<string, unknown>> }> {
   return getJson(`/system/transaction-ledger?limit=${limit}`);
+}
+
+export interface RollbackResult {
+  batch_id: string;
+  dry_run: boolean;
+  rolled_back: number;
+  failed: number;
+  results: Array<{ entry_id: string; src: string; dst: string; ok: boolean; error?: string }>;
+}
+
+export function rollbackBatch(batch: string, entries?: string[]): Promise<RollbackResult> {
+  return postJson("/transactions/rollback", {
+    batch_id: batch,
+    dry_run: entries === undefined,
+    confirm_live: entries !== undefined,
+    entry_ids: entries,
+  });
 }
 
 export function fetchSystemProcesses(): Promise<Record<string, unknown>> {
@@ -1201,54 +1220,47 @@ export interface BrowseEntry {
   investigation_bucket?: string;
 }
 
-export async function browseDirectory(path: string = ""): Promise<{
+export interface DirectoryPage {
   path: string;
   parent: string | null;
   entries: BrowseEntry[];
-}> {
-  const qs = path ? `?path=${encodeURIComponent(path)}` : "";
-  return getJson(`/browse${qs}`);
+  next_cursor: string | null;
+  total: number;
+  partial: boolean;
+  observed_at: string;
+  skipped: number;
 }
 
-export async function browseDirectoryEnriched(
-  path: string = "",
-  stamp: string = "",
-): Promise<{
-  path: string;
-  parent: string | null;
-  entries: BrowseEntry[];
-}> {
-  const qs = new URLSearchParams();
-  if (path) qs.set("path", path);
-  if (stamp) qs.set("stamp", stamp);
-  const query = qs.toString();
-  return getJson(`/browse/enriched${query ? `?${query}` : ""}`);
-}
-
-export async function browseTreeChildren(path: string = ""): Promise<{
-  path: string;
-  parent: string | null;
-  children: BrowseEntry[];
-}> {
-  const qs = path ? `?path=${encodeURIComponent(path)}` : "";
-  return getJson(`/browse/tree${qs}`);
-}
-
-export async function browseSearch(
-  query: string,
-  root: string = "",
-  limit = 200,
-): Promise<{
+export interface SearchPage {
   query: string;
   root: string | null;
   scanned: number;
   count: number;
   truncated: boolean;
+  next_cursor: string | null;
+  skipped: number;
+  observed_at: string;
   entries: BrowseEntry[];
-}> {
-  const qs = new URLSearchParams({ q: query, limit: String(limit) });
-  if (root) qs.set("root", root);
-  return getJson(`/browse/search?${qs.toString()}`);
+}
+
+export function browseDirectory(path = "", cursor = ""): Promise<DirectoryPage> {
+  const qs = new URLSearchParams({ path, cursor });
+  return getJson(`/browse?${qs}`);
+}
+
+export function browseDirectoryEnriched(path = "", stamp = "", cursor = ""): Promise<DirectoryPage> {
+  const qs = new URLSearchParams({ path, stamp, cursor });
+  return getJson(`/browse/enriched?${qs}`);
+}
+
+export function browseTreeChildren(path = "", cursor = ""): Promise<Omit<DirectoryPage, "entries"> & { children: BrowseEntry[] }> {
+  const qs = new URLSearchParams({ path, cursor });
+  return getJson(`/browse/tree?${qs}`);
+}
+
+export function browseSearch(query: string, root = "", limit = 200, cursor = "", stamp = ""): Promise<SearchPage> {
+  const qs = new URLSearchParams({ q: query, root, limit: String(limit), cursor, stamp });
+  return getJson(`/browse/search?${qs}`);
 }
 
 export async function listArchiveContents(path: string, limit = 200): Promise<{
@@ -1364,7 +1376,14 @@ export function validateStagingRoot(path: string): Promise<{
   return postJson("/scan/staging/validate", { path });
 }
 
-export function postExplorerDrop(paths: string[]): Promise<{ ok: boolean; count: number; routed: Array<Record<string, unknown>> }> {
+export interface DropResult {
+  path: string;
+  action: "browse" | "audition" | "installer_inspect" | "carve_strings" | "path_accepted" | "error";
+  result?: Record<string, unknown>;
+  error?: string;
+}
+
+export function postExplorerDrop(paths: string[]): Promise<{ ok: boolean; count: number; routed: DropResult[] }> {
   return postJson("/explorer/drop", { paths });
 }
 
@@ -1546,8 +1565,10 @@ export function fetchLibraryRoots(): Promise<{ roots: string[]; configured?: boo
   return getJson("/security/library-roots");
 }
 
-export function saveLibraryRoots(roots: string[]): Promise<{ ok: boolean; roots: string[]; configured: boolean }> {
-  return putJson("/security/library-roots", { roots });
+export async function saveLibraryRoots(roots: string[]): Promise<{ ok: boolean; roots: string[]; configured: boolean }> {
+  const result = await putJson<{ ok: boolean; roots: string[]; configured: boolean }>("/security/library-roots", { roots });
+  if (result.ok && result.roots[0]) updateLibraryRoot(result.roots[0]);
+  return result;
 }
 
 export function exportEnvironmentManifest(): Promise<Record<string, unknown>> {
@@ -1634,6 +1655,10 @@ export function refreshVersionManifest(body: {
 
 export function syncVersionManifestCatalog(url: string): Promise<{ ok: boolean; merged: number; url: string }> {
   return postJson("/installations/manifest/sync", { url });
+}
+
+export function importManifestCatalog(catalog: unknown): Promise<{ ok: boolean; merged: number }> {
+  return postJson("/installations/manifest/sync", { catalog });
 }
 
 export function fetchInstallationPresets(): Promise<{ presets: Array<{ name: string; snapshot: Record<string, unknown> }> }> {

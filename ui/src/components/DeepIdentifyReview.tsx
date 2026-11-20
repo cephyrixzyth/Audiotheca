@@ -1,3 +1,5 @@
+import { WorkScope, WorkIssue } from "./ReviewWorkbench";
+import { LoadingStatus } from "../ui/LoadingStatus";
 import { useEffect, useMemo, useState } from "react";
 import { fetchDeepIdentify } from "../api/client";
 import type { DeepIdentifyItem } from "../types";
@@ -11,6 +13,8 @@ interface Props {
 }
 
 export function DeepIdentifyReview({ stamp }: Props) {
+  const [revision, setRevision] = useState(0);
+  const [method, setMethod] = useState("");
   const { query } = useContextSidebar();
   const [items, setItems] = useState<DeepIdentifyItem[]>([]);
   const [fetchedTotal, setFetchedTotal] = useState(0);
@@ -39,7 +43,7 @@ export function DeepIdentifyReview({ stamp }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [stamp]);
+  }, [stamp, revision]);
 
   const q = query.trim().toLowerCase();
   const visible = useMemo(() => items.filter((row) => matchesDeepIdentifyQuery(row, q)), [items, q]);
@@ -53,8 +57,9 @@ export function DeepIdentifyReview({ stamp }: Props) {
     return Object.entries(counts).sort((a, b) => b[1] - a[1]);
   }, [visible]);
 
-  if (loading) return <div className="count-muted">Loading deep identify results…</div>;
-  if (error) return <div className="error">{error}</div>;
+  const matches = method ? visible.filter(row => (row.method || "UNKNOWN") === method) : visible;
+  if (loading) return <LoadingStatus>Loading deep identify results…</LoadingStatus>;
+  if (error) return <WorkIssue message={error} retry={() => setRevision(v => v + 1)} />;
   if (items.length === 0) {
     return (
       <div className="empty">
@@ -67,11 +72,13 @@ export function DeepIdentifyReview({ stamp }: Props) {
   }
 
   return (
-    <div>
-      <div className="banner dry">
-        Fuzzy / sibling vendor recoveries from Phase 1.7 — review before relying on them in a live
-        restructure.
-      </div>
+    <div className="review-workspace">
+      <WorkScope title="Inspect recovered identities" detail="Check which method identified a vendor and read the evidence before using it in a move plan.">
+        <label>Identification method <select value={method} onChange={event => setMethod(event.target.value)}>
+          <option value="">All methods</option>
+          {methodCounts.map(([name, count]) => <option key={name} value={name}>{name} ({count})</option>)}
+        </select></label>
+      </WorkScope>
       {fetchedTotal > items.length ? (
         <div className="banner warn">
           Showing the first {items.length.toLocaleString()} of {fetchedTotal.toLocaleString()} recoveries.
@@ -79,18 +86,14 @@ export function DeepIdentifyReview({ stamp }: Props) {
       ) : null}
       <div className="toolbar compact-toolbar">
         <span className="count-muted">
-          {visible.length.toLocaleString()} recover{visible.length === 1 ? "y" : "ies"}
+          {matches.length.toLocaleString()} recover{matches.length === 1 ? "y" : "ies"}
           {q ? ` matching “${query.trim()}”` : ""}
           {q && visible.length !== items.length ? ` · ${items.length.toLocaleString()} total` : ""}
         </span>
-        {methodCounts.slice(0, 6).map(([method, count]) => (
-          <Badge key={method} tone="accent" title={`${count} via ${method}`}>
-            {method} · {count}
-          </Badge>
-        ))}
       </div>
+      {matches.length === 0 && <p className="empty">No recoveries use this method in the current search.</p>}
       <VirtualTable
-        items={visible}
+        items={matches}
         colCount={5}
         estimateSize={72}
         header={
