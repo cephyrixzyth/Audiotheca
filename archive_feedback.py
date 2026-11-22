@@ -185,7 +185,15 @@ def is_delete_confirmed(
 
 def confirmed_paths_for_stamp(stamp: str, store: ArchiveStore | None = None) -> list[str]:
     store = store or load_store()
-    return sorted(store.confirmed_deletes.get(stamp or LEGACY_STAMP, {}))
+    confirmed = store.confirmed_deletes.get(stamp or LEGACY_STAMP, {})
+    approvals = store.approvals.get(stamp or LEGACY_STAMP, {})
+    # Feedback keys are comparison keys and may be lowercased. Execute only the
+    # original validated path captured with the current approval snapshot.
+    return sorted(
+        (str(approvals[key].get("archive")) for key in confirmed
+         if isinstance(approvals.get(key), dict) and approvals[key].get("archive")),
+        key=normalize_path,
+    )
 
 
 def get_keeper(

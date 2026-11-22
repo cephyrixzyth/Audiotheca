@@ -1,5 +1,7 @@
 # Audiotheca implementation handoff
 
+> **Status refreshed November 22, 2026:** The November 19 studio sync implemented many of the original findings. See the [finding-by-finding status and evidence](Engineering%20review.md#follow-up-status--2026-11-22) before choosing a patch. The checkout is still at 1331dac; local working-tree fixes cover case-preserving archive execution, Windows file flushing, Windows identity snapshots and cross-platform browser assertions. Verification now passes: full Python suite 657 passed / 6 skipped / 76 subtests, portable acceptance runner 17/17, targeted Windows suites 37/37, Vitest 56/56, Playwright 29/29, and the TypeScript/Vite build. GitHub `main` remains at 1331dac and does not yet contain these changes. macOS packaging, Linux Docker runtime, native PowerShell export execution and live Unraid verification remain open.
+
 **For the engineer or coding agent taking the next patch · reviewed November 17, 2026 · baseline `ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb`**
 
 Start with **F02, archive keeper protection**. It has a small fixture, a visible user decision, and two independent routes to a file move. This handoff provides a first assignment you can paste into a new session, a runnable acceptance suite, and a patch plan for everything in the review. Read the original finding when you need its evidence or commit-pinned source links. [Engineering review](Engineering%20review.md) · [Portable acceptance checks](run_review_checks.py) · [Reviewed source](https://github.com/cephyrixzyth/Audiotheca/tree/ee8b368e9bc5d0cbdd00097054c7f8e1ca64e4cb)
@@ -32,7 +34,7 @@ python "$review_dir/run_review_checks.py" --repo "$PWD" -k 'archive_keeper_previ
 
 On Windows, use `py -3.13 -m venv .venv` and run commands with `.\.venv\Scripts\python.exe`. The runner uses Git and the selected Python environment. It prints the target HEAD and a digest of the copied Python inputs. Use the same invocation against a proposed fix and record both outputs. Windows behavior of the generated PowerShell script requires a separate Windows test.
 
-**Verified handoff baseline:** 17 checks collected on macOS arm64. **3 controls passed and 14 acceptance cases failed** at an assertion. These are new contract checks for known defects. The original repository's Python suite had 639 passes and two failures in its standard environment. Keep those two counts separate. The SHA-256 of the Python inputs copied by the handoff runner at the reviewed revision was `72819b6241705845df9d7405716a04a71588fc7e04f2c6e336f64c1d0bf19470`. [Acceptance code](run_review_checks.py)
+**Original verified handoff baseline at `ee8b368` on November 17:** 17 checks collected on macOS arm64. **3 controls passed and 14 acceptance cases failed** at an assertion. Current results are recorded in the engineering review status table; do not treat this historical baseline as the current checkout result. These are new contract checks for known defects. The original repository's Python suite had 639 passes and two failures in its standard environment. Keep those two counts separate. The SHA-256 of the Python inputs copied by the handoff runner at the reviewed revision was `72819b6241705845df9d7405716a04a71588fc7e04f2c6e336f64c1d0bf19470`. [Acceptance code](run_review_checks.py)
 
 | Finding | Runner selection after `-k` | Result on the reviewed revision |
 |---|---|---|
@@ -219,6 +221,14 @@ The catalog is an inventory. A feature earns a stronger completion claim when it
 
 Preserve the historical staging spelling `_delete-canidates` in readers and recovery records. Introducing a corrected spelling requires explicit handling when a library already contains one or both directories. A display-only wording change can ship separately.
 
+## Current follow-up evidence · November 22, 2026
+
+- Checkout head: `1331dac3264245d9fa4bdcf46bf57a71ed580046` (`main` / `origin/main`).
+- Portable acceptance runner, disposable source copy, Python 3.14.10 on Windows: **17 passed**. Copied-source SHA-256: `d00f1671bbbf93526adbc5902486d9045764b4293a2483063edcc1016c1cc0bc`.
+- Targeted repository tests (`test_studio_file_safety`, `test_transaction_ledger`, `test_duplicate_execute`, `test_archive_diff`, `test_phase_d`, `test_archive_peek`): **37 passed**.
+- The run surfaced three Windows-specific failures. The working tree now preserves approval spelling for archive execution, writes copied payloads through a writable handle before `fsync`, and ignores Windows access-time-only metadata changes while hashing. The archive executor also fails closed if the approval snapshot is missing or has a different path.
+- The acceptance runner is Python-focused and does not cover all criteria in this handoff. The local UI and browser suites now pass; the earlier GitHub Actions failure was tied to browser regressions on the unmodified `1331dac` revision. No CI run has tested the current local changes because they are not yet published. macOS sidecar restart, Linux Docker startup, real Unraid persistence and native PowerShell execution are not verified here.
+- The root and `USB review/` Markdown/HTML copies are the original November 17 artifacts. Their SHA-256 manifest is intentionally preserved as a record of the bundle. Update/regenerate those copies only when preparing a new review bundle; the canonical living review and handoff are under `docs/reviews/2026-11-17/`.
 ## Sequence and completion record
 
 1. **Protect files.** Start with F02 and cover both staging routes. Follow with F01, F03, F04 and F05. Include X01 when touching CLI outcome reporting. Gate release advice about live cleanup on filesystem assertions for these cases.

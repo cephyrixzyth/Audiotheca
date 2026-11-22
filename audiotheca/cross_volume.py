@@ -75,7 +75,10 @@ def _copy(src: Path, target: Path) -> None:
                         os.fsync(stream.fileno())
             _sync_directory(Path(directory))
     else:
-        with target.open("rb") as stream:
+        # Windows rejects fsync on a read-only handle (EBADF). Flush through a
+        # writable handle so the copied payload is durable on Windows and POSIX.
+        with target.open("r+b") as stream:
+            stream.flush()
             os.fsync(stream.fileno())
 
 

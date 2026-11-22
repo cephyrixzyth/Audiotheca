@@ -77,7 +77,7 @@ test("command palette opens (Ctrl+K / button), filters, and navigates", async ({
   await expect(page).toHaveURL(/#\/review\/restructure/);
 
   // Topbar button opens it too, and spec codes are searchable.
-  await page.getByRole("button", { name: "Search ⌘K" }).click();
+  await page.getByRole("button", { name: /^Search / }).click();
   const input2 = page.getByPlaceholder("Search tabs, actions, and spec codes…");
   await expect(input2).toBeVisible();
   await input2.fill("WEB-SPDR");
