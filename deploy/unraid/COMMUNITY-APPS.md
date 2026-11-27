@@ -11,7 +11,7 @@ Because that repo is already in CA, a template merged to its `main` branch is pi
 
 ## Requirements
 
-- **The image must be public.** CA users pull anonymously. Package settings: https://github.com/users/cephyrixzyth/packages/container/package/audiotheca → Change visibility → Public.
+- **The image must be public.** CA users pull anonymously. Package settings: https://github.com/users/cephyrixzyth/packages/container/audiotheca/settings → Danger Zone → Change visibility → Public. The repo being public does not make the package public.
   Check: `docker logout ghcr.io; docker pull ghcr.io/cephyrixzyth/audiotheca:latest`.
 - The template uses `ghcr.io/cephyrixzyth/audiotheca:latest`. `.github/workflows/docker-publish.yml` moves `latest` on every `v*` tag, so releases reach CA users through Unraid's normal update check with no template change.
 
