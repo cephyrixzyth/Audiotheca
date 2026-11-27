@@ -47,9 +47,13 @@ def _stage(stamp: str, *, dry_run: bool, root: str | None, approved_keys: set[st
     batch_id = new_batch_id()
 
     reserved: set[Path] = set()
-    for key in confirmed:
+    for archive_path_str in confirmed:
+        key = arch_fb.normalize_path(archive_path_str)
         saved = store.approvals.get(stamp, {}).get(key, {})
-        archive_path_str = saved.get("archive", key)
+        if saved.get("archive") != archive_path_str:
+            results.append({"path": archive_path_str, "ok": False,
+                            "error": "Archive approval path is missing or ambiguous. Review and confirm again."})
+            continue
         if arch_fb.is_archive_rejected(archive_path_str, store, stamp=stamp):
             results.append({
                 "path": archive_path_str,

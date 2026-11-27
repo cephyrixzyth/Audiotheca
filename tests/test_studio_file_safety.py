@@ -260,3 +260,14 @@ def test_legacy_archive_confirmation_and_wrong_case_cannot_stage(tmp_path, monke
     assert confirmed_paths_for_stamp("20260101_0001") == []
     assert feedback.normalize_path("/Library/Packs/Brass.zip") != feedback.normalize_path("/Library/Packs/brass.zip")
     assert feedback.normalize_path(r"C:\Sound\Clip.rar") == feedback.normalize_path("c:/sound/clip.rar")
+
+    # The execution iterator must retain the spelling from an approval, even
+    # though the durable comparison key is lowercase on Windows.
+    archive = tmp_path / "Library" / "Pack.ZIP"
+    archive.parent.mkdir()
+    archive.write_bytes(b"fixture")
+    state = feedback.ArchiveStore()
+    key = feedback.normalize_path(str(archive))
+    state.confirmed_deletes["20260101_0001"] = {key: "confirmed"}
+    state.approvals["20260101_0001"] = {key: {"archive": str(archive)}}
+    assert feedback.confirmed_paths_for_stamp("20260101_0001", state) == [str(archive)]
