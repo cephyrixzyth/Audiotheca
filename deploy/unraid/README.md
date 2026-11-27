@@ -6,7 +6,11 @@ Designed for Unraid 6.x/7.x where the audio library lives on local array paths (
 
 Main project docs: [README](../../README.md) · Engine **10.0.0** · Web UI **1.0.12**
 
-## Add Container (recommended)
+## Community Applications
+
+Once listed, install from **Apps** → search **Audiotheca**. Template location and requirements: [COMMUNITY-APPS.md](COMMUNITY-APPS.md).
+
+## Add Container (self-build)
 
 Unraid **Docker → Add Container** needs a single image and a user template.
 

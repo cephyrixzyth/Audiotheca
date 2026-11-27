@@ -43,6 +43,9 @@ RUN chmod +x /entrypoint.sh
 # Official nginx image layout is not used here; entrypoint runs envsubst into conf.d.
 
 LABEL org.opencontainers.image.title="Audiotheca" \
+    org.opencontainers.image.description="Audiotheca audio library scanner and organizer (web UI + API engine)" \
+    org.opencontainers.image.source="https://github.com/cephyrixzyth/Audiotheca" \
+    org.opencontainers.image.url="https://github.com/cephyrixzyth/Audiotheca" \
     org.opencontainers.image.version="${AUDIOTHECA_VERSION}" \
     audiotheca.engine.version="${ENGINE_VERSION}" \
     audiotheca.ui.version="${AUDIOTHECA_VERSION}"
