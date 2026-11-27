@@ -8,7 +8,7 @@ Main project docs: [README](../../README.md) · Engine **10.0.0** · Web UI **1.
 
 ## Community Applications
 
-Once listed, install from **Apps** → search **Audiotheca**. Publishing steps and the template repo contents: [COMMUNITY-APPS.md](COMMUNITY-APPS.md).
+Once listed, install from **Apps** → search **Audiotheca**. Template location and requirements: [COMMUNITY-APPS.md](COMMUNITY-APPS.md).
 
 ## Add Container (self-build)
 

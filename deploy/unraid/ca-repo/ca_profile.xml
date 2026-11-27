@@ -1,6 +1,0 @@
-<?xml version="1.0"?>
-<CommunityApplications>
-  <Profile>Unraid templates for Audiotheca, a self-hosted scanner and organizer for large audio-software and sample libraries. Report problems and ask for help on the Audiotheca GitHub issues page.</Profile>
-  <Icon>https://raw.githubusercontent.com/cephyrixzyth/unraid-templates/main/icon.png</Icon>
-  <WebPage>https://github.com/cephyrixzyth/Audiotheca</WebPage>
-</CommunityApplications>
