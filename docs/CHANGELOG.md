@@ -6,6 +6,25 @@ Git tag **v1.0.7** was published with a broken Windows NSIS pre-install hook (si
 
 ## Unreleased
 
+### New features
+
+- **Plugin Ledger** (System → Plugins) — inventory of installed VST3/AU/VST/CLAP plugins compared with the installers in your library: installer older than installed, installed with no installer, never installed, and a reinstall checklist (Markdown/CSV). Inventory can be exported on one machine and imported on another.
+- **License vault** — serials and license files stored per product, encrypted with AES-256-GCM (needs `cryptography`); secrets are only shown on an explicit, audited reveal.
+- **DAW project dependency scan** — indexes Ableton `.als` and REAPER `.rpp` projects so the ledger shows which projects use a plugin and which projects reference a sample path.
+- **Scheduled scans** (System → Automation) — cron-style schedules (`@daily`, `0 3 * * 1`, …). Scheduled scans are always dry runs and never run the live restructure phase.
+- **Notifications** — ntfy, Discord, Gotify, Pushover, JSON webhooks and email (Apprise URLs if `apprise` is installed), with a run digest of what changed since the last run.
+- **Reflink dedupe** — space recovery now defaults to copy-on-write clones (btrfs/XFS/APFS/ReFS) and writes `Clone_Plan_*.csv` plus `make_clones_*.ps1/.sh`. Hard links need `--allow-hardlinks`.
+- **Startup recovery** — moves left half done by a crash are listed at startup with keep / put back / dismiss / resume choices.
+- **Naming templates** — destination names from fields such as `{vendor}/{product}[ {version}]`, with presets and a live preview.
+- **Import pipeline** — watches an incoming folder, identifies vendor and version, compares with the library and proposes Apply / Skip; live apply needs confirmation.
+- **Vendor release monitoring** — RSS/Atom feeds checked against what you own, producing a wanted list.
+- **Space treemap** — Space Recovery → Space map shows size by bin or status and vendor with the duplicate share in red.
+- **UCS write-back** — UCS-style renames and iXML metadata writes with backups and undo.
+- **Sample finder** (System → Automation → Sample finder, and "Find similar sounds" in the Library inspector) — "more like this" across the sample library from locally computed spectral features. WAV and AIFF decode natively; FLAC/MP3/OGG/M4A need the optional `soundfile`. An extension can plug in a learned audio embedding with `embed_audio(path)`.
+- **Shared catalog** (System → Automation → Shared catalog) — export your vendor keyword rules and release feeds as an Ed25519-signed JSON file, import someone else's, or subscribe to a catalog URL. Subscriptions pin the publisher key on first fetch; every entry is reviewed before it is applied.
+- **More DAW formats** — the DAW project scan now reads Studio One `.song` and FL Studio `.flp`, plus best-effort Bitwig `.bwproject`, Cubase `.cpr` and Logic `.logicx`.
+- **Extensions** — opt-in Python extensions (`AUDIOTHECA_EXTENSIONS=1`) can add vendor rules, notifiers and run exporters. See `docs/EXTENSIONS.md`.
+
 ### Privacy and security
 
 - **AI release metadata** — ignore symlinked metadata files and directories so lookup cannot read release notes outside the scanned folder

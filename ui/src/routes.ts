@@ -24,6 +24,8 @@ export const TAB_TO_PATH: Record<TabId, string> = {
   "scan-audit": "/review/scan-audit",
   skipped: "/review/skipped",
   "space-recovery": "/system/space-recovery",
+  plugins: "/system/plugins",
+  automation: "/system/automation",
   security: "/system/security",
   environment: "/system/environment",
   vendors: "/system/vendors",

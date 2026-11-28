@@ -200,6 +200,16 @@ External tester checklist: [Testing Guide](TESTING.md).
 
 ---
 
+## Library management tools (added 2026-11)
+
+- **Plugin Ledger** (System → Plugins): compares installed plugins with installers in the library, flags older installers and missing installers, and builds a reinstall checklist. Plugin folders can be extended or ignored, and the inventory can be exported from one machine and imported on another. The Licenses view keeps serials and license files encrypted; the DAW projects view indexes Ableton and REAPER projects to show which projects use each plugin.
+- **Automation** (System → Automation): scheduled dry-run scans, notification targets, the import pipeline for an incoming folder, naming templates, the vendor release wanted list, UCS rename and metadata write-back, the sample finder, the shared catalog, and extensions (`EXTENSIONS.md`).
+- **Sample finder**: index sample folders once, then pick any sound (or select it in the Library and press "Find similar sounds") to list the closest-sounding samples in other packs. Analysis runs locally; matches below 15% similarity are hidden.
+- **Shared catalog**: vendor keyword rules and release feeds can be exported as a signed catalog file, published on any HTTPS host, and subscribed to by others. A subscription pins the publisher's key on first fetch and refuses files signed by another key. Nothing is applied until you tick the entries you want.
+- **DAW projects**: Ableton Live, REAPER, Studio One and FL Studio projects are parsed; Bitwig, Cubase and Logic projects are read on a best-effort basis (plugin binaries named in the file, Cubase plugin records, names that match the Plugin Ledger inventory, and absolute audio paths). Run a Plugin Ledger scan first for the best results with those three.
+- **Space Recovery**: the Space map treemap, and copy-on-write clone plans (`Clone_Plan_*.csv`, `make_clones_*.ps1/.sh`). Each library root shows whether it supports clones.
+- **Startup recovery**: if Audiotheca stopped during a move, a dialog lists each interrupted move as found on disk and offers to keep it, put it back, or dismiss it.
+
 ## Reports reference
 
 All in `dedupe_reports/` with timestamp `YYYYMMDD_HHMM`. Copied to `{ROOT}/_dedupe_reports/` when writable.

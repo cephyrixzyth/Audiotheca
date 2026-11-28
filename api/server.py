@@ -23,6 +23,10 @@ from api import service as api_service
 from api.service import API_VERSION
 from api.routers import (
     auth_health,
+    automation,
+    discovery,
+    library_ops,
+    plugin_ledger,
     browse,
     environment,
     jobs,
@@ -34,6 +38,7 @@ from api.routers import (
 )
 
 _env_check_task: asyncio.Task | None = None
+_scheduler_task: asyncio.Task | None = None
 ENV_CHECK_INTERVAL_S = int(os.environ.get("AUDIOTHECA_ENV_CHECK_INTERVAL_S", "21600"))
 
 
@@ -50,7 +55,7 @@ async def _environment_check_loop() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _env_check_task
+    global _env_check_task, _scheduler_task
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
@@ -67,7 +72,18 @@ async def lifespan(app: FastAPI):
             logging.warning("Library watcher requested but watchdog is not installed")
             deps.library_watcher = None
     _env_check_task = asyncio.create_task(_environment_check_loop())
+    from api.schedule_runner import scheduler_enabled, scheduler_loop
+
+    if scheduler_enabled():
+        _scheduler_task = asyncio.create_task(scheduler_loop())
     yield
+    if _scheduler_task is not None:
+        _scheduler_task.cancel()
+        try:
+            await _scheduler_task
+        except asyncio.CancelledError:
+            pass
+        _scheduler_task = None
     if _env_check_task is not None:
         _env_check_task.cancel()
         try:
@@ -155,6 +171,10 @@ app.include_router(vendors.router)
 app.include_router(browse.router)
 app.include_router(system.router)
 app.include_router(tools.router)
+app.include_router(plugin_ledger.router)
+app.include_router(automation.router)
+app.include_router(library_ops.router)
+app.include_router(discovery.router)
 
 
 def main() -> None:

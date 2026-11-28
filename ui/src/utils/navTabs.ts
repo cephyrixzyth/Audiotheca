@@ -23,7 +23,9 @@ export const ALL_TABS: TabDef[] = [
   },
   { id: "scan-audit", label: "Scan audit", title: "Per-item scan status, ID method, and quick corrections" },
   { id: "skipped", label: "Skipped", title: "Failures, loose archives, cache hits, and rescan targets" },
-  { id: "space-recovery", label: "Space recovery", title: "Hardlink dedup and bloat detection plans" },
+  { id: "space-recovery", label: "Space recovery", title: "Clone dedup, bloat detection and the space map" },
+  { id: "plugins", label: "Plugin ledger", title: "Installed plugins, their installers in the library, and licenses" },
+  { id: "automation", label: "Automation", title: "Scheduled scans, notifications, import, naming, the wanted list, sample finder and shared catalog" },
   { id: "security", label: "Security", title: "Malware heuristics, quarantine, hash lookup" },
   { id: "environment", label: "Environment", title: "Toolchain health, repairs, manifest backup" },
   { id: "vendors", label: "Vendors", title: "Add vendor keywords, harvest gaps, and export feedback" },
@@ -41,7 +43,7 @@ export const REVIEW_TAB_IDS: TabId[] = [
   "skipped",
 ];
 
-export const SYSTEM_TAB_IDS: TabId[] = ["space-recovery", "security", "environment", "vendors"];
+export const SYSTEM_TAB_IDS: TabId[] = ["space-recovery", "plugins", "automation", "security", "environment", "vendors"];
 
 export type PrimaryNavId = "library" | "studio" | "dashboard" | "scan" | "review" | "system" | "help";
 
@@ -76,6 +78,8 @@ export function primaryNavId(tab: TabId): PrimaryNavId {
     case "skipped":
       return "review";
     case "space-recovery":
+    case "plugins":
+    case "automation":
     case "security":
     case "environment":
     case "vendors":

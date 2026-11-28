@@ -174,6 +174,8 @@ const TAB_HINTS: Partial<Record<TabId, string>> = {
   "scene-renames": "Filter by scene ID, proposed name, or source path.",
   "deep-identify": "Filter recoveries by item, vendor, method, or evidence.",
   "space-recovery": "Use Space Recovery panel filters.",
+  plugins: "Use the Plugin Ledger filters.",
+  automation: "Automation uses in-panel controls.",
 };
 
 export function ContextSidebar() {

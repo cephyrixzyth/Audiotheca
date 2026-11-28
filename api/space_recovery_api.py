@@ -52,7 +52,19 @@ def summarize_coexistence(stamp: str) -> dict[str, object]:
 
 def list_offline_reports() -> dict[str, object]:
     """Latest Hardlink / Bloat CSV+PS1 artifacts from space_recovery.py."""
-    out: dict[str, list[dict]] = {"hardlink": [], "bloat": []}
+    out: dict[str, list[dict]] = {"hardlink": [], "clone": [], "bloat": []}
+    for path in sorted(REPORT_PATH.glob("Clone_Plan_*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)[:5]:
+        stamp = path.stem.removeprefix("Clone_Plan_")
+        scripts = [name for name in (f"make_clones_{stamp}.ps1", f"make_clones_{stamp}.sh") if (REPORT_PATH / name).is_file()]
+        out["clone"].append(
+            {
+                "stamp": stamp,
+                "csv": path.name,
+                "script": scripts[0] if scripts else None,
+                "scripts": scripts,
+                "size_bytes": path.stat().st_size,
+            }
+        )
     for path in sorted(REPORT_PATH.glob("Hardlink_Plan_*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)[:5]:
         stamp = path.stem.removeprefix("Hardlink_Plan_")
         ps1 = REPORT_PATH / f"make_hardlinks_{stamp}.ps1"
