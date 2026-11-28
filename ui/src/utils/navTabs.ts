@@ -25,7 +25,7 @@ export const ALL_TABS: TabDef[] = [
   { id: "skipped", label: "Skipped", title: "Failures, loose archives, cache hits, and rescan targets" },
   { id: "space-recovery", label: "Space recovery", title: "Clone dedup, bloat detection and the space map" },
   { id: "plugins", label: "Plugin ledger", title: "Installed plugins, their installers in the library, and licenses" },
-  { id: "automation", label: "Automation", title: "Scheduled scans, notifications, import, naming and the wanted list" },
+  { id: "automation", label: "Automation", title: "Scheduled scans, notifications, import, naming, the wanted list, sample finder and shared catalog" },
   { id: "security", label: "Security", title: "Malware heuristics, quarantine, hash lookup" },
   { id: "environment", label: "Environment", title: "Toolchain health, repairs, manifest backup" },
   { id: "vendors", label: "Vendors", title: "Add vendor keywords, harvest gaps, and export feedback" },

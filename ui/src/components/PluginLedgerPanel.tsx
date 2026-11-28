@@ -542,6 +542,16 @@ function FoldersView() {
   );
 }
 
+const DAW_LABEL: Record<string, string> = {
+  ableton: "Ableton",
+  reaper: "REAPER",
+  studioone: "Studio One",
+  flstudio: "FL Studio",
+  bitwig: "Bitwig",
+  cubase: "Cubase",
+  logic: "Logic",
+};
+
 function ProjectsView() {
   const [summary, setSummary] = useState<DawSummary | null>(null);
   const [roots, setRoots] = useState("");
@@ -586,7 +596,7 @@ function ProjectsView() {
     <section>
       <WorkScope
         title="DAW project dependencies"
-        detail="Index Ableton Live (.als) and REAPER (.rpp) projects to see which plugins and samples each one uses. The Ledger then shows how many projects use each plugin, so you know what still matters before you uninstall or stage anything."
+        detail="Index Ableton Live, REAPER, Studio One, FL Studio, Bitwig, Cubase and Logic projects to see which plugins and samples each one uses. The Ledger then shows how many projects use each plugin, so you know what still matters before you uninstall or stage anything. Bitwig, Cubase and Logic files are undocumented, so those are read on a best-effort basis: run a Plugin Ledger scan first so installed plugin names can be recognised."
       />
       {error && <WorkIssue message={error} />}
       <label className="field-stack">
@@ -599,7 +609,10 @@ function ProjectsView() {
         </Button>
         {summary?.indexed_at && (
           <span className="count-muted">
-            {summary.project_count} projects · indexed {new Date(summary.indexed_at).toLocaleString()}
+            {summary.project_count} projects
+            {summary.by_daw && Object.keys(summary.by_daw).length > 0 &&
+              ` (${Object.entries(summary.by_daw).map(([daw, n]) => `${DAW_LABEL[daw] ?? daw} ${n}`).join(", ")})`}
+            {" "}· indexed {new Date(summary.indexed_at).toLocaleString()}
           </span>
         )}
       </div>

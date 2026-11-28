@@ -39,6 +39,8 @@ import {
 import { Button, Tabs } from "../ui";
 import { WorkIssue, WorkScope } from "./ReviewWorkbench";
 import { PathLink } from "./PathLink";
+import { SampleFinderView } from "./SampleFinder";
+import { SharedCatalogView } from "./SharedCatalog";
 
 interface Props {
   stamp?: string;
@@ -59,6 +61,8 @@ export function AutomationPanel({ stamp }: Props) {
           { value: "naming", label: "Naming template" },
           { value: "releases", label: "Wanted list" },
           { value: "ucs", label: "UCS rename" },
+          { value: "samples", label: "Sample finder" },
+          { value: "catalog", label: "Shared catalog" },
           { value: "extensions", label: "Extensions" },
         ]}
       />
@@ -68,6 +72,8 @@ export function AutomationPanel({ stamp }: Props) {
       {view === "naming" && <NamingView stamp={stamp} />}
       {view === "releases" && <ReleasesView />}
       {view === "ucs" && <UcsView />}
+      {view === "samples" && <SampleFinderView />}
+      {view === "catalog" && <SharedCatalogView />}
       {view === "extensions" && <ExtensionsView />}
     </div>
   );
@@ -888,7 +894,7 @@ function ExtensionsView() {
     <section>
       <WorkScope
         title="Extensions"
-        detail="Python files in the extensions folder can add vendor rules, notifiers and run exporters. They run with Audiotheca's permissions, so they load only when AUDIOTHECA_EXTENSIONS=1 is set. See docs/EXTENSIONS.md."
+        detail="Python files in the extensions folder can add vendor rules, notifiers, run exporters and an audio embedding model for the sample finder. They run with Audiotheca's permissions, so they load only when AUDIOTHECA_EXTENSIONS=1 is set. See docs/EXTENSIONS.md."
       />
       {data && (
         <p className="count-muted">
@@ -903,6 +909,7 @@ function ExtensionsView() {
               <th>Vendor rules</th>
               <th>Notifier</th>
               <th>Exporter</th>
+              <th>Audio embedding</th>
             </tr>
           </thead>
           <tbody>
@@ -915,6 +922,7 @@ function ExtensionsView() {
                 <td>{x.vendor_rules}</td>
                 <td>{x.notifier ? "yes" : "—"}</td>
                 <td>{x.exporter ? "yes" : "—"}</td>
+                <td>{x.embedder ? "yes" : "—"}</td>
               </tr>
             ))}
           </tbody>

@@ -20,6 +20,9 @@ Git tag **v1.0.7** was published with a broken Windows NSIS pre-install hook (si
 - **Vendor release monitoring** — RSS/Atom feeds checked against what you own, producing a wanted list.
 - **Space treemap** — Space Recovery → Space map shows size by bin or status and vendor with the duplicate share in red.
 - **UCS write-back** — UCS-style renames and iXML metadata writes with backups and undo.
+- **Sample finder** (System → Automation → Sample finder, and "Find similar sounds" in the Library inspector) — "more like this" across the sample library from locally computed spectral features. WAV and AIFF decode natively; FLAC/MP3/OGG/M4A need the optional `soundfile`. An extension can plug in a learned audio embedding with `embed_audio(path)`.
+- **Shared catalog** (System → Automation → Shared catalog) — export your vendor keyword rules and release feeds as an Ed25519-signed JSON file, import someone else's, or subscribe to a catalog URL. Subscriptions pin the publisher key on first fetch; every entry is reviewed before it is applied.
+- **More DAW formats** — the DAW project scan now reads Studio One `.song` and FL Studio `.flp`, plus best-effort Bitwig `.bwproject`, Cubase `.cpr` and Logic `.logicx`.
 - **Extensions** — opt-in Python extensions (`AUDIOTHECA_EXTENSIONS=1`) can add vendor rules, notifiers and run exporters. See `docs/EXTENSIONS.md`.
 
 ### Privacy and security

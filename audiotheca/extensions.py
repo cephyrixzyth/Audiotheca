@@ -13,6 +13,7 @@ An extension module may define any of:
     def notify(title: str, body: str) -> None    # called after built-in notification targets
     def export_run(stamp: str, items: list[dict]) -> tuple[str, str]
                                                  # returns (filename, text) for a run export
+    def embed_audio(path: str) -> list[float]    # audio embedding for the sample similarity finder
 
 See ``docs/EXTENSIONS.md`` for a worked example.
 """
@@ -93,6 +94,7 @@ def describe() -> dict[str, Any]:
             "vendor_rules": len(rules) if isinstance(rules, dict) else 0,
             "notifier": callable(getattr(module, "notify", None)),
             "exporter": callable(getattr(module, "export_run", None)),
+            "embedder": callable(getattr(module, "embed_audio", None)),
         })
     return {"enabled": enabled(), "folder": str(extensions_dir()), "extensions": rows, "errors": errors}
 

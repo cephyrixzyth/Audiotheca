@@ -1,7 +1,8 @@
 /**
  * API calls for the Nov 28 review features: Plugin Ledger, license vault, DAW projects,
  * schedules, notifications, import pipeline, naming templates, release monitor,
- * recovery, space map, clone support, UCS write-back and extensions.
+ * recovery, space map, clone support, UCS write-back, extensions, the sample similarity
+ * finder and the shared catalog.
  *
  * Kept out of client.ts so that file stops growing (review P3-9).
  */
@@ -124,6 +125,9 @@ export interface DawSummary {
   project_count: number;
   errors: Array<{ path: string; error: string }>;
   top_plugins: Array<{ name: string; vendor: string; projects: number }>;
+  by_daw?: Record<string, number>;
+  formats?: string[];
+  heuristic?: string[];
 }
 
 export const fetchDawProjects = () => getJson<DawSummary>("/daw-projects");
@@ -300,7 +304,7 @@ export const fetchExtensions = () =>
   getJson<{
     enabled: boolean;
     folder: string;
-    extensions: Array<{ file: string; name: string; vendor_rules: number; notifier: boolean; exporter: boolean }>;
+    extensions: Array<{ file: string; name: string; vendor_rules: number; notifier: boolean; exporter: boolean; embedder?: boolean }>;
     errors: Array<{ file: string; error: string }>;
   }>("/extensions");
 
@@ -372,3 +376,98 @@ export const fetchUcsBatches = () =>
   getJson<{ batches: Array<{ batch: string; created: string; files: number; restored: boolean }> }>("/ucs/metadata-batches");
 export const undoUcsBatch = (batch: string) =>
   postJson<{ restored: number }>(`/ucs/metadata-batches/${encodeURIComponent(batch)}/undo`, { confirm_live: true });
+
+// ── Sample similarity ────────────────────────────────────────────────────────
+
+export interface SimilarityStatus {
+  roots: string[];
+  indexed_at: string | null;
+  count: number;
+  skipped: number;
+  skip_reasons: Record<string, number>;
+  embedder: string | null;
+  method: string;
+  analysed?: number;
+  remaining?: number;
+}
+
+export interface SimilarSample {
+  path: string;
+  name: string;
+  folder: string;
+  score: number;
+  duration_s: number | null;
+}
+
+export const fetchSimilarityStatus = () => getJson<SimilarityStatus>("/samples/similarity");
+export const saveSimilarityRoots = (roots: string[]) => putJson<SimilarityStatus>("/samples/similarity/roots", { roots });
+export const indexSimilarity = (maxFiles = 2000) =>
+  postJson<SimilarityStatus>("/samples/similarity/index", { max_files: maxFiles });
+export const findSimilar = (path: string, opts: { limit?: number; excludeSameFolder?: boolean } = {}) => {
+  const qs = new URLSearchParams({ path, limit: String(opts.limit ?? 25) });
+  if (opts.excludeSameFolder) qs.set("exclude_same_folder", "true");
+  return getJson<{ query: string; duration_s: number | null; results: SimilarSample[]; method: string }>(
+    `/samples/similar?${qs}`,
+  );
+};
+export const searchSimilarityIndex = (q: string) =>
+  getJson<{ results: Array<{ path: string; name: string; duration_s: number | null }> }>(
+    `/samples/similarity/search?q=${encodeURIComponent(q)}`,
+  );
+
+// ── Shared catalog ───────────────────────────────────────────────────────────
+
+export type CatalogBundle = Record<string, unknown>;
+
+export interface CatalogSubscription {
+  id: string;
+  url: string;
+  name: string;
+  pinned_fingerprint: string | null;
+  last_checked: string | null;
+  last_error: string | null;
+  pending: number | null;
+}
+
+export interface CatalogPreview {
+  name: string;
+  publisher: string;
+  description: string;
+  created: string | null;
+  signature: { state: "unsigned" | "invalid" | "valid" | "trusted" | "key_changed"; fingerprint: string | null };
+  vendor_rules: Array<{ company: string; keywords: string[]; category: string; change: string; new_keywords: string[] }>;
+  release_feeds: Array<{ vendor: string; url: string; change: string }>;
+  dropped: number;
+  changes: number;
+}
+
+export interface CatalogOverview {
+  subscriptions: CatalogSubscription[];
+  trusted: Record<string, { name: string; added_at: string }>;
+  applied: Array<{ at: string; source: string; name: string; fingerprint: string | null; vendor_rules: number; release_feeds: number }>;
+  publisher: { public_key: string; fingerprint: string } | null;
+  local: { vendor_rules: number; release_feeds: number };
+}
+
+export interface CatalogSelection {
+  companies?: string[];
+  feed_urls?: string[];
+}
+
+export const fetchCatalog = () => getJson<CatalogOverview>("/catalog");
+export const exportCatalog = (body: { name: string; publisher?: string; description?: string }) =>
+  postJson<CatalogBundle>("/catalog/export", body);
+export const previewCatalog = (bundle: CatalogBundle) => postJson<CatalogPreview>("/catalog/preview", { bundle });
+export const importCatalog = (bundle: CatalogBundle, selection: CatalogSelection) =>
+  postJson<{ vendor_rules: number; release_feeds: number }>("/catalog/import", { bundle, ...selection });
+export const subscribeCatalog = (url: string, name = "") =>
+  postJson<CatalogSubscription>("/catalog/subscriptions", { url, name });
+export const unsubscribeCatalog = (id: string) => deleteJson<{ ok: boolean }>(`/catalog/subscriptions/${id}`);
+export const refreshCatalog = (id: string) =>
+  postJson<{ subscription: CatalogSubscription; preview: CatalogPreview }>(`/catalog/subscriptions/${id}/refresh`, {});
+export const subscriptionPreview = (id: string) =>
+  getJson<{ subscription: CatalogSubscription; preview: CatalogPreview }>(`/catalog/subscriptions/${id}/preview`);
+export const applySubscription = (id: string, selection: CatalogSelection) =>
+  postJson<{ vendor_rules: number; release_feeds: number }>(`/catalog/subscriptions/${id}/apply`, selection);
+export const trustPublisher = (fingerprint: string, name: string, trusted = true) =>
+  postJson<{ trusted: Record<string, unknown> }>("/catalog/trust", { fingerprint, name, trusted });

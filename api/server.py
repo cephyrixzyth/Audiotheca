@@ -24,6 +24,7 @@ from api.service import API_VERSION
 from api.routers import (
     auth_health,
     automation,
+    discovery,
     library_ops,
     plugin_ledger,
     browse,
@@ -157,6 +158,7 @@ app.include_router(tools.router)
 app.include_router(plugin_ledger.router)
 app.include_router(automation.router)
 app.include_router(library_ops.router)
+app.include_router(discovery.router)
 
 
 def main() -> None:

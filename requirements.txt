@@ -11,6 +11,7 @@ numpy>=1.26.0         # PCM load for BS.1770 metering
 pyloudnorm>=0.1.1     # ITU-R BS.1770 / EBU R128 integrated loudness (Phase M3)
 cryptography>=44.0.0  # License vault (AES-256-GCM); vault is unavailable without it
 # Optional: apprise>=1.9 — extra notification services beyond the built-in ntfy/Discord/Gotify/Pushover/webhook/email
+# Optional: soundfile>=0.12 — FLAC/MP3/OGG/M4A support in the sample finder (WAV/AIFF need nothing extra)
 # Optional analysis: librosa (BPM), essentia (full feature extract) — soft-imported when present
 
 # UI API (local report viewer) — optional until you run the web UI

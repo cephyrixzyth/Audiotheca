@@ -34,6 +34,7 @@ import { AudioPreviewStrip, isAuditionableFile } from "./AudioPreviewStrip";
 import { FileExplorerTree } from "./FileExplorerTree";
 import { ArchiveDiffWizard } from "./ArchiveDiffWizard";
 import { DropZoneOverlay } from "./DropZoneOverlay";
+import { SimilarSounds } from "./SampleFinder";
 
 const ARCHIVE_EXT = /\.(zip|rar|7z|iso|tar(\.(gz|bz2|xz))?|gz|001)$/i;
 const LAST_PATH_KEY = "audiotheca.explorer.lastPath";
@@ -969,6 +970,9 @@ function ExplorerPane({
                 <Button onClick={() => void openEntry(selectedEntry)}>
                   List archive
                 </Button>
+              )}
+              {!selectedEntry.is_dir && assetKind(selectedEntry) === "audio" && (
+                <SimilarSounds path={selectedEntry.path} />
               )}
               {!selectedEntry.is_dir && isPeBinaryFile(selectedEntry.name) && (
                 <Button

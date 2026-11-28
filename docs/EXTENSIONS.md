@@ -18,6 +18,7 @@ System → Automation → Extensions lists every loaded extension, what it provi
 | `VENDOR_RULES` | `dict[str, list[str]]` | Company name to keywords. Merged into vendor routing with strong priority |
 | `notify(title, body)` | function | Called after the built-in notification targets on every notification |
 | `export_run(stamp, items)` | function returning `(filename, text)` | Adds an export for a run. `items` are the normalized scan rows (`section`, `item_name`, `path`, `vendor`, `version_key`, `size_mb`, `status`, …) |
+| `embed_audio(path)` | function returning a list of floats | Audio embedding for the sample finder (for example a CLAP model you install). When present, the index stores these vectors and ranks by them instead of the built-in spectral features. Changing or removing the embedder re-analyses the index on the next run. Only the first extension with `embed_audio` is used |
 
 An exception in one extension is caught and reported. It does not stop the scan or other extensions.
 
