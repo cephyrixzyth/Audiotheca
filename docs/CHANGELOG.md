@@ -6,6 +6,15 @@ Git tag **v1.0.7** was published with a broken Windows NSIS pre-install hook (si
 
 ## Unreleased
 
+### Duplicate identification
+
+- **Renamed packs** — folders holding the same files under different names are grouped (`IDENTICAL_CONTENT`) even when the vendor is unknown, verified by hashing the largest files
+- **Partial copies** — a same-name copy missing files is demoted from HIGH/MATCH to MEDIUM/`SUBSET`; near-identical copies get `NEAR_MATCH` and are never auto-staged; new `PARTIAL_COPY` / `NEAR_DUPLICATE` review groups
+- **Archive vs extracted** — pairs are verified against the archive listing: a match is HIGH, a similar-named but different pack is dropped, and renamed archives are matched by contents
+- **One report per pair** — the same pair found by several checks (e.g. renamed-archive and size-block hashes) is merged, with an **Evidence** column explaining each match
+- **Fixes** — size blocking no longer tries to hash folders or files with unique sizes; an unverified LOW archive pair no longer hides the vendor/name group for the same paths
+- Scan cache schema bumped to 9.8.0 so folders are re-walked once to record their file manifests
+
 ### New features
 
 - **Plugin Ledger** (System → Plugins) — inventory of installed VST3/AU/VST/CLAP plugins compared with the installers in your library: installer older than installed, installed with no installer, never installed, and a reinstall checklist (Markdown/CSV). Inventory can be exported on one machine and imported on another.

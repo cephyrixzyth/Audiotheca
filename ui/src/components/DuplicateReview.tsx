@@ -60,6 +60,29 @@ function confidenceTone(confidence: string): BadgeTone {
   return CONFIDENCE_TONE[confidence.toLowerCase()] ?? "neutral";
 }
 
+/** Human-readable names for the engine's duplicate group kinds. */
+const GROUP_KIND_LABELS: Record<string, string> = {
+  SAME_VERSION: "same product",
+  VERSION_COEXIST: "different versions",
+  IDENTICAL_CONTENT: "same files, renamed",
+  NEAR_DUPLICATE: "nearly the same files",
+  PARTIAL_COPY: "partial copy",
+  ARCHIVE_EXTRACTED: "archive + extracted",
+  SIZE_BLOCKED: "identical file",
+  RENAMED_COPY: "identical file, renamed",
+  reference_extra: "extra copy of reference",
+};
+
+const CONTENT_CHECK_LABELS: Record<string, string> = {
+  MATCH: "bytes match",
+  LISTING_MATCH: "archive listing matches",
+  NEAR_MATCH: "mostly the same",
+  SUBSET: "one copy is incomplete",
+  PARTIAL: "partly overlapping",
+  DIFFERS: "contents differ",
+  SKIPPED: "not verified",
+};
+
 export function DuplicateReview({ stamp }: Props) {
   const { ask, dialog } = useReviewDecision();
   const [revision, setRevision] = useState(0);
@@ -566,9 +589,13 @@ export function DuplicateReview({ stamp }: Props) {
             <header>
               <h3>{group.dedup_key}</h3>
               <Badge tone={confidenceTone(group.confidence)}>{group.confidence}</Badge>
-              <Badge tone="accent">{group.group_kind}</Badge>
+              <Badge tone="accent" title={group.group_kind}>
+                {GROUP_KIND_LABELS[group.group_kind] ?? group.group_kind}
+              </Badge>
               {group.content_check && (
-                <span className="count-muted">hash: {group.content_check}</span>
+                <span className="count-muted" title="Content verification result">
+                  check: {CONTENT_CHECK_LABELS[group.content_check] ?? group.content_check}
+                </span>
               )}
               {keepers[group.dedup_key] && <Badge tone="ready">keeper set</Badge>}
               {rejected && <Badge tone="review">bad match</Badge>}
@@ -585,6 +612,7 @@ export function DuplicateReview({ stamp }: Props) {
                 </span>
               </HoverMenu>
             </header>
+            {group.evidence && <p className="dupe-evidence count-muted">{group.evidence}</p>}
             {group.members.map((member) => {
               const isKeeper = keepers[group.dedup_key] === member.full_path;
               const isSuggested = member.recommendation === "KEEP";

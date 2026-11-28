@@ -47,6 +47,7 @@ class DuplicateGroup:
     name_similarity_pct: float | None = None
     size_ratio: float | None = None
     content_check: str = ""
+    evidence: str = ""
     members: list[DuplicateMember] = field(default_factory=list)
 
 

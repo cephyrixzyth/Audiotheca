@@ -924,6 +924,10 @@
   margin-bottom: 0.75rem;
 }
 
+.dupe-card .dupe-evidence {
+  margin: -0.35rem 0 0.6rem;
+}
+
 .dupe-card h3 {
   margin: 0;
   font-size: 0.95rem;

@@ -67,6 +67,8 @@ export interface DuplicateGroup {
   name_similarity_pct: number | null;
   size_ratio: number | null;
   content_check: string;
+  /** Plain-language reason the copies were matched (file manifest, listing, hash). */
+  evidence?: string;
   members: DuplicateMember[];
 }
 
