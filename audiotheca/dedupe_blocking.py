@@ -50,21 +50,30 @@ def find_size_blocked_pairs(
     for _bucket_id, bucket_items in buckets.items():
         if len(bucket_items) < 2:
             continue
-        by_hash: dict[str, list[dict]] = defaultdict(list)
+        # Only files can be byte-identical; folders are matched by manifest
+        # elsewhere. Sub-block on exact size so unique sizes are never hashed.
+        by_exact: dict[int, list[dict]] = defaultdict(list)
         for item in bucket_items:
             size = int(item.get("size") or 0)
-            if size < min_size_bytes:
+            if size < min_size_bytes or item.get("is_dir") or not item.get("path"):
                 continue
-            path = item.get("path")
-            if not path:
+            by_exact[size].append(item)
+        by_hash: dict[str, list[dict]] = defaultdict(list)
+        for same_size in by_exact.values():
+            if len(same_size) < 2:
                 continue
-            digest = hash_fn(path)
-            if digest:
-                by_hash[digest].append(item)
+            for item in same_size:
+                digest = hash_fn(item["path"])
+                if digest:
+                    by_hash[f"{digest}|{item['size']}"].append(item)
         for digest, matched in by_hash.items():
             if len(matched) < 2:
                 continue
-            keep = max(matched, key=lambda entry: (entry.get("version_key", ""), entry["size"]))
+            # Identical bytes: prefer newest tag, then the most descriptive name.
+            keep = max(
+                matched,
+                key=lambda entry: (entry.get("version_key", ""), len(entry.get("original_name") or "")),
+            )
             groups.append(
                 {
                     "dedup_key": f"sizeblock|{digest[:12]}|{matched[0]['size']}",

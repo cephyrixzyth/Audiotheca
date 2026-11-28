@@ -270,6 +270,7 @@ def load_duplicates(
             name_similarity_pct=_float(first.get("Name Similarity %")),
             size_ratio=_float(first.get("Size Ratio")),
             content_check=first.get("Content Check", ""),
+            evidence=first.get("Evidence", "") or "",
             members=[
                 DuplicateMember(
                     index=_int(row.get("Index")) or idx + 1,

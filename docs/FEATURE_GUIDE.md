@@ -120,6 +120,16 @@ When `SCENE_AUTO_RENAME = True` and `DRY_RUN = False`, folders ≥ `SCENE_RENAME
 
 Same vendor + fingerprint + name similarity ≥ 82%. HIGH groups get sparse hash on **correct nested largest file path**. LOW groups excluded from prompts.
 
+**Content manifests.** The scan walk records each folder's files (name + size from the directory listing, no extra reads; OS litter and `.nfo`/`.sfv` ignored) as an exact-layout signature, a layout-independent signature, and a 128-value MinHash sketch. These drive:
+
+| Group kind | Found by | Confidence |
+| --- | --- | --- |
+| `IDENTICAL_CONTENT` | Same files under a different folder name, any or unknown vendor; split by a hash of the 3 largest files | HIGH (bytes match) |
+| `PARTIAL_COPY` / `NEAR_DUPLICATE` | ≥ 95% of the smaller folder's files inside the larger, or ≥ 90% shared | MEDIUM, review only |
+| `ARCHIVE_EXTRACTED` | Archive listing (zip natively, rar/7z via 7-Zip) compared with the folder; also matches a renamed archive whose listing equals a folder | HIGH on listing match, dropped on mismatch |
+
+Vendor + name groups are checked against the manifests too: a half-copied pack that shares its name is demoted to MEDIUM / `SUBSET`, and a copy that is only *mostly* the same gets `NEAR_MATCH`, so auto mode never stages a copy holding files the keeper lacks. The same pair found by several checks is reported once, with the other checks listed in the group's **Evidence** (new last column of `Duplicate_Review_*.csv`, shown on each card in the Duplicates screen).
+
 Opt-in extra lanes (do not replace engine groups): **Acoustic near-dupes** (`POST /api/audio/near-dupes`, Chromaprint / heuristic) and **Fuzzy pack dupes** (`POST /api/tools/fuzzy-hash`, ssdeep/TLSH or rolling fallback). Optional AcoustID/MusicBrainz lookup: `POST /api/audio/acoustid-lookup` when `ACOUSTID_CLIENT_KEY` is set.
 
 ### 7. Investigation buckets

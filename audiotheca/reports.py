@@ -156,6 +156,7 @@ class ReportsMixin:
                         round(item["size"] / (1024 * 1024), 1),
                         "KEEP" if item["path"] == group["recommended_keep"]["path"] else "REVIEW",
                         group["action"],
+                        group.get("evidence", ""),
                     ]
                 )
         self._write_csv(
@@ -177,6 +178,7 @@ class ReportsMixin:
                 "Size MB",
                 "Recommendation",
                 "Planned Action",
+                "Evidence",
             ],
             duplicate_rows,
         )
@@ -563,6 +565,9 @@ class ReportsMixin:
                     f"(similarity {group['name_similarity']}%, size ratio {group['size_ratio']}, "
                     f"content {group.get('content_check', 'SKIPPED')}) — {group['action']}"
                 )
+                if group.get("evidence"):
+                    lines.append(f"_Evidence: {group['evidence']}_")
+                    lines.append("")
                 for idx, item in enumerate(group["items"], 1):
                     tag = " **KEEP**" if item["path"] == group["recommended_keep"]["path"] else ""
                     lines.append(

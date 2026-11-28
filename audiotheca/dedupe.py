@@ -37,6 +37,7 @@ from vendor_db import VENDOR_DATABASE
 
 from audiotheca.config import *  # noqa: F403
 from audiotheca.content_hash import content_hash, full_hash, sparse_hash as _sparse_hash_impl
+from audiotheca.content_signature import compare_manifests, describe_relation, manifest_for_archive
 from audiotheca.dedupe_blocking import find_size_blocked_pairs
 from audiotheca.helpers import _archive_stem, _limit_walk, _squash, _walk_depth
 
@@ -301,21 +302,416 @@ class DedupeMixin:
                 sizes = sorted([archive["size"], folder["size"]])
                 size_ratio = round(sizes[0] / sizes[-1], 2) if sizes[-1] else 0.0
                 seen.add(pair_key)
+                confidence = "MEDIUM" if size_ratio >= 0.15 else "LOW"
+                content_check = "SKIPPED"
+                evidence = f"names {sim}% similar; size ratio {size_ratio}"
+
+                # Verify against the archive's own file listing when both sides
+                # have a manifest: a match upgrades the pair, a clear mismatch
+                # (different pack with a similar name) drops it.
+                folder_manifest = folder.get("manifest") or {}
+                archive_manifest = self._archive_manifest(archive) if folder_manifest else {}
+                if folder_manifest and archive_manifest:
+                    cmp = compare_manifests(archive_manifest, folder_manifest)
+                    relation = cmp["relation"]
+                    evidence = (
+                        f"archive listing vs folder: "
+                        f"{describe_relation(cmp, archive_manifest['file_count'], folder_manifest['file_count'])}"
+                    )
+                    if relation in {"IDENTICAL", "SAME_FILES_MOVED"}:
+                        confidence, content_check = "HIGH", "LISTING_MATCH"
+                    elif relation == "NEAR_IDENTICAL":
+                        confidence, content_check = "HIGH", "NEAR_MATCH"
+                    elif relation == "SUBSET":
+                        confidence, content_check = "MEDIUM", "SUBSET"
+                    elif relation == "OVERLAP":
+                        confidence, content_check = "MEDIUM", "PARTIAL"
+                    else:
+                        confidence, content_check = "LOW", "DIFFERS"
+
                 pairs.append(
                     {
                         "dedup_key": f"archive|{arch_key}",
-                        "confidence": "MEDIUM" if size_ratio >= 0.15 else "LOW",
+                        "confidence": confidence,
                         "group_kind": "ARCHIVE_EXTRACTED",
                         "name_similarity": sim,
                         "size_ratio": size_ratio,
                         "same_version": archive["version_key"] == folder["version_key"],
-                        "content_check": "SKIPPED",
+                        "content_check": content_check,
+                        "evidence": evidence,
                         "recommended_keep": folder if folder["size"] >= archive["size"] else archive,
                         "items": sorted([archive, folder], key=lambda entry: entry["size"], reverse=True),
                         "action": "REVIEW — archive vs extracted copy in same section",
                     }
                 )
+        pairs.extend(self._archive_content_pairs(archives, folders, pairs))
         return pairs
+
+    _MULTIPART_TAIL_RE = re.compile(r"(\.part0*(?:[2-9]|\d{2,})\.rar|\.r\d{2}|\.z\d{2}|\.(?!001)\d{3})$", re.IGNORECASE)
+    ARCHIVE_CONTENT_SCAN_CAP = 3000
+
+    def _archive_content_pairs(self, archives: list[dict], folders: list[dict], existing: list[dict]) -> list[dict]:
+        """Archive whose listing matches a folder's files exactly, whatever
+        either is called (e.g. "Pack.zip" next to an extracted folder that the
+        scan resolved to its inner "Samples" directory)."""
+        by_sig: dict[str, list[dict]] = defaultdict(list)
+        for folder in folders:
+            if self._manifest_eligible(folder):
+                by_sig[folder["manifest"]["loose_sig"]].append(folder)
+        if not by_sig:
+            return []
+        already = {
+            frozenset(str(item["path"]) for item in pair["items"])
+            for pair in existing
+            if pair["confidence"] != "LOW"
+        }
+        out: list[dict] = []
+        listed = 0
+        for archive in sorted(archives, key=lambda entry: entry["size"], reverse=True):
+            if archive["size"] < 1024 * 1024 or self._MULTIPART_TAIL_RE.search(archive["original_name"]):
+                continue
+            if listed >= self.ARCHIVE_CONTENT_SCAN_CAP:
+                break
+            listed += 1
+            manifest = self._archive_manifest(archive)
+            if not manifest:
+                continue
+            for folder in by_sig.get(manifest.get("loose_sig") or "", []):
+                if frozenset({str(archive["path"]), str(folder["path"])}) in already:
+                    continue
+                same_tree = manifest.get("tree_sig") == folder["manifest"].get("tree_sig")
+                out.append(
+                    {
+                        "dedup_key": f"archive|{_squash(_archive_stem(archive['original_name']))[:24]}|{_squash(folder['original_name'])[:24]}",
+                        "confidence": "HIGH",
+                        "group_kind": "ARCHIVE_EXTRACTED",
+                        "name_similarity": self._name_similarity(
+                            _archive_stem(archive["original_name"]), folder["display_name"]
+                        ),
+                        "size_ratio": round(min(archive["size"], folder["size"]) / max(archive["size"], folder["size"]), 2)
+                        if max(archive["size"], folder["size"])
+                        else 1.0,
+                        "same_version": archive["version_key"] == folder["version_key"],
+                        "content_check": "LISTING_MATCH",
+                        "evidence": (
+                            f"archive listing vs folder: same {manifest['file_count']} files"
+                            f"{'' if same_tree else ' (different folder layout)'}"
+                        ),
+                        "recommended_keep": folder,
+                        "items": [folder, archive],
+                        "action": "REVIEW — archive holds exactly the files already extracted",
+                    }
+                )
+        return out
+
+    def _archive_manifest(self, archive: dict) -> dict:
+        """Listing manifest for an archive, cached in the scan cache by size+mtime."""
+        path = Path(archive["path"])
+        try:
+            stat = path.stat()
+        except OSError:
+            return {}
+        signature = f"{stat.st_size}:{stat.st_mtime_ns}"
+        cache_key = f"archive-manifest::{path}"
+        scan_cache = getattr(self, "scan_cache", None)
+        if isinstance(scan_cache, dict):
+            cached = scan_cache.get(cache_key)
+            if isinstance(cached, dict) and cached.get("signature") == signature:
+                return cached.get("info") or {}
+        seven_zip = getattr(self, "_seven_zip_for_manifests", False)
+        if seven_zip is False:
+            try:
+                seven_zip = find_7z()
+            except Exception:  # noqa: BLE001
+                seven_zip = None
+            self._seven_zip_for_manifests = seven_zip
+        manifest = manifest_for_archive(path, seven_zip)
+        if isinstance(scan_cache, dict):
+            with self._lock:
+                scan_cache[cache_key] = {"signature": signature, "info": manifest}
+        return manifest
+
+    # ------------------------------------------------------------------
+    # Content-based matching (independent of names and vendor)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _manifest_eligible(item: dict, *, min_files: int = 2, min_bytes: int = 1024 * 1024) -> bool:
+        manifest = item.get("manifest") or {}
+        return (
+            bool(item.get("is_dir"))
+            and bool(manifest.get("loose_sig"))
+            and int(manifest.get("file_count") or 0) >= min_files
+            and int(manifest.get("total_bytes") or 0) >= min_bytes
+        )
+
+    @staticmethod
+    def _descriptive_keep(items: list[dict]) -> dict:
+        """For copies with the same content: prefer the newest version tag, a
+        confirmed vendor, then the most descriptive name."""
+        confidence_rank = {"CONFIRMED": 2, "TENTATIVE": 1}
+        return max(
+            items,
+            key=lambda entry: (
+                entry.get("version_key") or "",
+                confidence_rank.get(entry.get("id_confidence") or "", 0) if entry.get("company") else -1,
+                len(entry.get("original_name") or ""),
+            ),
+        )
+
+    @staticmethod
+    def _is_nested(left: dict, right: dict) -> bool:
+        a, b = Path(left["path"]), Path(right["path"])
+        return a == b or a in b.parents or b in a.parents
+
+    def manifest_check(self, items: list[dict]) -> dict | None:
+        """Compare folder manifests across a group. None when any copy lacks one."""
+        manifests = [item.get("manifest") or {} for item in items]
+        if len(items) < 2 or any(not manifest.get("loose_sig") for manifest in manifests):
+            return None
+        ranking = {
+            "IDENTICAL": 0,
+            "SAME_FILES_MOVED": 1,
+            "NEAR_IDENTICAL": 2,
+            "SUBSET": 3,
+            "OVERLAP": 4,
+            "PARTIAL_OVERLAP": 5,
+            "DIFFERENT": 6,
+            "UNKNOWN": 7,
+        }
+        worst: tuple[int, dict, int, int] | None = None
+        for left in range(len(items)):
+            for right in range(left + 1, len(items)):
+                cmp = compare_manifests(manifests[left], manifests[right])
+                rank = ranking.get(cmp["relation"], 7)
+                if worst is None or rank > worst[0]:
+                    worst = (
+                        rank,
+                        cmp,
+                        int(manifests[left]["file_count"]),
+                        int(manifests[right]["file_count"]),
+                    )
+        assert worst is not None
+        _rank, cmp, n_left, n_right = worst
+        truncated = any(manifest.get("truncated") for manifest in manifests)
+        evidence = describe_relation(cmp, n_left, n_right)
+        if truncated:
+            evidence += " (deep folders not fully walked)"
+        return {**cmp, "evidence": evidence, "truncated": truncated}
+
+    def find_content_twin_groups(self, all_items: list[dict]) -> list[dict]:
+        """Folders holding the same files under different names.
+
+        Catches renamed packs and copies whose vendor was never identified —
+        both invisible to the vendor|name key.
+        """
+        by_sig: dict[str, list[dict]] = defaultdict(list)
+        for item in all_items:
+            if self._manifest_eligible(item):
+                by_sig[item["manifest"]["loose_sig"]].append(item)
+
+        groups: list[dict] = []
+        for sig, members in by_sig.items():
+            if len(members) < 2:
+                continue
+            # Never pair a folder with its own parent/child.
+            members = [
+                item for item in members
+                if not any(other is not item and self._is_nested(item, other) for other in members)
+            ]
+            if len(members) < 2:
+                continue
+            # Same names and sizes is strong but not proof (re-encoded or
+            # re-rendered packs keep both). Split by a hash of the largest files
+            # so only byte-verified copies are grouped together.
+            by_bytes: dict[tuple, list[dict]] = defaultdict(list)
+            for item in members:
+                by_bytes[self._content_key(item)].append(item)
+            for content_key, verified in by_bytes.items():
+                if len(verified) < 2:
+                    continue
+                groups.append(self._content_twin_group(sig, verified, hashed=content_key is not None))
+        return groups
+
+    def _content_key(self, item: dict) -> tuple | None:
+        refs = self._top_file_refs(item, limit=3)
+        if not refs:
+            return None
+        digests = tuple(content_hash(path, prefer_full=True) for _size, path in refs)
+        if any(digest is None for digest in digests):
+            return None
+        return tuple((size, digest) for (size, _path), digest in zip(refs, digests))
+
+    def _content_twin_group(self, sig: str, members: list[dict], *, hashed: bool) -> dict:
+        same_tree = len({item["manifest"].get("tree_sig") for item in members}) == 1
+        content = "MATCH" if hashed else "SKIPPED"
+        confidence = "HIGH" if hashed else "MEDIUM"
+        manifest = members[0]["manifest"]
+        evidence = (
+            f"same {manifest['file_count']} files "
+            f"({'same layout' if same_tree else 'different folder layout'}); "
+            f"largest files hash {content.lower()}"
+        )
+        if any(item["manifest"].get("truncated") for item in members):
+            evidence += "; deep folders not fully walked"
+        names = [item["display_name"] for item in members]
+        similarity = min(
+            (self._name_similarity(names[i], names[j]) for i in range(len(names)) for j in range(i + 1, len(names))),
+            default=100,
+        )
+        key_suffix = hashlib.sha1("|".join(sorted(str(item["path"]) for item in members)).encode()).hexdigest()[:6]
+        return {
+            "dedup_key": f"content|{sig[:12]}|{key_suffix}",
+            "confidence": confidence,
+            "group_kind": "IDENTICAL_CONTENT",
+            "name_similarity": similarity,
+            "size_ratio": 1.0,
+            "same_version": len({item["version_key"] for item in members}) == 1,
+            "content_check": content,
+            "evidence": evidence,
+            "recommended_keep": self._descriptive_keep(members),
+            "items": sorted(members, key=lambda entry: entry["original_name"].lower()),
+            "action": "REVIEW — same files under a different folder name",
+        }
+
+    def find_near_duplicate_folders(
+        self,
+        all_items: list[dict],
+        *,
+        exclude_paths: set[str] | None = None,
+        min_files: int = 4,
+        max_posting: int = 64,
+    ) -> list[dict]:
+        """Folder pairs that mostly share files: partial copies and re-releases.
+
+        Candidate pairs come from an inverted index over MinHash sketch values,
+        so the cost stays near-linear in the number of folders.
+        """
+        exclude_paths = exclude_paths or set()
+        eligible = [
+            item for item in all_items
+            if self._manifest_eligible(item, min_files=min_files) and str(item["path"]) not in exclude_paths
+        ]
+        postings: dict[int, list[int]] = defaultdict(list)
+        for idx, item in enumerate(eligible):
+            for value in item["manifest"].get("sketch") or []:
+                postings[value].append(idx)
+
+        shared: dict[tuple[int, int], int] = defaultdict(int)
+        for members in postings.values():
+            if len(members) < 2 or len(members) > max_posting:
+                continue
+            for i in range(len(members)):
+                for j in range(i + 1, len(members)):
+                    shared[(members[i], members[j])] += 1
+
+        groups: list[dict] = []
+        for (i, j), count in shared.items():
+            if count < 4:
+                continue
+            left, right = eligible[i], eligible[j]
+            if self._is_nested(left, right):
+                continue
+            if left["manifest"].get("loose_sig") == right["manifest"].get("loose_sig"):
+                continue  # exact twins are reported by find_content_twin_groups
+            cmp = compare_manifests(left["manifest"], right["manifest"])
+            if cmp["relation"] not in {"NEAR_IDENTICAL", "SUBSET"}:
+                continue
+            n_left = int(left["manifest"]["file_count"])
+            n_right = int(right["manifest"]["file_count"])
+            bigger, smaller = (left, right) if (n_left, left["size"]) >= (n_right, right["size"]) else (right, left)
+            sizes = sorted([left["size"], right["size"]])
+            kind = "PARTIAL_COPY" if cmp["relation"] == "SUBSET" else "NEAR_DUPLICATE"
+            groups.append(
+                {
+                    "dedup_key": f"overlap|{_squash(bigger['original_name'])[:24]}|{_squash(smaller['original_name'])[:24]}",
+                    "confidence": "MEDIUM",
+                    "group_kind": kind,
+                    "name_similarity": self._name_similarity(left["display_name"], right["display_name"]),
+                    "size_ratio": round(sizes[0] / sizes[-1], 2) if sizes[-1] else 1.0,
+                    "same_version": left["version_key"] == right["version_key"],
+                    "content_check": "SUBSET" if kind == "PARTIAL_COPY" else "NEAR_MATCH",
+                    "evidence": describe_relation(cmp, int(bigger["manifest"]["file_count"]), int(smaller["manifest"]["file_count"])),
+                    "recommended_keep": bigger,
+                    "items": [bigger, smaller],
+                    "action": (
+                        "REVIEW — smaller copy looks like an incomplete copy of the larger"
+                        if kind == "PARTIAL_COPY"
+                        else "REVIEW — mostly the same files; check what differs before removing either"
+                    ),
+                }
+            )
+        return groups
+
+    @staticmethod
+    def consolidate_groups(groups: list[dict]) -> list[dict]:
+        """Collapse groups that flag exactly the same set of paths.
+
+        Several passes can find the same pair (vendor|name key, renamed-archive
+        sparse hash, size-block full hash, content manifest). Reporting it
+        three times inflates the count and splits keeper decisions, so keep the
+        best-evidenced group and fold the others' evidence into it.
+        """
+        confidence_rank = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
+        check_rank = {"MATCH": 0, "LISTING_MATCH": 1, "NEAR_MATCH": 2, "SUBSET": 3, "PARTIAL": 4, "SKIPPED": 5, "DIFFERS": 6}
+        # Name-keyed groups carry vendor context; byte-level kinds are equally strong.
+        kind_rank = {
+            "SAME_VERSION": 0,
+            "VERSION_COEXIST": 0,
+            "reference_extra": 0,
+            "ARCHIVE_EXTRACTED": 1,
+            "IDENTICAL_CONTENT": 1,
+            "SIZE_BLOCKED": 2,
+            "RENAMED_COPY": 3,
+        }
+
+        def score(group: dict) -> tuple:
+            return (
+                confidence_rank.get(group.get("confidence", ""), 3),
+                check_rank.get(group.get("content_check", "SKIPPED"), 5),
+                kind_rank.get(group.get("group_kind", ""), 4),
+            )
+
+        best: dict[frozenset, dict] = {}
+        order: list[frozenset] = []
+        also: dict[frozenset, list[str]] = defaultdict(list)
+        for group in groups:
+            key = frozenset(str(item["path"]) for item in group["items"])
+            current = best.get(key)
+            if current is None:
+                best[key] = group
+                order.append(key)
+                continue
+            if score(group) < score(current):
+                also[key].append(current.get("group_kind", ""))
+                best[key] = group
+            else:
+                also[key].append(group.get("group_kind", ""))
+
+        # A pair already covered by a larger group with at least as strong
+        # evidence (e.g. vendor|name found 2 copies, content found all 3) is
+        # folded into the larger group so keeper decisions are made once.
+        absorbed: set[frozenset] = set()
+        for key in order:
+            for other in order:
+                if other is key or other in absorbed or not key < other:
+                    continue
+                if score(best[other])[:2] <= score(best[key])[:2]:
+                    absorbed.add(key)
+                    also[other].append(best[key].get("group_kind", ""))
+                    break
+
+        out: list[dict] = []
+        for key in order:
+            if key in absorbed:
+                continue
+            group = best[key]
+            extra = sorted({kind for kind in also.get(key, []) if kind and kind != group.get("group_kind")})
+            if extra:
+                note = "also matched by " + ", ".join(kind.replace("_", " ").lower() for kind in extra)
+                group["evidence"] = f"{group['evidence']}; {note}" if group.get("evidence") else note
+            out.append(group)
+        return out
 
     def _record_coexistence_findings(self, item: dict, info: dict) -> None:
         rows: list[dict] = []

@@ -36,6 +36,7 @@ from investigation_feedback import (
 from progress import PhaseProgress, tqdm_bar
 from vendor_db import VENDOR_DATABASE
 
+from audiotheca.content_signature import ManifestBuilder
 from audiotheca.incremental_scan import tree_signature
 from audiotheca.config import *  # noqa: F403
 from audiotheca.binary_arch import inspect_binary, merge_arch_flags
@@ -117,6 +118,7 @@ class ScanMixin:
             "legacy_32bit": False,
         }
         largest_heap: list[tuple[int, str, str]] = []
+        manifest = ManifestBuilder()
 
         stack: list[tuple[Path, int]] = [(root, 0)]
         while stack:
@@ -228,6 +230,7 @@ class ScanMixin:
                             ext = name_lower.rsplit(".", 1)[-1] if "." in name_lower else ""
                             rel_name = str(Path(entry.path).relative_to(root))
 
+                            manifest.add(rel_name, fsize)
                             if fsize > 0:
                                 largest_heap.append((fsize, entry.name, rel_name))
                                 if len(largest_heap) > 12:
@@ -285,6 +288,8 @@ class ScanMixin:
                 time.sleep(throttle_ms / 1000.0)
 
         largest_heap.sort(key=lambda row: row[0], reverse=True)
+        manifest.truncated = any(t.get("kind") == "WALK_DEPTH" for t in info["truncations"])
+        info["manifest"] = manifest.finalize()
         info["largest_files"] = [(size, rel_name) for size, _name, rel_name in largest_heap[:8]]
         nested_indexes: list[dict] = []
         for arch in info.get("archive_files", [])[:5]:
@@ -372,6 +377,7 @@ class ScanMixin:
                 "nested": info["nested"],
                 "top_files": info["top_files"],
                 "largest_files": info.get("largest_files") or info["top_files"],
+                "manifest": info.get("manifest") or {},
                 "archive_count": len(info.get("archive_files") or []),
                 "installer_count": len(info.get("installer_files") or []),
                 "from_cache": from_cache,

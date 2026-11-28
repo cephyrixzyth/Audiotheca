@@ -790,8 +790,13 @@ class DeduplicationEngine(
         feedback_store = load_feedback_store()
 
         archive_pairs = self.find_cross_item_archive_pairs(all_items)
+        # A dropped LOW pair only suppresses the vendor|name group for the same
+        # paths when the archive listing proved the contents differ; an
+        # unverified LOW (size ratio alone) must not hide a real duplicate.
         archive_pair_path_sets = {
-            frozenset(item["path"] for item in pair["items"]) for pair in archive_pairs
+            frozenset(item["path"] for item in pair["items"])
+            for pair in archive_pairs
+            if pair["confidence"] != "LOW" or pair.get("content_check") == "DIFFERS"
         }
         for pair in archive_pairs:
             if pair["confidence"] == "LOW":
@@ -826,7 +831,10 @@ class DeduplicationEngine(
         if not self.scan_options.skip("duplicates"):
             renamed_groups = find_renamed_archive_dupes(all_items, self.sparse_hash)
             size_blocked_groups = self.find_size_bucket_groups(all_items)
-            for group in renamed_groups + size_blocked_groups:
+            content_groups = self.find_content_twin_groups(all_items)
+            twin_paths = {str(item["path"]) for group in content_groups for item in group["items"]}
+            near_groups = self.find_near_duplicate_folders(all_items, exclude_paths=twin_paths)
+            for group in renamed_groups + size_blocked_groups + content_groups + near_groups:
                 pair_paths = [str(item["path"]) for item in group["items"]]
                 if frozenset(item["path"] for item in group["items"]) in archive_pair_path_sets:
                     continue
@@ -848,6 +856,8 @@ class DeduplicationEngine(
                     f"\n[{kind_label} {group['confidence']}] {group['dedup_key']} "
                     f"— {group.get('action', 'byte-identical match')}"
                 )
+                if group.get("evidence"):
+                    print(f"  evidence: {group['evidence']}")
                 for idx, item in enumerate(group["items"], 1):
                     size_mb = item["size"] / (1024 * 1024)
                     rec = " <-- suggested keep" if item["path"] == group["recommended_keep"]["path"] else ""
@@ -904,6 +914,29 @@ class DeduplicationEngine(
                     if content == "DIFFERS":
                         assessment["confidence"] = "MEDIUM"
 
+                # Same vendor + name is not proof of same contents: compare the
+                # folders' file manifests so partial copies and different packs
+                # sharing a name are never treated as safe-to-remove twins.
+                mcheck = self.manifest_check(assessment["items"])
+                if mcheck:
+                    assessment["evidence"] = mcheck["evidence"]
+                    relation = mcheck["relation"]
+                    if relation in {"IDENTICAL", "SAME_FILES_MOVED"}:
+                        if assessment["confidence"] != "HIGH":
+                            content = self._content_check(assessment["items"])
+                            assessment["content_check"] = content
+                            if content == "MATCH":
+                                assessment["confidence"] = "HIGH"
+                    elif relation == "NEAR_IDENTICAL":
+                        if assessment.get("content_check") == "MATCH":
+                            # Interactive review only: never auto-stage a copy
+                            # that may hold files the keeper lacks.
+                            assessment["content_check"] = "NEAR_MATCH"
+                    else:
+                        if assessment["confidence"] == "HIGH":
+                            assessment["confidence"] = "MEDIUM"
+                        assessment["content_check"] = "SUBSET" if relation == "SUBSET" else "DIFFERS"
+
                 if self.dry_run:
                     action = "REVIEW ONLY (no files removed in DRY_RUN)"
                 elif assessment["confidence"] == "HIGH":
@@ -920,6 +953,8 @@ class DeduplicationEngine(
                     f"({assessment['group_kind']}, similarity {assessment['name_similarity']}%, "
                     f"content {assessment.get('content_check', 'SKIPPED')})"
                 )
+                if assessment.get("evidence"):
+                    print(f"  evidence: {assessment['evidence']}")
                 for idx, item in enumerate(assessment["items"], 1):
                     size_mb = item["size"] / (1024 * 1024)
                     rec = " <-- suggested keep" if item["path"] == assessment["recommended_keep"]["path"] else ""
@@ -1014,6 +1049,13 @@ class DeduplicationEngine(
                         )
                         print(f"  [{idx}] {item['original_name']} ({size_mb:.1f} MB) in {item['source_bin']}{rec}")
                 ref_progress.finish(f"{added} reference-extra groups")
+
+            before = len(self.duplicate_groups)
+            self.duplicate_groups = self.consolidate_groups(self.duplicate_groups)
+            merged = before - len(self.duplicate_groups)
+            if merged:
+                self._inc("duplicates_suspected", -merged)
+                print(f"  Merged {merged} groups found by more than one duplicate check.")
         self._checkpoint("duplicates", "Phase 2 - Duplicate review")
 
         # Keep proposed discards out of other move plans, including a failed or declined stage.
