@@ -41,6 +41,9 @@ const RestructurePlan = lazy(() => import("./components/RestructurePlan").then(m
 const ScanAudit = lazy(() => import("./components/ScanAudit").then(module => ({ default: module.ScanAudit })));
 const SceneRenames = lazy(() => import("./components/SceneRenames").then(module => ({ default: module.SceneRenames })));
 const DeepIdentifyReview = lazy(() => import("./components/DeepIdentifyReview").then(module => ({ default: module.DeepIdentifyReview })));
+const PluginLedgerPanel = lazy(() => import("./components/PluginLedgerPanel").then(module => ({ default: module.PluginLedgerPanel })));
+const AutomationPanel = lazy(() => import("./components/AutomationPanel").then(module => ({ default: module.AutomationPanel })));
+const RecoveryDialog = lazy(() => import("./components/RecoveryDialog").then(module => ({ default: module.RecoveryDialog })));
 const SpaceRecovery = lazy(() => import("./components/SpaceRecovery").then(module => ({ default: module.SpaceRecovery })));
 const MalwarePanel = lazy(() => import("./components/MalwarePanel").then(module => ({ default: module.MalwarePanel })));
 const ArchivePeek = lazy(() => import("./components/ArchivePeek").then(module => ({ default: module.ArchivePeek })));
@@ -325,6 +328,8 @@ export default function App() {
                 ) : (
                   <TabEmptyState tab="space-recovery" onStartScan={() => setTab("scan")} />
                 ))}
+              {tab === "plugins" && <PluginLedgerPanel stamp={stamp || undefined} />}
+              {tab === "automation" && <AutomationPanel stamp={stamp || undefined} />}
               {tab === "security" && <MalwarePanel stamp={stamp || undefined} />}
               {tab === "environment" && <EnvironmentPanel />}
               {tab === "help" && <HelpPanel />}
@@ -333,6 +338,7 @@ export default function App() {
             </main>
         </WorkspaceFrame>
         <CommandPalette />
+        <Suspense fallback={null}><RecoveryDialog /></Suspense>
         {showFirstRun && (
           <FirstRunWizard onNavigate={setTab} onComplete={() => setShowFirstRun(false)} />
         )}

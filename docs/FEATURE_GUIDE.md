@@ -200,6 +200,13 @@ External tester checklist: [Testing Guide](TESTING.md).
 
 ---
 
+## Library management tools (added 2026-11)
+
+- **Plugin Ledger** (System → Plugins): compares installed plugins with installers in the library, flags older installers and missing installers, and builds a reinstall checklist. Plugin folders can be extended or ignored, and the inventory can be exported from one machine and imported on another. The Licenses view keeps serials and license files encrypted; the DAW projects view indexes Ableton and REAPER projects to show which projects use each plugin.
+- **Automation** (System → Automation): scheduled dry-run scans, notification targets, the import pipeline for an incoming folder, naming templates, the vendor release wanted list, UCS rename and metadata write-back, and extensions (`EXTENSIONS.md`).
+- **Space Recovery**: the Space map treemap, and copy-on-write clone plans (`Clone_Plan_*.csv`, `make_clones_*.ps1/.sh`). Each library root shows whether it supports clones.
+- **Startup recovery**: if Audiotheca stopped during a move, a dialog lists each interrupted move as found on disk and offers to keep it, put it back, or dismiss it.
+
 ## Reports reference
 
 All in `dedupe_reports/` with timestamp `YYYYMMDD_HHMM`. Copied to `{ROOT}/_dedupe_reports/` when writable.

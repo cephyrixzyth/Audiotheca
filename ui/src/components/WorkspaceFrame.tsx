@@ -11,7 +11,7 @@ export const pageTitles: Partial<Record<TabId, string>> = {
   dashboard: "Library workspace", library: "Sound library", scan: "Scan library", studio: "Spatial studio",
   investigation: "Investigation inbox", duplicates: "Duplicate review", restructure: "Restructure plan",
   archives: "Archive review", "scene-renames": "Scene renames", "deep-identify": "Deep identification",
-  "scan-audit": "Scan audit", skipped: "Skipped files", "space-recovery": "Space recovery", security: "Security",
+  "scan-audit": "Scan audit", skipped: "Skipped files", "space-recovery": "Space recovery", plugins: "Plugin ledger", automation: "Automation", security: "Security",
   environment: "Environment", vendors: "Vendor research", help: "Field guide",
 };
 const familyNames = { dashboard: "Workspace", scan: "Workspace", library: "Workspace", studio: "Production", review: "Review", system: "System", help: "Reference" };

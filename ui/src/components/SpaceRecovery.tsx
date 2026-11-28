@@ -14,6 +14,7 @@ import {
 import type { CoexistenceItem, JobSnapshot } from "../types";
 import { Button, Kpi, LabeledSelect, Tabs, VirtualTable } from "../ui";
 import { PathLink } from "./PathLink";
+import { CloneSupportBadges, SpaceTreemap } from "./SpaceTreemap";
 
 interface Props {
   stamp: string;
@@ -190,7 +191,7 @@ export function SpaceRecovery({ stamp }: Props) {
   return (
     <div className="review-workspace">
       <Tabs value={view} onValueChange={setView} aria-label="Recovery tasks" items={[
-        {value: "findings", label: "Review findings"}, {value: "reports", label: "Recovery reports"}, {value: "coverage", label: "Scan exclusions"},
+        {value: "findings", label: "Review findings"}, {value: "map", label: "Space map"}, {value: "reports", label: "Recovery reports"}, {value: "coverage", label: "Scan exclusions"},
       ]}/>
       {error && <WorkIssue message={error} retry={reload} />}
       {msg && <div className="banner dry" role="status" style={{ marginBottom: "0.75rem" }}>{msg}</div>}
@@ -200,6 +201,8 @@ export function SpaceRecovery({ stamp }: Props) {
           {job.stamp ? ` · stamp ${job.stamp}` : ""}
         </div>
       )}
+
+      {view === "map" && <SpaceTreemap stamp={stamp} />}
 
       {view === "reports" && <section>
         <WorkScope title="Estimate recovery opportunities" detail="Counts describe findings in the selected run. Download the generated reports to inspect clone plans and potential space savings." />

@@ -25,6 +25,8 @@ const ALL_TAB_IDS: TabId[] = [
   "scan-audit",
   "skipped",
   "space-recovery",
+  "plugins",
+  "automation",
   "security",
   "environment",
   "vendors",

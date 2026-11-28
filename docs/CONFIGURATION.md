@@ -17,6 +17,11 @@ Copy [.env.example](../.env.example) to `.env` for local overrides (load manuall
 | `AUDIOTHECA_LIBRARY_ROOT` | `Z:\_software\_audio` | Primary library root for engine and scans |
 | `AUDIOTHECA_LIBRARY_ROOTS` | same as above | Comma-separated allowlist for API path validation (scans, explorer, rescans) |
 | `AUDIOTHECA_HOME` | *(repo root)* | Workspace for `dedupe_reports/`, cache, token, feedback |
+| `AUDIOTHECA_SCHEDULER` | `1` | Set to `0` to turn off the built-in scheduled-scan runner |
+| `AUDIOTHECA_SCHEDULER_TICK_S` | `30` | How often (seconds) the scheduler checks for due schedules |
+| `AUDIOTHECA_INCOMING_DIRS` | *(empty)* | Comma-separated extra folders allowed as the import pipeline's incoming folder (it must otherwise sit under a library root) |
+| `AUDIOTHECA_EXTENSIONS` | `0` | Set to `1` to load Python extensions (see `EXTENSIONS.md`) |
+| `AUDIOTHECA_EXTENSIONS_DIR` | `<AUDIOTHECA_HOME>/extensions` | Folder extensions are loaded from |
 
 Example:
 

@@ -123,7 +123,7 @@ async function authHeaders(extra?: HeadersInit): Promise<HeadersInit> {
   return headers;
 }
 
-async function getJson<T>(path: string): Promise<T> {
+export async function getJson<T>(path: string): Promise<T> {
   const res = await fetchWithAuth(path);
   if (!res.ok) {
     const detail = await res.text();
@@ -132,7 +132,7 @@ async function getJson<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-async function putJson<T>(path: string, body: unknown): Promise<T> {
+export async function putJson<T>(path: string, body: unknown): Promise<T> {
   const res = await fetchWithAuth(path, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -145,7 +145,16 @@ async function putJson<T>(path: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-async function postJson<T>(path: string, body: unknown): Promise<T> {
+export async function deleteJson<T>(path: string): Promise<T> {
+  const res = await fetchWithAuth(path, { method: "DELETE" });
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(detail || res.statusText);
+  }
+  return res.json() as Promise<T>;
+}
+
+export async function postJson<T>(path: string, body: unknown): Promise<T> {
   const res = await fetchWithAuth(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
