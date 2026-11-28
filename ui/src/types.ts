@@ -505,6 +505,8 @@ export type TabId =
   | "skipped"
   | "vendors"
   | "space-recovery"
+  | "plugins"
+  | "automation"
   | "security"
   | "environment"
   | "help";

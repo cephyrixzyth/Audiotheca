@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import re
 import secrets
@@ -52,6 +53,8 @@ class JobState:
     events: list[dict] = field(default_factory=list)
     first_event_index: int = 0
     user_stopped: bool = False
+    schedule_id: str | None = None
+    schedule_name: str = ""
     _queues: list[asyncio.Queue] = field(default_factory=list, repr=False)
     _run_id: str | None = field(default=None, repr=False)
     _control_path: Path | None = field(default=None, repr=False)
@@ -69,6 +72,8 @@ class JobState:
             "current_phase": self.current_phase,
             "scan_options": self.scan_options,
             "event_count": self.first_event_index + len(self.events),
+            "schedule_id": self.schedule_id,
+            "schedule_name": self.schedule_name,
         }
 
 
@@ -231,6 +236,8 @@ class JobManager:
         root: str | None = None,
         scan_options: dict | None = None,
         auth_token: str = "",
+        schedule_id: str | None = None,
+        schedule_name: str = "",
     ) -> JobState:
         if self.running_job():
             raise RuntimeError("A scan is already running")
@@ -296,6 +303,8 @@ class JobManager:
             started_at=time.time(),
             auth_token=auth_token,
             scan_options=options.to_dict(),
+            schedule_id=schedule_id,
+            schedule_name=schedule_name,
             _run_id=run_id,
             _control_path=control_file,
             _progress_path=progress_file,
@@ -521,6 +530,7 @@ class JobManager:
         finally:
             if job.status not in {"running", "paused", "pause_pending", "stop_pending"}:
                 self._persist_job(job, finished=True)
+                self._notify_finished(job)
             try:
                 stderr_handle.close()
             except Exception:
@@ -535,6 +545,28 @@ class JobManager:
             progress_file.unlink(missing_ok=True)
             control_file.unlink(missing_ok=True)
             engine_lock.clear_lock(job_id=job.job_id)
+
+    def _notify_finished(self, job: JobState) -> None:
+        """Send the run digest to notification targets without blocking the event loop."""
+
+        def deliver() -> None:
+            try:
+                from audiotheca.notify import notify_run_finished
+
+                notify_run_finished(
+                    stamp=job.stamp,
+                    status=job.status,
+                    scheduled=job.schedule_id is not None,
+                    schedule_name=job.schedule_name,
+                    error=job.error or "",
+                )
+            except Exception as exc:  # noqa: BLE001 - notifications must never break a job
+                logging.getLogger("audiotheca.api").warning("Run notification failed: %s", exc)
+
+        try:
+            asyncio.get_running_loop().run_in_executor(None, deliver)
+        except RuntimeError:
+            deliver()
 
     def _import_run_reports(self, stamp: str | None) -> None:
         if not stamp:

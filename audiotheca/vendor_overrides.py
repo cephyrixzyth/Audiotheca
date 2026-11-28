@@ -139,7 +139,9 @@ def match_keyword(keyword: str, sample: str) -> dict:
 def compile_user_routes() -> list[tuple[str, re.Pattern[str], bool]]:
     """Extra vendor routes from user overrides (strong priority)."""
     staged: list[tuple[int, int, str, re.Pattern[str]]] = []
-    for row in load_user_vendors():
+    from audiotheca.extensions import vendor_rows as extension_vendor_rows
+
+    for row in [*load_user_vendors(), *extension_vendor_rows()]:
         for position, keyword in enumerate(row.keywords):
             kw = keyword.strip().lower()
             if len(kw) < 3 or kw in KEYWORD_BLOCKLIST:
