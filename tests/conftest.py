@@ -19,8 +19,20 @@ except ImportError:
 # Windows-style library roots used in tests and CI (logical validation on Linux).
 os.environ["AUDIOTHECA_LIBRARY_ROOTS"] = r"Z:\_software\_audio,Z:\test,Z:\lib,Z:\a"
 
+# TestClient sends Host: testserver; allow it past the DNS-rebinding host check.
+os.environ.setdefault("AUDIOTHECA_ALLOWED_HOSTS", "testserver")
+
 from api import security
 from api.server import app
+
+
+@pytest.fixture(autouse=True)
+def _not_elevated(monkeypatch):
+    """Run every test as an unprivileged process, even in root containers/CI."""
+    import ctx_prof
+
+    monkeypatch.setattr(ctx_prof, "_process_elevated", lambda: False)
+    monkeypatch.delenv("AUDIOTHECA_ADMIN_TOKEN", raising=False)
 
 
 @pytest.fixture

@@ -88,6 +88,19 @@ _RUN_STAMP_SEGMENT = re.compile(r"^/api/runs/([^/]+)")
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
+        if not security.host_header_ok(request):
+            security.audit(
+                "host_rejected",
+                path=path,
+                host=request.headers.get("host", ""),
+                client=security._client_host(request),
+            )
+            return JSONResponse(
+                status_code=421,
+                content={
+                    "detail": "Untrusted Host header. Add this hostname to AUDIOTHECA_ALLOWED_HOSTS to allow it."
+                },
+            )
         if request.method == "OPTIONS" or path in security.PUBLIC_HTTP_PATHS:
             return await call_next(request)
         # Peek credentials first so CSRF failures do not burn single-use tickets.
@@ -101,6 +114,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # Auth + CSRF passed — consume single-use tickets now.
         security.extract_bearer_token(request, consume_tickets=True)
         request.state.api_token = security.get_api_token()
+        from ctx_prof import ADMIN_HEADER, admin_credential_var
+
+        admin_credential_var.set(request.headers.get(ADMIN_HEADER, ""))
         if path.startswith("/api/runs/") and not path.startswith("/api/runs/compare"):
             match = _RUN_STAMP_SEGMENT.match(path)
             if match and match.group(1) != "compare":

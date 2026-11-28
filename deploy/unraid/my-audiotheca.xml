@@ -35,5 +35,10 @@
   <Config Name="AUDIOTHECA_API_TOKEN" Target="AUDIOTHECA_API_TOKEN" Default="" Mode="" Description="Required fixed API token (long random string)" Type="Variable" Display="always" Required="true" Mask="true"/>
   <Config Name="AUDIOTHECA_PROXY_SECRET" Target="AUDIOTHECA_PROXY_SECRET" Default="" Mode="" Description="Shared secret for nginx→API session minting (required; different from API token)" Type="Variable" Display="always" Required="true" Mask="true"/>
   <Config Name="AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP" Target="AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP" Default="1" Mode="" Description="Keep 1 for LAN — sessions via proxy secret only" Type="Variable" Display="advanced" Required="false" Mask="false">1</Config>
+  <Config Name="PUID" Target="PUID" Default="99" Mode="" Description="User ID that owns files Audiotheca writes or moves (99 = nobody). Set 0 to run as root." Type="Variable" Display="advanced" Required="false" Mask="false">99</Config>
+  <Config Name="PGID" Target="PGID" Default="100" Mode="" Description="Group ID for written or moved files (100 = users)" Type="Variable" Display="advanced" Required="false" Mask="false">100</Config>
+  <Config Name="UMASK" Target="UMASK" Default="000" Mode="" Description="File creation mask (000 keeps files editable over SMB)" Type="Variable" Display="advanced" Required="false" Mask="false">000</Config>
+  <Config Name="AUDIOTHECA_REQUIRE_ADMIN" Target="AUDIOTHECA_REQUIRE_ADMIN" Default="" Mode="" Description="Set 1 to require the admin token for quarantine, delete, shred and live execution" Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="AUDIOTHECA_ADMIN_TOKEN" Target="AUDIOTHECA_ADMIN_TOKEN" Default="" Mode="" Description="Admin token entered in the UI to unlock destructive actions when AUDIOTHECA_REQUIRE_ADMIN=1" Type="Variable" Display="advanced" Required="false" Mask="true"/>
   <Config Name="SEARXNG_URL" Target="SEARXNG_URL" Default="" Mode="" Description="Optional SearXNG base URL for vendor research (Compose default: http://searxng:8080). Leave empty if SearXNG is not running." Type="Variable" Display="advanced" Required="false" Mask="false"/>
 </Container>

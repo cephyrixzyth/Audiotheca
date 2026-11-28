@@ -545,13 +545,16 @@ docker pull ghcr.io/chrisjrovira/audiotheca:1.0.12
 ```bash
 docker run -d --name audiotheca \
   -e AUDIOTHECA_PROXY_SECRET="$(openssl rand -hex 32)" \
-  -p 4210:80 -p 4211:8787 \
+  -e PUID=99 -e PGID=100 -e UMASK=000 \
+  -p 4210:80 \
   -v /path/to/appdata:/data \
   -v /path/to/library:/library:ro \
   ghcr.io/chrisjrovira/audiotheca:1.0.12
 ```
 
 Open `http://localhost:4210`. Appdata holds reports, scan cache, and the API token (`AUDIOTHECA_HOME=/data`).
+The API listens on loopback inside the container; nginx on port 80 is the only entry point. `PUID`/`PGID`/`UMASK`
+set the owner of files Audiotheca writes or moves (Unraid default `nobody:users`); set `PUID=0` to run as root.
 
 **Docker Compose** — API + UI + SearXNG (optional ClamAV / VPN profiles):
 

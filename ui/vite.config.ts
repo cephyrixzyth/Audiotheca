@@ -43,5 +43,8 @@ export default defineConfig({
     // Vite 8 minifies with oxc (Rust) by default; "esbuild" is no longer bundled
     minify: !process.env.TAURI_DEBUG,
     sourcemap: !!process.env.TAURI_DEBUG,
+    // The Spatial Studio room (three.js) is already a lazy chunk loaded only when
+    // the Studio opens; allow it without a warning on every build.
+    chunkSizeWarningLimit: 600,
   },
 });

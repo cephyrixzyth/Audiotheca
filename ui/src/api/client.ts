@@ -114,11 +114,37 @@ async function issueAccessTicket(options?: {
   return data.ticket;
 }
 
+const ADMIN_TOKEN_KEY = "audiotheca.adminToken";
+let adminToken = "";
+try {
+  adminToken = sessionStorage.getItem(ADMIN_TOKEN_KEY) ?? "";
+} catch {
+  adminToken = "";
+}
+
+/** Admin token for destructive actions when the server sets AUDIOTHECA_ADMIN_TOKEN (kept for this tab only). */
+export function setAdminToken(token: string): void {
+  adminToken = token.trim();
+  try {
+    if (adminToken) sessionStorage.setItem(ADMIN_TOKEN_KEY, adminToken);
+    else sessionStorage.removeItem(ADMIN_TOKEN_KEY);
+  } catch {
+    /* storage unavailable: keep it in memory */
+  }
+}
+
+export function hasAdminToken(): boolean {
+  return adminToken.length > 0;
+}
+
 async function authHeaders(extra?: HeadersInit): Promise<HeadersInit> {
   await ensureAuth();
   const headers: Record<string, string> = { ...(extra as Record<string, string>) };
   if (cachedToken) {
     headers.Authorization = `Bearer ${cachedToken}`;
+  }
+  if (adminToken) {
+    headers["X-Audiotheca-Admin"] = adminToken;
   }
   return headers;
 }

@@ -4,7 +4,7 @@ set -e
 export AUDIOTHECA_HOME="${AUDIOTHECA_HOME:-/data}"
 export AUDIOTHECA_LIBRARY_ROOT="${AUDIOTHECA_LIBRARY_ROOT:-/library}"
 export AUDIOTHECA_LIBRARY_ROOTS="${AUDIOTHECA_LIBRARY_ROOTS:-${AUDIOTHECA_LIBRARY_ROOT}}"
-export AUDIOTHECA_API_HOST="${AUDIOTHECA_API_HOST:-0.0.0.0}"
+export AUDIOTHECA_API_HOST="${AUDIOTHECA_API_HOST:-127.0.0.1}"
 export AUDIOTHECA_API_PORT="${AUDIOTHECA_API_PORT:-8787}"
 export AUDIOTHECA_NO_RELOAD="${AUDIOTHECA_NO_RELOAD:-1}"
 export AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP="${AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP:-1}"
@@ -27,7 +27,8 @@ elif [ -f /etc/nginx/conf.d/default.conf.template ]; then
         > /etc/nginx/conf.d/default.conf
 fi
 
-python -m api.server &
+# Drop root for the API: files it creates or moves on the shares get PUID:PGID.
+/usr/local/bin/run-as-user python -m api.server &
 API_PID=$!
 
 i=0

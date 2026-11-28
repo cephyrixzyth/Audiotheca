@@ -89,6 +89,14 @@ def test_run_harvest_saves_candidates(tmp_path: Path, monkeypatch: pytest.Monkey
         return [row], vh.HarvestResult(url=url, source_label="test", ok=True, candidates_found=1)
 
     monkeypatch.setattr(vh, "harvest_url", fake_harvest)
+    # Keep the outbound URL guard offline-safe: resolve example.com to a public test address.
+    import socket
+
+    monkeypatch.setattr(
+        socket,
+        "getaddrinfo",
+        lambda *a, **k: [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.215.14", 443))],
+    )
 
     result = vh.run_harvest(["https://example.com"], default_category="Stems_Multitracks")
     assert result["added"] == 1

@@ -102,17 +102,34 @@ CREATE INDEX IF NOT EXISTS idx_dup_members_group ON duplicate_members(group_id);
 """
 
 
+_initialized_paths: set[str] = set()
+
+
 def _connect() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30.0)
     conn.row_factory = sqlite3.Row
+    # Wait for a concurrent writer (report import vs. API reads) instead of
+    # failing with "database is locked". WAL is deliberately not enabled: appdata
+    # often lives on Unraid user shares where WAL's shared memory is unreliable.
+    conn.execute("PRAGMA busy_timeout = 30000")
     return conn
 
 
+def _escape_like(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 def init_db() -> None:
+    # The schema script is idempotent but not free; run it once per database
+    # file per process (re-run if the file was removed or DB_PATH changed).
+    key = str(DB_PATH)
+    if key in _initialized_paths and DB_PATH.is_file():
+        return
     with _connect() as conn:
         conn.executescript(_SCHEMA)
         conn.commit()
+    _initialized_paths.add(key)
 
 
 def upsert_job(snapshot: dict[str, Any], *, finished: bool = False) -> None:
@@ -355,10 +372,11 @@ def query_items(
         clauses.append("section = ?")
         params.append(section)
     if query:
-        q = f"%{query.lower()}%"
+        q = f"%{_escape_like(query.lower())}%"
         clauses.append(
-            "(LOWER(item_name) LIKE ? OR LOWER(current_path) LIKE ? "
-            "OR LOWER(vendor) LIKE ? OR LOWER(fingerprint) LIKE ? OR LOWER(bucket) LIKE ?)"
+            "(LOWER(item_name) LIKE ? ESCAPE '\\' OR LOWER(current_path) LIKE ? ESCAPE '\\' "
+            "OR LOWER(vendor) LIKE ? ESCAPE '\\' OR LOWER(fingerprint) LIKE ? ESCAPE '\\' "
+            "OR LOWER(bucket) LIKE ? ESCAPE '\\')"
         )
         params.extend([q, q, q, q, q])
 
@@ -398,11 +416,11 @@ def query_investigation_items(
         clauses.append("section = ?")
         params.append(section)
     if query:
-        q = f"%{query.lower()}%"
+        q = f"%{_escape_like(query.lower())}%"
         clauses.append(
-            "(LOWER(item_name) LIKE ? OR LOWER(current_path) LIKE ? "
-            "OR LOWER(fingerprint) LIKE ? OR LOWER(investigation_bucket) LIKE ? "
-            "OR LOWER(reason) LIKE ? OR LOWER(id_method) LIKE ?)"
+            "(LOWER(item_name) LIKE ? ESCAPE '\\' OR LOWER(current_path) LIKE ? ESCAPE '\\' "
+            "OR LOWER(fingerprint) LIKE ? ESCAPE '\\' OR LOWER(investigation_bucket) LIKE ? ESCAPE '\\' "
+            "OR LOWER(reason) LIKE ? ESCAPE '\\' OR LOWER(id_method) LIKE ? ESCAPE '\\')"
         )
         params.extend([q, q, q, q, q, q])
 
