@@ -71,6 +71,46 @@ _ticket_lock = threading.Lock()
 _session_lock = threading.Lock()
 
 
+_TRUSTED_HOSTNAMES = frozenset({"localhost", "127.0.0.1", "::1", "tauri.localhost"})
+
+
+def _extra_allowed_hosts() -> set[str]:
+    raw = os.environ.get("AUDIOTHECA_ALLOWED_HOSTS", "")
+    return {part.strip().lower().rstrip(".") for part in raw.split(",") if part.strip()}
+
+
+def host_header_ok(request: Request) -> bool:
+    """Reject DNS-rebinding requests addressed to an attacker-controlled hostname.
+
+    A rebinding page reaches the API from the victim's own browser, so the TCP
+    peer is loopback (or a trusted LAN address) while the Host header names the
+    attacker's domain. Loopback names, ``*.localhost``, IP literals (rebinding
+    needs a DNS name) and hosts listed in ``AUDIOTHECA_ALLOWED_HOSTS`` are
+    accepted. Only enforced while token bootstrap is possible; Docker/LAN
+    installs disable bootstrap and authenticate through the proxy secret.
+    """
+    if os.environ.get("AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP") == "1":
+        return True
+    extra = _extra_allowed_hosts()
+    if "*" in extra:
+        return True
+    raw = (request.headers.get("host") or "").strip()
+    if not raw:
+        # HTTP/1.0 clients without Host cannot be rebinding browsers.
+        return True
+    hostname, _port = _split_host_port(raw)
+    hostname = hostname.rstrip(".")
+    if not hostname:
+        return False
+    if hostname in _TRUSTED_HOSTNAMES or hostname.endswith(".localhost") or hostname in extra:
+        return True
+    try:
+        ipaddress.ip_address(hostname)
+        return True
+    except ValueError:
+        return False
+
+
 def proxy_secret_expected() -> str:
     return os.environ.get("AUDIOTHECA_PROXY_SECRET", "").strip()
 
@@ -262,8 +302,17 @@ def extract_bearer_token(request: Request, *, consume_tickets: bool = True) -> s
 
     if ticket_ok:
         return get_api_token()
-    # Legacy fallback: still accept ?token= for older clients / bookmarks.
-    return request.query_params.get("token") or None
+    # Legacy ?token= puts the long-lived credential in access logs, history and
+    # Referer headers. Access tickets replace it; opt back in only if needed.
+    legacy = request.query_params.get("token")
+    if legacy and query_token_allowed():
+        audit("legacy_query_token_used", path=request.url.path)
+        return legacy
+    return None
+
+
+def query_token_allowed() -> bool:
+    return os.environ.get("AUDIOTHECA_ALLOW_QUERY_TOKEN", "").strip().lower() in {"1", "true", "yes"}
 
 
 def verify_token(token: str | None) -> bool:
@@ -591,6 +640,28 @@ def assert_library_path(raw: str, *, must_exist: bool = False, label: str = "pat
     except ValueError as exc:
         status = 404 if "not found" in str(exc) else 400 if "required" in str(exc) else 403
         raise HTTPException(status_code=status, detail=str(exc)) from exc
+
+
+def assert_destructive_file_target(raw: str, *, label: str = "path") -> Path:
+    """Validate a path for a permanent, destructive action (delete / shred).
+
+    The target must be an existing regular file under a library root. Library
+    roots themselves, directories and anything that contains a root are refused
+    so a single request can never remove a whole library or vendor tree.
+    """
+    path = assert_library_path(raw, must_exist=True, label=label)
+    for root in library_roots():
+        if path == root or is_canonical_path_under(root, path):
+            audit("destructive_target_denied", path=str(path), label=label, reason="library_root")
+            raise HTTPException(status_code=403, detail=f"{label} is a library root or contains one: {path}")
+    try:
+        is_link = Path(raw).is_symlink()
+    except OSError:
+        is_link = False
+    if is_link or not path.is_file():
+        audit("destructive_target_denied", path=str(path), label=label, reason="not_regular_file")
+        raise HTTPException(status_code=400, detail=f"{label} must be a regular file (directories are not accepted): {path}")
+    return path
 
 
 def assert_library_paths(paths: list[str], *, must_exist: bool = False, label: str = "path") -> list[Path]:

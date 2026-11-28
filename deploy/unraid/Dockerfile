@@ -23,7 +23,7 @@ ARG AUDIOTHECA_VERSION=1.0.12
 ARG ENGINE_VERSION=10.0.0
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends nginx p7zip-full curl tini clamav gettext-base \
+    && apt-get install -y --no-install-recommends nginx p7zip-full curl tini clamav gettext-base gosu \
     && rm -rf /var/lib/apt/lists/* \
     && rm -f /etc/nginx/sites-enabled/default
 
@@ -39,7 +39,8 @@ COPY *.py ./
 COPY --from=ui-build /app/ui/dist /usr/share/nginx/html
 COPY deploy/unraid/nginx-local.conf.template /etc/nginx/templates/default.conf.template
 COPY deploy/unraid/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+COPY deploy/unraid/run-as-user.sh /usr/local/bin/run-as-user
+RUN chmod +x /entrypoint.sh /usr/local/bin/run-as-user
 # Official nginx image layout is not used here; entrypoint runs envsubst into conf.d.
 
 LABEL org.opencontainers.image.title="Audiotheca" \
@@ -56,11 +57,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     AUDIOTHECA_LIBRARY_ROOT=/library \
     AUDIOTHECA_LIBRARY_ROOTS=/library \
     AUDIOTHECA_NO_RELOAD=1 \
-    AUDIOTHECA_API_HOST=0.0.0.0 \
+    AUDIOTHECA_API_HOST=127.0.0.1 \
     AUDIOTHECA_API_PORT=8787 \
-    AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP=1
+    AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP=1 \
+    PUID=99 \
+    PGID=100 \
+    UMASK=000
 
-EXPOSE 80 8787
+# The API listens on loopback only; nginx on port 80 is the single entry point.
+EXPOSE 80
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=45s --retries=3 \
     CMD curl -f http://127.0.0.1/api/health && curl -sf http://127.0.0.1:8787/api/health

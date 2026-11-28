@@ -130,6 +130,10 @@ See `.env.example`. Key variables:
 - Set strong `AUDIOTHECA_API_TOKEN` and `AUDIOTHECA_PROXY_SECRET` in `.env` (and in the Unraid Add Container template).
 - The UI nginx injects the proxy secret so `/api/auth/session` can set an **opaque HttpOnly** cookie — the long-lived bearer is never baked into the JS bundle or stored in the cookie value.
 - Token bootstrap (`GET /api/auth/token`) is disabled in the default compose (`AUDIOTHECA_DISABLE_TOKEN_BOOTSTRAP=1`).
+- The API runs as `PUID:PGID` (default `99:100`, nobody:users) with `UMASK=000`, so staged, quarantined and moved files stay editable over SMB. Only the appdata folder is chowned at startup; the library is never touched. `PUID=0` restores root.
+- In the all-in-one image the API binds `127.0.0.1` and port `8787` is no longer exposed; nginx is the only entry point.
+- To gate quarantine, delete, shred and live execution, set `AUDIOTHECA_REQUIRE_ADMIN=1` and `AUDIOTHECA_ADMIN_TOKEN`; the Security panel asks for the admin token before those actions run.
+- Desktop and dev installs reject requests whose `Host` is not loopback, an IP address or listed in `AUDIOTHECA_ALLOWED_HOSTS` (DNS-rebinding protection). The legacy `?token=` query credential is off unless `AUDIOTHECA_ALLOW_QUERY_TOKEN=1`.
 - For reverse proxy (Nginx Proxy Manager / SWAG): proxy to `ui:80`, enable WebSocket upgrade for scan progress, and prefer proxy auth.
 
 ## Smoke test

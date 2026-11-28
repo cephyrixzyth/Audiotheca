@@ -8,6 +8,7 @@ from fastapi import APIRouter, Body, HTTPException, Query
 
 from api import security
 from api.deps import require_ctx_permission as _require_ctx_permission
+from shred_erase import MAX_PASSES as MAX_SHRED_PASSES
 
 router = APIRouter()
 
@@ -108,9 +109,9 @@ async def security_delete(body: dict = Body(...)) -> dict[str, object]:
     paths_raw = body.get("paths") or []
     if not isinstance(paths_raw, list) or not paths_raw:
         raise HTTPException(status_code=400, detail="paths list required")
-    paths = [str(security.assert_library_path(str(p), label="path")) for p in paths_raw]
+    paths = [str(security.assert_destructive_file_target(str(p), label="path")) for p in paths_raw]
     results = await asyncio.to_thread(ms.delete_paths, paths)
-    security.audit("malware_delete", count=len(paths))
+    security.audit("malware_delete", count=len(paths), paths=paths)
     return {"ok": True, "results": results}
 
 @router.post("/api/security/shred")
@@ -123,13 +124,18 @@ async def security_shred(body: dict = Body(...)) -> dict[str, object]:
     paths_raw = body.get("paths") or []
     if not isinstance(paths_raw, list) or not paths_raw:
         raise HTTPException(status_code=400, detail="paths list required")
-    passes = int(body.get("passes") or 3)
+    try:
+        passes = int(body.get("passes") or 3)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="passes must be an integer") from exc
+    if not 1 <= passes <= MAX_SHRED_PASSES:
+        raise HTTPException(status_code=400, detail=f"passes must be between 1 and {MAX_SHRED_PASSES}")
+    targets = [security.assert_destructive_file_target(str(raw), label="path") for raw in paths_raw]
     results: list[dict[str, object]] = []
-    for raw in paths_raw:
-        target = security.assert_library_path(str(raw), must_exist=True, label="path")
+    for target in targets:
         result = await asyncio.to_thread(secure_delete, target, passes=passes)
         results.append(result)
-    security.audit("secure_shred", count=len(paths_raw))
+    security.audit("secure_shred", count=len(paths_raw), paths=[str(t) for t in targets])
     return {"ok": True, "results": results}
 
 @router.post("/api/security/quarantine/analyze")
