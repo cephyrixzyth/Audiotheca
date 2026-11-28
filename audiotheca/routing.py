@@ -39,6 +39,9 @@ from vendor_db import VENDOR_DATABASE
 
 from audiotheca.config import *  # noqa: F403
 from audiotheca.helpers import _archive_stem, _limit_walk, _squash, _walk_depth
+from audiotheca.naming_template import active_template as active_naming_template
+from audiotheca.naming_template import fields_for as naming_fields
+from audiotheca.naming_template import render as render_naming_template
 from audiotheca.platform_routing import off_lane, prefix_destination
 
 
@@ -254,6 +257,22 @@ class RoutingMixin:
             relative_dest = f"_requiresinvestigation/{bucket}/{item['original_name']}"
             dest_path, relative_dest = self._apply_platform_lane(item, dest_path, relative_dest)
             return dest_path, relative_dest, "NEEDS REVIEW", bucket
+
+        template = None if item["is_tonex"] else active_naming_template()
+        if template:
+            relative_dest = render_naming_template(
+                template,
+                naming_fields(
+                    name=item["original_name"],
+                    vendor=safe_company,
+                    bin_name=target_bin.name,
+                    version_key=str(item.get("version_key") or ""),
+                ),
+            )
+            if relative_dest:
+                dest_path = self.root_dir.joinpath(*relative_dest.split("/"))
+                dest_path, relative_dest = self._apply_platform_lane(item, dest_path, relative_dest)
+                return dest_path, relative_dest, "READY", ""
 
         dest_dir = target_bin / safe_company
         if safe_company.lower() == item["original_name"].lower():

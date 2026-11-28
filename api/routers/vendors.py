@@ -98,7 +98,9 @@ def space_recovery_reports() -> dict[str, object]:
 def download_space_recovery_report(filename: str) -> FileResponse:
     if ".." in filename or "/" in filename or "\\" in filename:
         raise HTTPException(status_code=400, detail="Invalid filename")
-    allowed_prefixes = ("Hardlink_Plan_", "Bloat_Report_", "make_hardlinks_", "move_bloat_")
+    allowed_prefixes = (
+        "Hardlink_Plan_", "Clone_Plan_", "Bloat_Report_", "make_hardlinks_", "make_clones_", "move_bloat_",
+    )
     if not any(filename.startswith(prefix) for prefix in allowed_prefixes):
         raise HTTPException(status_code=404, detail="Unknown report file")
     path = report_dir() / filename

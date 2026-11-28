@@ -1,12 +1,14 @@
 """
 Space recovery tools — hardlink dedup and bloat detection for the audio share.
 
-System 1: HARDLINK DEDUP
+System 1: CLONE / HARDLINK DEDUP
   Finds byte-identical files (full SHA-256, not sparse) shared between
-  libraries — sample WAVs, manuals, PDFs — and plans hardlinks so the data
-  exists once on disk. Hardlinks are program-transparent: every path still
-  opens the same bytes, so nothing breaks at run or install time (unlike
-  symlinks, which some installers refuse to follow). Same-volume only.
+  libraries — sample WAVs, manuals, PDFs — and plans copy-on-write clones
+  (reflinks) so the data exists once on disk. Clones are program-transparent
+  like hardlinks, but each path stays an independent file: editing or
+  shredding one copy never changes the other. Reflinks need btrfs, XFS, APFS
+  or ReFS. Hardlinks are still available with --method hardlink
+  --allow-hardlinks for filesystems that cannot clone. Same-volume only.
 
 System 2: BLOAT FINDER
   Flags files that add no product value:
@@ -27,6 +29,8 @@ Usage:
   python space_recovery.py --no-links      # bloat only
   python space_recovery.py --no-bloat      # links only
   python space_recovery.py --execute       # generated scripts run live
+  python space_recovery.py --method hardlink --allow-hardlinks
+                                           # opt into shared-inode hardlinks
 """
 
 from __future__ import annotations
@@ -284,6 +288,46 @@ def write_hardlink_script(path: Path, rows: list[dict], *, execute: bool, stamp:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def write_clone_scripts(ps1: Path, sh: Path, rows: list[dict], *, execute: bool, stamp: str) -> None:
+    """PowerShell + POSIX shell scripts that clone each keeper over its duplicate."""
+
+    def ps_quote(value: str) -> str:
+        return "'" + value.replace("'", "''") + "'"
+
+    def sh_quote(value: str) -> str:
+        return "'" + value.replace("'", "'\\''") + "'"
+
+    ps_lines = [
+        "# Audiotheca copy-on-write clone plan. Run from the Audiotheca source directory.",
+        f"# Stamp: {stamp} | Pairs: {len(rows)}",
+        "$ErrorActionPreference = 'Stop'",
+    ]
+    sh_lines = [
+        "#!/bin/sh",
+        "# Audiotheca copy-on-write clone plan. Run from the Audiotheca source directory.",
+        f"# Stamp: {stamp} | Pairs: {len(rows)}",
+        "set -u",
+        "failed=0",
+    ]
+    for row in rows:
+        keep, dup, digest = row["keeper_path"], row["duplicate_path"], row["sha256"]
+        if execute:
+            ps_lines += [
+                f"python -m audiotheca.reflink --keeper {ps_quote(keep)} --duplicate {ps_quote(dup)} --sha256 {ps_quote(digest)}",
+                "if ($LASTEXITCODE -eq 1) { exit 1 }",
+            ]
+            sh_lines.append(
+                f"python3 -m audiotheca.reflink --keeper {sh_quote(keep)} --duplicate {sh_quote(dup)} "
+                f"--sha256 {sh_quote(digest)} || [ $? -eq 3 ] || failed=1"
+            )
+        else:
+            ps_lines.append(f"Write-Output ('[PREVIEW] clone ' + {ps_quote(keep)} + ' over ' + {ps_quote(dup)})")
+            sh_lines.append(f"echo '[PREVIEW] clone' {sh_quote(keep)} 'over' {sh_quote(dup)}")
+    sh_lines.append("exit $failed")
+    ps1.write_text("\n".join(ps_lines) + "\n", encoding="utf-8")
+    sh.write_text("\n".join(sh_lines) + "\n", encoding="utf-8")
+
+
 def write_bloat_script(path: Path, rows: list[dict], *, execute: bool, stamp: str, root: Path) -> None:
     stageable = [
         row for row in rows
@@ -331,7 +375,18 @@ def main() -> int:
     parser.add_argument("--root", type=Path, default=ROOT_DIR)
     parser.add_argument("--min-size-mb", type=float, default=MIN_LINK_SIZE_MB)
     parser.add_argument("--max-depth", type=int, default=MAX_WALK_DEPTH)
-    parser.add_argument("--no-links", action="store_true", help="skip hardlink dedup")
+    parser.add_argument("--no-links", action="store_true", help="skip clone/hardlink dedup")
+    parser.add_argument(
+        "--method",
+        choices=("reflink", "hardlink"),
+        default="reflink",
+        help="dedupe method: copy-on-write clones (default) or shared-inode hardlinks",
+    )
+    parser.add_argument(
+        "--allow-hardlinks",
+        action="store_true",
+        help="required with --method hardlink; hardlinked copies share every later write",
+    )
     parser.add_argument("--no-bloat", action="store_true", help="skip bloat finder")
     parser.add_argument("--execute", action="store_true", help="generated scripts run live")
     args = parser.parse_args()
@@ -339,6 +394,17 @@ def main() -> int:
     if not args.root.exists():
         print(f"[X] Cannot reach {args.root}")
         return 1
+    if args.method == "hardlink" and not args.allow_hardlinks:
+        print("[X] Hardlinked copies share every later write (edit, shred, truncate).")
+        print("    Re-run with --allow-hardlinks to opt in, or use the default --method reflink.")
+        return 2
+    if args.method == "reflink" and not args.no_links:
+        from audiotheca.reflink import probe
+
+        support = probe(args.root)
+        if not support["supported"]:
+            print(f"[!] {args.root} cannot make copy-on-write clones: {support['reason']}")
+            print("    The clone plan is still written; pairs on volumes without reflink support are skipped.")
 
     stamp = datetime.now().strftime("%Y%m%d_%H%M")
     size_index: dict[int, list[tuple[Path, str]]] = defaultdict(list)
@@ -381,15 +447,27 @@ def main() -> int:
 
     if not args.no_links:
         link_rows = build_link_plan(size_index)
-        link_csv = REPORT_DIR / f"Hardlink_Plan_{stamp}.csv"
-        link_ps1 = REPORT_DIR / f"make_hardlinks_{stamp}.ps1"
-        write_csv(link_csv, link_rows)
-        write_hardlink_script(link_ps1, link_rows, execute=args.execute, stamp=stamp)
+        for row in link_rows:
+            row["method"] = args.method
         saved = sum(row["size_mb"] for row in link_rows)
-        print(f"\nHardlink dedup: {len(link_rows)} duplicates, ~{saved:,.0f} MB recoverable")
+        if args.method == "hardlink":
+            link_csv = REPORT_DIR / f"Hardlink_Plan_{stamp}.csv"
+            link_ps1 = REPORT_DIR / f"make_hardlinks_{stamp}.ps1"
+            write_csv(link_csv, link_rows)
+            write_hardlink_script(link_ps1, link_rows, execute=args.execute, stamp=stamp)
+            scripts = [link_ps1]
+        else:
+            link_csv = REPORT_DIR / f"Clone_Plan_{stamp}.csv"
+            link_ps1 = REPORT_DIR / f"make_clones_{stamp}.ps1"
+            link_sh = REPORT_DIR / f"make_clones_{stamp}.sh"
+            write_csv(link_csv, link_rows)
+            write_clone_scripts(link_ps1, link_sh, link_rows, execute=args.execute, stamp=stamp)
+            scripts = [link_ps1, link_sh]
+        print(f"\n{args.method.capitalize()} dedup: {len(link_rows)} duplicates, ~{saved:,.0f} MB recoverable")
         if link_rows:
             print(f"  Plan:   {link_csv}")
-            print(f"  Script: {link_ps1}")
+            for script in scripts:
+                print(f"  Script: {script}")
 
     if not args.no_bloat:
         bloat_csv = REPORT_DIR / f"Bloat_Report_{stamp}.csv"
